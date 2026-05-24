@@ -4,7 +4,7 @@ $dest = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 foreach ($f in $files) {
     try {
-        $url = "$baseUrl/$f"
+        $url = "$baseUrl/$f?t=" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
         $out = Join-Path $dest $f
         Write-Host "  Updating $f ..." -ForegroundColor Cyan
         Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
