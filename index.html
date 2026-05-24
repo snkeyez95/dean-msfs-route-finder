@@ -282,6 +282,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <span>Folder contents are <strong>never read or uploaded.</strong> Only subfolder names are checked for ICAO identifiers.</span>
     </div>
     <div class="snote" id="scan-note"></div>
+    <div id="log-path-note" style="font-size:11px;color:var(--ink4);margin-top:4px;font-family:'JetBrains Mono',monospace;"></div>
     <div id="prog-wrap" style="display:none" class="prog">
       <div class="pt"><div class="pf" id="prog-fill" style="width:0%"></div></div>
       <div class="pl" id="prog-lbl">Scanning...</div>
@@ -410,6 +411,12 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 </div>
 
 </div><script>
+// ── RENDERER LOGGER ──────────────────────────────────────────────────────────
+function RLOG(...args){
+  const msg=args.map(a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' ');
+  try{window.api.rendererLog(msg);}catch(e){}
+}
+
 // ── AIRPORT DB ──────────────────────────────────────────────────────────────
 const AI={
   "EGLL":["London Heathrow","London","GB","Large Airport",51.477,-0.461],
@@ -673,10 +680,15 @@ window.addEventListener('DOMContentLoaded',async()=>{
       document.getElementById('apt-sec').style.display='block';
       renderApts();
       setScanNote('Loaded '+S.allRows.length+' airports from last session. Click Scan Now if your library has changed.');
-      try{ S.routes=buildRouteList(); }catch(e){ console.error('buildRouteList init error:',e); S.routes=[]; }
+      try{ S.routes=buildRouteList(); RLOG('buildRouteList init OK: '+S.routes.length+' routes'); }catch(e){ RLOG('buildRouteList init ERROR: '+e.message); console.error('buildRouteList init error:',e); S.routes=[]; }
     }catch(e){ console.error('Session restore error:',e); }
   }
   buildChSB();renderCD(0);updateStats();
+  // Show log file path
+  window.api.getLogPath().then(p=>{
+    const el=document.getElementById('log-path-note');
+    if(el) el.textContent='Debug log: '+p;
+  }).catch(()=>{});
 });
 
 function sw(t){
@@ -698,6 +710,7 @@ async function doBrowse(){
 
 async function doScan(){
   if(!S.folderPath)return;
+  RLOG('doScan started, path='+S.folderPath);
   S.allRows=[];S.selICAOs=new Set();
   document.getElementById('apt-body').innerHTML='';
   document.getElementById('prog-wrap').style.display='block';
@@ -717,6 +730,7 @@ async function doScan(){
   if(!res.success){document.getElementById('prog-wrap').style.display='none';alert('Scan error: '+res.error);return;}
   // Debug: show what came back
   const folderCount=res.folders?res.folders.length:0;
+  RLOG('scanFolder result: success='+res.success+' folders='+folderCount+(res.error?' error='+res.error:''));
   setScanNote('Scan returned '+folderCount+' folders. Processing...');
   if(folderCount===0){
     document.getElementById('prog-wrap').style.display='none';
@@ -768,14 +782,16 @@ async function procFolders(folders){
       else unmatchCount++;
     }catch(e){ console.warn('Error processing folder:',f,e); }
   }
+  RLOG('procFolders complete: matched='+matchCount+' unmatched='+unmatchCount+' noise='+noiseCount);
   setScanNote('Processed: '+matchCount+' matched, '+unmatchCount+' unmatched, '+noiseCount+' noise skipped.');
   document.getElementById('apt-sec').style.display='block';
   // Render airports FIRST so they show even if route building fails
   renderApts();updateStats();
   // Then build routes safely
   try{
-    S.routes=buildRouteList();
+    S.routes=buildRouteList(); RLOG('buildRouteList scan OK: '+S.routes.length+' routes');
   }catch(e){
+    RLOG('buildRouteList scan ERROR: '+e.message);
     console.error('buildRouteList error:',e);
     S.routes=[];
   }
@@ -841,6 +857,7 @@ async function saveKey(){
 }
 
 async function fetchRoutes(){
+  RLOG('fetchRoutes started, airports='+[...S.selICAOs].join(','));
   if(!S.apiKey){setSt('No API key — save your key first.','var(--acc)');return;}
   const icaos=[...S.selICAOs].filter(i=>i&&i.length===4);
   if(!icaos.length){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
@@ -861,6 +878,7 @@ async function fetchRoutes(){
   S.cfg.routeCache=S.routeCache;await window.api.saveConfig(S.cfg);
   S.routes=buildRouteList();
   btn.disabled=false;btn.textContent='Fetch Live Routes';
+  RLOG('fetchRoutes complete: total='+total+' errors='+errors);
   setSt((errors?`${total} routes fetched. ${errors} airport(s) had no data.`:`${total} routes fetched across ${icaos.length} airports. Cached locally.`),'var(--grn)');
   updateStats();renderRoutes();
 }

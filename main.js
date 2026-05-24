@@ -4,6 +4,30 @@ const fs    = require('fs');
 const os    = require('os');
 const https = require('https');
 
+// ── FILE LOGGER ──────────────────────────────────────────────────────────────
+const LOG_PATH = path.join(os.homedir(), 'dean_msfs_debug.log');
+function log(level, ...args) {
+  const ts = new Date().toISOString();
+  const line = `[${ts}] [${level}] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}`;
+  console.log(line);
+  try { fs.appendFileSync(LOG_PATH, line + '\n'); } catch(e) {}
+}
+const LOG = {
+  info:  (...a) => log('INFO ', ...a),
+  warn:  (...a) => log('WARN ', ...a),
+  error: (...a) => log('ERROR', ...a),
+};
+
+// Clear log on fresh start, write header
+try {
+  fs.writeFileSync(LOG_PATH,
+    `Dean's MSFS Route Finder — Session started ${new Date().toISOString()}\n` +
+    `Platform: ${process.platform} | Node: ${process.version} | Electron: ${process.versions.electron}\n` +
+    '='.repeat(80) + '\n'
+  );
+} catch(e) {}
+LOG.info('App starting');
+
 // Fix GPU cache errors when running as Administrator on Windows
 app.setPath('userData',    path.join(os.homedir(), '.dean-msfs-cache'));
 app.setPath('sessionData', path.join(os.homedir(), '.dean-msfs-session'));
@@ -36,20 +60,28 @@ app.on('web-contents-created',(_,c)=>{
   c.setWindowOpenHandler(({url})=>{ shell.openExternal(url); return {action:'deny'}; });
 });
 
-ipcMain.handle('browse-folder', async ()=>{
+ipcMain.handle('browse-folder', async ()=>{ LOG.info('browse-folder requested');
   const r=await dialog.showOpenDialog(win,{properties:['openDirectory'],title:'Select 3rd-Party Scenery Folder'});
-  return r.canceled?null:r.filePaths[0];
+  const result = r.canceled ? null : r.filePaths[0];
+  LOG.info('browse-folder result:', result||'cancelled');
+  return result;
 });
 ipcMain.handle('scan-folder', async (_,p)=>{
+  LOG.info('scan-folder:', p);
   try{
     const entries=fs.readdirSync(p,{withFileTypes:true});
-    return {success:true,folders:entries.filter(e=>e.isDirectory()).map(e=>e.name)};
-  }catch(e){return {success:false,error:e.message};}
+    const folders=entries.filter(e=>e.isDirectory()).map(e=>e.name);
+    LOG.info('scan-folder found', folders.length, 'subfolders');
+    return {success:true,folders};
+  }catch(e){
+    LOG.error('scan-folder failed:', e.message);
+    return {success:false,error:e.message};
+  }
 });
 
 const CFG=path.join(os.homedir(),'.dean_msfs_v4.json');
-ipcMain.handle('load-config',()=>{try{return JSON.parse(fs.readFileSync(CFG,'utf8'));}catch{return {};}});
-ipcMain.handle('save-config',(_,cfg)=>{fs.writeFileSync(CFG,JSON.stringify(cfg,null,2));});
+ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' routeCache airports='+(Object.keys(c.routeCache||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
+ipcMain.handle('save-config',(_,cfg)=>{try{fs.writeFileSync(CFG,JSON.stringify(cfg,null,2));LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);}catch(e){LOG.error('save-config failed:',e.message);}});
 
 ipcMain.handle('airlabs-routes',(_,{icao,key})=>new Promise(resolve=>{
   const opts={
@@ -62,15 +94,24 @@ ipcMain.handle('airlabs-routes',(_,{icao,key})=>new Promise(resolve=>{
     let data='';
     res.on('data',c=>data+=c);
     res.on('end',()=>{
-      try{resolve({ok:res.statusCode<300,status:res.statusCode,data:JSON.parse(data)});}
-      catch{resolve({ok:false,status:res.statusCode,data:null});}
+      try{
+        const parsed=JSON.parse(data);
+        const count=(parsed.response||[]).length;
+        LOG.info('airlabs-routes response: status='+res.statusCode+' routes='+count+' icao='+icao);
+        resolve({ok:res.statusCode<300,status:res.statusCode,data:parsed});
+      }catch(e){
+        LOG.error('airlabs-routes parse error: status='+res.statusCode+' raw='+data.slice(0,200));
+        resolve({ok:false,status:res.statusCode,data:null});
+      }
     });
   });
-  req.on('error',e=>resolve({ok:false,error:e.message}));
+  req.on('error',e=>{LOG.error('airlabs-routes network error:',e.message);resolve({ok:false,error:e.message});});
   req.setTimeout(15000,()=>{req.destroy();resolve({ok:false,error:'timeout'});});
   req.end();
 }));
 
+ipcMain.handle('get-log-path',()=>LOG_PATH);
+ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
 ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());
 ipcMain.on('win-close',()=>win.close());

@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('api', {
   winMinimize:   ()    => ipcRenderer.send('win-minimize'),
   winMaximize:   ()    => ipcRenderer.send('win-maximize'),
   winClose:      ()    => ipcRenderer.send('win-close'),
+  rendererLog:   (msg) => ipcRenderer.send('renderer-log', msg),
+  getLogPath:    ()    => ipcRenderer.invoke('get-log-path'),
 });
