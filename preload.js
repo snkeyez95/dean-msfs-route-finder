@@ -1,0 +1,12 @@
+const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('api', {
+  browseFolder:  ()    => ipcRenderer.invoke('browse-folder'),
+  scanFolder:    (p)   => ipcRenderer.invoke('scan-folder', p),
+  loadConfig:    ()    => ipcRenderer.invoke('load-config'),
+  saveConfig:    (c)   => ipcRenderer.invoke('save-config', c),
+  airlabsRoutes: (o)   => ipcRenderer.invoke('airlabs-routes', o),
+  openExternal:  (url) => ipcRenderer.send('open-external', url),
+  winMinimize:   ()    => ipcRenderer.send('win-minimize'),
+  winMaximize:   ()    => ipcRenderer.send('win-maximize'),
+  winClose:      ()    => ipcRenderer.send('win-close'),
+});

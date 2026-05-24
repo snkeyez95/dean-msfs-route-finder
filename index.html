@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dean's MSFS Route Finder</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#000;--bg1:#0d0d0d;--bg2:#141414;--bg3:#1c1c1e;--bg4:#2c2c2e;
+  --sep:rgba(255,255,255,.08);--sep2:rgba(255,255,255,.14);
+  --acc:#f5a623;--acc2:rgba(245,166,35,.13);--acc3:rgba(245,166,35,.06);
+  --grn:#32d74b;--grn2:rgba(50,215,75,.13);
+  --red:#ff453a;--red2:rgba(255,69,58,.13);
+  --blu:#0a84ff;--blu2:rgba(10,132,255,.13);
+  --ink0:#fff;--ink1:#f2f2f7;--ink2:#c7c7cc;--ink3:#8e8e93;--ink4:#3a3a3c;
+  --r:12px;--r2:9px;--r3:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg0);color:var(--ink1);
+  display:flex;flex-direction:column;font-size:15px;-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
+.tbar{-webkit-app-region:drag;height:44px;flex-shrink:0;background:var(--bg0);
+  border-bottom:1px solid var(--sep);display:flex;align-items:center;padding:0 20px;gap:12px}
+.wbtns{-webkit-app-region:no-drag;display:flex;gap:8px}
+.wb{width:13px;height:13px;border-radius:50%;border:none;cursor:pointer}
+.wb.cl{background:#ff5f57}.wb.mn{background:#ffbd2e}.wb.mx{background:#28c840}
+.tname{font-size:12px;color:var(--ink4);letter-spacing:.04em;font-family:'JetBrains Mono',monospace}
+.hdr{background:var(--bg0);border-bottom:1px solid var(--sep);flex-shrink:0;padding:24px 40px 0}
+.brand{font-size:30px;font-weight:700;letter-spacing:-0.05em;line-height:1;margin-bottom:5px;color:var(--ink0)}
+.brand .acc{color:var(--acc);font-family:'JetBrains Mono',monospace}
+.bsub{font-size:13px;color:var(--ink3);margin-bottom:18px}
+.tabs{display:flex}
+.tab{padding:10px 22px;font-size:14px;font-weight:500;cursor:pointer;color:var(--ink3);
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;user-select:none}
+.tab:hover{color:var(--ink2)}.tab.active{color:var(--ink0);border-bottom-color:var(--acc)}
+.tbadge{display:inline-block;background:var(--acc);color:#000;font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:20px;margin-left:7px;font-family:'JetBrains Mono',monospace;vertical-align:1px}
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.pane{display:none;flex:1;overflow:hidden}
+.pane.on{display:flex;flex-direction:column}
+.scroll{flex:1;overflow-y:auto;padding:24px 40px}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:22px}
+.sc{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden}
+.sc.hi{border-color:rgba(245,166,35,.4)}
+.sc.hi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--acc),rgba(245,166,35,.1))}
+.sc-l{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+.sc-v{font-size:38px;font-weight:700;line-height:1;letter-spacing:-0.05em;font-family:'JetBrains Mono',monospace}
+.va{color:var(--acc)}.vg{color:var(--grn)}.vb{color:var(--blu)}.vw{color:var(--ink0)}
+.slbl{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);
+  margin-bottom:12px;font-family:'JetBrains Mono',monospace;padding-bottom:9px;border-bottom:1px solid var(--sep)}
+.card{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:18px 22px;margin-bottom:14px}
+.frow{display:flex;gap:9px;align-items:stretch}
+.fpath{flex:1;background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);
+  padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .2s}
+.fpath.set{color:var(--acc);border-color:rgba(245,166,35,.3)}
+.fnote{margin-top:10px;font-size:13px;color:var(--ink3);display:flex;align-items:flex-start;gap:9px;line-height:1.6}
+.ni{width:18px;height:18px;border-radius:50%;background:var(--blu2);color:var(--blu);font-size:11px;font-weight:700;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.snote{margin-top:8px;font-size:12px;color:var(--grn);font-family:'JetBrains Mono',monospace;min-height:18px}
+.prog{margin-top:12px}
+.pt{background:var(--bg4);border-radius:2px;height:2px;overflow:hidden}
+.pf{height:2px;background:var(--acc);border-radius:2px;transition:width .3s}
+.pl{font-size:11px;color:var(--ink3);margin-top:5px;font-family:'JetBrains Mono',monospace}
+.btn{padding:9px 17px;border-radius:var(--r2);border:1px solid var(--sep);font-size:14px;font-weight:500;
+  cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;white-space:nowrap;letter-spacing:-0.01em;
+  display:inline-flex;align-items:center;gap:6px}
+.bg{background:var(--bg3);color:var(--ink1)}.bg:hover{border-color:var(--sep2);color:var(--ink0);background:var(--bg4)}
+.bp{background:var(--acc);color:#000;border-color:var(--acc);font-weight:600}.bp:hover{background:#ffbe4a;border-color:#ffbe4a}
+.bp:disabled,.bg:disabled{opacity:.3;cursor:not-allowed}
+.bsm{padding:7px 13px;font-size:13px}.bxs{padding:5px 10px;font-size:12px}
+.fbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.srch{position:relative}
+.srch input{background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);
+  padding:9px 13px 9px 35px;font-size:14px;color:var(--ink1);font-family:'Inter',sans-serif;
+  width:260px;transition:border-color .2s}
+.srch input:focus{outline:none;border-color:rgba(245,166,35,.5)}
+.srch input::placeholder{color:var(--ink4)}
+.si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:14px;pointer-events:none}
+select{background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);padding:9px 11px;
+  font-size:14px;color:var(--ink2);font-family:'Inter',sans-serif;cursor:pointer}
+select:focus{outline:none;border-color:rgba(245,166,35,.5)}
+.crow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.clbl{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);
+  font-family:'JetBrains Mono',monospace;margin-right:3px;white-space:nowrap}
+.chip{padding:6px 14px;border-radius:20px;border:1px solid var(--sep);font-size:13px;font-weight:500;
+  cursor:pointer;color:var(--ink2);background:transparent;transition:all .15s}
+.chip:hover{border-color:var(--sep2);color:var(--ink0)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#000;font-weight:600}
+.chip.sq{border-radius:var(--r3)}
+.bdg{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 7px;
+  border-radius:5px;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.bgrn{background:var(--grn2);color:var(--grn);border:1px solid rgba(50,215,75,.25)}
+.bacc{background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)}
+.bblu{background:var(--blu2);color:var(--blu);border:1px solid rgba(10,132,255,.25)}
+.bgry{background:var(--bg3);color:var(--ink2);border:1px solid var(--sep)}
+.bred{background:var(--red2);color:var(--red);border:1px solid rgba(255,69,58,.25)}
+.awrap{border:1px solid var(--sep);border-radius:var(--r);overflow:hidden}
+.atbl{width:100%;border-collapse:collapse;font-size:14px}
+.atbl th{text-align:left;padding:10px 15px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  font-family:'JetBrains Mono',monospace;color:var(--ink0);background:var(--bg1);border-bottom:1px solid var(--sep)}
+.atbl td{padding:11px 15px;border-bottom:1px solid var(--sep);vertical-align:middle}
+.atbl tr:last-child td{border-bottom:none}.atbl tbody tr:hover td{background:var(--bg3)}
+.icao{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--acc)}
+.an{font-size:14px;color:var(--ink0);font-weight:500}
+.af{display:inline-block;background:var(--bg1);border:1px solid var(--sep);border-radius:4px;padding:2px 7px;
+  font-size:10px;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-top:2px;max-width:260px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ROUTE TABLE */
+.rwrap{border:1px solid var(--sep);border-radius:var(--r);overflow:hidden}
+.rtbl{width:100%;border-collapse:collapse}
+.rtbl th{text-align:left;padding:10px 15px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  font-family:'JetBrains Mono',monospace;color:var(--ink0);background:var(--bg1);border-bottom:1px solid var(--sep)}
+.rtbl td{padding:12px 15px;border-bottom:1px solid var(--sep);vertical-align:middle}
+.rtbl tbody tr.dr{cursor:pointer;transition:background .1s}
+.rtbl tbody tr.dr:hover td{background:var(--bg3)}
+.rtbl tbody tr.dr.open td{background:var(--acc3);border-left:2px solid var(--acc)}
+.rtbl tbody tr:last-child td{border-bottom:none}
+.rp{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--ink0);letter-spacing:.02em}
+.rc{font-size:11px;color:var(--ink3);margin-top:2px}
+.ra{font-size:14px;font-weight:500;color:var(--ink0)}
+.rf{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--acc);margin-top:2px}
+/* DETAIL PANEL */
+.det-row td{padding:0!important;border-bottom:1px solid var(--sep)!important}
+.det-pan{background:linear-gradient(180deg,rgba(245,166,35,.05) 0%,transparent 60%);
+  border-top:1px solid rgba(245,166,35,.15);padding:18px 18px 18px 44px}
+.dp-strip{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.dp-apt{text-align:center;min-width:76px}
+.dp-icao{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--acc);letter-spacing:.04em}
+.dp-city{font-size:11px;color:var(--ink3);margin-top:2px}
+.dp-line{flex:1;display:flex;align-items:center;gap:7px}
+.dp-dash{flex:1;height:1px;background:linear-gradient(90deg,var(--sep),rgba(245,166,35,.5),var(--sep))}
+.dp-mid{text-align:center}.dp-plane{color:var(--acc);font-size:17px}
+.dp-info{font-size:11px;color:var(--ink3);margin-top:3px}
+.dp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:12px}
+.dp-sec{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:12px 14px}
+.dp-st{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);
+  font-family:'JetBrains Mono',monospace;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--sep)}
+.dpr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:7px}
+.dpr:last-child{margin-bottom:0}
+.dl{font-size:12px;color:var(--ink3)}
+.dv2{font-size:12px;font-weight:600;font-family:'JetBrains Mono',monospace;text-align:right;line-height:1.4}
+.dv2.g{color:var(--grn)}.dv2.a{color:var(--acc)}.dv2.b{color:var(--blu)}.dv2.ov{color:var(--acc)!important}
+.dp-acts{display:flex;gap:7px;flex-wrap:wrap}
+.dp-note{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+.dp-note a{color:var(--blu);text-decoration:none}
+/* METAR IN DETAIL */
+.metar-raw{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);
+  word-break:break-all;line-height:1.5;margin-bottom:6px;margin-top:4px}
+.adv{font-size:12px;font-weight:500;padding:6px 10px;border-radius:var(--r3);line-height:1.4}
+.advg{background:var(--grn2);color:var(--grn);border:1px solid rgba(50,215,75,.2)}
+.adva{background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.2)}
+.advr{background:var(--red2);color:var(--red);border:1px solid rgba(255,69,58,.2)}
+/* API PANEL */
+.api-pan{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:18px 22px;margin-bottom:14px}
+.api-t{font-size:15px;font-weight:600;color:var(--ink0);letter-spacing:-0.02em;margin-bottom:4px}
+.api-s{font-size:13px;color:var(--ink3);margin-bottom:12px;line-height:1.6}
+.api-s a{color:var(--blu);text-decoration:none}.api-s strong{color:var(--ink2)}
+.api-row{display:flex;gap:7px;align-items:center}
+.api-inp{flex:1;background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);padding:9px 13px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--grn);letter-spacing:.02em}
+.api-inp:focus{outline:none;border-color:rgba(50,215,75,.4)}
+.api-inp::placeholder{color:var(--ink4);letter-spacing:0}
+.api-st{font-size:12px;margin-top:7px;font-family:'JetBrains Mono',monospace;min-height:18px}
+/* RESULTS HDR */
+.rhdl{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.rcnt{font-size:12px;color:var(--ink3);font-family:'JetBrains Mono',monospace}
+.lpill{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--grn);
+  background:var(--grn2);border:1px solid rgba(50,215,75,.2);border-radius:20px;padding:3px 9px;font-family:'JetBrains Mono',monospace}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--grn);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+/* EMPTY */
+.empty{text-align:center;padding:50px 20px}
+.ei{font-size:36px;margin-bottom:10px;opacity:.3}
+.et{font-size:17px;color:var(--ink2);font-weight:600;letter-spacing:-0.03em;margin-bottom:6px}
+.es{font-size:13px;line-height:1.7;color:var(--ink3)}
+/* CHALLENGES */
+.chlayout{display:flex;flex:1;overflow:hidden}
+.chsb{width:270px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--sep);overflow-y:auto;display:flex;flex-direction:column}
+.chsb::-webkit-scrollbar{width:3px}.chsb::-webkit-scrollbar-thumb{background:var(--bg4)}
+.chsb-filters{padding:14px 14px 10px;border-bottom:1px solid var(--sep);flex-shrink:0}
+.chsb-filters h3{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);font-family:'JetBrains Mono',monospace;margin-bottom:10px}
+.ch-sel{width:100%;background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);
+  padding:8px 10px;font-size:13px;color:var(--ink1);font-family:'Inter',sans-serif;margin-bottom:8px;cursor:pointer}
+.ch-sel:focus{outline:none;border-color:rgba(245,166,35,.5)}
+.chsb-list{flex:1;overflow-y:auto}
+.chi{padding:11px 14px;border-bottom:1px solid var(--sep);cursor:pointer;transition:background .1s}
+.chi:hover{background:var(--bg2)}.chi.on{background:var(--acc2);border-left:2px solid var(--acc)}
+.chi.hidden{display:none}
+.ci-top{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.ci-icao{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--acc)}
+.ci-diff{font-size:11px;font-weight:600}
+.ci-time{font-size:10px;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-left:auto}
+.ci-lib{font-size:9px;color:var(--grn);font-weight:700;letter-spacing:.06em}
+.ci-name{font-size:12px;color:var(--ink0);font-weight:600;margin-bottom:1px}
+.ci-cat{font-size:11px;color:var(--ink3)}
+.ch-none{padding:20px 14px;font-size:12px;color:var(--ink3);text-align:center;line-height:1.6}
+.chdet{flex:1;overflow-y:auto;padding:24px 28px}
+.chdet::-webkit-scrollbar{width:4px}.chdet::-webkit-scrollbar-thumb{background:var(--bg4)}
+.cd-hdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+.cd-icao{font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:700;color:var(--acc);line-height:1;letter-spacing:.04em}
+.cd-info{flex:1}.cd-n{font-size:18px;font-weight:700;color:var(--ink0);letter-spacing:-0.03em;margin-bottom:3px}
+.cd-c{font-size:13px;color:var(--ink3);margin-bottom:10px}
+.cd-pills{display:flex;gap:5px;flex-wrap:wrap}
+.pill{font-size:12px;font-weight:500;padding:4px 11px;border-radius:20px;border:1px solid var(--sep);color:var(--ink2);background:var(--bg3)}
+.pill.g{background:var(--grn2);border-color:rgba(50,215,75,.25);color:var(--grn)}
+.pill.a{background:var(--acc2);border-color:rgba(245,166,35,.25);color:var(--acc)}
+.cd-desc{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.cd-app{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);margin-bottom:7px}
+.cd-txt{font-size:14px;color:var(--ink1);line-height:1.8}
+.cdg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.cdb{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:12px 14px}
+.cdb-t{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);
+  font-family:'JetBrains Mono',monospace;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--sep)}
+.cdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;gap:6px}
+.cdr:last-child{margin-bottom:0}
+.cdl{font-size:12px;color:var(--ink3)}.cdv{font-size:12px;font-weight:500;color:var(--ink0);text-align:right;max-width:145px;line-height:1.4}
+.sclinks{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.scl{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:5px 11px;
+  border-radius:var(--r3);cursor:pointer;text-decoration:none;font-family:'JetBrains Mono',monospace;transition:all .15s}
+.scl.pay{background:var(--acc2);border:1px solid rgba(245,166,35,.25);color:var(--acc)}.scl.pay:hover{background:rgba(245,166,35,.2)}
+.scl.free{background:var(--grn2);border:1px solid rgba(50,215,75,.25);color:var(--grn)}.scl.free:hover{background:rgba(50,215,75,.2)}
+.mcard{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:13px 16px;margin-bottom:12px}
+.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.mt{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);font-family:'JetBrains Mono',monospace}
+.mraw{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);line-height:1.5;word-break:break-all;margin-bottom:6px}
+/* RWY OVERRIDE */
+.rwy-card{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:16px 20px;margin-bottom:12px}
+.rwy-t{font-size:14px;font-weight:600;color:var(--ink0);letter-spacing:-0.02em;margin-bottom:10px}
+.rwy-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rg{display:flex;flex-direction:column;gap:4px}
+.rg label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace}
+.ri{background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);padding:8px 11px;
+  font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--acc);width:85px}
+.ri:focus{outline:none;border-color:rgba(245,166,35,.5)}.ri::placeholder{color:var(--ink4)}
+.rwy-hint{font-size:12px;color:var(--ink3);max-width:300px;line-height:1.5}
+/* FLY-THERE PANEL */
+.ft-card{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:16px 20px;margin-bottom:14px}
+.ft-t{font-size:14px;font-weight:600;color:var(--ink0);letter-spacing:-0.02em;margin-bottom:12px}
+.ft-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.ft-info{font-size:13px;color:var(--ink2);padding:10px 14px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--sep);line-height:1.6}
+.ft-sched{margin-top:10px;padding:10px 14px;background:var(--acc3);border:1px solid rgba(245,166,35,.2);border-radius:var(--r2)}
+.ft-sched-t{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);font-family:'JetBrains Mono',monospace;margin-bottom:6px}
+</style></head><body>
+<div class="tbar">
+  <div class="wbtns">
+    <button class="wb cl" onclick="window.api.winClose()"></button>
+    <button class="wb mn" onclick="window.api.winMinimize()"></button>
+    <button class="wb mx" onclick="window.api.winMaximize()"></button>
+  </div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.0</div>
+</div>
+<div class="hdr">
+  <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
+  <div class="bsub">Fenix A319 / A320 / A321 &nbsp;&bull;&nbsp; PMDG 737-800 &nbsp;&bull;&nbsp; Challenging Approaches &nbsp;&bull;&nbsp; Live Routes via AirLabs</div>
+  <div class="tabs">
+    <div class="tab active" data-tab="airports" onclick="sw('airports')">My Airports</div>
+    <div class="tab" data-tab="routes" onclick="sw('routes')">Plan a Flight <span class="tbadge" id="rbadge">0</span></div>
+    <div class="tab" data-tab="challenges" onclick="sw('challenges')">Challenging Approaches</div>
+  </div>
+</div>
+<div class="main">
+
+<!-- ── TAB 1: MY AIRPORTS ── -->
+<div class="pane on" id="pane-airports"><div class="scroll">
+  <div class="stats">
+    <div class="sc hi"><div class="sc-l">Total Airports</div><div class="sc-v va" id="st-tot">0</div></div>
+    <div class="sc"><div class="sc-l">Auto-Matched</div><div class="sc-v vg" id="st-auto">0</div></div>
+    <div class="sc"><div class="sc-l">Manual</div><div class="sc-v vb" id="st-man">0</div></div>
+    <div class="sc"><div class="sc-l">Unmatched</div><div class="sc-v vw" id="st-un">0</div></div>
+  </div>
+  <div class="card">
+    <div class="slbl">3rd-Party Scenery Folder</div>
+    <div class="frow">
+      <div class="fpath" id="fdsp">No folder selected &mdash; click Browse</div>
+      <button class="btn bg" onclick="doBrowse()">Browse&hellip;</button>
+      <button class="btn bp" id="scan-btn" onclick="doScan()" disabled>Scan Now</button>
+    </div>
+    <div class="fnote"><div class="ni">i</div>
+      <span>Folder contents are <strong>never read or uploaded.</strong> Only subfolder names are checked for ICAO identifiers.</span>
+    </div>
+    <div class="snote" id="scan-note"></div>
+    <div id="prog-wrap" style="display:none" class="prog">
+      <div class="pt"><div class="pf" id="prog-fill" style="width:0%"></div></div>
+      <div class="pl" id="prog-lbl">Scanning...</div>
+    </div>
+  </div>
+  <div id="apt-sec" style="display:none">
+    <div class="fbar">
+      <div class="srch"><span class="si">&#128269;</span><input type="text" id="apt-srch" placeholder="Search ICAO, name, city..." oninput="renderApts()"></div>
+      <select id="apt-type" onchange="renderApts()">
+        <option value="">All Types</option>
+        <option value="Large Airport">Large Airport</option>
+        <option value="Medium Airport">Medium Airport</option>
+        <option value="Small Airport">Small Airport</option>
+      </select>
+      <button class="btn bg bsm" onclick="selAll()">Select All</button>
+      <button class="btn bg bsm" onclick="clrAll()">Clear</button>
+      <button class="btn bg bsm" onclick="addManual()" style="margin-left:auto">+ Add ICAO</button>
+    </div>
+    <div class="awrap">
+      <table class="atbl">
+        <thead><tr>
+          <th style="width:38px"></th><th style="width:80px">ICAO</th><th>Airport</th>
+          <th style="width:52px">Ctry</th><th style="width:125px">Type</th><th style="width:78px">Method</th>
+        </tr></thead>
+        <tbody id="apt-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div></div>
+
+<!-- ── TAB 2: PLAN A FLIGHT ── -->
+<div class="pane" id="pane-routes"><div class="scroll">
+  <div class="api-pan">
+    <div class="api-t">Live Route Data &mdash; AirLabs</div>
+    <div class="api-s">Real airline schedules updated every 24h. <strong>Free plan, no credit card.</strong>
+      Sign up at <a href="#" onclick="window.api.openExternal('https://airlabs.co');return false">airlabs.co</a> &mdash; paste key below once, it's saved permanently.</div>
+    <div class="api-row">
+      <input class="api-inp" type="password" id="api-key-inp" placeholder="Paste AirLabs API key here...">
+      <button class="btn bg bsm" onclick="saveKey()">Save Key</button>
+      <button class="btn bp bsm" id="fetch-btn" onclick="fetchRoutes()" disabled>Fetch Live Routes</button>
+    </div>
+    <div class="api-st" id="api-st"></div>
+  </div>
+  <div class="crow">
+    <span class="clbl">Aircraft</span>
+    <div class="chip on" data-acft="all" onclick="setAcft('all')">All</div>
+    <div class="chip" data-acft="a319" onclick="setAcft('a319')">Fenix A319</div>
+    <div class="chip" data-acft="a320" onclick="setAcft('a320')">Fenix A320</div>
+    <div class="chip" data-acft="a321" onclick="setAcft('a321')">Fenix A321</div>
+    <div class="chip" data-acft="b738" onclick="setAcft('b738')">PMDG 737-800</div>
+  </div>
+  <div class="crow">
+    <span class="clbl">Mode</span>
+    <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
+    <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+  </div>
+  <div class="fbar">
+    <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, flight number..." oninput="renderRoutes()"></div>
+    <select id="dur-f" onchange="renderRoutes()">
+      <option value="">Duration: Any</option>
+      <option value="60">Under 1h</option>
+      <option value="120">Under 2h</option>
+      <option value="180">Under 3h</option>
+      <option value="240">Under 4h</option>
+      <option value="360">Under 6h</option>
+    </select>
+    <select id="sort-f" onchange="renderRoutes()">
+      <option value="dur">Sort: Duration</option>
+      <option value="airline">Sort: Airline</option>
+      <option value="flt">Sort: Flight No.</option>
+    </select>
+    <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
+  </div>
+  <div class="rwy-card">
+    <div class="rwy-t">Runway Override <span style="font-size:12px;font-weight:400;color:var(--ink3)">&mdash; leave blank to use live METAR</span></div>
+    <div class="rwy-row">
+      <div class="rg"><label>Dep Runway</label><input class="ri" id="dep-rwy" placeholder="27R" maxlength="4" oninput="renderRoutes()"></div>
+      <span style="color:var(--ink4);font-size:16px">&rarr;</span>
+      <div class="rg"><label>Arr Runway</label><input class="ri" id="arr-rwy" placeholder="31L" maxlength="4" oninput="renderRoutes()"></div>
+      <div class="rwy-hint">When set, overrides METAR-recommended runway and shows in amber.</div>
+      <button class="btn bg bxs" onclick="clrRwy()" style="align-self:flex-end">&times; Clear</button>
+    </div>
+  </div>
+  <div class="rhdl">
+    <div class="rcnt" id="rcnt">No routes loaded</div>
+    <div class="lpill"><div class="ldot"></div>AirLabs schedule data</div>
+  </div>
+  <div class="rwrap">
+    <table class="rtbl">
+      <thead><tr>
+        <th style="width:24px"></th>
+        <th style="width:130px">Route</th>
+        <th>Airline &amp; Flight</th>
+        <th style="width:85px">Duration</th>
+        <th style="width:130px">Operates</th>
+      </tr></thead>
+      <tbody id="rt-body"></tbody>
+    </table>
+  </div>
+</div></div>
+
+<!-- ── TAB 3: CHALLENGING APPROACHES ── -->
+<div class="pane" id="pane-challenges">
+  <div class="chlayout">
+    <div class="chsb">
+      <div class="chsb-filters">
+        <h3>Challenging Approaches</h3>
+        <select class="ch-sel" id="ch-dep" onchange="filterChallenges()">
+          <option value="">Departure: Any airport</option>
+        </select>
+        <div class="crow" style="margin-bottom:0;gap:5px">
+          <span class="clbl" style="font-size:9px">Max Time</span>
+          <div class="chip on" style="font-size:11px;padding:4px 10px" data-ct="0" onclick="setCT(0)">Any</div>
+          <div class="chip" style="font-size:11px;padding:4px 10px" data-ct="60" onclick="setCT(60)">1h</div>
+          <div class="chip" style="font-size:11px;padding:4px 10px" data-ct="120" onclick="setCT(120)">2h</div>
+          <div class="chip" style="font-size:11px;padding:4px 10px" data-ct="180" onclick="setCT(180)">3h</div>
+          <div class="chip" style="font-size:11px;padding:4px 10px" data-ct="240" onclick="setCT(240)">4h</div>
+          <div class="chip" style="font-size:11px;padding:4px 10px" data-ct="360" onclick="setCT(360)">6h</div>
+        </div>
+      </div>
+      <div class="chsb-list" id="ch-sb-list"></div>
+      <div class="ch-none" id="ch-none" style="display:none">No approaches within range.<br>Try increasing the time limit.</div>
+    </div>
+    <div class="chdet" id="ch-det"></div>
+  </div>
+</div>
+
+</div><script>
+// ── AIRPORT DB ──────────────────────────────────────────────────────────────
+const AI={
+  "EGLL":["London Heathrow","London","GB","Large Airport",51.477,-0.461],
+  "EGKK":["London Gatwick","London","GB","Large Airport",51.148,-0.190],
+  "EGCC":["Manchester Airport","Manchester","GB","Large Airport",53.354,-2.275],
+  "EGGP":["Liverpool John Lennon","Liverpool","GB","Medium Airport",53.334,-2.850],
+  "EGSS":["London Stansted","London","GB","Large Airport",51.885,0.235],
+  "EGLC":["London City Airport","London","GB","Medium Airport",51.505,0.055],
+  "EGHI":["Southampton Airport","Southampton","GB","Medium Airport",50.950,-1.357],
+  "EIDW":["Dublin Airport","Dublin","IE","Large Airport",53.421,-6.270],
+  "EDDF":["Frankfurt Airport","Frankfurt","DE","Large Airport",50.026,8.543],
+  "EDDM":["Munich Franz Josef Strauss","Munich","DE","Large Airport",48.354,11.786],
+  "EDDL":["Dusseldorf Airport","Dusseldorf","DE","Large Airport",51.289,6.767],
+  "EHAM":["Amsterdam Schiphol","Amsterdam","NL","Large Airport",52.308,4.764],
+  "LFPG":["Paris Charles de Gaulle","Paris","FR","Large Airport",49.009,2.548],
+  "LEMD":["Madrid Barajas","Madrid","ES","Large Airport",40.472,-3.561],
+  "LPPT":["Lisbon Humberto Delgado","Lisbon","PT","Large Airport",38.774,-9.135],
+  "LIRF":["Rome Fiumicino","Rome","IT","Large Airport",41.800,12.239],
+  "LIMC":["Milan Malpensa","Milan","IT","Large Airport",45.630,8.728],
+  "LSZH":["Zurich Airport","Zurich","CH","Large Airport",47.464,8.549],
+  "LOWW":["Vienna International","Vienna","AT","Large Airport",48.110,16.570],
+  "LOWI":["Innsbruck Airport","Innsbruck","AT","Medium Airport",47.260,11.344],
+  "EBBR":["Brussels Airport","Brussels","BE","Large Airport",50.901,4.484],
+  "EKCH":["Copenhagen Kastrup","Copenhagen","DK","Large Airport",55.618,12.656],
+  "ESSA":["Stockholm Arlanda","Stockholm","SE","Large Airport",59.651,17.919],
+  "EFHK":["Helsinki-Vantaa","Helsinki","FI","Large Airport",60.317,24.963],
+  "EPWA":["Warsaw Chopin","Warsaw","PL","Medium Airport",52.166,20.967],
+  "LKPR":["Vaclav Havel Prague","Prague","CZ","Large Airport",50.101,14.260],
+  "LHBP":["Budapest Ferenc Liszt","Budapest","HU","Large Airport",47.433,19.261],
+  "LGAV":["Athens Venizelos","Athens","GR","Large Airport",37.936,23.944],
+  "CYYZ":["Toronto Pearson","Toronto","CA","Large Airport",43.677,-79.631],
+  "CYYC":["Calgary International","Calgary","CA","Large Airport",51.114,-114.020],
+  "CYVR":["Vancouver International","Vancouver","CA","Large Airport",49.194,-123.184],
+  "CYUL":["Montreal Trudeau","Montreal","CA","Large Airport",45.470,-73.740],
+  "KJFK":["John F. Kennedy Intl","New York","US","Large Airport",40.641,-73.778],
+  "KLAX":["Los Angeles Intl","Los Angeles","US","Large Airport",33.943,-118.408],
+  "KORD":["Chicago O'Hare","Chicago","US","Large Airport",41.978,-87.905],
+  "KMIA":["Miami International","Miami","US","Large Airport",25.796,-80.287],
+  "KSEA":["Seattle-Tacoma","Seattle","US","Large Airport",47.449,-122.309],
+  "KDEN":["Denver International","Denver","US","Large Airport",39.856,-104.674],
+  "KDFW":["Dallas/Fort Worth","Dallas","US","Large Airport",32.897,-97.038],
+  "KSFO":["San Francisco Intl","San Francisco","US","Large Airport",37.619,-122.375],
+  "KPDX":["Portland International","Portland","US","Large Airport",45.589,-122.598],
+  "KMSP":["Minneapolis-St Paul","Minneapolis","US","Large Airport",44.883,-93.208],
+  "KBOS":["Boston Logan","Boston","US","Large Airport",42.366,-71.011],
+  "KLAS":["Harry Reid Intl","Las Vegas","US","Large Airport",36.080,-115.152],
+  "KPSP":["Palm Springs Intl","Palm Springs","US","Medium Airport",33.829,-116.507],
+  "KSAT":["San Antonio Intl","San Antonio","US","Large Airport",29.533,-98.470],
+  "KATL":["Hartsfield-Jackson Atlanta","Atlanta","US","Large Airport",33.641,-84.427],
+  "KMCO":["Orlando International","Orlando","US","Large Airport",28.429,-81.309],
+  "KIAD":["Washington Dulles","Washington DC","US","Large Airport",38.944,-77.456],
+  "KEWR":["Newark Liberty","Newark","US","Large Airport",40.690,-74.174],
+  "KPHX":["Phoenix Sky Harbor","Phoenix","US","Large Airport",33.438,-112.008],
+  "KSAN":["San Diego International","San Diego","US","Large Airport",32.734,-117.190],
+};
+const IS=new Set(Object.keys(AI));
+
+// Supplemental commercial airports from AirLabs cache — real narrowbody destinations
+// not in AI{} but confirmed commercial service (holiday, regional hubs etc.)
+const COMMERCIAL_EXTRA=new Set([
+  // European holiday/leisure
+  'GCRR','LEMG','LEAL','LTBJ','GMAD','GMME','EKAH','EKYT','EGAC','EGPD','EGAA',
+  'LEPA','LPFR','LGSK','LGSR','LCLK','LICJ','LIML','LIPE','LEBB','LEMD',
+  'GCFV','GCLA','GCTS','GCXO','GMFN','DTTA','DTMB','HECA',
+  // North Africa / Middle East
+  'DIAP','DNAA','DGAA','HAAB','OJAI',
+  // North America commercial
+  'PANC','KABQ','KAMA','KBNA','KBLI','KBUR','MMUN','MZBZ','TAPA',
+  'KCLT','KBOS','KDEN','KAUS','KBDL','KCMH','KLGA','KPHL',
+]);
+
+// Confirmed single-fleet narrowbody carriers — trust their destinations regardless
+const CONFIRMED_NARROWBODY=new Set([
+  'FR','U2','W6','VY','WN','B6','NK','F9','G4','SY','D8','DY',
+  'BY','X3','TB','HV','OR','TO','PC','XQ','EC','EW','RK','LS','DE','A0',
+]);
+["EDDB","EDDH","LEBL","LEAL","LEMG","GCTS","LTFM","LGTS","LCPH","LLBG","OMDB","OERK","OTHH","WSSS","RJTT","RJAA","RKSI","ZBAA","ZSPD","VIDP","VABB","YSSY","YMML","NZAA","KIAH","KHOU","KFLL","KTPA","KMSY","KDTW","KBWI","KRDU","KSLC","KBNA","KCLT"].forEach(c=>IS.add(c));
+const CM={"heathrow":"EGLL","gatwick":"EGKK","stansted":"EGSS","manchester":"EGCC","liverpool":"EGGP","southampton":"EGHI","birmingham":"EGBB","edinburgh":"EGPH","amsterdam":"EHAM","frankfurt":"EDDF","munich":"EDDM","dusseldorf":"EDDL","paris":"LFPG","madrid":"LEMD","barcelona":"LEBL","rome":"LIRF","milan":"LIMC","vienna":"LOWW","zurich":"LSZH","lisbon":"LPPT","athens":"LGAV","dublin":"EIDW","brussels":"EBBR","copenhagen":"EKCH","stockholm":"ESSA","helsinki":"EFHK","warsaw":"EPWA","prague":"LKPR","budapest":"LHBP","toronto":"CYYZ","calgary":"CYYC","vancouver":"CYVR","montreal":"CYUL","newyork":"KJFK","losangeles":"KLAX","chicago":"KORD","dallas":"KDFW","miami":"KMIA","seattle":"KSEA","denver":"KDEN","sanfrancisco":"KSFO","lasvegas":"KLAS","portland":"KPDX","minneapolis":"KMSP","boston":"KBOS","sanantonio":"KSAT","atlanta":"KATL","orlando":"KMCO","dulles":"KIAD","newark":"KEWR","phoenix":"KPHX","sandiego":"KSAN","innsbruck":"LOWI"};
+
+// Aircraft type mapping
+const ACFT_MAP={
+  // A319 family — ICAO codes
+  "A319":"a319","A19N":"a319","A318":"a319","A310":"a319",
+  // A319 — numeric/IATA variants AirLabs sometimes returns
+  "319":"a319","318":"a319",
+  // A320 family — ICAO codes
+  "A320":"a320","A20N":"a320","A20P":"a320",
+  // A320 — numeric/IATA variants
+  "320":"a320","32A":"a320","32N":"a320",
+  // A321 family — ICAO codes
+  "A321":"a321","A21N":"a321","A21P":"a321","A21X":"a321",
+  // A321 — numeric/IATA variants
+  "321":"a321","32B":"a321",
+  // Boeing 737-800 family — ICAO codes
+  "B737":"b738","B738":"b738","B739":"b738",
+  "B38M":"b738","B37M":"b738","B39M":"b738","B7M8":"b738","B7M9":"b738",
+  // Boeing 737 — IATA codes AirLabs uses
+  "73H":"b738","738":"b738","739":"b738","737":"b738","73J":"b738","73W":"b738","73G":"b738","73N":"b738",
+  // Nearest-match for common similar types
+  "A220":"a319","BCS1":"a319","BCS3":"a320","BCS5":"a321",
+  "E190":"a319","E195":"a319","E75L":"a319","E170":"a319","E175":"a319","E7W":"a319",
+  "AT72":"a319","AT76":"a319","DH8D":"a319","DH8C":"a319",
+};
+const NEAREST={"A220":"≈ Fenix A319","BCS1":"≈ Fenix A319","BCS3":"≈ Fenix A320","E190":"≈ Fenix A319","E195":"≈ Fenix A319","E75L":"≈ Fenix A319","E170":"≈ Fenix A319","E175":"≈ Fenix A319","AT72":"≈ Fenix A319","AT76":"≈ Fenix A319","DH8D":"≈ Fenix A319","DH8C":"≈ Fenix A319"};
+
+// ── AIRLINE FLEET DATABASE ──────────────────────────────────────────────────
+// Built from Dean's actual AirLabs cache. AirLabs free tier returns no aircraft
+// type for ~99% of routes, so we infer from the airline's known fleet.
+// conf: 'confirmed' = single-fleet carrier (100% reliable)
+//       'likely'    = mixed fleet, but short/medium haul = narrowbody
+//       'unlikely'  = regional jets or widebody — not Dean's sim fleet
+const AIRLINE_FLEET={
+  // ── CONFIRMED NARROWBODY ─────────────────────────────────────────────────
+  "FR":{sim:"b738",conf:"confirmed",name:"Ryanair"},
+  "U2":{sim:"a320",conf:"confirmed",name:"easyJet"},
+  "W6":{sim:"a321",conf:"confirmed",name:"Wizz Air"},
+  "VY":{sim:"a320",conf:"confirmed",name:"Vueling"},
+  "WN":{sim:"b738",conf:"confirmed",name:"Southwest"},
+  "B6":{sim:"a320",conf:"confirmed",name:"JetBlue"},
+  "NK":{sim:"a320",conf:"confirmed",name:"Spirit"},
+  "F9":{sim:"a321",conf:"confirmed",name:"Frontier"},
+  "G4":{sim:"a320",conf:"confirmed",name:"Allegiant"},
+  "SY":{sim:"b738",conf:"confirmed",name:"Sun Country"},
+  "D8":{sim:"b738",conf:"confirmed",name:"Norwegian"},
+  "DY":{sim:"b738",conf:"confirmed",name:"Norwegian"},
+  "BY":{sim:"b738",conf:"confirmed",name:"TUI Airways"},
+  "X3":{sim:"b738",conf:"confirmed",name:"TUIfly"},
+  "TB":{sim:"a320",conf:"confirmed",name:"TUI fly Belgium"},
+  "HV":{sim:"b738",conf:"confirmed",name:"Transavia NL"},
+  "OR":{sim:"b738",conf:"confirmed",name:"TUI fly NL"},
+  "TO":{sim:"b738",conf:"confirmed",name:"Transavia France"},
+  "PC":{sim:"b738",conf:"confirmed",name:"Pegasus"},
+  "XQ":{sim:"b738",conf:"confirmed",name:"SunExpress"},
+  "EC":{sim:"a320",conf:"confirmed",name:"easyJet Europe"},
+  "EW":{sim:"a320",conf:"confirmed",name:"Eurowings"},
+  "RK":{sim:"b738",conf:"confirmed",name:"Ryanair UK"},
+  "LS":{sim:"b738",conf:"confirmed",name:"Jet2"},
+  "DE":{sim:"b738",conf:"confirmed",name:"Condor"},
+  "A0":{sim:"a320",conf:"confirmed",name:"SunExpress"},
+  // ── LIKELY NARROWBODY (short/medium haul) ────────────────────────────────
+  "BA":{sim:"a320",conf:"likely",name:"British Airways"},
+  "LH":{sim:"a320",conf:"likely",name:"Lufthansa"},
+  "AF":{sim:"a320",conf:"likely",name:"Air France"},
+  "KL":{sim:"b738",conf:"likely",name:"KLM"},
+  "IB":{sim:"a320",conf:"likely",name:"Iberia"},
+  "AY":{sim:"a320",conf:"likely",name:"Finnair"},
+  "SN":{sim:"a320",conf:"likely",name:"Brussels Airlines"},
+  "TP":{sim:"a320",conf:"likely",name:"TAP Air Portugal"},
+  "OS":{sim:"a320",conf:"likely",name:"Austrian"},
+  "LX":{sim:"a320",conf:"likely",name:"SWISS"},
+  "EI":{sim:"a320",conf:"likely",name:"Aer Lingus"},
+  "AA":{sim:"a320",conf:"likely",name:"American Airlines"},
+  "DL":{sim:"b738",conf:"likely",name:"Delta"},
+  "UA":{sim:"a320",conf:"likely",name:"United"},
+  "AS":{sim:"b738",conf:"likely",name:"Alaska Airlines"},
+  "AC":{sim:"b738",conf:"likely",name:"Air Canada"},
+  "WS":{sim:"b738",conf:"likely",name:"WestJet"},
+  "BT":{sim:"a320",conf:"likely",name:"airBaltic"},
+  "EA":{sim:"a320",conf:"likely",name:"Eastern Airways"},
+  // ── REGIONAL / WIDEBODY — not Dean's fleet ───────────────────────────────
+  "9K":{sim:null,conf:"unlikely",name:"Cape Air"},
+  "OO":{sim:null,conf:"unlikely",name:"SkyWest"},
+  "MQ":{sim:null,conf:"unlikely",name:"Envoy Air"},
+  "9E":{sim:null,conf:"unlikely",name:"Endeavor Air"},
+  "OO":{sim:null,conf:"unlikely",name:"SkyWest"},
+  "MQ":{sim:null,conf:"unlikely",name:"Envoy Air"},
+  "QK":{sim:null,conf:"unlikely",name:"Jazz Aviation"},
+  "GR":{sim:null,conf:"unlikely",name:"Aurigny"},
+  "WA":{sim:null,conf:"unlikely",name:"KLM Cityhopper"},
+  "LM":{sim:null,conf:"unlikely",name:"Loganair"},
+  "VS":{sim:null,conf:"unlikely",name:"Virgin Atlantic"},
+  "ET":{sim:null,conf:"unlikely",name:"Ethiopian"},
+  "EK":{sim:null,conf:"unlikely",name:"Emirates"},
+  "QR":{sim:null,conf:"unlikely",name:"Qatar Airways"},
+  "EY":{sim:null,conf:"unlikely",name:"Etihad"},
+  "TS":{sim:null,conf:"unlikely",name:"Air Transat"},
+  "JL":{sim:null,conf:"unlikely",name:"Japan Airlines"},
+  "NH":{sim:null,conf:"unlikely",name:"ANA"},
+  "QX":{sim:null,conf:"unlikely",name:"Horizon Air"},
+  "9M":{sim:null,conf:"unlikely",name:"Central Mountain Air"},
+  "TJ":{sim:null,conf:"unlikely",name:"Tradewind"},
+};
+
+const SIM_LBL={"a319":"Fenix A319","a320":"Fenix A320","a321":"Fenix A321","b738":"PMDG 737-800"};
+const SIM_SB={"a319":"A319","a320":"A320","a321":"A321","b738":"B738"};
+const DAYS={"mon":"Mon","tue":"Tue","wed":"Wed","thu":"Thu","fri":"Fri","sat":"Sat","sun":"Sun"};
+
+// RWY headings for METAR-based recommendation
+const RWY_HDGS={
+  "EGLL":[{r:"09L",h:90},{r:"09R",h:90},{r:"27L",h:270},{r:"27R",h:270}],
+  "EGKK":[{r:"26L",h:260},{r:"08R",h:80}],
+  "EGCC":[{r:"23L",h:228},{r:"05R",h:48},{r:"23R",h:228},{r:"05L",h:48}],
+  "EIDW":[{r:"28L",h:284},{r:"28R",h:284},{r:"10L",h:104},{r:"10R",h:104}],
+  "EDDF":[{r:"25C",h:252},{r:"25L",h:252},{r:"25R",h:252},{r:"07C",h:72},{r:"07L",h:72},{r:"07R",h:72}],
+  "EDDM":[{r:"26L",h:260},{r:"26R",h:260},{r:"08L",h:80},{r:"08R",h:80}],
+  "EDDL":[{r:"23L",h:234},{r:"23R",h:234},{r:"05L",h:54},{r:"05R",h:54}],
+  "EHAM":[{r:"36C",h:360},{r:"36L",h:360},{r:"36R",h:360},{r:"18C",h:180},{r:"18L",h:180},{r:"18R",h:180},{r:"27",h:270},{r:"09",h:90},{r:"06",h:58},{r:"24",h:238}],
+  "LFPG":[{r:"27L",h:270},{r:"27R",h:270},{r:"09L",h:90},{r:"09R",h:90}],
+  "LOWW":[{r:"11",h:110},{r:"16",h:160},{r:"29",h:290},{r:"34",h:340}],
+  "LOWI":[{r:"26",h:260},{r:"08",h:80}],
+  "EKCH":[{r:"04L",h:40},{r:"04R",h:40},{r:"22L",h:220},{r:"22R",h:220}],
+  "ESSA":[{r:"26",h:260},{r:"08",h:80},{r:"01L",h:10},{r:"19R",h:190}],
+  "LEMD":[{r:"32L",h:323},{r:"32R",h:323},{r:"36L",h:360},{r:"36R",h:360},{r:"14L",h:143},{r:"14R",h:143},{r:"18L",h:180},{r:"18R",h:180}],
+  "LPPT":[{r:"03",h:30},{r:"21",h:210},{r:"35",h:350},{r:"17",h:170}],
+  "LIRF":[{r:"25",h:250},{r:"07",h:70},{r:"16L",h:160},{r:"16R",h:160},{r:"34L",h:340},{r:"34R",h:340}],
+  "KLAX":[{r:"24L",h:245},{r:"24R",h:245},{r:"06L",h:65},{r:"06R",h:65}],
+  "KSFO":[{r:"28L",h:284},{r:"28R",h:284},{r:"10L",h:104},{r:"10R",h:104}],
+  "KSEA":[{r:"34L",h:340},{r:"34C",h:340},{r:"16L",h:160},{r:"16C",h:160}],
+  "KDEN":[{r:"34L",h:340},{r:"34R",h:340},{r:"35L",h:350},{r:"35R",h:350},{r:"16L",h:160},{r:"16R",h:160},{r:"08",h:80},{r:"26",h:260}],
+  "KPDX":[{r:"28L",h:283},{r:"28R",h:283},{r:"10L",h:103},{r:"10R",h:103}],
+  "KJFK":[{r:"31L",h:310},{r:"31R",h:310},{r:"22L",h:220},{r:"22R",h:220},{r:"04L",h:40},{r:"04R",h:40}],
+  "KMSP":[{r:"35",h:350},{r:"17",h:170},{r:"30L",h:300},{r:"12R",h:120}],
+  "CYYZ":[{r:"23",h:230},{r:"05",h:50},{r:"33L",h:330},{r:"15R",h:150},{r:"06L",h:60},{r:"24R",h:240}],
+  "CYYC":[{r:"35L",h:350},{r:"35R",h:350},{r:"17L",h:170},{r:"17R",h:170},{r:"28",h:280},{r:"10",h:100}],
+  "CYVR":[{r:"26L",h:260},{r:"26R",h:260},{r:"08L",h:80},{r:"08R",h:80}],
+};
+
+// Challenging approaches — lat/lon for distance calc, all details
+const CH=[
+  {icao:"LOWI",name:"Innsbruck Airport",city:"Innsbruck, Austria",lat:47.260,lon:11.344,rwy:"26",approach:"LLZ/DME 26 — Alpine Valley",diff:5,cat:"Mountain / Instrument",desc:"Surrounded on all sides by 9,000ft Alps with only one way in and out. No glideslope — step-down fixes only. Special airline authorisation required in real life. One of Europe's most technically demanding approaches.",bestwind:"Westerly — RWY 26",worstwind:"Strong crosswind — hard limit 20kt",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"iniBuilds LOWI",u:"https://inibuilds.com/products/inibuilds-innsbruck-lowi-msfs"},free:null,yt:"https://www.youtube.com/results?search_query=LOWI+innsbruck+approach+msfs",sv:"https://skyvector.com/?ll=47.26,11.34&chart=301&zoom=4"},
+  {icao:"LPMA",name:"Madeira Cristiano Ronaldo",city:"Funchal, Portugal",lat:32.694,lon:-16.778,rwy:"05",approach:"Circling Visual — Ocean Pillars",diff:5,cat:"Coastal / Crosswind",desc:"Runway extended over the Atlantic on 180 concrete columns. Cliffs at one end, open ocean at the other. Notorious Atlantic crosswinds and mountain downdrafts. One of the most demanding approaches for airline pilots worldwide.",bestwind:"Calm or light northerly",worstwind:"Atlantic westerlies — banned above limits",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"Atelic LPMA",u:"https://secure.simmarket.com/atelic-madeira-airport-lpma-msfs20.phtml"},free:{l:"flightsim.to",u:"https://flightsim.to/file/59718"},yt:"https://www.youtube.com/results?search_query=LPMA+madeira+approach+msfs",sv:"https://skyvector.com/?ll=32.69,-16.77&chart=301&zoom=4"},
+  {icao:"NZQN",name:"Queenstown Airport",city:"Queenstown, New Zealand",lat:-45.021,lon:168.740,rwy:"23",approach:"VOR/DME Circling — Remarkables",diff:4,cat:"Mountain / Visual",desc:"Hemmed in by the Remarkables range and Lake Wakatipu. Arrivals circle over the lake with rotor turbulence off the peaks and frequent windshear. Voted the world's most beautiful approach.",bestwind:"Northerly — RWY 05",worstwind:"Southerly — Remarkables rotor turbulence",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"Orbx NZQN",u:"https://orbxdirect.com/product/nzqn-msfs"},free:null,yt:"https://www.youtube.com/results?search_query=NZQN+queenstown+approach+msfs",sv:"https://skyvector.com/?ll=-45.02,168.74&chart=301&zoom=4"},
+  {icao:"VQPR",name:"Paro International",city:"Paro, Bhutan",lat:27.403,lon:89.424,rwy:"15",approach:"Visual Only — Himalayan Valley",diff:5,cat:"Mountain / Visual Only",desc:"Fewer than 30 pilots worldwide are certified here. A 7,332ft valley surrounded by 18,000ft Himalayan peaks. Daylight and clear weather only. No ILS, no radar. Widely considered the world's most difficult commercial airport.",bestwind:"Calm or light southerly",worstwind:"Any significant wind — airport closes",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"IronSim VQPR",u:"https://secure.simmarket.com/ironsim-paro-vqpr.phtml"},free:null,yt:"https://www.youtube.com/results?search_query=VQPR+paro+bhutan+approach+msfs",sv:"https://skyvector.com/?ll=27.40,89.42&chart=301&zoom=4"},
+  {icao:"VNLK",name:"Tenzing-Hillary Lukla",city:"Lukla, Nepal",lat:27.686,lon:86.729,rwy:"06",approach:"Visual Only — Cliff-Edge Uphill Strip",diff:5,cat:"Short Strip / Mountain",desc:"1,729ft runway with a 12% uphill gradient at 9,334ft elevation. One end drops into a gorge, the other is solid rock. No go-around. No navigation aids. Consistently rated the most dangerous airport in the world.",bestwind:"Light easterly",worstwind:"Any wind or cloud — immediate closure",inMSFS:true,note:"Built into MSFS 2024 as enhanced scenery.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=VNLK"},yt:"https://www.youtube.com/results?search_query=VNLK+lukla+approach+msfs",sv:"https://skyvector.com/?ll=27.68,86.73&chart=301&zoom=4"},
+  {icao:"LXGB",name:"Gibraltar International",city:"Gibraltar",lat:36.151,lon:-5.346,rwy:"09",approach:"Visual 09 — Motorway Crossing",diff:4,cat:"Urban / Crosswind",desc:"The main road between Spain and Gibraltar crosses the active runway. The Rock creates severe turbulence in Levante conditions. 1,859m runway. One of the world's most unique operations.",bestwind:"Calm or westerly",worstwind:"Levante (easterly) — severe rotor",inMSFS:true,note:"Built into MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LXGB"},yt:"https://www.youtube.com/results?search_query=LXGB+gibraltar+approach+msfs",sv:"https://skyvector.com/?ll=36.15,-5.35&chart=301&zoom=5"},
+  {icao:"EGLC",name:"London City Airport",city:"London, UK",lat:51.505,lon:0.055,rwy:"09",approach:"ILS/DME 09 — 5.5° Steep Glide",diff:4,cat:"Steep Glide / Urban",desc:"5.5-degree glideslope to clear Canary Wharf skyscrapers — over twice the standard 3 degrees. Strict noise abatement. 1,508m runway with the Thames on final. Special type rating required for real airline pilots.",bestwind:"Westerly",worstwind:"Strong easterly — go-around into congested airspace",inMSFS:false,note:"Not enhanced in MSFS 2024 by default.",pay:{l:"Orbx EGLC",u:"https://orbxdirect.com/product/eglc-msfs"},free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=EGLC"},yt:"https://www.youtube.com/results?search_query=EGLC+london+city+steep+approach+msfs",sv:"https://skyvector.com/?ll=51.50,-0.05&chart=301&zoom=5"},
+  {icao:"TNCM",name:"Princess Juliana St Maarten",city:"Sint Maarten",lat:18.041,lon:-63.109,rwy:"10",approach:"Visual 10 — Maho Beach Flyover",diff:3,cat:"Scenic / Beach",desc:"Final approach passes at 30-40ft over Maho Beach — one of the most photographed approaches in the world. Jet blast from departing aircraft famously knocked beachgoers over.",bestwind:"Easterly — RWY 10",worstwind:"Westerly — RWY 28 rarely used",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=TNCM"},yt:"https://www.youtube.com/results?search_query=TNCM+st+maarten+approach+msfs",sv:"https://skyvector.com/?ll=18.04,-63.11&chart=301&zoom=5"},
+  {icao:"LFLJ",name:"Courchevel Altiport",city:"Courchevel, France",lat:45.397,lon:6.632,rwy:"04",approach:"Visual Only — 18.5% Uphill Gradient",diff:5,cat:"Altiport / Short Strip",desc:"18.5% uphill gradient at 6,588ft in the French Alps. Departure end drops into a vertical cliff. No go-around once established. Special altiport licence required in real life.",bestwind:"Calm",worstwind:"Any significant wind — airport closes",inMSFS:true,note:"Built into MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LFLJ"},yt:"https://www.youtube.com/results?search_query=LFLJ+courchevel+approach+msfs",sv:"https://skyvector.com/?ll=45.39,6.63&chart=301&zoom=5"},
+  {icao:"VHHX",name:"Kai Tak Airport (Historic)",city:"Kowloon, Hong Kong",lat:22.328,lon:114.191,rwy:"13",approach:"IGS 13 — The Checkerboard Turn",diff:5,cat:"Historic / Urban",desc:"Closed 1998 but the most legendary approach in aviation history. At 140kt, pilots made a 47-degree right bank at 600ft over apartment blocks — the Kai Tak Heart Attack. Every major widebody flew it daily.",bestwind:"Southeasterly",worstwind:"Typhoon season",inMSFS:true,note:"Built into MSFS 2024. Use freeware enhancement.",pay:null,free:{l:"VHHX Enhancement",u:"https://flightsim.to/addon/4713/hong-kong-kai-tak"},yt:"https://www.youtube.com/results?search_query=Kai+Tak+VHHX+checkerboard+approach+msfs",sv:"https://skyvector.com/?ll=22.33,114.19&chart=301&zoom=5"},
+  {icao:"KDCA",name:"Ronald Reagan Washington",city:"Washington DC, USA",lat:38.852,lon:-77.037,rwy:"19",approach:"River Visual 19 — Capitol Curve",diff:4,cat:"Urban / Visual",desc:"Aircraft descend the Potomac River at low altitude to avoid Prohibited Airspace over the Capitol and White House, then make a sharp right bank to align with RWY 19. Manual flying required — no autopilot.",bestwind:"Southerly",worstwind:"Northerly — RWY 01, no river visual",inMSFS:false,note:"Default airport in MSFS 2024 — no addon required.",pay:{l:"FlyTampa KDCA",u:"https://www.flytampa.com/dca.html"},free:null,yt:"https://www.youtube.com/results?search_query=KDCA+river+visual+approach+msfs",sv:"https://skyvector.com/?ll=38.85,-77.04&chart=301&zoom=5"},
+  {icao:"SBRJ",name:"Santos Dumont Airport",city:"Rio de Janeiro, Brazil",lat:-22.910,lon:-43.163,rwy:"02",approach:"GPS/Visual 02 — Guanabara Bay",diff:4,cat:"Scenic / Coastal",desc:"Flanked by Guanabara Bay with Sugarloaf Mountain ahead and Christ the Redeemer to the right on final. 1,323m runway. One of the most spectacular arrival views in commercial aviation.",bestwind:"Southerly",worstwind:"Strong crosswind — gusts off surrounding hills",inMSFS:false,note:"Default in MSFS 2024 — no addon required.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=SBRJ"},yt:"https://www.youtube.com/results?search_query=SBRJ+santos+dumont+approach+msfs",sv:"https://skyvector.com/?ll=-22.91,-43.17&chart=301&zoom=5"},
+  {icao:"LEPA",name:"Palma de Mallorca Airport",city:"Mallorca, Spain",lat:39.551,lon:2.739,rwy:"06L",approach:"ILS 06L — Sea Approach over Bay",diff:3,cat:"Scenic / Coastal",desc:"Long final over the Bay of Palma with the Serra de Tramuntana mountains visible. One of Europe's busiest summer leisure airports. Strong thermal activity and occasional Tramontane wind events make this more challenging than it looks.",bestwind:"Easterly — RWY 06L",worstwind:"Tramontane — strong NW gusts",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LEPA"},yt:"https://www.youtube.com/results?search_query=LEPA+palma+approach+msfs",sv:"https://skyvector.com/?ll=39.55,2.74&chart=301&zoom=5"},
+  {icao:"BIKF",name:"Keflavik International",city:"Reykjavik, Iceland",lat:63.985,lon:-22.605,rwy:"28",approach:"ILS 28 — North Atlantic Crosswinds",diff:3,cat:"Coastal / Crosswind",desc:"Keflavik sits on a flat lava plain fully exposed to North Atlantic weather. Crosswinds regularly exceed 30kt and gusts of 50kt+ are not unusual. Iceland is among the most challenging environments for crosswind landings.",bestwind:"Westerly — RWY 28",worstwind:"Southerly — full crosswind with gusts",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=BIKF"},yt:"https://www.youtube.com/results?search_query=BIKF+keflavik+crosswind+landing+msfs",sv:"https://skyvector.com/?ll=63.99,-22.61&chart=301&zoom=4"},
+  {icao:"GMME",name:"Rabat-Salé Airport",city:"Rabat, Morocco",lat:33.982,lon:-6.752,rwy:"17",approach:"ILS 17 — Coastal North Africa",diff:2,cat:"Scenic / Regional",desc:"A short hop from southern Europe into North Africa. The approach crosses the Atlantic coast of Morocco. A great destination to practice ATC communications in French and add a new continent to your logbook.",bestwind:"Northerly — RWY 17",worstwind:"Sharav dust storm — low visibility",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=GMME"},yt:"https://www.youtube.com/results?search_query=GMME+rabat+approach+msfs",sv:"https://skyvector.com/?ll=33.98,-6.75&chart=301&zoom=5"},
+  {icao:"LGSR",name:"Santorini Airport",city:"Santorini, Greece",lat:36.399,lon:25.479,rwy:"34",approach:"VOR 34 — Caldera Visual",diff:3,cat:"Scenic / Island",desc:"Short 2,127m runway on the volcanic island of Santorini. Strong Meltemi winds in summer create significant turbulence on final. The caldera view on approach is extraordinary.",bestwind:"Northerly — RWY 34",worstwind:"Meltemi season (summer) — severe gusts",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LGSR"},yt:"https://www.youtube.com/results?search_query=LGSR+santorini+approach+msfs",sv:"https://skyvector.com/?ll=36.40,25.48&chart=301&zoom=5"},
+  {icao:"LIML",name:"Milan Linate Airport",city:"Milan, Italy",lat:45.445,lon:9.277,rwy:"36",approach:"ILS 36 — Po Valley Fog",diff:3,cat:"Low Visibility / Instrument",desc:"Milan Linate is notorious for LIFR conditions with Po Valley radiation fog reducing visibility to near zero. CAT III ILS approaches are common in winter. A perfect destination to practice low-visibility autoland procedures.",bestwind:"Northerly — RWY 36",worstwind:"Deep Po Valley fog — CAT III conditions",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LIML"},yt:"https://www.youtube.com/results?search_query=LIML+linate+fog+approach+msfs",sv:"https://skyvector.com/?ll=45.45,9.28&chart=301&zoom=5"},
+  {icao:"LPFR",name:"Faro Airport",city:"Algarve, Portugal",lat:37.014,lon:-7.966,rwy:"28",approach:"ILS 28 — Atlantic Coast",diff:2,cat:"Scenic / Coastal",desc:"Short final over the Ria Formosa lagoon with Atlantic ocean views. One of Europe's busiest holiday airports. Strong seasonal sea breezes and occasional gales from Atlantic weather systems.",bestwind:"Westerly — RWY 28",worstwind:"Levante — easterly gales with low cloud",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LPFR"},yt:"https://www.youtube.com/results?search_query=LPFR+faro+approach+msfs",sv:"https://skyvector.com/?ll=37.01,-7.97&chart=301&zoom=5"},
+  {icao:"EGPD",name:"Aberdeen Dyce Airport",city:"Aberdeen, Scotland",lat:57.202,lon:-2.197,rwy:"16",approach:"ILS 16 — North Sea Crosswinds",diff:3,cat:"Coastal / Crosswind",desc:"Gateway to North Sea oil operations. Exposed to severe North Sea weather with frequent crosswinds, low cloud and icing. Aberdeen is one of the world's busiest helicopter airports — a unique mix of fixed wing and rotary traffic.",bestwind:"Southerly — RWY 16",worstwind:"Northerly gales — full crosswind with icing",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=EGPD"},yt:"https://www.youtube.com/results?search_query=EGPD+aberdeen+approach+msfs",sv:"https://skyvector.com/?ll=57.20,-2.20&chart=301&zoom=5"},
+  {icao:"ENBO",name:"Bodø Airport",city:"Bodø, Norway",lat:67.269,lon:14.365,rwy:"25",approach:"ILS 25 — Arctic Circle Approach",diff:4,cat:"Arctic / Crosswind",desc:"Above the Arctic Circle, Bodø is one of Norway's most challenging airports. Polar vortex weather, aurora-season icing, severe crosswinds from Saltfjorden fjord. The midnight sun means 24-hour operations in summer.",bestwind:"Westerly — RWY 25",worstwind:"Polar low — rapid weather deterioration",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=ENBO"},yt:"https://www.youtube.com/results?search_query=ENBO+bodo+arctic+approach+msfs",sv:"https://skyvector.com/?ll=67.27,14.37&chart=301&zoom=4"},
+];
+
+// State
+const S={
+  folderPath:'',allRows:[],selICAOs:new Set(),
+  acft:'all',mode:'1',openRoute:null,
+  selChall:0,cfg:{},apiKey:'',
+  routes:[],routeCache:{},
+  chDep:'',chMaxMins:0,
+};
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',async()=>{
+  S.cfg=await window.api.loadConfig();
+  if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
+  if(S.cfg.apiKey){S.apiKey=S.cfg.apiKey;document.getElementById('api-key-inp').value='••••••••••••••••';setSt('API key saved. Click Fetch Live Routes after scanning.','var(--grn)');document.getElementById('fetch-btn').disabled=false;}
+  if(S.cfg.routeCache){S.routeCache=S.cfg.routeCache;S.routes=buildRouteList();}
+  if(S.cfg.savedRows&&S.cfg.savedRows.length){
+    try{
+      S.allRows=S.cfg.savedRows;
+      S.selICAOs=new Set(S.allRows.filter(r=>r.icao&&r.selected!==false).map(r=>r.icao));
+      document.getElementById('apt-sec').style.display='block';
+      renderApts();
+      setScanNote('Loaded '+S.allRows.length+' airports from last session. Click Scan Now if your library has changed.');
+      try{ S.routes=buildRouteList(); }catch(e){ console.error('buildRouteList init error:',e); S.routes=[]; }
+    }catch(e){ console.error('Session restore error:',e); }
+  }
+  buildChSB();renderCD(0);updateStats();
+});
+
+function sw(t){
+  document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));
+  document.querySelectorAll('.pane').forEach(e=>e.classList.toggle('on',e.id==='pane-'+t));
+  if(t==='routes')renderRoutes();
+  if(t==='challenges')buildChDepSelect();
+}
+
+// ── AIRPORTS ────────────────────────────────────────────────────────────────
+function setFD(p){const e=document.getElementById('fdsp');e.textContent=p;e.classList.add('set');}
+function setScanNote(msg){const e=document.getElementById('scan-note');if(e)e.textContent=msg;}
+
+async function doBrowse(){
+  const p=await window.api.browseFolder();if(!p)return;
+  S.folderPath=p;setFD(p);document.getElementById('scan-btn').disabled=false;
+  S.cfg.folder=p;await window.api.saveConfig(S.cfg);
+}
+
+async function doScan(){
+  if(!S.folderPath)return;
+  S.allRows=[];S.selICAOs=new Set();
+  document.getElementById('apt-body').innerHTML='';
+  document.getElementById('prog-wrap').style.display='block';
+  const pf=document.getElementById('prog-fill'),pl=document.getElementById('prog-lbl');
+  pf.style.width='0%';
+  const msgs=['Reading directory tree...','Extracting ICAO identifiers...','Cross-referencing airport database...','Building index...','Done!'];
+  let mi=0;pl.textContent=msgs[0];
+  const t=setInterval(()=>{
+    const p=Math.min(100,parseInt(pf.style.width||'0')+Math.floor(Math.random()*18+5));
+    pf.style.width=p+'%';
+    const nm=Math.min(Math.floor(p/22),msgs.length-1);
+    if(nm>mi){mi=nm;pl.textContent=msgs[mi];}
+    if(p>=100)clearInterval(t);
+  },160);
+  const res=await window.api.scanFolder(S.folderPath);
+  clearInterval(t);pf.style.width='100%';
+  if(!res.success){document.getElementById('prog-wrap').style.display='none';alert('Scan error: '+res.error);return;}
+  // Debug: show what came back
+  const folderCount=res.folders?res.folders.length:0;
+  setScanNote('Scan returned '+folderCount+' folders. Processing...');
+  if(folderCount===0){
+    document.getElementById('prog-wrap').style.display='none';
+    setScanNote('Scan returned 0 folders. Check folder path is correct and contains subfolders.');
+    return;
+  }
+  setTimeout(()=>{document.getElementById('prog-wrap').style.display='none';procFolders(res.folders);},300);
+}
+
+// Folders that are definitely not airports — skip them entirely
+// Keep this list conservative — better to show a false positive than miss an airport
+const NOISE_EXACT=[
+  'calman','nvidia','directx','system32','readme','license',
+];
+function isNoise(name){
+  try {
+    const low=name.toLowerCase();
+    // Block known non-airport software by exact keyword
+    if(NOISE_EXACT.some(k=>low.includes(k))) return true;
+    // Block if starts with version number like "5.12.3"
+    if(/^\d+\.\d+/.test(name)) return true;
+    // That's it — don't block microsoft, windows, update etc.
+    // as these appear in legitimate MSFS scenery folder names
+    return false;
+  } catch(e){ return false; }
+}
+
+function exICAO(name){
+  if(isNoise(name)) return[null,'noise'];
+  const up=name.toUpperCase(),pts=up.split(/[-_\s]/);
+  for(const p of pts)if(p.length===4&&/^[A-Z]+$/.test(p)&&IS.has(p))return[p,'auto'];
+  for(let i=0;i<up.length-3;i++){const c=up.slice(i,i+4);if(/^[A-Z]+$/.test(c)&&IS.has(c))return[c,'auto'];}
+  const low=name.toLowerCase().replace(/[^a-z]/g,'');
+  for(const[k,v]of Object.entries(CM))if(low.includes(k))return[v,'fuzzy'];
+  return[null,null];
+}
+
+async function procFolders(folders){
+  setScanNote('Processing '+folders.length+' folders...');
+  const ov=S.cfg.manualOverrides||{};
+  let noiseCount=0, matchCount=0, unmatchCount=0;
+  for(const f of folders){
+    try{
+      let[icao,method]=exICAO(f);
+      if(ov[f]){icao=ov[f];method='manual';}
+      if(method==='noise'){noiseCount++;continue;}
+      S.allRows.push({folder:f,icao,method,selected:true});
+      if(icao){S.selICAOs.add(icao);matchCount++;}
+      else unmatchCount++;
+    }catch(e){ console.warn('Error processing folder:',f,e); }
+  }
+  setScanNote('Processed: '+matchCount+' matched, '+unmatchCount+' unmatched, '+noiseCount+' noise skipped.');
+  document.getElementById('apt-sec').style.display='block';
+  // Render airports FIRST so they show even if route building fails
+  renderApts();updateStats();
+  // Then build routes safely
+  try{
+    S.routes=buildRouteList();
+  }catch(e){
+    console.error('buildRouteList error:',e);
+    S.routes=[];
+  }
+  buildChSB();buildChDepSelect();
+  if(document.getElementById('pane-routes').classList.contains('on'))renderRoutes();
+  S.cfg.savedRows=S.allRows;
+  await window.api.saveConfig(S.cfg);
+  setScanNote('Scan complete — '+S.allRows.length+' folders read. Results saved for next session.');
+}
+
+function renderApts(){
+  const q=(document.getElementById('apt-srch').value||'').toLowerCase();
+  const tf=document.getElementById('apt-type').value;
+  document.getElementById('apt-body').innerHTML=S.allRows.filter(r=>{
+    if(r.method==='noise') return false; // hide non-airport folders
+    const info=AI[r.icao]||['','','',''];
+    return(!q||(r.icao||'').toLowerCase().includes(q)||info[0].toLowerCase().includes(q)||r.folder.toLowerCase().includes(q))&&(!tf||info[3]===tf);
+  }).map(r=>{
+    const info=AI[r.icao]||['Unknown Airport','','',''];
+    const sel=r.icao?S.selICAOs.has(r.icao):false;
+    const mc=r.method==='auto'?'var(--acc)':r.method==='fuzzy'?'#d4a017':r.method==='manual'?'var(--blu)':'var(--bg4)';
+    return`<tr>
+      <td><input type="checkbox" ${sel?'checked':''} ${r.icao?'':'disabled'} onchange="togA('${r.icao}',this.checked)" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;"></td>
+      <td class="icao" style="color:${r.icao?'var(--acc)':'var(--ink4)'}">${r.icao||'&mdash;'}</td>
+      <td><div class="an">${info[0]}</div><div class="af">${r.folder}</div></td>
+      <td style="font-size:13px;color:var(--ink2)">${info[2]||''}</td>
+      <td><span class="bdg bgry">${info[3]||''}</span></td>
+      <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:${mc};flex-shrink:0;display:inline-block"></span>${r.method||'&mdash;'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function togA(icao,c){
+  if(c)S.selICAOs.add(icao);else S.selICAOs.delete(icao);
+  S.allRows.forEach(r=>{if(r.icao===icao)r.selected=c;});
+  S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);
+  S.routes=buildRouteList();updateStats();renderRoutes();
+}
+function selAll(){S.allRows.forEach(r=>{if(r.icao){S.selICAOs.add(r.icao);r.selected=true;}});S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);S.routes=buildRouteList();renderApts();updateStats();}
+function clrAll(){S.selICAOs.clear();S.allRows.forEach(r=>r.selected=false);S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);S.routes=buildRouteList();renderApts();updateStats();}
+
+async function addManual(){
+  const icao=prompt('Enter 4-letter ICAO code:');if(!icao)return;
+  const c=icao.trim().toUpperCase();
+  if(c.length!==4||!/^[A-Z]+$/.test(c)){alert('Invalid ICAO code');return;}
+  const folder=prompt('Subfolder name? (optional)')||'manual-'+c.toLowerCase();
+  S.allRows.push({folder,icao:c,method:'manual',selected:true});S.selICAOs.add(c);
+  const ov=S.cfg.manualOverrides||{};ov[folder]=c;S.cfg.manualOverrides=ov;
+  S.cfg.savedRows=S.allRows;await window.api.saveConfig(S.cfg);
+  S.routes=buildRouteList();renderApts();updateStats();buildChSB();buildChDepSelect();
+}
+
+// ── AIRLABS ─────────────────────────────────────────────────────────────────
+function setSt(msg,c){const e=document.getElementById('api-st');e.textContent=msg;e.style.color=c;}
+
+async function saveKey(){
+  const k=document.getElementById('api-key-inp').value.trim();
+  if(!k||k.startsWith('•'))return;
+  S.apiKey=k;S.cfg.apiKey=k;await window.api.saveConfig(S.cfg);
+  document.getElementById('api-key-inp').value='••••••••••••••••';
+  setSt('API key saved.','var(--grn)');
+  document.getElementById('fetch-btn').disabled=false;
+}
+
+async function fetchRoutes(){
+  if(!S.apiKey){setSt('No API key — save your key first.','var(--acc)');return;}
+  const icaos=[...S.selICAOs].filter(i=>i&&i.length===4);
+  if(!icaos.length){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
+  const btn=document.getElementById('fetch-btn');
+  btn.disabled=true;btn.textContent='Fetching...';
+  setSt('Fetching routes for '+icaos.length+' airports from AirLabs...','var(--acc)');
+  let total=0,errors=0;
+  for(const icao of icaos){
+    const res=await window.api.airlabsRoutes({icao,key:S.apiKey});
+    if(res.ok&&res.data&&res.data.response){
+      S.routeCache[icao]=res.data.response;
+      total+=res.data.response.length;
+    } else {
+      errors++;
+      if(res.status===401||res.status===403){setSt('API key rejected by AirLabs.','var(--red)');btn.disabled=false;btn.textContent='Fetch Live Routes';return;}
+    }
+  }
+  S.cfg.routeCache=S.routeCache;await window.api.saveConfig(S.cfg);
+  S.routes=buildRouteList();
+  btn.disabled=false;btn.textContent='Fetch Live Routes';
+  setSt((errors?`${total} routes fetched. ${errors} airport(s) had no data.`:`${total} routes fetched across ${icaos.length} airports. Cached locally.`),'var(--grn)');
+  updateStats();renderRoutes();
+}
+
+// Airports that are cargo-only or GA-only — never narrowbody passenger destinations
+const CARGO_GA_BLACKLIST=new Set([
+  'KAFW',  // Fort Worth Alliance — FedEx hub, no passenger service
+  'KBFI',  // Boeing Field Seattle — test flights only
+  'KADS',  // Addison TX — GA only
+  'KBDL',  // Bradley — actually commercial, keep
+  'KBJC',  // Rocky Mountain Metro — GA only
+  'KCSL',  // Colorado Springs — military/GA
+  'KBED',  // Hanscom — corporate/military
+  'KBLH',  // Blythe — tiny GA
+  'KCGZ',  // Casa Grande — GA
+  'KCRQ',  // McClellan-Palomar — GA/regional
+  'KCOE',  // Coeur d Alene — GA
+  'KCXP',  // Carson City — GA
+  'KBRD',  // Brainerd — small regional
+  'KCRS',  // Corsicana — GA
+  'KAST',  // Astoria — tiny GA
+  'KARA',  // New Iberia — GA
+  'KART',  // Watertown NY — GA
+  'KAPC',  // Napa — GA
+  'KAHN',  // Athens GA — GA
+  'KABS',  // Albany TX — GA
+  'KAEX',  // Alexandria LA — small regional
+  'KACY',  // Atlantic City — seasonal charter only
+  'KAPA',  // Centennial Denver — GA
+  'KAPF',  // Naples FL — small/GA
+  'KACV',  // Arcata — too small for narrowbody
+  'KABI',  // Abilene — regional jets only, no narrowbody
+  'KCOE',  // Coeur d Alene — GA
+  'KBOI',  // Boise — actually commercial, keep... remove from here
+]);
+// Remove KBOI from blacklist — it's a real commercial airport
+CARGO_GA_BLACKLIST.delete('KBOI');
+
+function buildRouteList(){
+  const REGIONAL_OPS=new Set([
+    'OO','9E','MQ','OH','CP','PT','ZW','YV','C5','KS','QX','XE','G7','EM','LF',
+    'QK','JV','PB','GX','LM','BE','WW','NR','WA','KP','GR','BM','EA','ZT',
+    '9K','9M','CM','TJ','RJ','S4',
+  ]);
+  const CARGO_GA=new Set([
+    'KAFW','KBFI','KADS','KBJC','KCSL','KBED','KBLH','KCGZ','KCRQ','KAST','KARA',
+    'KART','KAPC','KAHN','KAEX','KACY','KAPA','KAPF','KCOE','KCXP','KBRD','KCRS',
+    'KABS','KACV','CET2','HAAB','DGAA','DIAP','DNAA','MMUN','MZBZ','TAPA','OJAI',
+  ]);
+  const SINGLE_FLEET=new Set([
+    'FR','U2','W6','VY','WN','B6','NK','F9','G4','SY','D8','DY','BY','X3','TB',
+    'HV','OR','TO','PC','XQ','EC','EW','RK','LS','DE','A0',
+  ]);
+
+  const raw=[];
+  for(const[dep,rts] of Object.entries(S.routeCache)){
+    for(const r of rts){
+      const arr=(r.arr_icao||'').toUpperCase();
+      if(!arr||arr===dep||CARGO_GA.has(arr)) continue;
+      const mktg=(r.airline_iata||'').toUpperCase();
+      const oper=(r.cs_airline_iata||'').toUpperCase();
+      const op=oper||mktg;
+      if(!mktg) continue;
+      const dur=r.duration||0;
+      const cnt=r.counter||0;
+      if(!dur||cnt<500) continue;
+      if(REGIONAL_OPS.has(op)) continue;
+      if(dur>360&&!SINGLE_FLEET.has(op)) continue;
+      const acftRaw=(r.aircraft_icao||'').toUpperCase();
+      const fleetInfo=AIRLINE_FLEET[op]||AIRLINE_FLEET[mktg]||null;
+      let simAcft='unknown',confidence='unknown';
+      if(acftRaw&&ACFT_MAP[acftRaw]){
+        simAcft=ACFT_MAP[acftRaw];confidence='airlabs';
+      } else if(SINGLE_FLEET.has(op)&&fleetInfo){
+        simAcft=fleetInfo.sim;confidence='confirmed';
+      } else if(fleetInfo&&fleetInfo.conf==='likely'&&dur>=60&&dur<=300){
+        simAcft=fleetInfo.sim;confidence='likely';
+      }
+      raw.push({
+        dep,arr,airline:mktg,operAl:op,
+        airlineName:AIRLINE_FLEET[op]?.name||AIRLINE_FLEET[mktg]?.name||mktg,
+        flt:r.flight_iata||r.flight_icao||'',
+        simAcft,confidence,
+        dm:dur,dur:fmtDur(dur),
+        days:r.days||[],
+        depTerm:(r.dep_terminals||[]).join('/'),
+        arrTerm:(r.arr_terminals||[]).join('/'),
+        counter:cnt,
+      });
+    }
+  }
+  const best={};
+  for(const r of raw){
+    const key=r.dep+'_'+r.arr;
+    if(!best[key]||r.counter>best[key].counter)best[key]=r;
+  }
+  return Object.values(best).sort((a,b)=>a.dep.localeCompare(b.dep)||a.arr.localeCompare(b.arr));
+}
+
+function getRoutes(){
+  const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
+  const durMax=parseInt((document.getElementById('dur-f')||{value:''}).value)||0;
+  const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
+  let rs=S.routes.filter(r=>{
+    const di=S.selICAOs.has(r.dep),ai=S.selICAOs.has(r.arr);
+    if(S.mode==='2'&&!(di&&ai))return false;
+    if(S.mode==='1'&&!(di||ai))return false;
+    if(S.acft!=='all'){
+      if(r.simAcft==='unknown')return false;
+      if(r.simAcft!==S.acft)return false;
+    }
+    if(durMax&&r.dm>durMax)return false;
+    if(q&&![r.dep,r.arr,r.airlineName,r.airline,r.flt].some(x=>(x||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+  rs.sort((a,b)=>srt==='airline'?a.airlineName.localeCompare(b.airlineName):
+                  srt==='flt'?a.flt.localeCompare(b.flt):a.dm-b.dm);
+  return rs;
+}
+
+
+function renderRoutes(){
+  const rs=getRoutes();
+  const cnt=rs.length;
+  document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(S.routes.length?'':' — paste API key and click Fetch Live Routes');
+  const od=document.getElementById('dep-rwy').value.trim().toUpperCase();
+  const oa=document.getElementById('arr-rwy').value.trim().toUpperCase();
+  if(!cnt){
+    const msg=!S.routes.length?'Paste your AirLabs API key above and click Fetch Live Routes.':'No routes match your current filters.';
+    document.getElementById('rt-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
+    updateStats();return;
+  }
+  document.getElementById('rt-body').innerHTML=rs.flatMap((r,i)=>{
+    const isO=S.openRoute===i;
+    const da=AI[r.dep]||[r.dep,'','',''];
+    const aa=AI[r.arr]||[r.arr,'','',''];
+    const confColor=r.confidence==='confirmed'?'var(--grn)':r.confidence==='likely'?'var(--acc)':'var(--ink3)';
+    const acftDisplay=r.simAcft&&r.simAcft!=='unknown'?SIM_LBL[r.simAcft]||r.simAcft:'—';
+    const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
+      <td style="color:var(--ink3);font-size:11px;padding-left:16px">${isO?'&#9660;':'&#9658;'}</td>
+      <td><div class="rp">${r.dep}&thinsp;&rarr;&thinsp;${r.arr}</div>
+          <div class="rc">${da[1]||r.dep} &rarr; ${aa[1]||r.arr}</div></td>
+      <td><div class="ra">${r.airlineName}</div><div class="rf">${r.flt}</div></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${r.dur}</td>
+      <td style="font-size:12px;color:var(--ink2)">${fmtDays(r.days)}</td>
+    </tr>`;
+    if(!isO)return[main];
+    const sbType=r.simAcft&&r.simAcft!=='unknown'?SIM_SB[r.simAcft]:'A320';
+    const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${r.dep}&dest=${r.arr}&type=${sbType}`;
+    const faU=`https://www.flightaware.com/live/findflight/?origin=${r.dep}&destination=${r.arr}`;
+    const svU=`https://skyvector.com/?fpl=${r.dep}%20${r.arr}`;
+    const det=`<tr class="det-row"><td colspan="5"><div class="det-pan">
+      <div class="dp-strip">
+        <div class="dp-apt"><div class="dp-icao">${r.dep}</div><div class="dp-city">${da[1]||''}</div></div>
+        <div class="dp-line"><div class="dp-dash"></div>
+          <div class="dp-mid"><div class="dp-plane">&#9992;</div>
+            <div class="dp-info">${r.dur} &bull; ${fmtDays(r.days)}</div></div>
+        <div class="dp-dash"></div></div>
+        <div class="dp-apt"><div class="dp-icao">${r.arr}</div><div class="dp-city">${aa[1]||''}</div></div>
+      </div>
+      <div class="dp-grid">
+        <div class="dp-sec">
+          <div class="dp-st">Flight Info</div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airlineName}</span></div>
+          <div class="dpr"><span class="dl">Flight No.</span><span class="dv2 a">${r.flt}</span></div>
+          <div class="dpr"><span class="dl">Sim aircraft</span><span class="dv2" style="color:${confColor}">${acftDisplay}</span></div>
+          <div class="dpr"><span class="dl">Confidence</span><span class="dv2" style="color:${confColor};font-size:11px">${
+            r.confidence==='confirmed'?'&#10003; Confirmed fleet':
+            r.confidence==='likely'?'~ Short-haul likely':
+            r.confidence==='airlabs'?'AirLabs type data':
+            'Verify on FlightAware'
+          }</span></div>
+          <div class="dpr"><span class="dl">Block time</span><span class="dv2">${r.dur}</span></div>
+          <div class="dpr"><span class="dl">Operates</span><span class="dv2">${fmtDays(r.days)}</span></div>
+        </div>
+        <div class="dp-sec">
+          <div class="dp-st">Departure &mdash; ${r.dep}</div>
+          <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${da[0]}</span></div>
+          <div class="dpr"><span class="dl">Terminal</span><span class="dv2 g">${r.depTerm||'&mdash;'}</span></div>
+          ${od?`<div class="dpr"><span class="dl">Runway (override)</span><span class="dv2 ov">${od}</span></div>`
+              :`<div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>`}
+          <div class="metar-raw" id="metar-dep-${i}"></div>
+          <div id="wind-dep-${i}"></div>
+        </div>
+        <div class="dp-sec">
+          <div class="dp-st">Arrival &mdash; ${r.arr}</div>
+          <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${aa[0]}</span></div>
+          <div class="dpr"><span class="dl">Terminal</span><span class="dv2 g">${r.arrTerm||'&mdash;'}</span></div>
+          ${oa?`<div class="dpr"><span class="dl">Runway (override)</span><span class="dv2 ov">${oa}</span></div>`
+              :`<div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>`}
+          <div class="metar-raw" id="metar-arr-${i}"></div>
+          <div id="wind-arr-${i}"></div>
+        </div>
+      </div>
+      <div class="dp-acts">
+        <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
+        <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
+      </div>
+      <div class="dp-note">Use FlightAware to confirm direct service and aircraft type before filing in SimBrief.</div>
+    </div></td></tr>`;
+    return[main,det];
+  }).join('');
+  updateStats();
+}
+
+
+function togR(i){
+  S.openRoute=S.openRoute===i?null:i;renderRoutes();
+  if(S.openRoute!==null){
+    const r=getRoutes()[S.openRoute];
+    if(r){
+      const od=document.getElementById('dep-rwy').value.trim().toUpperCase();
+      const oa=document.getElementById('arr-rwy').value.trim().toUpperCase();
+      if(!od)fetchMetar(r.dep,S.openRoute,'dep');
+      if(!oa)fetchMetar(r.arr,S.openRoute,'arr');
+    }
+  }
+}
+
+function setAcft(v){S.acft=v;document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
+function setMode(v){S.mode=v;document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
+function clrRwy(){document.getElementById('dep-rwy').value='';document.getElementById('arr-rwy').value='';renderRoutes();}
+
+function exportCSV(){
+  const rs=getRoutes();
+  const h='Flight,Airline,Dep,Arr,RealAcft,SimAcft,Duration,Days,SimBriefURL';
+  const rows=rs.map(r=>[r.flt,r.airline,r.dep,r.arr,r.acftReal,SIM_LBL[r.acftSim]||'',r.dur,fmtDays(r.days),
+    `https://www.simbrief.com/system/dispatch.php?orig=${r.dep}&dest=${r.arr}&type=${SIM_SB[r.acftSim]||'A320'}`].join(','));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...rows].join('\n')],{type:'text/csv'}));
+  a.download='dean_msfs_routes.csv';a.click();
+}
+
+// ── METAR ────────────────────────────────────────────────────────────────────
+async function fetchMetar(icao,idx,side){
+  const rawEl=document.getElementById('metar-'+side+'-'+idx);
+  const rwyEl=document.getElementById('rwy-'+side+'-'+idx);
+  const windEl=document.getElementById('wind-'+side+'-'+idx);
+  if(!rawEl)return;
+  try{
+    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
+    const text=(await res.text()).trim();
+    if(!text){rawEl.textContent='No METAR for '+icao;return;}
+    rawEl.textContent=text;
+    const w=parseWind(text);
+    if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+    const best=bestRwy(icao,w.dir,w.spd);
+    if(rwyEl)rwyEl.textContent=best;
+    if(windEl){
+      const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
+      const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
+      const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
+      windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` — ${xw}kt crosswind`:''}</div>`;
+    }
+  }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';}
+}
+
+function parseWind(m){
+  const w=m.match(/(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT/);
+  if(!w)return null;
+  return{dir:w[1],spd:parseInt(w[2]),gust:w[3]?parseInt(w[3]):parseInt(w[2])};
+}
+
+function bestRwy(icao,dir,spd){
+  const rwys=RWY_HDGS[icao];
+  if(!rwys||dir==='VRB'||spd<3)return'Check ATIS';
+  const wd=parseInt(dir);let best=null,bestHW=-999;
+  for(const r of rwys){
+    const diff=((wd-r.h+360)%360),angle=diff>180?360-diff:diff;
+    const hw=Math.round(spd*Math.cos(angle*Math.PI/180));
+    if(hw>bestHW){bestHW=hw;best=r.r;}
+  }
+  return best||'Check ATIS';
+}
+
+function xwind(icao,rwyId,dir,spd){
+  const rwys=RWY_HDGS[icao];if(!rwys||dir==='VRB')return 0;
+  const r=rwys.find(x=>x.r===rwyId);if(!r)return 0;
+  const diff=((parseInt(dir)-r.h+360)%360),angle=diff>180?360-diff:diff;
+  return Math.round(spd*Math.sin(angle*Math.PI/180));
+}
+
+// ── CHALLENGES ───────────────────────────────────────────────────────────────
+function gcDist(lat1,lon1,lat2,lon2){
+  const R=3440,d2r=Math.PI/180;
+  const dLat=(lat2-lat1)*d2r,dLon=(lon2-lon1)*d2r;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLon/2)**2;
+  return R*2*Math.asin(Math.sqrt(a));
+}
+function flightMins(nm){return Math.round((nm/450)*60*1.10);}
+
+function buildChDepSelect(){
+  const sel=document.getElementById('ch-dep');
+  const prev=sel.value;
+  sel.innerHTML='<option value="">Departure: Any airport</option>';
+  [...S.selICAOs].sort().forEach(icao=>{
+    const info=AI[icao];if(!info)return;
+    const opt=document.createElement('option');
+    opt.value=icao;opt.textContent=icao+' — '+info[0];
+    sel.appendChild(opt);
+  });
+  if(prev)sel.value=prev;
+}
+
+function setCT(v){
+  S.chMaxMins=v;
+  document.querySelectorAll('[data-ct]').forEach(e=>e.classList.toggle('on',parseInt(e.dataset.ct)===v));
+  buildChSB();
+}
+
+function filterChallenges(){S.chDep=document.getElementById('ch-dep').value;buildChSB();}
+
+function chFlightMins(ch){
+  if(!S.chDep)return null;
+  const dep=AI[S.chDep];if(!dep||!dep[4])return null;
+  const nm=gcDist(dep[4],dep[5],ch.lat,ch.lon);
+  return flightMins(nm);
+}
+
+function buildChSB(){
+  const list=document.getElementById('ch-sb-list');
+  const DC={1:'var(--grn)',2:'var(--grn)',3:'var(--acc)',4:'var(--acc)',5:'var(--red)'};
+  let visible=0;
+  list.innerHTML='';
+  CH.forEach((ch,i)=>{
+    const mins=chFlightMins(ch);
+    const inLib=S.selICAOs.has(ch.icao);
+    // Filter by max time
+    if(S.chMaxMins>0&&mins!==null&&mins>S.chMaxMins)return;
+    visible++;
+    const timeStr=mins!==null?`${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}m`:'';
+    const d=document.createElement('div');
+    d.className='chi'+(i===S.selChall?' on':'');
+    d.onclick=()=>{S.selChall=i;buildChSB();renderCD(i);};
+    d.innerHTML=`<div class="ci-top">
+      <span class="ci-icao">${ch.icao}</span>
+      <span class="ci-diff" style="color:${DC[ch.diff]}">${ch.diff}/5</span>
+      ${timeStr?`<span class="ci-time">${timeStr}</span>`:''}
+      ${inLib?'<span class="ci-lib">IN LIB</span>':''}
+    </div>
+    <div class="ci-name">${ch.name}</div>
+    <div class="ci-cat">${ch.cat}</div>`;
+    list.appendChild(d);
+  });
+  document.getElementById('ch-none').style.display=visible?'none':'block';
+  // If selected challenge is now hidden, select first visible
+  if(visible>0&&S.chMaxMins>0){
+    const firstVisible=CH.findIndex(ch=>{
+      const mins=chFlightMins(ch);
+      return!(S.chMaxMins>0&&mins!==null&&mins>S.chMaxMins);
+    });
+    if(firstVisible>=0&&firstVisible!==S.selChall){S.selChall=firstVisible;}
+  }
+}
+
+function renderCD(idx){
+  const ch=CH[idx];
+  if(!ch){document.getElementById('ch-det').innerHTML='';return;}
+  const inLib=S.selICAOs.has(ch.icao);
+  const lr=S.allRows.find(r=>r.icao===ch.icao);
+  const DC={1:'var(--grn)',2:'var(--grn)',3:'var(--acc)',4:'var(--acc)',5:'var(--red)'};
+  const mins=chFlightMins(ch);
+  const timeStr=mins?`~${Math.floor(mins/60)}h ${String(mins%60).padStart(2,'0')}m from ${S.chDep}`:'';
+
+  // Find real scheduled route if one exists
+  const realRoute=S.routes.find(r=>
+    (r.dep===S.chDep&&r.arr===ch.icao)||(r.arr===S.chDep&&r.dep===ch.icao)
+  );
+
+  const sbType=SIM_SB['a320'];
+  const sbDep=S.chDep||'EGKK';
+  const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${sbDep}&dest=${ch.icao}&type=${sbType}`;
+  const svU=`https://skyvector.com/?ll=${ch.lat},${ch.lon}&chart=301&zoom=4`;
+
+  document.getElementById('ch-det').innerHTML=`
+    <div class="cd-hdr">
+      <div class="cd-icao">${ch.icao}</div>
+      <div class="cd-info">
+        <div class="cd-n">${ch.name}</div>
+        <div class="cd-c">${ch.city}</div>
+        <div class="cd-pills">
+          <span class="pill" style="color:${DC[ch.diff]};border-color:${DC[ch.diff]}33">${'★'.repeat(ch.diff)}${'☆'.repeat(5-ch.diff)} ${ch.diff}/5</span>
+          <span class="pill ${ch.inMSFS?'g':'a'}">${ch.inMSFS?'✓ In MSFS 2024':'Addon required'}</span>
+          <span class="pill ${inLib?'g':''}">${inLib?'✓ In your library':'Not in your library'}</span>
+          ${timeStr?`<span class="pill a">✈ ${timeStr}</span>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="cd-desc"><div class="cd-app">RWY ${ch.rwy} &bull; ${ch.approach}</div><div class="cd-txt">${ch.desc}</div></div>
+
+    ${realRoute?`<div class="ft-card">
+      <div class="ft-t">&#9989; Real scheduled service found</div>
+      <div class="ft-sched">
+        <div class="ft-sched-t">AirLabs Route Data</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
+          <span><span style="color:var(--ink3)">Route</span> &nbsp;<strong style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${realRoute.dep}&thinsp;→&thinsp;${realRoute.arr}</strong></span>
+          <span><span style="color:var(--ink3)">Airline</span> &nbsp;<strong>${realRoute.airline}</strong></span>
+          <span><span style="color:var(--ink3)">Flight</span> &nbsp;<strong style="color:var(--acc);font-family:'JetBrains Mono',monospace">${realRoute.flt}</strong></span>
+          <span><span style="color:var(--ink3)">Aircraft</span> &nbsp;<strong>${realRoute.acftReal}</strong> <span style="color:var(--ink3);font-size:11px">${realRoute.nearest||SIM_LBL[realRoute.acftSim]||''}</span></span>
+          <span><span style="color:var(--ink3)">Duration</span> &nbsp;<strong>${realRoute.dur}</strong></span>
+          <span><span style="color:var(--ink3)">Operates</span> &nbsp;<strong>${fmtDays(realRoute.days)}</strong></span>
+        </div>
+      </div>
+    </div>`:`${S.chDep?`<div class="ft-card">
+      <div class="ft-t" style="color:var(--ink3)">No scheduled service found — fly it anyway</div>
+      <div class="ft-info">No real airline operates ${S.chDep} → ${ch.icao} with your sim fleet. You can still plan this route in SimBrief — the point is to fly the approach, not the carrier.</div>
+    </div>`:'<div class="ft-card"><div class="ft-info" style="color:var(--ink3)">Select a departure airport in the left panel to check for real scheduled service and calculate flight time.</div></div>'}`}
+
+    <div class="cdg">
+      <div class="cdb">
+        <div class="cdb-t">Wind Guidance</div>
+        <div class="cdr"><span class="cdl">Preferred runway</span><span class="cdv" style="color:var(--acc);font-family:'JetBrains Mono',monospace">RWY ${ch.rwy}</span></div>
+        <div class="cdr"><span class="cdl">Best conditions</span><span class="cdv">${ch.bestwind}</span></div>
+        <div class="cdr"><span class="cdl">Worst conditions</span><span class="cdv">${ch.worstwind}</span></div>
+      </div>
+      <div class="cdb">
+        <div class="cdb-t">MSFS 2024 Scenery</div>
+        <div class="cdr"><span class="cdl">Default in sim</span><span class="cdv" style="color:${ch.inMSFS?'var(--grn)':'var(--acc)'}">${ch.inMSFS?'Yes':'No'}</span></div>
+        <div class="cdr"><span class="cdl" style="font-size:11px">${ch.note}</span></div>
+        <div class="sclinks">
+          ${ch.pay?`<a class="scl pay" onclick="window.api.openExternal('${ch.pay.u}');return false" href="#">$ ${ch.pay.l}</a>`:''}
+          ${ch.free?`<a class="scl free" onclick="window.api.openExternal('${ch.free.u}');return false" href="#">↑ ${ch.free.l}</a>`:''}
+        </div>
+      </div>
+      <div class="cdb">
+        <div class="cdb-t">Library Status</div>
+        <div class="cdr"><span class="cdl">In your scan</span><span class="cdv" style="color:${inLib?'var(--grn)':'var(--ink3)'}">${inLib?'Yes':'No'}</span></div>
+        ${inLib&&lr?`<div class="cdr"><span class="cdl">Folder</span><span class="cdv" style="font-size:10px">${lr.folder}</span></div>`:''}
+      </div>
+    </div>
+    <div class="mcard">
+      <div class="mhdr">
+        <span class="mt">Live METAR — ${ch.icao}</span>
+        <span class="lpill"><div class="ldot"></div>aviationweather.gov</span>
+      </div>
+      <div class="mraw" id="chmetar-${ch.icao}">Fetching METAR for ${ch.icao}...</div>
+      <div id="chadv-${ch.icao}"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${S.chDep?`<button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>`:''}
+      <button class="btn bg bsm" onclick="window.api.openExternal('${ch.yt}')">&#9654; Watch Approach on YouTube</button>
+      <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector Chart</button>
+    </div>`;
+
+  fetchChMetar(ch);
+}
+
+async function fetchChMetar(ch){
+  const raw=document.getElementById('chmetar-'+ch.icao);
+  const adv=document.getElementById('chadv-'+ch.icao);
+  if(!raw)return;
+  try{
+    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+ch.icao+'&format=raw');
+    const text=(await res.text()).trim();
+    if(!text){raw.textContent='No METAR available.';return;}
+    raw.textContent=text;
+    const w=parseWind(text);
+    if(!w){adv&&(adv.innerHTML='<div class="adv adva">Wind data not available in METAR.</div>');return;}
+    const rwy=parseInt(ch.rwy)*10;
+    const diff=Math.abs((w.dir==='VRB'?0:((parseInt(w.dir)-rwy+360)%360)));
+    const angle=diff>180?360-diff:diff;
+    const xw=Math.round(w.spd*Math.sin(angle*Math.PI/180));
+    const hw=Math.round(w.spd*Math.cos(angle*Math.PI/180));
+    const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
+    let msg,cls;
+    if(w.spd<3){msg='Calm winds — ideal conditions.';cls='advg';}
+    else if(w.dir==='VRB'){msg=`Variable ${w.spd}kt${ga} — check ATIS.`;cls='adva';}
+    else if(xw>20){msg=`Extreme crosswind: ${xw}kt across RWY ${ch.rwy}. Wind ${w.dir}° at ${w.spd}${ga}kt.`;cls='advr';}
+    else if(xw>12){msg=`Challenging crosswind: ${xw}kt. Wind ${w.dir}° at ${w.spd}${ga}kt.`;cls='adva';}
+    else if(hw<0){msg=`Tailwind ${Math.abs(hw)}kt. Wind ${w.dir}° at ${w.spd}${ga}kt.`;cls='adva';}
+    else{msg=`Conditions good: ${hw}kt headwind, ${xw}kt crosswind. Wind ${w.dir}° at ${w.spd}${ga}kt.`;cls='advg';}
+    if(adv)adv.innerHTML=`<div class="adv ${cls}">${msg}</div>`;
+  }catch(e){raw.textContent='METAR unavailable.';}
+}
+
+function updateStats(){
+  const auto=S.allRows.filter(r=>r.method&&r.method!=='manual').length;
+  const nonNoise=S.allRows.filter(r=>r.method!=='noise');
+  document.getElementById('st-tot').textContent=nonNoise.length;
+  document.getElementById('st-auto').textContent=nonNoise.filter(r=>r.method&&r.method!=='manual'&&r.method!=='noise').length;
+  document.getElementById('st-man').textContent=nonNoise.filter(r=>r.method==='manual').length;
+  document.getElementById('st-un').textContent=nonNoise.filter(r=>!r.icao).length;
+  document.getElementById('rbadge').textContent=S.routes.length?getRoutes().length:0;
+}
+
+function exportRawCache(){
+  if(!S.routeCache||!Object.keys(S.routeCache).length){alert('No cached data. Fetch routes first.');return;}
+  // Build a readable summary showing all unique aircraft codes
+  const codes={};
+  for(const[dep,routes] of Object.entries(S.routeCache)){
+    for(const r of routes){
+      const ac=(r.aircraft_icao||'(empty)').toUpperCase();
+      if(!codes[ac])codes[ac]={count:0,mapped:ACFT_MAP[ac]||'OTHER (unmapped)',sample:null};
+      codes[ac].count++;
+      if(!codes[ac].sample)codes[ac].sample=`${r.dep_icao||dep}→${r.arr_icao||'?'} ${r.airline_iata||''} ${r.flight_iata||''}`;
+    }
+  }
+  const lines=['DEAN\'S MSFS ROUTE FINDER — RAW CACHE ANALYSIS','='.repeat(60),'',
+    `Total airports: ${Object.keys(S.routeCache).length}`,
+    `Total routes: ${Object.values(S.routeCache).reduce((a,b)=>a+b.length,0)}`,
+    `Unique aircraft codes: ${Object.keys(codes).length}`,'',
+    'AIRCRAFT TYPE CODES (sorted by frequency):','-'.repeat(50)];
+  Object.entries(codes).sort((a,b)=>b[1].count-a[1].count).forEach(([code,info])=>{
+    lines.push(`  ${code.padEnd(8)} ${String(info.count).padStart(4)} routes  →  ${info.mapped.padEnd(20)}  e.g. ${info.sample}`);
+  });
+  lines.push('','FULL JSON CACHE:','-'.repeat(50));
+  lines.push(JSON.stringify(S.routeCache,null,2));
+  const blob=new Blob([lines.join('\n')],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='dean_msfs_cache_debug.txt';a.click();
+}
+</script></body></html>

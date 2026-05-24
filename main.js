@@ -1,0 +1,77 @@
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const path  = require('path');
+const fs    = require('fs');
+const os    = require('os');
+const https = require('https');
+
+// Fix GPU cache errors when running as Administrator on Windows
+app.setPath('userData',    path.join(os.homedir(), '.dean-msfs-cache'));
+app.setPath('sessionData', path.join(os.homedir(), '.dean-msfs-session'));
+
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('in-process-gpu');
+app.commandLine.appendSwitch('disable-dev-shm-usage');
+app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor,UseSkiaRenderer');
+app.commandLine.appendSwitch('use-angle', 'swiftshader');
+
+let win;
+function createWindow() {
+  win = new BrowserWindow({
+    width:1440, height:900, minWidth:1100, minHeight:700,
+    frame:false, backgroundColor:'#000000',
+    webPreferences:{
+      preload: path.join(__dirname,'preload.js'),
+      contextIsolation:true, nodeIntegration:false
+    }
+  });
+  win.loadFile('index.html');
+}
+app.whenReady().then(createWindow);
+app.on('window-all-closed',()=>{ if(process.platform!=='darwin') app.quit(); });
+app.on('web-contents-created',(_,c)=>{
+  c.setWindowOpenHandler(({url})=>{ shell.openExternal(url); return {action:'deny'}; });
+});
+
+ipcMain.handle('browse-folder', async ()=>{
+  const r=await dialog.showOpenDialog(win,{properties:['openDirectory'],title:'Select 3rd-Party Scenery Folder'});
+  return r.canceled?null:r.filePaths[0];
+});
+ipcMain.handle('scan-folder', async (_,p)=>{
+  try{
+    const entries=fs.readdirSync(p,{withFileTypes:true});
+    return {success:true,folders:entries.filter(e=>e.isDirectory()).map(e=>e.name)};
+  }catch(e){return {success:false,error:e.message};}
+});
+
+const CFG=path.join(os.homedir(),'.dean_msfs_v4.json');
+ipcMain.handle('load-config',()=>{try{return JSON.parse(fs.readFileSync(CFG,'utf8'));}catch{return {};}});
+ipcMain.handle('save-config',(_,cfg)=>{fs.writeFileSync(CFG,JSON.stringify(cfg,null,2));});
+
+ipcMain.handle('airlabs-routes',(_,{icao,key})=>new Promise(resolve=>{
+  const opts={
+    hostname:'airlabs.co',
+    path:`/api/v9/routes?dep_icao=${encodeURIComponent(icao)}&api_key=${encodeURIComponent(key)}`,
+    method:'GET',
+    headers:{'Accept':'application/json','User-Agent':'DeanMSFSRouteFinder/4.0'}
+  };
+  const req=https.request(opts,res=>{
+    let data='';
+    res.on('data',c=>data+=c);
+    res.on('end',()=>{
+      try{resolve({ok:res.statusCode<300,status:res.statusCode,data:JSON.parse(data)});}
+      catch{resolve({ok:false,status:res.statusCode,data:null});}
+    });
+  });
+  req.on('error',e=>resolve({ok:false,error:e.message}));
+  req.setTimeout(15000,()=>{req.destroy();resolve({ok:false,error:'timeout'});});
+  req.end();
+}));
+
+ipcMain.on('win-minimize',()=>win.minimize());
+ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());
+ipcMain.on('win-close',()=>win.close());
+ipcMain.on('open-external',(_,url)=>shell.openExternal(url));
