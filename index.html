@@ -250,7 +250,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.1.0</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.0</div>
 </div>
 <div class="hdr">
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
@@ -359,9 +359,9 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   <div class="rwy-card">
     <div class="rwy-t">Runway Override <span style="font-size:12px;font-weight:400;color:var(--ink3)">&mdash; leave blank to use live METAR</span></div>
     <div class="rwy-row">
-      <div class="rg"><label>Dep Runway</label><input class="ri" id="dep-rwy" placeholder="27R" maxlength="4" oninput="renderRoutes()"></div>
+      <div class="rg"><label>Dep Runway</label><input class="ri" id="dep-rwy" placeholder="e.g. 27R" maxlength="4" oninput="renderRoutes()"></div>
       <span style="color:var(--ink4);font-size:16px">&rarr;</span>
-      <div class="rg"><label>Arr Runway</label><input class="ri" id="arr-rwy" placeholder="31L" maxlength="4" oninput="renderRoutes()"></div>
+      <div class="rg"><label>Arr Runway</label><input class="ri" id="arr-rwy" placeholder="e.g. 31L" maxlength="4" oninput="renderRoutes()"></div>
       <div class="rwy-hint">When set, overrides METAR-recommended runway and shows in amber.</div>
       <button class="btn bg bxs" onclick="clrRwy()" style="align-self:flex-end">&times; Clear</button>
     </div>
@@ -576,6 +576,7 @@ const AIRLINE_FLEET={
   "WS":{sim:"b738",conf:"likely",name:"WestJet"},
   "BT":{sim:"a320",conf:"likely",name:"airBaltic"},
   "EA":{sim:"a320",conf:"likely",name:"Eastern Airways"},
+  "SK":{sim:"a320",conf:"likely",name:"SAS Scandinavian"},
   // ── REGIONAL / WIDEBODY — not Dean's fleet ───────────────────────────────
   "9K":{sim:null,conf:"unlikely",name:"Cape Air"},
   "OO":{sim:null,conf:"unlikely",name:"SkyWest"},
@@ -944,6 +945,7 @@ CARGO_GA_BLACKLIST.delete('KBOI');
 function fmtDur(m){
   if(!m)return'TBD';
   const h=Math.floor(m/60),min=m%60;
+  if(h===0)return min+'m';
   return h+'h '+String(min).padStart(2,'0')+'m';
 }
 function fmtDays(d){
@@ -1427,5 +1429,5 @@ function exportRawCache(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink4);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.1.0</div>
+  pointer-events:none;">v4.2.0</div>
 </body></html>
