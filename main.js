@@ -5,7 +5,7 @@ const os    = require('os');
 const https = require('https');
 
 // ── FILE LOGGER ──────────────────────────────────────────────────────────────
-const LOG_PATH = path.join(os.homedir(), 'dean_msfs_debug.log');
+const LOG_PATH = path.join(__dirname, 'dean_msfs_debug.log');
 function redact(str) {
   // Redact AirLabs API keys (32-char hex strings)
   return String(str).replace(/[a-f0-9]{32}/gi, '***REDACTED***');
