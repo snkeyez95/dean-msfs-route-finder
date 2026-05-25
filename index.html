@@ -250,7 +250,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.3</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.4</div>
 </div>
 <div class="hdr">
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
@@ -447,6 +447,7 @@ const AI={
   "LKPR":["Vaclav Havel Prague","Prague","CZ","Large Airport",50.101,14.260],
   "LHBP":["Budapest Ferenc Liszt","Budapest","HU","Large Airport",47.433,19.261],
   "LGAV":["Athens Venizelos","Athens","GR","Large Airport",37.936,23.944],
+  "LGZA":["Zakynthos International","Zakynthos","GR","Medium Airport",37.7509,20.8843],
   "CYYZ":["Toronto Pearson","Toronto","CA","Large Airport",43.677,-79.631],
   "CYYC":["Calgary International","Calgary","CA","Large Airport",51.114,-114.020],
   "CYVR":["Vancouver International","Vancouver","CA","Large Airport",49.194,-123.184],
@@ -494,7 +495,7 @@ const CONFIRMED_NARROWBODY=new Set([
   'BY','X3','TB','HV','OR','TO','PC','XQ','EC','EW','RK','LS','DE','A0',
 ]);
 ["EDDB","EDDH","LEBL","LEAL","LEMG","GCTS","LTFM","LGTS","LCPH","LLBG","OMDB","OERK","OTHH","WSSS","RJTT","RJAA","RKSI","ZBAA","ZSPD","VIDP","VABB","YSSY","YMML","NZAA","KIAH","KHOU","KFLL","KTPA","KMSY","KDTW","KBWI","KRDU","KSLC","KBNA","KCLT"].forEach(c=>IS.add(c));
-const CM={"heathrow":"EGLL","gatwick":"EGKK","stansted":"EGSS","manchester":"EGCC","liverpool":"EGGP","southampton":"EGHI","birmingham":"EGBB","edinburgh":"EGPH","amsterdam":"EHAM","frankfurt":"EDDF","munich":"EDDM","dusseldorf":"EDDL","paris":"LFPG","madrid":"LEMD","barcelona":"LEBL","rome":"LIRF","milan":"LIMC","vienna":"LOWW","zurich":"LSZH","lisbon":"LPPT","athens":"LGAV","dublin":"EIDW","brussels":"EBBR","copenhagen":"EKCH","stockholm":"ESSA","helsinki":"EFHK","warsaw":"EPWA","prague":"LKPR","budapest":"LHBP","toronto":"CYYZ","calgary":"CYYC","vancouver":"CYVR","montreal":"CYUL","newyork":"KJFK","losangeles":"KLAX","chicago":"KORD","dallas":"KDFW","miami":"KMIA","seattle":"KSEA","denver":"KDEN","sanfrancisco":"KSFO","lasvegas":"KLAS","portland":"KPDX","minneapolis":"KMSP","boston":"KBOS","sanantonio":"KSAT","atlanta":"KATL","orlando":"KMCO","dulles":"KIAD","newark":"KEWR","phoenix":"KPHX","sandiego":"KSAN","innsbruck":"LOWI"};
+const CM={"heathrow":"EGLL","gatwick":"EGKK","stansted":"EGSS","manchester":"EGCC","liverpool":"EGGP","southampton":"EGHI","birmingham":"EGBB","edinburgh":"EGPH","amsterdam":"EHAM","frankfurt":"EDDF","munich":"EDDM","dusseldorf":"EDDL","paris":"LFPG","madrid":"LEMD","barcelona":"LEBL","rome":"LIRF","milan":"LIMC","vienna":"LOWW","zurich":"LSZH","lisbon":"LPPT","athens":"LGAV","dublin":"EIDW","brussels":"EBBR","copenhagen":"EKCH","stockholm":"ESSA","helsinki":"EFHK","warsaw":"EPWA","prague":"LKPR","budapest":"LHBP","toronto":"CYYZ","calgary":"CYYC","vancouver":"CYVR","montreal":"CYUL","newyork":"KJFK","losangeles":"KLAX","chicago":"KORD","dallas":"KDFW","miami":"KMIA","seattle":"KSEA","denver":"KDEN","sanfrancisco":"KSFO","lasvegas":"KLAS","portland":"KPDX","minneapolis":"KMSP","boston":"KBOS","sanantonio":"KSAT","atlanta":"KATL","orlando":"KMCO","dulles":"KIAD","newark":"KEWR","phoenix":"KPHX","sandiego":"KSAN","innsbruck":"LOWI","zakynthos":"LGZA","zante":"LGZA"};
 
 // Aircraft type mapping
 const ACFT_MAP={
@@ -1429,5 +1430,5 @@ function exportRawCache(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.2.3</div>
+  pointer-events:none;">v4.2.4</div>
 </body></html>
