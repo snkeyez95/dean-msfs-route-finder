@@ -226,16 +226,6 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 .mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
 .mt{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink0);font-family:'JetBrains Mono',monospace}
 .mraw{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);line-height:1.5;word-break:break-all;margin-bottom:6px}
-/* RWY OVERRIDE */
-.rwy-card{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:16px 20px;margin-bottom:12px}
-.rwy-t{font-size:14px;font-weight:600;color:var(--ink0);letter-spacing:-0.02em;margin-bottom:10px}
-.rwy-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.rg{display:flex;flex-direction:column;gap:4px}
-.rg label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace}
-.ri{background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);padding:8px 11px;
-  font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--acc);width:85px}
-.ri:focus{outline:none;border-color:rgba(245,166,35,.5)}.ri::placeholder{color:var(--ink4)}
-.rwy-hint{font-size:12px;color:var(--ink3);max-width:300px;line-height:1.5}
 /* FLY-THERE PANEL */
 .ft-card{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:16px 20px;margin-bottom:14px}
 .ft-t{font-size:14px;font-weight:600;color:var(--ink0);letter-spacing:-0.02em;margin-bottom:12px}
@@ -250,7 +240,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.9</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.3.0</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -260,15 +250,15 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
   <div class="bsub">Fenix A319 / A320 / A321 &nbsp;&bull;&nbsp; PMDG 737-800 &nbsp;&bull;&nbsp; Challenging Approaches &nbsp;&bull;&nbsp; Live Routes via AirLabs</div>
   <div class="tabs">
-    <div class="tab active" data-tab="airports" onclick="sw('airports')">My Airports</div>
-    <div class="tab" data-tab="routes" onclick="sw('routes')">Plan a Flight <span class="tbadge" id="rbadge">0</span></div>
+    <div class="tab" data-tab="airports" onclick="sw('airports')">My Airports</div>
+    <div class="tab active" data-tab="routes" onclick="sw('routes')">Plan a Flight <span class="tbadge" id="rbadge">0</span></div>
     <div class="tab" data-tab="challenges" onclick="sw('challenges')">Challenging Approaches</div>
   </div>
 </div>
 <div class="main">
 
 <!-- ── TAB 1: MY AIRPORTS ── -->
-<div class="pane on" id="pane-airports"><div class="scroll">
+<div class="pane" id="pane-airports"><div class="scroll">
   <div class="stats">
     <div class="sc hi"><div class="sc-l">Total Airports</div><div class="sc-v va" id="st-tot">0</div></div>
     <div class="sc"><div class="sc-l">Auto-Matched</div><div class="sc-v vg" id="st-auto">0</div></div>
@@ -318,7 +308,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 </div></div>
 
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
-<div class="pane" id="pane-routes"><div class="scroll">
+<div class="pane on" id="pane-routes"><div class="scroll">
   <div class="api-pan">
     <div class="api-t">Live Route Data &mdash; AirLabs</div>
     <div class="api-s">Real airline schedules updated every 24h. <strong>Free plan, no credit card.</strong>
@@ -371,16 +361,6 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <option value="flt">Sort: Flight No.</option>
     </select>
     <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
-  </div>
-  <div class="rwy-card">
-    <div class="rwy-t">Runway Override <span style="font-size:12px;font-weight:400;color:var(--ink3)">&mdash; leave blank to use live METAR</span></div>
-    <div class="rwy-row">
-      <div class="rg"><label>Dep Runway</label><input class="ri" id="dep-rwy" placeholder="e.g. 27R" maxlength="4" oninput="renderRoutes()"></div>
-      <span style="color:var(--ink4);font-size:16px">&rarr;</span>
-      <div class="rg"><label>Arr Runway</label><input class="ri" id="arr-rwy" placeholder="e.g. 31L" maxlength="4" oninput="renderRoutes()"></div>
-      <div class="rwy-hint">When set, overrides METAR-recommended runway and shows in amber.</div>
-      <button class="btn bg bxs" onclick="clrRwy()" style="align-self:flex-end">&times; Clear</button>
-    </div>
   </div>
   <div class="rhdl">
     <div class="rcnt" id="rcnt">No routes loaded</div>
@@ -705,6 +685,29 @@ window.addEventListener('DOMContentLoaded',async()=>{
     }catch(e){ console.error('Session restore error:',e); }
   }
   buildChSB();renderCD(0);updateStats();
+  // Background diff-check: silently scan folder and auto-update if library changed
+  if(S.cfg.folder){
+    (async()=>{
+      try{
+        const res=await window.api.scanFolder(S.cfg.folder);
+        if(!res.success||!res.folders)return;
+        const savedFolders=new Set((S.cfg.savedRows||[]).map(r=>r.folder));
+        const newFolders=new Set(res.folders);
+        const added=res.folders.filter(f=>!savedFolders.has(f));
+        const removed=[...savedFolders].filter(f=>!newFolders.has(f));
+        if(added.length||removed.length){
+          S.allRows=[];S.selICAOs=new Set();
+          await procFolders(res.folders);
+          const n=added.length;
+          setScanNote(n>0
+            ?'Library updated — '+n+' new airport'+(n!==1?'s':'')+' detected'
+            :'Library updated — '+removed.length+' folder'+(removed.length!==1?'s':'')+' removed');
+        }else{
+          setScanNote('Library unchanged');
+        }
+      }catch(e){}
+    })();
+  }
   // Show log file path
   window.api.getLogPath().then(p=>{
     const el=document.getElementById('log-path-note');
@@ -1130,8 +1133,6 @@ function renderRoutes(){
   const rs=getRoutes();
   const cnt=rs.length;
   document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(S.routes.length?'':' — paste API key and click Fetch Live Routes');
-  const od=document.getElementById('dep-rwy').value.trim().toUpperCase();
-  const oa=document.getElementById('arr-rwy').value.trim().toUpperCase();
   if(!cnt){
     const msg=!S.routes.length?'Paste your AirLabs API key above and click Fetch Live Routes.':'No routes match your current filters.';
     document.getElementById('rt-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
@@ -1190,8 +1191,7 @@ function renderRoutes(){
           <div class="dp-st">Departure &mdash; ${r.dep}</div>
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${da[0]}</span></div>
           <div class="dpr"><span class="dl">Terminal</span><span class="dv2 g">${r.depTerm||'&mdash;'}</span></div>
-          ${od?`<div class="dpr"><span class="dl">Runway (override)</span><span class="dv2 ov">${od}</span></div>`
-              :`<div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>`}
+          <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
         </div>
@@ -1199,8 +1199,7 @@ function renderRoutes(){
           <div class="dp-st">Arrival &mdash; ${r.arr}</div>
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${aa[0]}</span></div>
           <div class="dpr"><span class="dl">Terminal</span><span class="dv2 g">${r.arrTerm||'&mdash;'}</span></div>
-          ${oa?`<div class="dpr"><span class="dl">Runway (override)</span><span class="dv2 ov">${oa}</span></div>`
-              :`<div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>`}
+          <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
         </div>
@@ -1223,10 +1222,8 @@ function togR(i){
   if(S.openRoute!==null){
     const r=getRoutes()[S.openRoute];
     if(r){
-      const od=document.getElementById('dep-rwy').value.trim().toUpperCase();
-      const oa=document.getElementById('arr-rwy').value.trim().toUpperCase();
-      if(!od)fetchMetar(r.dep,S.openRoute,'dep');
-      if(!oa)fetchMetar(r.arr,S.openRoute,'arr');
+      fetchMetar(r.dep,S.openRoute,'dep');
+      fetchMetar(r.arr,S.openRoute,'arr');
     }
   }
 }
@@ -1235,7 +1232,6 @@ function setAcft(v){S.acft=v;document.querySelectorAll('[data-acft]').forEach(e=
 function setMode(v){S.mode=v;document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
 function setConf(v){S.confFilter=v;document.querySelectorAll('[data-conf]').forEach(e=>e.classList.toggle('on',e.dataset.conf===v));S.openRoute=null;renderRoutes();}
 function setRegion(v){S.regionFilter=v;document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
-function clrRwy(){document.getElementById('dep-rwy').value='';document.getElementById('arr-rwy').value='';renderRoutes();}
 
 function exportCSV(){
   const rs=getRoutes();
@@ -1538,5 +1534,5 @@ function exportRawCache(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.2.9</div>
+  pointer-events:none;">v4.3.0</div>
 </body></html>
