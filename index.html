@@ -250,7 +250,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.5</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.6</div>
 </div>
 <div class="hdr">
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
@@ -291,12 +291,12 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   <div id="apt-sec" style="display:none">
     <div class="fbar">
       <div class="srch"><span class="si">&#128269;</span><input type="text" id="apt-srch" placeholder="Search ICAO, name, city..." oninput="renderApts()"></div>
-      <select id="apt-type" onchange="renderApts()">
-        <option value="">All Types</option>
-        <option value="Large Airport">Large Airport</option>
-        <option value="Medium Airport">Medium Airport</option>
-        <option value="Small Airport">Small Airport</option>
+      <select id="apt-show" onchange="renderApts()">
+        <option value="all">Show: All</option>
+        <option value="matched">Matched</option>
+        <option value="missing">Missing</option>
       </select>
+      <a id="ignored-link" href="#" onclick="S.showIgnored=!S.showIgnored;renderApts();return false;" style="display:none;font-size:13px;color:var(--ink3);text-decoration:none;align-self:center;white-space:nowrap"></a>
       <button class="btn bg bsm" onclick="selAll()">Select All</button>
       <button class="btn bg bsm" onclick="clrAll()">Clear</button>
       <button class="btn bg bsm" onclick="addManual()" style="margin-left:auto">+ Add ICAO</button>
@@ -305,7 +305,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <table class="atbl">
         <thead><tr>
           <th style="width:38px"></th><th style="width:80px">ICAO</th><th>Airport</th>
-          <th style="width:52px">Ctry</th><th style="width:125px">Type</th><th style="width:78px">Method</th>
+          <th style="width:52px">Ctry</th><th style="width:125px">Type</th><th style="width:78px">Method</th><th style="width:40px"></th>
         </tr></thead>
         <tbody id="apt-body"></tbody>
       </table>
@@ -667,6 +667,7 @@ const S={
   selChall:0,cfg:{},apiKey:'',
   routes:[],routeCache:{},
   chDep:'',chMaxMins:0,
+  showIgnored:false,
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -834,15 +835,38 @@ async function resolveUnknownAirports(){
 
 function renderApts(){
   const q=(document.getElementById('apt-srch').value||'').toLowerCase();
-  const tf=document.getElementById('apt-type').value;
+  const show=(document.getElementById('apt-show')||{value:'all'}).value||'all';
+  const ignored=new Set(S.cfg.ignoredFolders||[]);
+  const ignCount=S.allRows.filter(r=>r.method!=='noise'&&ignored.has(r.folder)).length;
+  const ignLink=document.getElementById('ignored-link');
+  if(ignLink){
+    ignLink.style.display=ignCount>0?'':'none';
+    ignLink.textContent=S.showIgnored?'Hide ignored':'Show ignored ('+ignCount+')';
+  }
   document.getElementById('apt-body').innerHTML=S.allRows.filter(r=>{
-    if(r.method==='noise') return false; // hide non-airport folders
+    if(r.method==='noise')return false;
+    if(ignored.has(r.folder))return S.showIgnored;
+    if(show==='matched'&&!r.icao)return false;
+    if(show==='missing'&&r.icao)return false;
     const info=AI[r.icao]||['','','',''];
-    return(!q||(r.icao||'').toLowerCase().includes(q)||info[0].toLowerCase().includes(q)||r.folder.toLowerCase().includes(q))&&(!tf||info[3]===tf);
+    if(q&&!(r.icao||'').toLowerCase().includes(q)&&!info[0].toLowerCase().includes(q)&&!r.folder.toLowerCase().includes(q))return false;
+    return true;
   }).map(r=>{
+    const isIgnored=ignored.has(r.folder);
     const info=AI[r.icao]||['Unknown Airport','','',''];
     const sel=r.icao?S.selICAOs.has(r.icao):false;
     const mc=r.method==='auto'?'var(--acc)':r.method==='fuzzy'?'#d4a017':r.method==='manual'?'var(--blu)':'var(--bg4)';
+    if(isIgnored){
+      return`<tr style="opacity:0.35">
+        <td></td>
+        <td class="icao" style="color:var(--ink4)">${r.icao||'&mdash;'}</td>
+        <td><div class="an" style="color:var(--ink3)">${info[0]}</div><div class="af">${r.folder}</div></td>
+        <td style="font-size:13px;color:var(--ink3)">${info[2]||''}</td>
+        <td><span class="bdg bgry">${info[3]||''}</span></td>
+        <td><span style="font-size:12px;color:var(--ink4)">${r.method||'&mdash;'}</span></td>
+        <td><button class="btn bg bxs" onclick="unignoreFolder(${JSON.stringify(r.folder)})" title="Restore this airport">Restore</button></td>
+      </tr>`;
+    }
     return`<tr>
       <td><input type="checkbox" ${sel?'checked':''} ${r.icao?'':'disabled'} onchange="togA('${r.icao}',this.checked)" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;"></td>
       <td class="icao" style="color:${r.icao?'var(--acc)':'var(--ink4)'}">${r.icao||'&mdash;'}</td>
@@ -850,6 +874,7 @@ function renderApts(){
       <td style="font-size:13px;color:var(--ink2)">${info[2]||''}</td>
       <td><span class="bdg bgry">${info[3]||''}</span></td>
       <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:${mc};flex-shrink:0;display:inline-block"></span>${r.method||'&mdash;'}</span></td>
+      <td>${!r.icao?`<button class="btn bg bxs" onclick="ignoreFolder(${JSON.stringify(r.folder)})" title="Ignore this airport (hide from list)" style="padding:4px 8px;font-size:13px;line-height:1">🚫</button>`:''}</td>
     </tr>`;
   }).join('');
 }
@@ -1421,13 +1446,25 @@ async function fetchChMetar(ch){
 }
 
 function updateStats(){
-  const auto=S.allRows.filter(r=>r.method&&r.method!=='manual').length;
-  const nonNoise=S.allRows.filter(r=>r.method!=='noise');
+  const ignored=new Set(S.cfg.ignoredFolders||[]);
+  const nonNoise=S.allRows.filter(r=>r.method!=='noise'&&!ignored.has(r.folder));
   document.getElementById('st-tot').textContent=nonNoise.length;
   document.getElementById('st-auto').textContent=nonNoise.filter(r=>r.method&&r.method!=='manual'&&r.method!=='noise').length;
   document.getElementById('st-man').textContent=nonNoise.filter(r=>r.method==='manual').length;
   document.getElementById('st-un').textContent=nonNoise.filter(r=>!r.icao).length;
   document.getElementById('rbadge').textContent=S.routes.length?getRoutes().length:0;
+}
+async function ignoreFolder(folder){
+  if(!S.cfg.ignoredFolders)S.cfg.ignoredFolders=[];
+  if(!S.cfg.ignoredFolders.includes(folder))S.cfg.ignoredFolders.push(folder);
+  await window.api.saveConfig(S.cfg);
+  renderApts();updateStats();
+}
+async function unignoreFolder(folder){
+  if(!S.cfg.ignoredFolders)return;
+  S.cfg.ignoredFolders=S.cfg.ignoredFolders.filter(f=>f!==folder);
+  await window.api.saveConfig(S.cfg);
+  renderApts();updateStats();
 }
 
 function exportRawCache(){
@@ -1458,5 +1495,5 @@ function exportRawCache(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.2.5</div>
+  pointer-events:none;">v4.2.6</div>
 </body></html>
