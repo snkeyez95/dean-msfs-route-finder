@@ -47,6 +47,40 @@ app.commandLine.appendSwitch('disable-dev-shm-usage');
 app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor,UseSkiaRenderer');
 app.commandLine.appendSwitch('use-angle', 'swiftshader');
 
+function isNewer(remote, local) {
+  const r = remote.split('.').map(Number);
+  const l = local.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (r[i] > l[i]) return true;
+    if (r[i] < l[i]) return false;
+  }
+  return false;
+}
+
+function checkForUpdate() {
+  try {
+    const localHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+    const localMatch = localHtml.match(/Dean's MSFS Route Finder[^v]*v(\d+\.\d+\.\d+)/);
+    if (!localMatch) return;
+    const localVer = localMatch[1];
+    https.get('https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main/index.html', res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        const remoteMatch = data.match(/Dean's MSFS Route Finder[^v]*v(\d+\.\d+\.\d+)/);
+        if (!remoteMatch) return;
+        const remoteVer = remoteMatch[1];
+        LOG.info(`Version check: local=v${localVer} remote=v${remoteVer}`);
+        if (isNewer(remoteVer, localVer) && win && !win.isDestroyed()) {
+          win.webContents.send('update-available', remoteVer);
+        }
+      });
+    }).on('error', e => LOG.warn('Version check failed:', e.message));
+  } catch(e) {
+    LOG.warn('Version check error:', e.message);
+  }
+}
+
 let win;
 function createWindow() {
   win = new BrowserWindow({
@@ -58,6 +92,7 @@ function createWindow() {
     }
   });
   win.loadFile('index.html');
+  win.webContents.once('did-finish-load', checkForUpdate);
 }
 app.whenReady().then(createWindow);
 app.on('window-all-closed',()=>{ if(process.platform!=='darwin') app.quit(); });

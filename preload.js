@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('api', {
   winMaximize:   ()    => ipcRenderer.send('win-maximize'),
   winClose:      ()    => ipcRenderer.send('win-close'),
   rendererLog:   (msg) => ipcRenderer.send('renderer-log', msg),
-  getLogPath:    ()    => ipcRenderer.invoke('get-log-path'),
+  getLogPath:         ()    => ipcRenderer.invoke('get-log-path'),
+  onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available', (_, ver) => cb(ver)),
 });
