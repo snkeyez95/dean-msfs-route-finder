@@ -250,7 +250,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.4</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.5</div>
 </div>
 <div class="hdr">
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
@@ -672,6 +672,7 @@ const S={
 // ── INIT ────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
+  if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
   if(S.cfg.apiKey){S.apiKey=S.cfg.apiKey;document.getElementById('api-key-inp').value='••••••••••••••••';setSt('API key saved. Click Fetch Live Routes after scanning.','var(--grn)');document.getElementById('fetch-btn').disabled=false;}
   if(S.cfg.routeCache){S.routeCache=S.cfg.routeCache;S.routes=buildRouteList();}
@@ -802,6 +803,33 @@ async function procFolders(folders){
   S.cfg.savedRows=S.allRows;
   await window.api.saveConfig(S.cfg);
   setScanNote('Scan complete — '+S.allRows.length+' folders read. Results saved for next session.');
+  await resolveUnknownAirports();
+}
+
+async function resolveUnknownAirports(){
+  const unknown=S.allRows.filter(r=>r.icao&&!AI[r.icao]);
+  if(!unknown.length)return;
+  setScanNote('Resolving '+unknown.length+' unknown airport'+(unknown.length>1?'s':'')+'...');
+  if(!S.cfg.resolvedAirports)S.cfg.resolvedAirports={};
+  for(const row of unknown){
+    try{
+      const resp=await fetch('https://aviationweather.gov/api/data/airport?ids='+row.icao+'&format=json');
+      if(!resp.ok)continue;
+      const data=await resp.json();
+      if(!data||!data.length)continue;
+      const a=data[0];
+      const entry=[a.site||row.icao,a.city||'',a.country||'','Medium Airport',a.lat||0,a.lon||0];
+      AI[row.icao]=entry;
+      COMMERCIAL_EXTRA.add(row.icao);
+      S.cfg.resolvedAirports[row.icao]=entry;
+    }catch(e){RLOG('resolveUnknownAirports error '+row.icao+': '+e.message);}
+  }
+  await window.api.saveConfig(S.cfg);
+  renderApts();updateStats();
+  try{S.routes=buildRouteList();}catch(e){S.routes=[];}
+  buildChSB();buildChDepSelect();
+  if(document.getElementById('pane-routes').classList.contains('on'))renderRoutes();
+  setScanNote('Scan complete — '+S.allRows.length+' folders read. '+Object.keys(S.cfg.resolvedAirports).length+' airport(s) auto-resolved.');
 }
 
 function renderApts(){
@@ -1430,5 +1458,5 @@ function exportRawCache(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.2.4</div>
+  pointer-events:none;">v4.2.5</div>
 </body></html>
