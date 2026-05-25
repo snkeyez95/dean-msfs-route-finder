@@ -250,7 +250,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.6</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.2.7</div>
 </div>
 <div class="hdr">
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
@@ -338,6 +338,18 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <span class="clbl">Mode</span>
     <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
     <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+  </div>
+  <div class="crow">
+    <span class="clbl">Confidence</span>
+    <div class="chip sq on" data-conf="all" onclick="setConf('all')">All</div>
+    <div class="chip sq" data-conf="confirmed" onclick="setConf('confirmed')">Confirmed only</div>
+    <div class="chip sq" data-conf="likely" onclick="setConf('likely')">Confirmed + Likely</div>
+  </div>
+  <div class="crow">
+    <span class="clbl">Region</span>
+    <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
+    <div class="chip sq" data-region="eu" onclick="setRegion('eu')">Europe</div>
+    <div class="chip sq" data-region="na" onclick="setRegion('na')">North America</div>
   </div>
   <div class="fbar">
     <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, flight number..." oninput="renderRoutes()"></div>
@@ -668,6 +680,7 @@ const S={
   routes:[],routeCache:{},
   chDep:'',chMaxMins:0,
   showIgnored:false,
+  confFilter:'all',regionFilter:'all',
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -1069,6 +1082,13 @@ function buildRouteList(){
   return Object.values(best).sort((a,b)=>a.dep.localeCompare(b.dep)||a.arr.localeCompare(b.arr));
 }
 
+const _CONF_SET=new Set(['FR','U2','EC','W6','VY','WN','B6','NK','F9','G4','SY','D8','DY','BY','X3','TB','HV','OR','TO','PC','XQ','EW','RK','LS','DE','A0']);
+function routeConf(r){
+  if(_CONF_SET.has(r.operAl))return'confirmed';
+  const f=AIRLINE_FLEET[r.operAl];
+  if(f&&f.conf==='likely')return'likely';
+  return'uncertain';
+}
 function getRoutes(){
   const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
   const durMax=parseInt((document.getElementById('dur-f')||{value:''}).value)||0;
@@ -1083,6 +1103,11 @@ function getRoutes(){
     }
     if(durMax&&r.dm>durMax)return false;
     if(q&&![r.dep,r.arr,r.airlineName,r.airline,r.flt].some(x=>(x||'').toLowerCase().includes(q)))return false;
+    const rc=routeConf(r);
+    if(S.confFilter==='confirmed'&&rc!=='confirmed')return false;
+    if(S.confFilter==='likely'&&rc==='uncertain')return false;
+    if(S.regionFilter==='eu'&&!/^[ELGBD]/.test(r.dep)&&!/^[ELGBD]/.test(r.arr))return false;
+    if(S.regionFilter==='na'&&!'KCMP'.includes(r.dep[0])&&!'KCMP'.includes(r.arr[0]))return false;
     return true;
   });
   rs.sort((a,b)=>srt==='airline'?a.airlineName.localeCompare(b.airlineName):
@@ -1108,8 +1133,12 @@ function renderRoutes(){
     const aa=AI[r.arr]||[r.arr,'','',''];
     const confColor=r.confidence==='confirmed'?'var(--grn)':r.confidence==='likely'?'var(--acc)':'var(--ink3)';
     const acftDisplay=r.simAcft&&r.simAcft!=='unknown'?SIM_LBL[r.simAcft]||r.simAcft:'—';
+    const dc=routeConf(r);
+    const tdBs=dc==='confirmed'?'border-left:2px solid var(--grn);background:rgba(50,215,75,0.04)'
+              :dc==='likely'?'border-left:2px solid rgba(245,166,35,0.5)'
+              :'border-left:2px solid var(--bg4)';
     const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
-      <td style="color:var(--ink3);font-size:11px;padding-left:16px">${isO?'&#9660;':'&#9658;'}</td>
+      <td style="color:var(--ink3);font-size:11px;padding-left:14px;${tdBs}">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${r.dep}&thinsp;&rarr;&thinsp;${r.arr}</div>
           <div class="rc">${da[1]||r.dep} &rarr; ${aa[1]||r.arr}</div></td>
       <td><div class="ra">${r.airlineName}</div><div class="rf">${r.flt}</div></td>
@@ -1192,6 +1221,8 @@ function togR(i){
 
 function setAcft(v){S.acft=v;document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
 function setMode(v){S.mode=v;document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
+function setConf(v){S.confFilter=v;document.querySelectorAll('[data-conf]').forEach(e=>e.classList.toggle('on',e.dataset.conf===v));S.openRoute=null;renderRoutes();}
+function setRegion(v){S.regionFilter=v;document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
 function clrRwy(){document.getElementById('dep-rwy').value='';document.getElementById('arr-rwy').value='';renderRoutes();}
 
 function exportCSV(){
@@ -1495,5 +1526,5 @@ function exportRawCache(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.2.6</div>
+  pointer-events:none;">v4.2.7</div>
 </body></html>
