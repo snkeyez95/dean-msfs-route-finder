@@ -247,12 +247,12 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
 <div id="si-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
-  SayIntentions cookie expired &mdash; paste new cookie in Settings (Plan a Flight tab)
+  <span id="si-banner-msg">SayIntentions cookie expired &mdash; paste new cookie in Settings (Plan a Flight tab)</span>
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
 <div class="hdr">
   <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
-  <div class="bsub">Fenix A319 / A320 / A321 &nbsp;&bull;&nbsp; PMDG 737-800 &nbsp;&bull;&nbsp; Challenging Approaches &nbsp;&bull;&nbsp; Live Routes via AirLabs</div>
+  <div class="bsub">Fenix A319 / A320 / A321 &nbsp;&bull;&nbsp; PMDG 737-800 &nbsp;&bull;&nbsp; Challenging Approaches &nbsp;&bull;&nbsp; Live Routes via SayIntentions.AI</div>
   <div class="tabs">
     <div class="tab" data-tab="airports" onclick="sw('airports')">My Airports</div>
     <div class="tab active" data-tab="routes" onclick="sw('routes')">Plan a Flight <span class="tbadge" id="rbadge">0</span></div>
@@ -329,8 +329,8 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       Sign in at <a href="#" onclick="window.api.openExternal('https://sayintentions.ai');return false">sayintentions.ai</a>,
       open DevTools &rarr; Application &rarr; Cookies, copy the <strong>p2_session_id</strong> value and paste below.</div>
     <div class="api-row">
-      <input class="api-inp" type="password" id="si-cookie-inp" placeholder="Paste p2_session_id value here...">
-      <button class="btn bg bsm" onclick="saveSICookie()">Save Cookie</button>
+      <input class="api-inp" type="password" id="si-cookie-inp" placeholder="Paste p2_session_id value here..." oninput="onCookieInput()">
+      <button class="btn bg bsm" id="save-cookie-btn" onclick="saveSICookie()">Save Cookie</button>
       <button class="btn bp bsm" id="fetch-btn" onclick="fetchSIRoutes()" disabled>Refresh Routes</button>
     </div>
     <div class="api-st" id="api-st"></div>
@@ -598,6 +598,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     S.siCookie=S.cfg.siCookie;
     document.getElementById('si-cookie-inp').value='••••••••••••••••';
     document.getElementById('fetch-btn').disabled=false;
+    setCookieBtnSaved(true);
   }
   // Load route registry
   S.routeRegistry=await window.api.siGetRegistry();
@@ -864,6 +865,16 @@ function siSetProg(pct){
   w.style.display='block';f.style.width=pct+'%';
 }
 
+function setCookieBtnSaved(saved){
+  const btn=document.getElementById('save-cookie-btn');
+  if(!btn)return;
+  btn.style.opacity=saved?'0.4':'';
+  btn.style.pointerEvents=saved?'none':'';
+}
+function onCookieInput(){
+  const v=document.getElementById('si-cookie-inp').value;
+  setCookieBtnSaved(!v.trim()||v.startsWith('•'));
+}
 async function saveSICookie(){
   const k=document.getElementById('si-cookie-inp').value.trim();
   if(!k||k.startsWith('•'))return;
@@ -871,6 +882,7 @@ async function saveSICookie(){
   document.getElementById('si-cookie-inp').value='••••••••••••••••';
   setSt('Cookie saved.','var(--grn)');
   document.getElementById('fetch-btn').disabled=false;
+  setCookieBtnSaved(true);
 }
 
 function toggleFleetPanel(){
@@ -903,7 +915,7 @@ function renderFleetPanel(){
   }).join('');
 }
 
-async function toggleFleet(code,checked){
+function toggleFleet(code,checked){
   if(!S.cfg.myFleet||!Object.keys(S.cfg.myFleet).length){
     S.cfg.myFleet={};
     FLEET_DEF.forEach(f=>{S.cfg.myFleet[f.code]=f.def;});
@@ -914,10 +926,10 @@ async function toggleFleet(code,checked){
     const active=getActiveFleet();
     if(!FLEET_DEF.some(f=>active.has(f.code)&&SI_ACFT_MAP[f.code]===S.acft))S.acft='all';
   }
-  await window.api.saveConfig(S.cfg);
-  renderFleetPanel();
+  // Update chips and routes immediately — no await needed for instant feedback
   renderFleetChips();
   renderRoutes();
+  window.api.saveConfig(S.cfg);
 }
 
 function renderFleetChips(){
@@ -985,6 +997,17 @@ function pruneRegistry(){
   if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
 }
 
+function showSIError(msg){
+  const b=document.getElementById('si-banner');
+  const m=document.getElementById('si-banner-msg');
+  if(!b)return;
+  if(m)m.textContent=msg||'Route fetch failed — cookie may be expired. Paste a new cookie in Settings.';
+  b.style.display='flex';
+}
+function isFatalStatus(res){
+  return res.expired||res.status===401||res.status===403||res.status===429;
+}
+
 async function fetchSIRoutes(){
   RLOG('fetchSIRoutes started');
   if(!S.siCookie){setSt('No cookie — save your SayIntentions cookie first.','var(--acc)');return;}
@@ -994,10 +1017,15 @@ async function fetchSIRoutes(){
   setSt('Fetching page 1...','var(--acc)');
   const p1=await window.api.siFetchPage({page:1,cookie:S.siCookie});
   if(!p1.ok){
-    setSt('Fetch failed: '+(p1.error||'HTTP '+p1.status),'var(--red)');
-    btn.disabled=false;siSetProg(-1);return;
+    btn.disabled=false;siSetProg(-1);
+    if(isFatalStatus(p1)){
+      setSt('Fetch failed — cookie expired or rate limited.','var(--red)');
+      showSIError();
+    }else{
+      setSt('Fetch failed: '+(p1.error||'HTTP '+p1.status),'var(--red)');
+    }
+    return;
   }
-  if(p1.expired){btn.disabled=false;siSetProg(-1);return;}
   const pagination=p1.data?.pagination||{};
   const totalPages=pagination.totalPages||pagination.total_pages||1;
   RLOG('fetchSIRoutes: totalPages='+totalPages);
@@ -1007,8 +1035,15 @@ async function fetchSIRoutes(){
     setSt('Fetching page '+pg+' of '+totalPages+'...','var(--acc)');
     await new Promise(r=>setTimeout(r,500));
     const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
-    if(!res.ok){RLOG('si page '+pg+' failed: '+(res.error||res.status));continue;}
-    if(res.expired){btn.disabled=false;siSetProg(-1);return;}
+    if(!res.ok){
+      RLOG('si page '+pg+' failed: status='+(res.status||res.error));
+      if(isFatalStatus(res)){
+        setSt('Fetch stopped — cookie expired or rate limited (page '+pg+').','var(--red)');
+        showSIError();
+        btn.disabled=false;siSetProg(-1);return;
+      }
+      continue;
+    }
     processPage(res.data?.data||res.data?.routes||[]);
     siSetProg(Math.round(pg/totalPages*100));
   }
