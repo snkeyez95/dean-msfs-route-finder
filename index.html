@@ -240,10 +240,14 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.3.1</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.0</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
+  <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
+</div>
+<div id="si-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
+  SayIntentions cookie expired &mdash; paste new cookie in Settings (Plan a Flight tab)
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
 <div class="hdr">
@@ -310,15 +314,19 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
 <div class="pane on" id="pane-routes"><div class="scroll">
   <div class="api-pan">
-    <div class="api-t">Live Route Data &mdash; AirLabs</div>
-    <div class="api-s">Real airline schedules updated every 24h. <strong>Free plan, no credit card.</strong>
-      Sign up at <a href="#" onclick="window.api.openExternal('https://airlabs.co');return false">airlabs.co</a> &mdash; paste key below once, it's saved permanently.</div>
+    <div class="api-t">Live Route Data &mdash; SayIntentions.AI</div>
+    <div class="api-s">Real commercial traffic flying on SayIntentions right now.
+      Sign in at <a href="#" onclick="window.api.openExternal('https://sayintentions.ai');return false">sayintentions.ai</a>,
+      open DevTools &rarr; Application &rarr; Cookies, copy the <strong>p2_session_id</strong> value and paste below.</div>
     <div class="api-row">
-      <input class="api-inp" type="password" id="api-key-inp" placeholder="Paste AirLabs API key here...">
-      <button class="btn bg bsm" onclick="saveKey()">Save Key</button>
-      <button class="btn bp bsm" id="fetch-btn" onclick="fetchRoutes()" disabled>Fetch Live Routes</button>
+      <input class="api-inp" type="password" id="si-cookie-inp" placeholder="Paste p2_session_id value here...">
+      <button class="btn bg bsm" onclick="saveSICookie()">Save Cookie</button>
+      <button class="btn bp bsm" id="fetch-btn" onclick="fetchSIRoutes()" disabled>Refresh Routes</button>
     </div>
     <div class="api-st" id="api-st"></div>
+    <div id="si-prog" style="display:none" class="prog">
+      <div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div>
+    </div>
   </div>
   <div class="crow">
     <span class="clbl">Aircraft</span>
@@ -334,46 +342,41 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
   </div>
   <div class="crow">
-    <span class="clbl">Confidence</span>
-    <div class="chip sq on" data-conf="all" onclick="setConf('all')">All</div>
-    <div class="chip sq" data-conf="confirmed" onclick="setConf('confirmed')">Confirmed only</div>
-    <div class="chip sq" data-conf="confirmed_likely" onclick="setConf('confirmed_likely')">Confirmed + Likely</div>
-  </div>
-  <div class="crow">
     <span class="clbl">Region</span>
     <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
     <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
     <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
   </div>
   <div class="fbar">
-    <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, flight number..." oninput="renderRoutes()"></div>
+    <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
     <select id="dur-f" onchange="renderRoutes()">
       <option value="">Duration: Any</option>
-      <option value="60">Under 1h</option>
-      <option value="120">Under 2h</option>
-      <option value="180">Under 3h</option>
-      <option value="240">Under 4h</option>
-      <option value="360">Under 6h</option>
+      <option value="1">Under 1h</option>
+      <option value="2">Under 2h</option>
+      <option value="3">Under 3h</option>
+      <option value="4">Under 4h</option>
+      <option value="6">Under 6h</option>
     </select>
     <select id="sort-f" onchange="renderRoutes()">
       <option value="dur">Sort: Duration</option>
       <option value="airline">Sort: Airline</option>
-      <option value="flt">Sort: Flight No.</option>
+      <option value="dist">Sort: Distance</option>
     </select>
     <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
   </div>
   <div class="rhdl">
     <div class="rcnt" id="rcnt">No routes loaded</div>
-    <div class="lpill"><div class="ldot"></div>AirLabs schedule data</div>
+    <div class="lpill"><div class="ldot"></div>SayIntentions.AI traffic</div>
   </div>
   <div class="rwrap">
     <table class="rtbl">
       <thead><tr>
         <th style="width:24px"></th>
         <th style="width:130px">Route</th>
-        <th>Airline &amp; Flight</th>
+        <th>Airline</th>
+        <th style="width:130px">Aircraft</th>
         <th style="width:85px">Duration</th>
-        <th style="width:130px">Operates</th>
+        <th style="width:90px">Distance</th>
       </tr></thead>
       <tbody id="rt-body"></tbody>
     </table>
@@ -485,122 +488,19 @@ const COMMERCIAL_EXTRA=new Set([
   'KCLT','KBOS','KDEN','KAUS','KBDL','KCMH','KLGA','KPHL',
 ]);
 
-// Confirmed single-fleet narrowbody carriers — trust their destinations regardless
-const CONFIRMED_NARROWBODY=new Set([
-  'FR','U2','W6','VY','WN','B6','NK','F9','G4','SY','D8','DY',
-  'BY','X3','TB','HV','OR','TO','PC','XQ','EC','EW','RK','LS','DE','A0',
-]);
 ["EDDB","EDDH","LEBL","LEAL","LEMG","GCTS","LTFM","LGTS","LCPH","LLBG","OMDB","OERK","OTHH","WSSS","RJTT","RJAA","RKSI","ZBAA","ZSPD","VIDP","VABB","YSSY","YMML","NZAA","KIAH","KHOU","KFLL","KTPA","KMSY","KDTW","KBWI","KRDU","KSLC","KBNA","KCLT"].forEach(c=>IS.add(c));
 const CM={"heathrow":"EGLL","gatwick":"EGKK","stansted":"EGSS","manchester":"EGCC","liverpool":"EGGP","southampton":"EGHI","birmingham":"EGBB","edinburgh":"EGPH","amsterdam":"EHAM","frankfurt":"EDDF","munich":"EDDM","dusseldorf":"EDDL","paris":"LFPG","madrid":"LEMD","barcelona":"LEBL","rome":"LIRF","milan":"LIMC","vienna":"LOWW","zurich":"LSZH","lisbon":"LPPT","athens":"LGAV","dublin":"EIDW","brussels":"EBBR","copenhagen":"EKCH","stockholm":"ESSA","helsinki":"EFHK","warsaw":"EPWA","prague":"LKPR","budapest":"LHBP","toronto":"CYYZ","calgary":"CYYC","vancouver":"CYVR","montreal":"CYUL","newyork":"KJFK","losangeles":"KLAX","chicago":"KORD","dallas":"KDFW","miami":"KMIA","seattle":"KSEA","denver":"KDEN","sanfrancisco":"KSFO","lasvegas":"KLAS","portland":"KPDX","minneapolis":"KMSP","boston":"KBOS","sanantonio":"KSAT","atlanta":"KATL","orlando":"KMCO","dulles":"KIAD","newark":"KEWR","phoenix":"KPHX","sandiego":"KSAN","innsbruck":"LOWI","zakynthos":"LGZA","zante":"LGZA"};
 
-// Aircraft type mapping
-const ACFT_MAP={
-  // A319 family — ICAO codes
-  "A319":"a319","A19N":"a319","A318":"a319","A310":"a319",
-  // A319 — numeric/IATA variants AirLabs sometimes returns
-  "319":"a319","318":"a319",
-  // A320 family — ICAO codes
-  "A320":"a320","A20N":"a320","A20P":"a320",
-  // A320 — numeric/IATA variants
-  "320":"a320","32A":"a320","32N":"a320",
-  // A321 family — ICAO codes
-  "A321":"a321","A21N":"a321","A21P":"a321","A21X":"a321",
-  // A321 — numeric/IATA variants
-  "321":"a321","32B":"a321",
-  // Boeing 737-800 family — ICAO codes
-  "B737":"b738","B738":"b738","B739":"b738",
-  "B38M":"b738","B37M":"b738","B39M":"b738","B7M8":"b738","B7M9":"b738",
-  // Boeing 737 — IATA codes AirLabs uses
-  "73H":"b738","738":"b738","739":"b738","737":"b738","73J":"b738","73W":"b738","73G":"b738","73N":"b738",
-  // Nearest-match for common similar types
-  "A220":"a319","BCS1":"a319","BCS3":"a320","BCS5":"a321",
-  "E190":"a319","E195":"a319","E75L":"a319","E170":"a319","E175":"a319","E7W":"a319",
-  "AT72":"a319","AT76":"a319","DH8D":"a319","DH8C":"a319",
-};
-const NEAREST={"A220":"≈ Fenix A319","BCS1":"≈ Fenix A319","BCS3":"≈ Fenix A320","E190":"≈ Fenix A319","E195":"≈ Fenix A319","E75L":"≈ Fenix A319","E170":"≈ Fenix A319","E175":"≈ Fenix A319","AT72":"≈ Fenix A319","AT76":"≈ Fenix A319","DH8D":"≈ Fenix A319","DH8C":"≈ Fenix A319"};
-
-// ── AIRLINE FLEET DATABASE ──────────────────────────────────────────────────
-// Built from Dean's actual AirLabs cache. AirLabs free tier returns no aircraft
-// type for ~99% of routes, so we infer from the airline's known fleet.
-// conf: 'confirmed' = single-fleet carrier (100% reliable)
-//       'likely'    = mixed fleet, but short/medium haul = narrowbody
-//       'unlikely'  = regional jets or widebody — not Dean's sim fleet
-const AIRLINE_FLEET={
-  // ── CONFIRMED NARROWBODY ─────────────────────────────────────────────────
-  "FR":{sim:"b738",conf:"confirmed",name:"Ryanair"},
-  "U2":{sim:"a320",conf:"confirmed",name:"easyJet"},
-  "W6":{sim:"a321",conf:"confirmed",name:"Wizz Air"},
-  "VY":{sim:"a320",conf:"confirmed",name:"Vueling"},
-  "WN":{sim:"b738",conf:"confirmed",name:"Southwest"},
-  "B6":{sim:"a320",conf:"confirmed",name:"JetBlue"},
-  "NK":{sim:"a320",conf:"confirmed",name:"Spirit"},
-  "F9":{sim:"a321",conf:"confirmed",name:"Frontier"},
-  "G4":{sim:"a320",conf:"confirmed",name:"Allegiant"},
-  "SY":{sim:"b738",conf:"confirmed",name:"Sun Country"},
-  "D8":{sim:"b738",conf:"confirmed",name:"Norwegian"},
-  "DY":{sim:"b738",conf:"confirmed",name:"Norwegian"},
-  "BY":{sim:"b738",conf:"confirmed",name:"TUI Airways"},
-  "X3":{sim:"b738",conf:"confirmed",name:"TUIfly"},
-  "TB":{sim:"a320",conf:"confirmed",name:"TUI fly Belgium"},
-  "HV":{sim:"b738",conf:"confirmed",name:"Transavia NL"},
-  "OR":{sim:"b738",conf:"confirmed",name:"TUI fly NL"},
-  "TO":{sim:"b738",conf:"confirmed",name:"Transavia France"},
-  "PC":{sim:"b738",conf:"confirmed",name:"Pegasus"},
-  "XQ":{sim:"b738",conf:"confirmed",name:"SunExpress"},
-  "EC":{sim:"a320",conf:"confirmed",name:"easyJet Europe"},
-  "EW":{sim:"a320",conf:"confirmed",name:"Eurowings"},
-  "RK":{sim:"b738",conf:"confirmed",name:"Ryanair UK"},
-  "LS":{sim:"b738",conf:"confirmed",name:"Jet2"},
-  "DE":{sim:"b738",conf:"confirmed",name:"Condor"},
-  "A0":{sim:"a320",conf:"confirmed",name:"SunExpress"},
-  // ── LIKELY NARROWBODY (short/medium haul) ────────────────────────────────
-  "BA":{sim:"a320",conf:"likely",name:"British Airways"},
-  "LH":{sim:"a320",conf:"likely",name:"Lufthansa"},
-  "AF":{sim:"a320",conf:"likely",name:"Air France"},
-  "KL":{sim:"b738",conf:"likely",name:"KLM"},
-  "IB":{sim:"a320",conf:"likely",name:"Iberia"},
-  "AY":{sim:"a320",conf:"likely",name:"Finnair"},
-  "SN":{sim:"a320",conf:"likely",name:"Brussels Airlines"},
-  "TP":{sim:"a320",conf:"likely",name:"TAP Air Portugal"},
-  "OS":{sim:"a320",conf:"likely",name:"Austrian"},
-  "LX":{sim:"a320",conf:"likely",name:"SWISS"},
-  "EI":{sim:"a320",conf:"likely",name:"Aer Lingus"},
-  "AA":{sim:"a320",conf:"likely",name:"American Airlines"},
-  "DL":{sim:"b738",conf:"likely",name:"Delta"},
-  "UA":{sim:"a320",conf:"likely",name:"United"},
-  "AS":{sim:"b738",conf:"likely",name:"Alaska Airlines"},
-  "AC":{sim:"b738",conf:"likely",name:"Air Canada"},
-  "WS":{sim:"b738",conf:"likely",name:"WestJet"},
-  "BT":{sim:"a320",conf:"likely",name:"airBaltic"},
-  "EA":{sim:"a320",conf:"likely",name:"Eastern Airways"},
-  "SK":{sim:"a320",conf:"likely",name:"SAS Scandinavian"},
-  // ── REGIONAL / WIDEBODY — not Dean's fleet ───────────────────────────────
-  "9K":{sim:null,conf:"unlikely",name:"Cape Air"},
-  "OO":{sim:null,conf:"unlikely",name:"SkyWest"},
-  "MQ":{sim:null,conf:"unlikely",name:"Envoy Air"},
-  "9E":{sim:null,conf:"unlikely",name:"Endeavor Air"},
-  "OO":{sim:null,conf:"unlikely",name:"SkyWest"},
-  "MQ":{sim:null,conf:"unlikely",name:"Envoy Air"},
-  "QK":{sim:null,conf:"unlikely",name:"Jazz Aviation"},
-  "GR":{sim:null,conf:"unlikely",name:"Aurigny"},
-  "WA":{sim:null,conf:"unlikely",name:"KLM Cityhopper"},
-  "LM":{sim:null,conf:"unlikely",name:"Loganair"},
-  "VS":{sim:null,conf:"unlikely",name:"Virgin Atlantic"},
-  "ET":{sim:null,conf:"unlikely",name:"Ethiopian"},
-  "EK":{sim:null,conf:"unlikely",name:"Emirates"},
-  "QR":{sim:null,conf:"unlikely",name:"Qatar Airways"},
-  "EY":{sim:null,conf:"unlikely",name:"Etihad"},
-  "TS":{sim:null,conf:"unlikely",name:"Air Transat"},
-  "JL":{sim:null,conf:"unlikely",name:"Japan Airlines"},
-  "NH":{sim:null,conf:"unlikely",name:"ANA"},
-  "QX":{sim:null,conf:"unlikely",name:"Horizon Air"},
-  "9M":{sim:null,conf:"unlikely",name:"Central Mountain Air"},
-  "TJ":{sim:null,conf:"unlikely",name:"Tradewind"},
+// SayIntentions aircraft_type → sim key (only accepted types)
+const SI_ACFT_MAP={
+  'B739':'b738','B738':'b738','B38M':'b738','B737':'b738',
+  'A319':'a319',
+  'A320':'a320','A20N':'a320',
+  'A321':'a321','A21N':'a321',
 };
 
 const SIM_LBL={"a319":"Fenix A319","a320":"Fenix A320","a321":"Fenix A321","b738":"PMDG 737-800"};
 const SIM_SB={"a319":"A319","a320":"A320","a321":"A321","b738":"B738"};
-const DAYS={"mon":"Mon","tue":"Tue","wed":"Wed","thu":"Thu","fri":"Fri","sat":"Sat","sun":"Sun"};
 
 // RWY headings for METAR-based recommendation
 const RWY_HDGS={
@@ -660,11 +560,11 @@ const CH=[
 const S={
   folderPath:'',allRows:[],selICAOs:new Set(),
   acft:'all',mode:'1',openRoute:null,
-  selChall:0,cfg:{},apiKey:'',
-  routes:[],routeCache:{},
+  selChall:0,cfg:{},siCookie:'',
+  routeRegistry:{},
   chDep:'',chMaxMins:0,
   showIgnored:false,
-  confFilter:'all',regionFilter:'all',
+  regionFilter:'all',
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -672,8 +572,14 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
-  if(S.cfg.apiKey){S.apiKey=S.cfg.apiKey;document.getElementById('api-key-inp').value='••••••••••••••••';setSt('API key saved. Click Fetch Live Routes after scanning.','var(--grn)');document.getElementById('fetch-btn').disabled=false;}
-  if(S.cfg.routeCache){S.routeCache=S.cfg.routeCache;S.routes=buildRouteList();}
+  if(S.cfg.siCookie){
+    S.siCookie=S.cfg.siCookie;
+    document.getElementById('si-cookie-inp').value='••••••••••••••••';
+    setSt('Cookie saved. Click Refresh Routes after scanning.','var(--grn)');
+    document.getElementById('fetch-btn').disabled=false;
+  }
+  // Load route registry
+  S.routeRegistry=await window.api.siGetRegistry();
   if(S.cfg.savedRows&&S.cfg.savedRows.length){
     try{
       S.allRows=S.cfg.savedRows;
@@ -681,11 +587,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
       document.getElementById('apt-sec').style.display='block';
       renderApts();
       setScanNote('Loaded '+S.allRows.length+' airports from last session. Click Scan Now if your library has changed.');
-      try{ S.routes=buildRouteList(); RLOG('buildRouteList init OK: '+S.routes.length+' routes'); }catch(e){ RLOG('buildRouteList init ERROR: '+e.message); console.error('buildRouteList init error:',e); S.routes=[]; }
     }catch(e){ console.error('Session restore error:',e); }
   }
-  buildChSB();renderCD(0);updateStats();
-  // Background diff-check: silently scan folder and auto-update if library changed
+  buildChSB();renderCD(0);updateStats();renderRoutes();
+  // Background diff-check
   if(S.cfg.folder){
     (async()=>{
       try{
@@ -718,6 +623,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
     const b=document.getElementById('upd-banner');
     const m=document.getElementById('upd-msg');
     if(b&&m){m.textContent='Update available: v'+ver+' — run update.bat to install';b.style.display='flex';}
+  });
+  // SI cookie expiry
+  window.api.onSiCookieExpired(()=>{
+    const b=document.getElementById('si-banner');
+    if(b)b.style.display='flex';
   });
 });
 
@@ -815,16 +725,7 @@ async function procFolders(folders){
   RLOG('procFolders complete: matched='+matchCount+' unmatched='+unmatchCount+' noise='+noiseCount);
   setScanNote('Processed: '+matchCount+' matched, '+unmatchCount+' unmatched, '+noiseCount+' noise skipped.');
   document.getElementById('apt-sec').style.display='block';
-  // Render airports FIRST so they show even if route building fails
   renderApts();updateStats();
-  // Then build routes safely
-  try{
-    S.routes=buildRouteList(); RLOG('buildRouteList scan OK: '+S.routes.length+' routes');
-  }catch(e){
-    RLOG('buildRouteList scan ERROR: '+e.message);
-    console.error('buildRouteList error:',e);
-    S.routes=[];
-  }
   buildChSB();buildChDepSelect();
   if(document.getElementById('pane-routes').classList.contains('on'))renderRoutes();
   S.cfg.savedRows=S.allRows;
@@ -853,7 +754,6 @@ async function resolveUnknownAirports(){
   }
   await window.api.saveConfig(S.cfg);
   renderApts();updateStats();
-  try{S.routes=buildRouteList();}catch(e){S.routes=[];}
   buildChSB();buildChDepSelect();
   if(document.getElementById('pane-routes').classList.contains('on'))renderRoutes();
   setScanNote('Scan complete — '+S.allRows.length+' folders read. '+Object.keys(S.cfg.resolvedAirports).length+' airport(s) auto-resolved.');
@@ -909,10 +809,10 @@ function togA(icao,c){
   if(c)S.selICAOs.add(icao);else S.selICAOs.delete(icao);
   S.allRows.forEach(r=>{if(r.icao===icao)r.selected=c;});
   S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);
-  S.routes=buildRouteList();updateStats();renderRoutes();
+  updateStats();renderRoutes();
 }
-function selAll(){S.allRows.forEach(r=>{if(r.icao){S.selICAOs.add(r.icao);r.selected=true;}});S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);S.routes=buildRouteList();renderApts();updateStats();}
-function clrAll(){S.selICAOs.clear();S.allRows.forEach(r=>r.selected=false);S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);S.routes=buildRouteList();renderApts();updateStats();}
+function selAll(){S.allRows.forEach(r=>{if(r.icao){S.selICAOs.add(r.icao);r.selected=true;}});S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);renderApts();updateStats();}
+function clrAll(){S.selICAOs.clear();S.allRows.forEach(r=>r.selected=false);S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);renderApts();updateStats();}
 
 async function addManual(){
   const icao=prompt('Enter 4-letter ICAO code:');if(!icao)return;
@@ -922,283 +822,206 @@ async function addManual(){
   S.allRows.push({folder,icao:c,method:'manual',selected:true});S.selICAOs.add(c);
   const ov=S.cfg.manualOverrides||{};ov[folder]=c;S.cfg.manualOverrides=ov;
   S.cfg.savedRows=S.allRows;await window.api.saveConfig(S.cfg);
-  S.routes=buildRouteList();renderApts();updateStats();buildChSB();buildChDepSelect();
+  renderApts();updateStats();buildChSB();buildChDepSelect();
 }
 
-// ── AIRLABS ─────────────────────────────────────────────────────────────────
+// ── SAYINTENTIONS ────────────────────────────────────────────────────────────
 function setSt(msg,c){const e=document.getElementById('api-st');e.textContent=msg;e.style.color=c;}
+function siSetProg(pct){
+  const w=document.getElementById('si-prog'),f=document.getElementById('si-prog-fill');
+  if(!w||!f)return;
+  if(pct<0){w.style.display='none';return;}
+  w.style.display='block';f.style.width=pct+'%';
+}
 
-async function saveKey(){
-  const k=document.getElementById('api-key-inp').value.trim();
+async function saveSICookie(){
+  const k=document.getElementById('si-cookie-inp').value.trim();
   if(!k||k.startsWith('•'))return;
-  S.apiKey=k;S.cfg.apiKey=k;await window.api.saveConfig(S.cfg);
-  document.getElementById('api-key-inp').value='••••••••••••••••';
-  setSt('API key saved.','var(--grn)');
+  S.siCookie=k;S.cfg.siCookie=k;await window.api.saveConfig(S.cfg);
+  document.getElementById('si-cookie-inp').value='••••••••••••••••';
+  setSt('Cookie saved.','var(--grn)');
   document.getElementById('fetch-btn').disabled=false;
 }
 
-async function fetchRoutes(){
-  RLOG('fetchRoutes started, airports='+[...S.selICAOs].join(','));
-  if(!S.apiKey){setSt('No API key — save your key first.','var(--acc)');return;}
-  const icaos=[...S.selICAOs].filter(i=>i&&i.length===4);
-  if(!icaos.length){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
+function processPage(routes){
+  const now=new Date().toISOString();
+  for(const r of routes){
+    if(r.type!=='carrier')continue;
+    if(!SI_ACFT_MAP[r.aircraft_type])continue;
+    const dep=(r.departure_airport||'').toUpperCase();
+    const arr=(r.arrival_airport||'').toUpperCase();
+    if(!S.selICAOs.has(dep)&&!S.selICAOs.has(arr))continue;
+    const id=String(r.id);
+    if(S.routeRegistry[id]){
+      S.routeRegistry[id].last_seen=now;
+      S.routeRegistry[id].times_seen++;
+    }else{
+      S.routeRegistry[id]={
+        id:r.id,callsign:r.callsign,type:r.type,
+        airline:r.airline,aircraft_type:r.aircraft_type,
+        aircraft_category:r.aircraft_category,
+        departure_airport:dep,arrival_airport:arr,
+        gate_origin:r.gate_origin,gate_destination:r.gate_destination,
+        distance_nm:r.distance_nm,flight_length:r.flight_length,
+        description:r.description,
+        departure_country:r.departure_country,arrival_country:r.arrival_country,
+        first_seen:now,last_seen:now,times_seen:1,
+      };
+    }
+  }
+}
+
+function pruneRegistry(){
+  const cutoff=new Date(Date.now()-14*24*60*60*1000).toISOString();
+  for(const id of Object.keys(S.routeRegistry)){
+    if(S.routeRegistry[id].last_seen<cutoff)delete S.routeRegistry[id];
+  }
+  const keys=Object.keys(S.routeRegistry);
+  if(keys.length>5000){
+    keys.sort((a,b)=>S.routeRegistry[a].last_seen.localeCompare(S.routeRegistry[b].last_seen));
+    keys.slice(0,keys.length-5000).forEach(id=>delete S.routeRegistry[id]);
+  }
+  const size=JSON.stringify(S.routeRegistry).length;
+  if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
+}
+
+async function fetchSIRoutes(){
+  RLOG('fetchSIRoutes started');
+  if(!S.siCookie){setSt('No cookie — save your SayIntentions cookie first.','var(--acc)');return;}
+  if(!S.selICAOs.size){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
   const btn=document.getElementById('fetch-btn');
-  btn.disabled=true;
-  let total=0,errors=0;
-  for(let i=0;i<icaos.length;i++){
-    const icao=icaos[i];
-    btn.textContent=`Fetching ${i+1}/${icaos.length}...`;
-    setSt(`[${i+1}/${icaos.length}] Fetching ${icao}...`,'var(--acc)');
-    try{
-      const res=await window.api.airlabsRoutes({icao,key:S.apiKey});
-      if(res.ok&&res.data&&res.data.response){
-        S.routeCache[icao]=res.data.response;
-        total+=res.data.response.length;
-        RLOG('airlabs OK: '+icao+' routes='+res.data.response.length);
-        setSt(`[${i+1}/${icaos.length}] ${icao} — ${res.data.response.length} routes fetched`,'var(--grn)');
-      } else {
-        errors++;
-        const errMsg=res.error||('HTTP '+res.status);
-        RLOG('airlabs FAIL: '+icao+' '+errMsg);
-        setSt(`[${i+1}/${icaos.length}] ${icao} — failed: ${errMsg}`,'var(--red)');
-        if(res.status===401||res.status===403){
-          setSt('API key rejected by AirLabs — check your key and try again.','var(--red)');
-          btn.disabled=false;btn.textContent='Fetch Live Routes';return;
-        }
-        if(res.status===429){
-          setSt('Rate limit hit — wait a minute and try again.','var(--red)');
-          btn.disabled=false;btn.textContent='Fetch Live Routes';return;
-        }
-      }
-    }catch(e){
-      errors++;
-      RLOG('airlabs EXCEPTION: '+icao+' '+e.message);
-      setSt(`[${i+1}/${icaos.length}] ${icao} — error: ${e.message}`,'var(--red)');
-    }
+  btn.disabled=true;siSetProg(0);
+  setSt('Fetching page 1...','var(--acc)');
+  const p1=await window.api.siFetchPage({page:1,cookie:S.siCookie});
+  if(!p1.ok){
+    setSt('Fetch failed: '+(p1.error||'HTTP '+p1.status),'var(--red)');
+    btn.disabled=false;siSetProg(-1);return;
   }
-  S.cfg.routeCache=S.routeCache;
+  if(p1.expired){btn.disabled=false;siSetProg(-1);return;}
+  const pagination=p1.data?.pagination||{};
+  const totalPages=pagination.totalPages||pagination.total_pages||1;
+  RLOG('fetchSIRoutes: totalPages='+totalPages);
+  processPage(p1.data?.data||p1.data?.routes||[]);
+  siSetProg(Math.round(1/totalPages*100));
+  for(let pg=2;pg<=totalPages;pg++){
+    setSt('Fetching page '+pg+' of '+totalPages+'...','var(--acc)');
+    await new Promise(r=>setTimeout(r,500));
+    const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+    if(!res.ok){RLOG('si page '+pg+' failed: '+(res.error||res.status));continue;}
+    if(res.expired){btn.disabled=false;siSetProg(-1);return;}
+    processPage(res.data?.data||res.data?.routes||[]);
+    siSetProg(Math.round(pg/totalPages*100));
+  }
+  pruneRegistry();
+  await window.api.siSaveRegistry(S.routeRegistry);
+  S.cfg.siLastFetch=new Date().toISOString();
   await window.api.saveConfig(S.cfg);
-  try{ S.routes=buildRouteList(); }catch(e){ RLOG('buildRouteList post-fetch ERROR: '+e.message); S.routes=[]; }
-  btn.disabled=false;btn.textContent='Fetch Live Routes';
-  RLOG('fetchRoutes complete: total='+total+' errors='+errors+' built='+S.routes.length);
-  setSt(errors
-    ?`Done — ${total} routes from ${icaos.length-errors} airports. ${errors} failed. ${S.routes.length} shown after filtering.`
-    :`Done — ${total} routes from ${icaos.length} airports. ${S.routes.length} shown after filtering.`,
-    'var(--grn)');
-  updateStats();renderRoutes();
+  btn.disabled=false;siSetProg(-1);
+  const cnt=Object.keys(S.routeRegistry).length;
+  setSt('Done — '+cnt+' routes in registry.','var(--grn)');
+  RLOG('fetchSIRoutes complete: registry='+cnt);
+  renderRoutes();updateStats();
 }
 
-// Airports that are cargo-only or GA-only — never narrowbody passenger destinations
-const CARGO_GA_BLACKLIST=new Set([
-  'KAFW',  // Fort Worth Alliance — FedEx hub, no passenger service
-  'KBFI',  // Boeing Field Seattle — test flights only
-  'KADS',  // Addison TX — GA only
-  'KBDL',  // Bradley — actually commercial, keep
-  'KBJC',  // Rocky Mountain Metro — GA only
-  'KCSL',  // Colorado Springs — military/GA
-  'KBED',  // Hanscom — corporate/military
-  'KBLH',  // Blythe — tiny GA
-  'KCGZ',  // Casa Grande — GA
-  'KCRQ',  // McClellan-Palomar — GA/regional
-  'KCOE',  // Coeur d Alene — GA
-  'KCXP',  // Carson City — GA
-  'KBRD',  // Brainerd — small regional
-  'KCRS',  // Corsicana — GA
-  'KAST',  // Astoria — tiny GA
-  'KARA',  // New Iberia — GA
-  'KART',  // Watertown NY — GA
-  'KAPC',  // Napa — GA
-  'KAHN',  // Athens GA — GA
-  'KABS',  // Albany TX — GA
-  'KAEX',  // Alexandria LA — small regional
-  'KACY',  // Atlantic City — seasonal charter only
-  'KAPA',  // Centennial Denver — GA
-  'KAPF',  // Naples FL — small/GA
-  'KACV',  // Arcata — too small for narrowbody
-  'KABI',  // Abilene — regional jets only, no narrowbody
-  'KCOE',  // Coeur d Alene — GA
-  'KBOI',  // Boise — actually commercial, keep... remove from here
-]);
-// Remove KBOI from blacklist — it's a real commercial airport
-CARGO_GA_BLACKLIST.delete('KBOI');
-
-function fmtDur(m){
-  if(!m)return'TBD';
-  const h=Math.floor(m/60),min=m%60;
-  if(h===0)return min+'m';
-  return h+'h '+String(min).padStart(2,'0')+'m';
-}
-function fmtDays(d){
-  const MAP={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
-  if(!d||!d.length)return'Daily';
-  return d.map(x=>MAP[x]||x).join(' ');
+function fmtFlightLen(fl){
+  if(fl===null||fl===undefined||fl==='')return'—';
+  const h=parseFloat(fl);
+  if(isNaN(h))return String(fl);
+  const hrs=Math.floor(h),mins=Math.round((h-hrs)*60);
+  if(hrs===0)return mins+'m';
+  return hrs+'h '+String(mins).padStart(2,'0')+'m';
 }
 
-function buildRouteList(){
-  const REGIONAL_OPS=new Set([
-    'OO','9E','MQ','OH','CP','PT','ZW','YV','C5','KS','QX','XE','G7','EM','LF',
-    'QK','JV','PB','GX','LM','BE','WW','NR','WA','KP','GR','BM','EA','ZT',
-    '9K','9M','CM','TJ','RJ','S4',
-  ]);
-  const CARGO_GA=new Set([
-    'KAFW','KBFI','KADS','KBJC','KCSL','KBED','KBLH','KCGZ','KCRQ','KAST','KARA',
-    'KART','KAPC','KAHN','KAEX','KACY','KAPA','KAPF','KCOE','KCXP','KBRD','KCRS',
-    'KABS','KACV','CET2','HAAB','DGAA','DIAP','DNAA','MMUN','MZBZ','TAPA','OJAI',
-  ]);
-  const SINGLE_FLEET=new Set([
-    'FR','U2','W6','VY','WN','B6','NK','F9','G4','SY','D8','DY','BY','X3','TB',
-    'HV','OR','TO','PC','XQ','EC','EW','RK','LS','DE','A0',
-  ]);
-
-  const raw=[];
-  for(const[dep,rts] of Object.entries(S.routeCache)){
-    for(const r of rts){
-      const arr=(r.arr_icao||'').toUpperCase();
-      if(!arr||arr===dep||CARGO_GA.has(arr)) continue;
-      const mktg=(r.airline_iata||'').toUpperCase();
-      const oper=(r.cs_airline_iata||'').toUpperCase();
-      const op=oper||mktg;
-      if(!mktg) continue;
-      const dur=r.duration||0;
-      const cnt=r.counter||0;
-      if(!dur||cnt<500) continue;
-      if(REGIONAL_OPS.has(op)) continue;
-      if(dur>360&&!SINGLE_FLEET.has(op)) continue;
-      const acftRaw=(r.aircraft_icao||'').toUpperCase();
-      const fleetInfo=AIRLINE_FLEET[op]||AIRLINE_FLEET[mktg]||null;
-      let simAcft='unknown',confidence='unknown';
-      if(acftRaw&&ACFT_MAP[acftRaw]){
-        simAcft=ACFT_MAP[acftRaw];confidence='airlabs';
-      } else if(SINGLE_FLEET.has(op)&&fleetInfo){
-        simAcft=fleetInfo.sim;confidence='confirmed';
-      } else if(fleetInfo&&fleetInfo.conf==='likely'&&dur>=60&&dur<=300){
-        simAcft=fleetInfo.sim;confidence='likely';
-      }
-      raw.push({
-        dep,arr,airline:mktg,operAl:op,
-        airlineName:AIRLINE_FLEET[op]?.name||AIRLINE_FLEET[mktg]?.name||mktg,
-        flt:r.flight_iata||r.flight_icao||'',
-        simAcft,confidence,
-        dm:dur,dur:fmtDur(dur),
-        days:r.days||[],
-        depTerm:(r.dep_terminals||[]).join('/'),
-        arrTerm:(r.arr_terminals||[]).join('/'),
-        counter:cnt,
-      });
-    }
-  }
-  const best={};
-  for(const r of raw){
-    const key=r.dep+'_'+r.arr;
-    if(!best[key]||r.counter>best[key].counter)best[key]=r;
-  }
-  return Object.values(best).sort((a,b)=>a.dep.localeCompare(b.dep)||a.arr.localeCompare(b.arr));
-}
-
-const _CONF_SET=new Set(['FR','U2','EC','W6','VY','WN','B6','NK','F9','G4','SY','D8','DY','BY','X3','TB','HV','OR','TO','PC','XQ','EW','RK','LS','DE','A0']);
-function routeConf(r){
-  if(_CONF_SET.has(r.operAl))return'confirmed';
-  const f=AIRLINE_FLEET[r.operAl];
-  if(f&&f.conf==='likely')return'likely';
-  return'uncertain';
-}
 function getRoutes(){
   const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
-  const durMax=parseInt((document.getElementById('dur-f')||{value:''}).value)||0;
+  const durMax=parseFloat((document.getElementById('dur-f')||{value:''}).value)||0;
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
-  let rs=S.routes.filter(r=>{
-    const di=S.selICAOs.has(r.dep),ai=S.selICAOs.has(r.arr);
+  let rs=Object.values(S.routeRegistry).filter(r=>{
+    const dep=r.departure_airport,arr=r.arrival_airport;
+    const di=S.selICAOs.has(dep),ai=S.selICAOs.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
     if(S.mode==='1'&&!(di||ai))return false;
-    if(S.acft!=='all'){
-      if(r.simAcft==='unknown')return false;
-      if(r.simAcft!==S.acft)return false;
-    }
-    if(durMax&&r.dm>durMax)return false;
-    if(q&&![r.dep,r.arr,r.airlineName,r.airline,r.flt].some(x=>(x||'').toLowerCase().includes(q)))return false;
-    const rc=routeConf(r);
-    if(S.confFilter==='confirmed'&&rc!=='confirmed')return false;
-    if(S.confFilter==='confirmed_likely'&&rc==='uncertain')return false;
-    if(S.regionFilter==='europe'&&!/^[ELGB]/.test(r.dep)&&!/^[ELGB]/.test(r.arr))return false;
-    if(S.regionFilter==='namerica'&&!'KCP'.includes(r.dep[0])&&!'KCP'.includes(r.arr[0]))return false;
+    const simAcft=SI_ACFT_MAP[r.aircraft_type];
+    if(S.acft!=='all'&&simAcft!==S.acft)return false;
+    const fl=parseFloat(r.flight_length)||0;
+    if(durMax&&fl>durMax)return false;
+    if(S.regionFilter==='europe'&&!/^[ELGB]/.test(dep)&&!/^[ELGB]/.test(arr))return false;
+    if(S.regionFilter==='namerica'&&!'KCP'.includes(dep[0])&&!'KCP'.includes(arr[0]))return false;
+    if(q&&!([dep,arr,r.airline||'',r.callsign||'',r.description||''].some(x=>x.toLowerCase().includes(q))))return false;
     return true;
   });
-  rs.sort((a,b)=>srt==='airline'?a.airlineName.localeCompare(b.airlineName):
-                  srt==='flt'?a.flt.localeCompare(b.flt):a.dm-b.dm);
+  rs.sort((a,b)=>
+    srt==='airline'?(a.airline||'').localeCompare(b.airline||''):
+    srt==='dist'?(a.distance_nm||0)-(b.distance_nm||0):
+    (parseFloat(a.flight_length)||0)-(parseFloat(b.flight_length)||0)
+  );
   return rs;
 }
-
 
 function renderRoutes(){
   const rs=getRoutes();
   const cnt=rs.length;
-  document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(S.routes.length?'':' — paste API key and click Fetch Live Routes');
+  const regSize=Object.keys(S.routeRegistry).length;
+  document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(regSize?' ('+regSize+' in registry)':' — paste cookie and click Refresh Routes');
   if(!cnt){
-    const msg=!S.routes.length?'Paste your AirLabs API key above and click Fetch Live Routes.':'No routes match your current filters.';
-    document.getElementById('rt-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
+    const msg=!regSize?'Paste your SayIntentions cookie above and click Refresh Routes.':'No routes match your current filters.';
+    document.getElementById('rt-body').innerHTML=`<tr><td colspan="6"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
     updateStats();return;
   }
   document.getElementById('rt-body').innerHTML=rs.flatMap((r,i)=>{
     const isO=S.openRoute===i;
-    const da=AI[r.dep]||[r.dep,'','',''];
-    const aa=AI[r.arr]||[r.arr,'','',''];
-    const confColor=r.confidence==='confirmed'?'var(--grn)':r.confidence==='likely'?'var(--acc)':'var(--ink3)';
-    const acftDisplay=r.simAcft&&r.simAcft!=='unknown'?SIM_LBL[r.simAcft]||r.simAcft:'—';
-    const dc=routeConf(r);
-    const dot=dc==='confirmed'
-      ?'<span style="width:7px;height:7px;border-radius:50%;background:#32d74b;box-shadow:0 0 5px rgba(50,215,75,0.5);display:block;margin:0 auto 3px"></span>'
-      :dc==='likely'
-      ?'<span style="width:7px;height:7px;border-radius:50%;background:rgba(245,166,35,0.6);display:block;margin:0 auto 3px"></span>'
-      :'<span style="width:7px;height:7px;border-radius:50%;background:#2c2c2e;display:block;margin:0 auto 3px"></span>';
+    const da=AI[r.departure_airport]||[r.departure_airport,'','',''];
+    const aa=AI[r.arrival_airport]||[r.arrival_airport,'','',''];
+    const simAcft=SI_ACFT_MAP[r.aircraft_type]||'a320';
+    const simLbl=SIM_LBL[simAcft]||r.aircraft_type;
+    const dur=fmtFlightLen(r.flight_length);
+    const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
     const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
-      <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${dot}${isO?'&#9660;':'&#9658;'}</td>
-      <td><div class="rp">${r.dep}&thinsp;&rarr;&thinsp;${r.arr}</div>
-          <div class="rc">${da[1]||r.dep} &rarr; ${aa[1]||r.arr}</div></td>
-      <td><div class="ra">${r.airlineName}</div></td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${r.dur}</td>
-      <td style="font-size:12px;color:var(--ink2)">${fmtDays(r.days)}</td>
+      <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
+      <td><div class="rp">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</div>
+          <div class="rc">${da[1]||r.departure_airport} &rarr; ${aa[1]||r.arrival_airport}</div></td>
+      <td><div class="ra">${r.airline||r.callsign||'—'}</div></td>
+      <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
+      <td style="font-size:12px;color:var(--ink2)">${dist}</td>
     </tr>`;
     if(!isO)return[main];
-    const sbType=r.simAcft&&r.simAcft!=='unknown'?SIM_SB[r.simAcft]:'A320';
-    const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${r.dep}&dest=${r.arr}&type=${sbType}`;
-    const faU=`https://www.flightaware.com/live/findflight/?origin=${r.dep}&destination=${r.arr}`;
-    const svU=`https://skyvector.com/?fpl=${r.dep}%20${r.arr}`;
-    const det=`<tr class="det-row"><td colspan="5"><div class="det-pan">
+    const sbType=SIM_SB[simAcft]||'A320';
+    const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${sbType}`;
+    const faU=`https://www.flightaware.com/live/findflight/?origin=${r.departure_airport}&destination=${r.arrival_airport}`;
+    const svU=`https://skyvector.com/?fpl=${r.departure_airport}%20${r.arrival_airport}`;
+    const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' → '+r.gate_destination:(r.gate_origin||r.gate_destination||'—');
+    const det=`<tr class="det-row"><td colspan="6"><div class="det-pan">
       <div class="dp-strip">
-        <div class="dp-apt"><div class="dp-icao">${r.dep}</div><div class="dp-city">${da[1]||''}</div></div>
+        <div class="dp-apt"><div class="dp-icao">${r.departure_airport}</div><div class="dp-city">${da[1]||''}</div></div>
         <div class="dp-line"><div class="dp-dash"></div>
           <div class="dp-mid"><div class="dp-plane">&#9992;</div>
-            <div class="dp-info">${r.dur} &bull; ${fmtDays(r.days)}</div></div>
+            <div class="dp-info">${dur} &bull; ${dist}</div></div>
         <div class="dp-dash"></div></div>
-        <div class="dp-apt"><div class="dp-icao">${r.arr}</div><div class="dp-city">${aa[1]||''}</div></div>
+        <div class="dp-apt"><div class="dp-icao">${r.arrival_airport}</div><div class="dp-city">${aa[1]||''}</div></div>
       </div>
       <div class="dp-grid">
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
-          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airlineName}</span></div>
-          <div class="dpr"><span class="dl">Flight No.</span><span class="dv2 a">${r.flt}</span></div>
-          <div class="dpr"><span class="dl">Sim aircraft</span><span class="dv2" style="color:${confColor}">${acftDisplay}</span></div>
-          <div class="dpr"><span class="dl">Confidence</span><span class="dv2" style="color:${confColor};font-size:11px">${
-            r.confidence==='confirmed'?'&#10003; Confirmed fleet':
-            r.confidence==='likely'?'~ Short-haul likely':
-            r.confidence==='airlabs'?'AirLabs type data':
-            'Verify on FlightAware'
-          }</span></div>
-          <div class="dpr"><span class="dl">Block time</span><span class="dv2">${r.dur}</span></div>
-          <div class="dpr"><span class="dl">Operates</span><span class="dv2">${fmtDays(r.days)}</span></div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airline||'—'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'—'}</span></div>
+          <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
+          <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
+          <div class="dpr"><span class="dl">Times seen</span><span class="dv2">${r.times_seen}</span></div>
+          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
         </div>
         <div class="dp-sec">
-          <div class="dp-st">Departure &mdash; ${r.dep}</div>
+          <div class="dp-st">Departure &mdash; ${r.departure_airport}</div>
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${da[0]}</span></div>
-          <div class="dpr"><span class="dl">Terminal</span><span class="dv2 g">${r.depTerm||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_origin||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
         </div>
         <div class="dp-sec">
-          <div class="dp-st">Arrival &mdash; ${r.arr}</div>
+          <div class="dp-st">Arrival &mdash; ${r.arrival_airport}</div>
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${aa[0]}</span></div>
-          <div class="dpr"><span class="dl">Terminal</span><span class="dv2 g">${r.arrTerm||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_destination||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
@@ -1209,35 +1032,39 @@ function renderRoutes(){
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
       </div>
-      <div class="dp-note">Use FlightAware to confirm direct service and aircraft type before filing in SimBrief.</div>
+      <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
     return[main,det];
   }).join('');
   updateStats();
 }
 
-
 function togR(i){
   S.openRoute=S.openRoute===i?null:i;renderRoutes();
   if(S.openRoute!==null){
     const r=getRoutes()[S.openRoute];
     if(r){
-      fetchMetar(r.dep,S.openRoute,'dep');
-      fetchMetar(r.arr,S.openRoute,'arr');
+      fetchMetar(r.departure_airport,S.openRoute,'dep');
+      fetchMetar(r.arrival_airport,S.openRoute,'arr');
     }
   }
 }
 
 function setAcft(v){S.acft=v;document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
 function setMode(v){S.mode=v;document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
-function setConf(v){S.confFilter=v;document.querySelectorAll('[data-conf]').forEach(e=>e.classList.toggle('on',e.dataset.conf===v));S.openRoute=null;renderRoutes();}
 function setRegion(v){S.regionFilter=v;document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
 
 function exportCSV(){
   const rs=getRoutes();
-  const h='Flight,Airline,Dep,Arr,RealAcft,SimAcft,Duration,Days,SimBriefURL';
-  const rows=rs.map(r=>[r.flt,r.airline,r.dep,r.arr,r.acftReal,SIM_LBL[r.acftSim]||'',r.dur,fmtDays(r.days),
-    `https://www.simbrief.com/system/dispatch.php?orig=${r.dep}&dest=${r.arr}&type=${SIM_SB[r.acftSim]||'A320'}`].join(','));
+  const h='Callsign,Airline,Dep,Arr,Aircraft,SimAcft,Duration,Distance,SimBriefURL';
+  const rows=rs.map(r=>{
+    const simAcft=SI_ACFT_MAP[r.aircraft_type]||'';
+    return[r.callsign,r.airline,r.departure_airport,r.arrival_airport,
+      r.aircraft_type,SIM_LBL[simAcft]||'',fmtFlightLen(r.flight_length),
+      r.distance_nm?Math.round(r.distance_nm)+'nm':'',
+      `https://www.simbrief.com/system/dispatch.php?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${SIM_SB[simAcft]||'A320'}`
+    ].join(',');
+  });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...rows].join('\n')],{type:'text/csv'}));
   a.download='dean_msfs_routes.csv';a.click();
 }
@@ -1374,8 +1201,9 @@ function renderCD(idx){
   const timeStr=mins?`~${Math.floor(mins/60)}h ${String(mins%60).padStart(2,'0')}m from ${S.chDep}`:'';
 
   // Find real scheduled route if one exists
-  const realRoute=S.routes.find(r=>
-    (r.dep===S.chDep&&r.arr===ch.icao)||(r.arr===S.chDep&&r.dep===ch.icao)
+  const realRoute=Object.values(S.routeRegistry).find(r=>
+    (r.departure_airport===S.chDep&&r.arrival_airport===ch.icao)||
+    (r.arrival_airport===S.chDep&&r.departure_airport===ch.icao)
   );
 
   const sbType=SIM_SB['a320'];
@@ -1400,22 +1228,21 @@ function renderCD(idx){
     <div class="cd-desc"><div class="cd-app">RWY ${ch.rwy} &bull; ${ch.approach}</div><div class="cd-txt">${ch.desc}</div></div>
 
     ${realRoute?`<div class="ft-card">
-      <div class="ft-t">&#9989; Real scheduled service found</div>
+      <div class="ft-t">&#9989; Route in your registry</div>
       <div class="ft-sched">
-        <div class="ft-sched-t">AirLabs Route Data</div>
+        <div class="ft-sched-t">SayIntentions Route Data</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
-          <span><span style="color:var(--ink3)">Route</span> &nbsp;<strong style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${realRoute.dep}&thinsp;→&thinsp;${realRoute.arr}</strong></span>
-          <span><span style="color:var(--ink3)">Airline</span> &nbsp;<strong>${realRoute.airline}</strong></span>
-          <span><span style="color:var(--ink3)">Flight</span> &nbsp;<strong style="color:var(--acc);font-family:'JetBrains Mono',monospace">${realRoute.flt}</strong></span>
-          <span><span style="color:var(--ink3)">Aircraft</span> &nbsp;<strong>${realRoute.acftReal}</strong> <span style="color:var(--ink3);font-size:11px">${realRoute.nearest||SIM_LBL[realRoute.acftSim]||''}</span></span>
-          <span><span style="color:var(--ink3)">Duration</span> &nbsp;<strong>${realRoute.dur}</strong></span>
-          <span><span style="color:var(--ink3)">Operates</span> &nbsp;<strong>${fmtDays(realRoute.days)}</strong></span>
+          <span><span style="color:var(--ink3)">Route</span> &nbsp;<strong style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${realRoute.departure_airport}&thinsp;→&thinsp;${realRoute.arrival_airport}</strong></span>
+          <span><span style="color:var(--ink3)">Airline</span> &nbsp;<strong>${realRoute.airline||'—'}</strong></span>
+          <span><span style="color:var(--ink3)">Callsign</span> &nbsp;<strong style="color:var(--acc);font-family:'JetBrains Mono',monospace">${realRoute.callsign||'—'}</strong></span>
+          <span><span style="color:var(--ink3)">Aircraft</span> &nbsp;<strong>${realRoute.aircraft_type}</strong> <span style="color:var(--ink3);font-size:11px">${SIM_LBL[SI_ACFT_MAP[realRoute.aircraft_type]]||''}</span></span>
+          <span><span style="color:var(--ink3)">Duration</span> &nbsp;<strong>${fmtFlightLen(realRoute.flight_length)}</strong></span>
         </div>
       </div>
     </div>`:`${S.chDep?`<div class="ft-card">
-      <div class="ft-t" style="color:var(--ink3)">No scheduled service found — fly it anyway</div>
-      <div class="ft-info">No real airline operates ${S.chDep} → ${ch.icao} with your sim fleet. You can still plan this route in SimBrief — the point is to fly the approach, not the carrier.</div>
-    </div>`:'<div class="ft-card"><div class="ft-info" style="color:var(--ink3)">Select a departure airport in the left panel to check for real scheduled service and calculate flight time.</div></div>'}`}
+      <div class="ft-t" style="color:var(--ink3)">Not in your route registry — fly it anyway</div>
+      <div class="ft-info">No SayIntentions route found for ${S.chDep} → ${ch.icao} in your registry. You can still plan this route in SimBrief — the point is to fly the approach.</div>
+    </div>`:'<div class="ft-card"><div class="ft-info" style="color:var(--ink3)">Select a departure airport in the left panel to check your route registry and calculate flight time.</div></div>'}`}
 
     <div class="cdg">
       <div class="cdb">
@@ -1491,7 +1318,8 @@ function updateStats(){
   document.getElementById('st-auto').textContent=nonNoise.filter(r=>r.method&&r.method!=='manual'&&r.method!=='noise').length;
   document.getElementById('st-man').textContent=nonNoise.filter(r=>r.method==='manual').length;
   document.getElementById('st-un').textContent=nonNoise.filter(r=>!r.icao).length;
-  document.getElementById('rbadge').textContent=S.routes.length?getRoutes().length:0;
+  const regSize=Object.keys(S.routeRegistry).length;
+  document.getElementById('rbadge').textContent=regSize?getRoutes().length:0;
 }
 async function ignoreFolder(folder){
   if(!S.cfg.ignoredFolders)S.cfg.ignoredFolders=[];
@@ -1506,33 +1334,8 @@ async function unignoreFolder(folder){
   renderApts();updateStats();
 }
 
-function exportRawCache(){
-  if(!S.routeCache||!Object.keys(S.routeCache).length){alert('No cached data. Fetch routes first.');return;}
-  // Build a readable summary showing all unique aircraft codes
-  const codes={};
-  for(const[dep,routes] of Object.entries(S.routeCache)){
-    for(const r of routes){
-      const ac=(r.aircraft_icao||'(empty)').toUpperCase();
-      if(!codes[ac])codes[ac]={count:0,mapped:ACFT_MAP[ac]||'OTHER (unmapped)',sample:null};
-      codes[ac].count++;
-      if(!codes[ac].sample)codes[ac].sample=`${r.dep_icao||dep}→${r.arr_icao||'?'} ${r.airline_iata||''} ${r.flight_iata||''}`;
-    }
-  }
-  const lines=['DEAN\'S MSFS ROUTE FINDER — RAW CACHE ANALYSIS','='.repeat(60),'',
-    `Total airports: ${Object.keys(S.routeCache).length}`,
-    `Total routes: ${Object.values(S.routeCache).reduce((a,b)=>a+b.length,0)}`,
-    `Unique aircraft codes: ${Object.keys(codes).length}`,'',
-    'AIRCRAFT TYPE CODES (sorted by frequency):','-'.repeat(50)];
-  Object.entries(codes).sort((a,b)=>b[1].count-a[1].count).forEach(([code,info])=>{
-    lines.push(`  ${code.padEnd(8)} ${String(info.count).padStart(4)} routes  →  ${info.mapped.padEnd(20)}  e.g. ${info.sample}`);
-  });
-  lines.push('','FULL JSON CACHE:','-'.repeat(50));
-  lines.push(JSON.stringify(S.routeCache,null,2));
-  const blob=new Blob([lines.join('\n')],{type:'text/plain'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='dean_msfs_cache_debug.txt';a.click();
-}
+
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.3.1</div>
+  pointer-events:none;">v4.4.0</div>
 </body></html>

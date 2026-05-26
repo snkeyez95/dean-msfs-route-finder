@@ -7,8 +7,10 @@ const https = require('https');
 // ── FILE LOGGER ──────────────────────────────────────────────────────────────
 const LOG_PATH = path.join(__dirname, 'dean_msfs_debug.log');
 function redact(str) {
-  // Redact AirLabs API keys (32-char hex strings)
-  return String(str).replace(/[a-f0-9]{32}/gi, '***REDACTED***');
+  // Redact long hex strings (API keys) and anything labelled cookie=
+  return String(str)
+    .replace(/[a-f0-9]{32,}/gi, '***REDACTED***')
+    .replace(/(cookie[=:]\s*)\S+/gi, '$1***REDACTED***');
 }
 function log(level, ...args) {
   const ts = new Date().toISOString();
@@ -123,32 +125,65 @@ const CFG=path.join(os.homedir(),'.dean_msfs_v4.json');
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' routeCache airports='+(Object.keys(c.routeCache||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
 ipcMain.handle('save-config',(_,cfg)=>{try{fs.writeFileSync(CFG,JSON.stringify(cfg,null,2));LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);}catch(e){LOG.error('save-config failed:',e.message);}});
 
-ipcMain.handle('airlabs-routes',(_,{icao,key})=>new Promise(resolve=>{
-  const opts={
-    hostname:'airlabs.co',
-    path:`/api/v9/routes?dep_icao=${encodeURIComponent(icao)}&api_key=${encodeURIComponent(key)}`,
-    method:'GET',
-    headers:{'Accept':'application/json','User-Agent':'DeanMSFSRouteFinder/4.0'}
+ipcMain.handle('si-fetch-page', (_, {page, cookie}) => new Promise(resolve => {
+  LOG.info('si-fetch-page: page=' + page + ' cookie=***REDACTED***');
+  const opts = {
+    hostname: 'p2.sayintentions.ai',
+    path: `/p2/api/commercial-routes/list?page=${page}&limit=100`,
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'DeanMSFSRouteFinder/4.4',
+      'Cookie': `p2_session_id=${cookie}`,
+    },
   };
-  const req=https.request(opts,res=>{
-    let data='';
-    res.on('data',c=>data+=c);
-    res.on('end',()=>{
-      try{
-        const parsed=JSON.parse(data);
-        const count=(parsed.response||[]).length;
-        LOG.info('airlabs-routes response: status='+res.statusCode+' routes='+count+' icao='+icao);
-        resolve({ok:res.statusCode<300,status:res.statusCode,data:parsed});
-      }catch(e){
-        LOG.error('airlabs-routes parse error: status='+res.statusCode+' raw='+data.slice(0,200));
-        resolve({ok:false,status:res.statusCode,data:null});
+  const req = https.request(opts, res => {
+    let data = '';
+    res.on('data', c => data += c);
+    res.on('end', () => {
+      LOG.info('si-fetch-page response: status=' + res.statusCode + ' page=' + page + ' bytes=' + data.length);
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        if (win && !win.isDestroyed()) win.webContents.send('si-cookie-expired');
+        resolve({ok: false, status: res.statusCode, expired: true});
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        resolve({ok: res.statusCode < 300, status: res.statusCode, data: parsed});
+      } catch(e) {
+        LOG.error('si-fetch-page parse error: status=' + res.statusCode + ' raw=' + data.slice(0, 200));
+        resolve({ok: false, status: res.statusCode, data: null});
       }
     });
   });
-  req.on('error',e=>{LOG.error('airlabs-routes network error:',e.message);resolve({ok:false,error:e.message});});
-  req.setTimeout(15000,()=>{req.destroy();resolve({ok:false,error:'timeout'});});
+  req.on('error', e => { LOG.error('si-fetch-page network error:', e.message); resolve({ok: false, error: e.message}); });
+  req.setTimeout(15000, () => { req.destroy(); resolve({ok: false, error: 'timeout'}); });
   req.end();
 }));
+
+ipcMain.handle('si-get-registry', () => {
+  try {
+    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+    const reg = c.routeRegistry || {};
+    LOG.info('si-get-registry: loaded ' + Object.keys(reg).length + ' entries');
+    return reg;
+  } catch(e) {
+    LOG.warn('si-get-registry: error', e.message);
+    return {};
+  }
+});
+
+ipcMain.handle('si-save-registry', (_, registry) => {
+  try {
+    let c = {};
+    try { c = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(e) {}
+    c.routeRegistry = registry;
+    fs.writeFileSync(CFG, JSON.stringify(c, null, 2));
+    LOG.info('si-save-registry: saved ' + Object.keys(registry).length + ' entries');
+  } catch(e) {
+    LOG.error('si-save-registry failed:', e.message);
+  }
+});
 
 ipcMain.handle('get-log-path',()=>LOG_PATH);
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
