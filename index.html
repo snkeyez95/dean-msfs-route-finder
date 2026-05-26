@@ -254,14 +254,14 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.1</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.2</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
 <div id="si-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
-  <span id="si-banner-msg">SayIntentions cookie expired &mdash; paste new cookie in Settings (Plan a Flight tab)</span>
+  <span id="si-banner-msg">SayIntentions cookie expired &mdash; paste new cookie in the Settings tab</span>
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
 <div class="hdr">
@@ -271,6 +271,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <div class="tab" data-tab="airports" onclick="sw('airports')">My Airports</div>
     <div class="tab active" data-tab="routes" onclick="sw('routes')">Plan a Flight <span class="tbadge" id="rbadge">0</span></div>
     <div class="tab" data-tab="challenges" onclick="sw('challenges')">Challenging Approaches</div>
+    <div class="tab" data-tab="settings" onclick="sw('settings')">&#9881; Settings</div>
   </div>
 </div>
 <div class="main">
@@ -327,37 +328,6 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
 <div class="pane on" id="pane-routes"><div class="scroll">
-  <div class="api-pan" style="margin-bottom:10px">
-    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleFleetPanel()">
-      <span class="api-t" style="margin-bottom:0">My Fleet</span>
-      <span id="fleet-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9660; configure</span>
-    </div>
-    <div id="fleet-panel" style="display:none;margin-top:14px">
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Check the aircraft you own. Route results and filter chips are driven by this list.</div>
-      <div id="fleet-checks" style="display:flex;flex-wrap:wrap;gap:12px 28px"></div>
-    </div>
-  </div>
-  <div class="api-pan">
-    <div class="api-t">Live Route Data &mdash; SayIntentions.AI</div>
-    <div class="api-s">Real commercial traffic flying on SayIntentions right now.
-      Sign in at <a href="#" onclick="window.api.openExternal('https://sayintentions.ai');return false">sayintentions.ai</a>,
-      open DevTools &rarr; Application &rarr; Cookies, copy the <strong>p2_session_id</strong> value and paste below.</div>
-    <div class="api-row">
-      <input class="api-inp" type="password" id="si-cookie-inp" placeholder="Paste p2_session_id value here..." oninput="onCookieInput()">
-      <button class="btn bg bsm" id="save-cookie-btn" onclick="saveSICookie()">Save Cookie</button>
-      <button class="btn bp bsm" id="fetch-btn" onclick="fetchSIRoutes()" disabled>Refresh Routes</button>
-    </div>
-    <div class="api-st" id="api-st"></div>
-    <div id="si-prog" style="display:none" class="prog">
-      <div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div>
-    </div>
-  </div>
-  <div id="si-drop-zone" class="si-drop"
-    ondragover="onSIDragOver(event)" ondragleave="onSIDragLeave(event)" ondrop="onSIDrop(event)">
-    <div class="si-drop-icon">&#128196;</div>
-    <div class="si-drop-txt"><strong>Drop SayIntentions JSON file here to import routes</strong><br>Accepts .txt and .json files</div>
-  </div>
-  <div id="si-import-result" class="si-import-result"></div>
   <div class="crow" id="acft-chips-row">
     <span class="clbl">Aircraft</span>
   </div>
@@ -442,6 +412,44 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <div class="chdet" id="ch-det"></div>
   </div>
 </div>
+
+<!-- ── TAB 4: SETTINGS ── -->
+<div class="pane" id="pane-settings"><div class="scroll">
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">My Fleet</div>
+  <div class="api-pan" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleFleetPanel()">
+      <span class="api-t" style="margin-bottom:0">My Fleet</span>
+      <span id="fleet-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9660; configure</span>
+    </div>
+    <div id="fleet-panel" style="display:none;margin-top:14px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Check the aircraft you own. Route results and filter chips are driven by this list.</div>
+      <div id="fleet-checks" style="display:flex;flex-wrap:wrap;gap:12px 28px"></div>
+    </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Route Data Source</div>
+  <div class="api-pan" style="margin-bottom:24px">
+    <div class="api-t">Live Route Data &mdash; SayIntentions.AI</div>
+    <div class="api-s">Real commercial traffic flying on SayIntentions right now.
+      Sign in at <a href="#" onclick="window.api.openExternal('https://sayintentions.ai');return false">sayintentions.ai</a>,
+      open DevTools &rarr; Application &rarr; Cookies, copy the <strong>p2_session_id</strong> value and paste below.</div>
+    <div class="api-row">
+      <input class="api-inp" type="password" id="si-cookie-inp" placeholder="Paste p2_session_id value here..." oninput="onCookieInput()">
+      <button class="btn bg bsm" id="save-cookie-btn" onclick="saveSICookie()">Save Cookie</button>
+      <button class="btn bp bsm" id="fetch-btn" onclick="fetchSIRoutes()" disabled>Refresh Routes</button>
+    </div>
+    <div class="api-st" id="api-st"></div>
+    <div id="si-prog" style="display:none" class="prog">
+      <div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Manual Import</div>
+  <div id="si-drop-zone" class="si-drop"
+    ondragover="onSIDragOver(event)" ondragleave="onSIDragLeave(event)" ondrop="onSIDrop(event)">
+    <div class="si-drop-icon">&#128196;</div>
+    <div class="si-drop-txt"><strong>Drop SayIntentions JSON file here to import routes</strong><br>Accepts .txt and .json files</div>
+  </div>
+  <div id="si-import-result" class="si-import-result"></div>
+</div></div>
 
 </div><script>
 // ── RENDERER LOGGER ──────────────────────────────────────────────────────────
@@ -1626,5 +1634,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.1</div>
+  pointer-events:none;">v4.5.2</div>
 </body></html>
