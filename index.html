@@ -913,7 +913,7 @@ function renderFleetPanel(){
     return`<div style="min-width:155px;flex-shrink:0">
       <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--sep)">${fam}</div>
       ${entries.map(e=>{
-        const checked=fleet[e.code]!==undefined?fleet[e.code]:e.def;
+        const checked=!!fleet[e.code];
         return`<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
           <input type="checkbox" ${checked?'checked':''} onchange="toggleFleet('${e.code}',this.checked)" style="accent-color:var(--acc);width:14px;height:14px;cursor:pointer;flex-shrink:0">
           <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);min-width:34px">${e.code}</span>
@@ -924,15 +924,15 @@ function renderFleetPanel(){
   }).join('');
 }
 
-function toggleFleet(code,checked){
+async function toggleFleet(code,checked){
   if(!S.cfg.myFleet)S.cfg.myFleet={};  // defensive; normally set on startup
   S.cfg.myFleet[code]=checked;
   // If the selected chip's API code is no longer active, reset to 'all'
   if(S.acft!=='all'&&!getActiveFleet().has(S.acft))S.acft='all';
-  // Update chips and routes immediately — no await needed for instant feedback
+  // Persist first so a fast close can't lose the change, then update UI
+  await window.api.saveConfig(S.cfg);
   renderFleetChips();
   renderRoutes();
-  window.api.saveConfig(S.cfg);
 }
 
 function renderFleetChips(){
@@ -1062,7 +1062,8 @@ function fmtFlightLen(fl){
 
 function getActiveFleet(){
   const fleet=S.cfg.myFleet||{};
-  if(!Object.keys(fleet).length)return new Set(FLEET_DEF.filter(f=>f.def).map(f=>f.code));
+  // S.cfg.myFleet is always the source of truth after first-run init.
+  // No hardcoded-default fallback — if fleet is empty, return empty set.
   return new Set(FLEET_DEF.filter(f=>fleet[f.code]).map(f=>f.code));
 }
 
