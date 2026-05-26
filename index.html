@@ -1001,11 +1001,27 @@ function showSIError(msg){
   const b=document.getElementById('si-banner');
   const m=document.getElementById('si-banner-msg');
   if(!b)return;
-  if(m)m.textContent=msg||'Route fetch failed — cookie may be expired. Paste a new cookie in Settings.';
+  if(m)m.textContent=msg||'Cookie expired — paste a new cookie in Settings.';
   b.style.display='flex';
 }
-function isFatalStatus(res){
-  return res.expired||res.status===401||res.status===403||res.status===429;
+function isAuthFail(res){
+  return res.expired||res.status===401||res.status===403;
+}
+
+// Fetch a single page with up to 3 attempts on 429 (5s then 10s back-off).
+// Returns the final response regardless of outcome — caller decides what to do.
+async function fetchPageWithRetry(pg){
+  let res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+  if(res.ok||res.status!==429)return res;
+  setSt('Rate limited — slowing down... (retry 1 of 2)','var(--acc)');
+  RLOG('si page '+pg+' 429, waiting 5s');
+  await new Promise(r=>setTimeout(r,5000));
+  res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+  if(res.ok||res.status!==429)return res;
+  setSt('Rate limited — slowing down... (retry 2 of 2)','var(--acc)');
+  RLOG('si page '+pg+' 429 again, waiting 10s');
+  await new Promise(r=>setTimeout(r,10000));
+  return window.api.siFetchPage({page:pg,cookie:S.siCookie});
 }
 
 async function fetchSIRoutes(){
@@ -1015,12 +1031,14 @@ async function fetchSIRoutes(){
   const btn=document.getElementById('fetch-btn');
   btn.disabled=true;siSetProg(0);
   setSt('Fetching page 1...','var(--acc)');
-  const p1=await window.api.siFetchPage({page:1,cookie:S.siCookie});
+  const p1=await fetchPageWithRetry(1);
   if(!p1.ok){
     btn.disabled=false;siSetProg(-1);
-    if(isFatalStatus(p1)){
-      setSt('Fetch failed — cookie expired or rate limited.','var(--red)');
+    if(isAuthFail(p1)){
+      setSt('Fetch failed — cookie expired.','var(--red)');
       showSIError();
+    }else if(p1.status===429){
+      setSt('Fetch failed — rate limited. Wait a moment and try again.','var(--red)');
     }else{
       setSt('Fetch failed: '+(p1.error||'HTTP '+p1.status),'var(--red)');
     }
@@ -1034,14 +1052,16 @@ async function fetchSIRoutes(){
   for(let pg=2;pg<=totalPages;pg++){
     setSt('Fetching page '+pg+' of '+totalPages+'...','var(--acc)');
     await new Promise(r=>setTimeout(r,500));
-    const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+    const res=await fetchPageWithRetry(pg);
     if(!res.ok){
       RLOG('si page '+pg+' failed: status='+(res.status||res.error));
-      if(isFatalStatus(res)){
-        setSt('Fetch stopped — cookie expired or rate limited (page '+pg+').','var(--red)');
+      if(isAuthFail(res)){
+        setSt('Fetch stopped — cookie expired (page '+pg+').','var(--red)');
         showSIError();
         btn.disabled=false;siSetProg(-1);return;
       }
+      // 429 exhausted or other error — skip page, keep going
+      if(res.status===429)RLOG('si page '+pg+' still 429 after 3 attempts, skipping');
       continue;
     }
     processPage(res.data?.data||res.data?.routes||[]);
