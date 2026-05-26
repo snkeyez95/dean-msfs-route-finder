@@ -313,6 +313,16 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
 <div class="pane on" id="pane-routes"><div class="scroll">
+  <div class="api-pan" style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleFleetPanel()">
+      <span class="api-t" style="margin-bottom:0">My Fleet</span>
+      <span id="fleet-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9660; configure</span>
+    </div>
+    <div id="fleet-panel" style="display:none;margin-top:14px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Check the aircraft you own. Route results and filter chips are driven by this list.</div>
+      <div id="fleet-checks" style="display:flex;flex-wrap:wrap;gap:12px 28px"></div>
+    </div>
+  </div>
   <div class="api-pan">
     <div class="api-t">Live Route Data &mdash; SayIntentions.AI</div>
     <div class="api-s">Real commercial traffic flying on SayIntentions right now.
@@ -328,13 +338,8 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div>
     </div>
   </div>
-  <div class="crow">
+  <div class="crow" id="acft-chips-row">
     <span class="clbl">Aircraft</span>
-    <div class="chip on" data-acft="all" onclick="setAcft('all')">All</div>
-    <div class="chip" data-acft="a319" onclick="setAcft('a319')">Fenix A319</div>
-    <div class="chip" data-acft="a320" onclick="setAcft('a320')">Fenix A320</div>
-    <div class="chip" data-acft="a321" onclick="setAcft('a321')">Fenix A321</div>
-    <div class="chip" data-acft="b738" onclick="setAcft('b738')">PMDG 737-800</div>
   </div>
   <div class="crow">
     <span class="clbl">Mode</span>
@@ -491,9 +496,9 @@ const COMMERCIAL_EXTRA=new Set([
 ["EDDB","EDDH","LEBL","LEAL","LEMG","GCTS","LTFM","LGTS","LCPH","LLBG","OMDB","OERK","OTHH","WSSS","RJTT","RJAA","RKSI","ZBAA","ZSPD","VIDP","VABB","YSSY","YMML","NZAA","KIAH","KHOU","KFLL","KTPA","KMSY","KDTW","KBWI","KRDU","KSLC","KBNA","KCLT"].forEach(c=>IS.add(c));
 const CM={"heathrow":"EGLL","gatwick":"EGKK","stansted":"EGSS","manchester":"EGCC","liverpool":"EGGP","southampton":"EGHI","birmingham":"EGBB","edinburgh":"EGPH","amsterdam":"EHAM","frankfurt":"EDDF","munich":"EDDM","dusseldorf":"EDDL","paris":"LFPG","madrid":"LEMD","barcelona":"LEBL","rome":"LIRF","milan":"LIMC","vienna":"LOWW","zurich":"LSZH","lisbon":"LPPT","athens":"LGAV","dublin":"EIDW","brussels":"EBBR","copenhagen":"EKCH","stockholm":"ESSA","helsinki":"EFHK","warsaw":"EPWA","prague":"LKPR","budapest":"LHBP","toronto":"CYYZ","calgary":"CYYC","vancouver":"CYVR","montreal":"CYUL","newyork":"KJFK","losangeles":"KLAX","chicago":"KORD","dallas":"KDFW","miami":"KMIA","seattle":"KSEA","denver":"KDEN","sanfrancisco":"KSFO","lasvegas":"KLAS","portland":"KPDX","minneapolis":"KMSP","boston":"KBOS","sanantonio":"KSAT","atlanta":"KATL","orlando":"KMCO","dulles":"KIAD","newark":"KEWR","phoenix":"KPHX","sandiego":"KSAN","innsbruck":"LOWI","zakynthos":"LGZA","zante":"LGZA"};
 
-// SayIntentions aircraft_type → sim key (only accepted types)
+// SayIntentions aircraft_type → sim key (all known types)
 const SI_ACFT_MAP={
-  'B739':'b738','B738':'b738','B38M':'b738','B737':'b738',
+  'B739':'b738','B738':'b738','B38M':'b738','B737':'b738','B39M':'b738',
   'A319':'a319',
   'A320':'a320','A20N':'a320',
   'A321':'a321','A21N':'a321',
@@ -501,6 +506,21 @@ const SI_ACFT_MAP={
 
 const SIM_LBL={"a319":"Fenix A319","a320":"Fenix A320","a321":"Fenix A321","b738":"PMDG 737-800"};
 const SIM_SB={"a319":"A319","a320":"A320","a321":"A321","b738":"B738"};
+
+const FLEET_DEF=[
+  {code:'B738',label:'PMDG 737-800',  family:'737', def:true},
+  {code:'B737',label:'PMDG 737-700',  family:'737', def:false},
+  {code:'B739',label:'PMDG 737-900',  family:'737', def:false},
+  {code:'B38M',label:'PMDG 737 MAX 8',family:'737', def:false},
+  {code:'B39M',label:'PMDG 737 MAX 9',family:'737', def:false},
+  {code:'A319',label:'Fenix A319',    family:'A319',def:true},
+  {code:'A320',label:'Fenix A320',    family:'A320',def:true},
+  {code:'A20N',label:'Fenix A320neo', family:'A320',def:false},
+  {code:'A321',label:'Fenix A321',    family:'A321',def:true},
+  {code:'A21N',label:'Fenix A321neo', family:'A321',def:false},
+];
+// API code → specific display label (more precise than SIM_LBL which uses sim key)
+const FLEET_LBL=Object.fromEntries(FLEET_DEF.map(f=>[f.code,f.label]));
 
 // RWY headings for METAR-based recommendation
 const RWY_HDGS={
@@ -572,6 +592,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
+  renderFleetPanel();
+  renderFleetChips();
   if(S.cfg.siCookie){
     S.siCookie=S.cfg.siCookie;
     document.getElementById('si-cookie-inp').value='••••••••••••••••';
@@ -851,6 +873,76 @@ async function saveSICookie(){
   document.getElementById('fetch-btn').disabled=false;
 }
 
+function toggleFleetPanel(){
+  const p=document.getElementById('fleet-panel');
+  const ic=document.getElementById('fleet-toggle-icon');
+  if(!p)return;
+  const open=p.style.display==='none';
+  p.style.display=open?'block':'none';
+  if(ic)ic.innerHTML=open?'&#9650; collapse':'&#9660; configure';
+}
+
+function renderFleetPanel(){
+  const el=document.getElementById('fleet-checks');
+  if(!el)return;
+  const fleet=S.cfg.myFleet||{};
+  const families=[...new Set(FLEET_DEF.map(f=>f.family))];
+  el.innerHTML=families.map(fam=>{
+    const entries=FLEET_DEF.filter(f=>f.family===fam);
+    return`<div style="min-width:155px;flex-shrink:0">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--sep)">${fam}</div>
+      ${entries.map(e=>{
+        const checked=fleet[e.code]!==undefined?fleet[e.code]:e.def;
+        return`<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
+          <input type="checkbox" ${checked?'checked':''} onchange="toggleFleet('${e.code}',this.checked)" style="accent-color:var(--acc);width:14px;height:14px;cursor:pointer;flex-shrink:0">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);min-width:34px">${e.code}</span>
+          <span style="font-size:13px;color:var(--ink1)">${e.label}</span>
+        </label>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+async function toggleFleet(code,checked){
+  if(!S.cfg.myFleet||!Object.keys(S.cfg.myFleet).length){
+    S.cfg.myFleet={};
+    FLEET_DEF.forEach(f=>{S.cfg.myFleet[f.code]=f.def;});
+  }
+  S.cfg.myFleet[code]=checked;
+  // If the active chip's sim key has no more active codes, reset to 'all'
+  if(S.acft!=='all'){
+    const active=getActiveFleet();
+    if(!FLEET_DEF.some(f=>active.has(f.code)&&SI_ACFT_MAP[f.code]===S.acft))S.acft='all';
+  }
+  await window.api.saveConfig(S.cfg);
+  renderFleetPanel();
+  renderFleetChips();
+  renderRoutes();
+}
+
+function renderFleetChips(){
+  const row=document.getElementById('acft-chips-row');
+  if(!row)return;
+  const active=getActiveFleet();
+  const seen=new Set();
+  const items=[];
+  for(const entry of FLEET_DEF){
+    if(!active.has(entry.code))continue;
+    const simKey=SI_ACFT_MAP[entry.code];
+    if(!simKey||seen.has(simKey))continue;
+    seen.add(simKey);
+    items.push({simKey,label:entry.label});
+  }
+  // Fallback to hardcoded defaults if fleet not configured
+  const chips=items.length?items:[
+    {simKey:'a319',label:'Fenix A319'},{simKey:'a320',label:'Fenix A320'},
+    {simKey:'a321',label:'Fenix A321'},{simKey:'b738',label:'PMDG 737-800'},
+  ];
+  row.innerHTML='<span class="clbl">Aircraft</span>'
+    +`<div class="chip ${S.acft==='all'?'on':''}" data-acft="all" onclick="setAcft('all')">All</div>`
+    +chips.map(({simKey,label})=>`<div class="chip ${S.acft===simKey?'on':''}" data-acft="${simKey}" onclick="setAcft('${simKey}')">${label}</div>`).join('');
+}
+
 function processPage(routes){
   const now=new Date().toISOString();
   for(const r of routes){
@@ -940,11 +1032,19 @@ function fmtFlightLen(fl){
   return hrs+'h '+String(mins).padStart(2,'0')+'m';
 }
 
+function getActiveFleet(){
+  const fleet=S.cfg.myFleet||{};
+  if(!Object.keys(fleet).length)return new Set(FLEET_DEF.filter(f=>f.def).map(f=>f.code));
+  return new Set(FLEET_DEF.filter(f=>fleet[f.code]).map(f=>f.code));
+}
+
 function getRoutes(){
   const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
   const durMaxHrs=parseFloat((document.getElementById('dur-f')||{value:''}).value)||0;
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
+  const activeFleet=getActiveFleet();
   let rs=Object.values(S.routeRegistry).filter(r=>{
+    if(!activeFleet.has(r.aircraft_type))return false;
     const dep=r.departure_airport,arr=r.arrival_airport;
     const di=S.selICAOs.has(dep),ai=S.selICAOs.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
@@ -981,7 +1081,7 @@ function renderRoutes(){
     const da=AI[r.departure_airport]||[r.departure_airport,'','',''];
     const aa=AI[r.arrival_airport]||[r.arrival_airport,'','',''];
     const simAcft=SI_ACFT_MAP[r.aircraft_type]||'a320';
-    const simLbl=SIM_LBL[simAcft]||r.aircraft_type;
+    const simLbl=FLEET_LBL[r.aircraft_type]||SIM_LBL[simAcft]||r.aircraft_type;
     const dur=fmtFlightLen(r.flight_length);
     const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
     const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
@@ -994,8 +1094,7 @@ function renderRoutes(){
       <td style="font-size:12px;color:var(--ink2)">${dist}</td>
     </tr>`;
     if(!isO)return[main];
-    const sbType=SIM_SB[simAcft]||'A320';
-    const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${sbType}`;
+    const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`;
     const faU=`https://www.flightaware.com/live/findflight/?origin=${r.departure_airport}&destination=${r.arrival_airport}`;
     const svU=`https://skyvector.com/?fpl=${r.departure_airport}%20${r.arrival_airport}`;
     const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' → '+r.gate_destination:(r.gate_origin||r.gate_destination||'—');
