@@ -240,7 +240,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.6</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.7</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -426,6 +426,7 @@ const AI={
   "EGLL":["London Heathrow","London","GB","Large Airport",51.477,-0.461],
   "EGKK":["London Gatwick","London","GB","Large Airport",51.148,-0.190],
   "EGCC":["Manchester Airport","Manchester","GB","Large Airport",53.354,-2.275],
+  "EGNM":["Leeds Bradford Airport","Leeds","GB","Medium Airport",53.866,-1.661],
   "EGGP":["Liverpool John Lennon","Liverpool","GB","Medium Airport",53.334,-2.850],
   "EGSS":["London Stansted","London","GB","Large Airport",51.885,0.235],
   "EGLC":["London City Airport","London","GB","Medium Airport",51.505,0.055],
@@ -830,7 +831,7 @@ function renderApts(){
         <td style="font-size:13px;color:var(--ink3)">${info[2]||''}</td>
         <td><span class="bdg bgry">${info[3]||''}</span></td>
         <td><span style="font-size:12px;color:var(--ink4)">${r.method||'&mdash;'}</span></td>
-        <td><button class="btn bg bxs" onclick="unignoreFolder(${JSON.stringify(r.folder)})" title="Restore this airport">Restore</button></td>
+        <td><button class="btn bg bxs" onclick="unignoreFolder('${r.folder}')" title="Restore this airport">Restore</button></td>
       </tr>`;
     }
     return`<tr>
@@ -840,7 +841,7 @@ function renderApts(){
       <td style="font-size:13px;color:var(--ink2)">${info[2]||''}</td>
       <td><span class="bdg bgry">${info[3]||''}</span></td>
       <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:${mc};flex-shrink:0;display:inline-block"></span>${r.method||'&mdash;'}</span></td>
-      <td style="white-space:nowrap">${!r.icao?`<span style="display:inline-flex;align-items:center;gap:4px"><button class="btn bg bxs" onclick="startAddIcao(this,${JSON.stringify(r.folder)})" title="Manually assign ICAO code" style="color:var(--acc);font-family:'JetBrains Mono',monospace;font-weight:600">+ ICAO</button><button class="btn bg bxs" onclick="ignoreFolder(${JSON.stringify(r.folder)})" title="Ignore this airport (hide from list)" style="padding:4px 8px;line-height:1;color:var(--ink3)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>`:''}</td>
+      <td style="white-space:nowrap">${!r.icao?`<span style="display:inline-flex;align-items:center;gap:4px"><button class="btn bg bxs" onclick="startAddIcao(this,'${r.folder}')" title="Manually assign ICAO code" style="color:var(--acc);font-family:'JetBrains Mono',monospace;font-weight:600">+ ICAO</button><button class="btn bg bxs" onclick="ignoreFolder('${r.folder}')" title="Ignore this airport (hide from list)" style="padding:4px 8px;line-height:1;color:var(--ink3)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>`:''}</td>
     </tr>`;
   }).join('');
 }
@@ -867,17 +868,8 @@ async function addManual(){
 
 function startAddIcao(btn,folder){
   const td=btn.closest('td');
-  td.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px">
-    <input type="text" maxlength="4" placeholder="ICAO"
-      style="width:56px;background:var(--bg0);border:1px solid var(--acc);border-radius:4px;
-             padding:3px 7px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);
-             text-transform:uppercase;letter-spacing:.06em;outline:none"
-      oninput="this.value=this.value.toUpperCase()"
-      onkeydown="if(event.key==='Enter'){event.preventDefault();saveRowIcao(this.value,${JSON.stringify(folder)});}
-                 if(event.key==='Escape'){renderApts();}">
-    <button class="btn bp bxs" onclick="saveRowIcao(this.previousElementSibling.value,${JSON.stringify(folder)})">&#10003;</button>
-    <button class="btn bg bxs" onclick="renderApts()">&#10005;</button>
-  </span>`;
+  const f=folder.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  td.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px"><input type="text" maxlength="4" placeholder="ICAO" style="width:56px;background:var(--bg0);border:1px solid var(--acc);border-radius:4px;padding:3px 7px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;outline:none" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();saveRowIcao(this.value,\'${f}\');}if(event.key===\'Escape\'){renderApts();}"><button class="btn bp bxs" onclick="saveRowIcao(this.previousElementSibling.value,\'${f}\')">&#10003;</button><button class="btn bg bxs" onclick="renderApts()">&#10005;</button></span>`;
   td.querySelector('input').focus();
 }
 
@@ -1500,5 +1492,5 @@ async function unignoreFolder(folder){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.4.6</div>
+  pointer-events:none;">v4.4.7</div>
 </body></html>
