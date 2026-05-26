@@ -233,6 +233,20 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 .ft-info{font-size:13px;color:var(--ink2);padding:10px 14px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--sep);line-height:1.6}
 .ft-sched{margin-top:10px;padding:10px 14px;background:var(--acc3);border:1px solid rgba(245,166,35,.2);border-radius:var(--r2)}
 .ft-sched-t{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);font-family:'JetBrains Mono',monospace;margin-bottom:6px}
+/* SI IMPORT DROP ZONE */
+.si-drop{border:2px dashed rgba(245,166,35,.45);border-radius:var(--r);padding:18px 22px;
+  margin-bottom:14px;display:flex;flex-direction:column;align-items:center;gap:7px;
+  cursor:default;transition:border-color .2s,background .2s,box-shadow .2s;background:var(--acc3)}
+.si-drop.drag-over{border-color:var(--acc);background:rgba(245,166,35,.12);
+  box-shadow:0 0 18px rgba(245,166,35,.18)}
+.si-drop-icon{font-size:22px;opacity:.55}
+.si-drop-txt{font-size:13px;color:var(--ink3);text-align:center;line-height:1.5}
+.si-drop-txt strong{color:var(--acc)}
+.si-import-result{border-radius:var(--r2);padding:10px 14px;font-size:13px;font-weight:500;
+  margin-bottom:14px;line-height:1.5;display:none}
+.sir-grn{background:var(--grn2);color:var(--grn);border:1px solid rgba(50,215,75,.25)}
+.sir-amb{background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)}
+.sir-red{background:var(--red2);color:var(--red);border:1px solid rgba(255,69,58,.25)}
 </style></head><body>
 <div class="tbar">
   <div class="wbtns">
@@ -240,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.7</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.8</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -338,6 +352,12 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div>
     </div>
   </div>
+  <div id="si-drop-zone" class="si-drop"
+    ondragover="onSIDragOver(event)" ondragleave="onSIDragLeave(event)" ondrop="onSIDrop(event)">
+    <div class="si-drop-icon">&#128196;</div>
+    <div class="si-drop-txt"><strong>Drop SayIntentions JSON file here to import routes</strong><br>Accepts .txt and .json files</div>
+  </div>
+  <div id="si-import-result" class="si-import-result"></div>
   <div class="crow" id="acft-chips-row">
     <span class="clbl">Aircraft</span>
   </div>
@@ -1489,8 +1509,94 @@ async function unignoreFolder(folder){
   renderApts();updateStats();
 }
 
+// ── SI FILE IMPORT ────────────────────────────────────────────────────────────
+function onSIDragOver(e){
+  e.preventDefault();e.stopPropagation();
+  e.dataTransfer.dropEffect='copy';
+  document.getElementById('si-drop-zone').classList.add('drag-over');
+}
+function onSIDragLeave(e){
+  e.preventDefault();
+  document.getElementById('si-drop-zone').classList.remove('drag-over');
+}
+function onSIDrop(e){
+  e.preventDefault();e.stopPropagation();
+  document.getElementById('si-drop-zone').classList.remove('drag-over');
+  const file=e.dataTransfer.files[0];
+  if(!file)return;
+  const nm=file.name.toLowerCase();
+  if(!nm.endsWith('.json')&&!nm.endsWith('.txt')){
+    showImportResult('red','Import failed — only .json and .txt files are accepted');
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=function(ev){importSIFile(file.name,ev.target.result);};
+  reader.readAsText(file);
+}
+function showImportResult(type,msg){
+  const el=document.getElementById('si-import-result');
+  el.className='si-import-result '+(type==='green'?'sir-grn':type==='amber'?'sir-amb':'sir-red');
+  el.textContent=msg;
+  el.style.display='block';
+}
+function importSIFile(filename,text){
+  let data;
+  try{data=JSON.parse(text);}catch(e){
+    showImportResult('red','Import failed — could not parse JSON: '+e.message);
+    RLOG('[SI-IMPORT] File: '+filename+' | Parse error: '+e.message);
+    return;
+  }
+  if(!data.success||!Array.isArray(data.routes)){
+    showImportResult('red','Import failed — Invalid file format — expected SayIntentions route JSON');
+    RLOG('[SI-IMPORT] File: '+filename+' | Validation failed: success='+data.success+' routes='+(Array.isArray(data.routes)?'present':'missing'));
+    return;
+  }
+  const total=data.routes.length;
+  const activeFleet=getActiveFleet();
+  const now=new Date().toISOString();
+  let newCount=0,dupeCount=0,filtered=0;
+  for(const r of data.routes){
+    if(r.type!=='carrier'){filtered++;continue;}
+    if(!activeFleet.has(r.aircraft_type)){filtered++;continue;}
+    const dep=(r.departure_airport||'').toUpperCase();
+    const arr=(r.arrival_airport||'').toUpperCase();
+    if(!S.selICAOs.has(dep)&&!S.selICAOs.has(arr)){filtered++;continue;}
+    const id=String(r.id);
+    if(S.routeRegistry[id]){
+      S.routeRegistry[id].last_seen=now;
+      S.routeRegistry[id].times_seen=(S.routeRegistry[id].times_seen||1)+1;
+      dupeCount++;
+    }else{
+      S.routeRegistry[id]={
+        id:r.id,callsign:r.callsign,type:r.type,
+        airline:r.airline,aircraft_type:r.aircraft_type,
+        aircraft_category:r.aircraft_category,
+        departure_airport:dep,arrival_airport:arr,
+        gate_origin:r.gate_origin,gate_destination:r.gate_destination,
+        distance_nm:r.distance_nm,flight_length:r.flight_length,
+        description:r.description,
+        departure_country:r.departure_country,arrival_country:r.arrival_country,
+        first_seen:now,last_seen:now,times_seen:1,
+      };
+      newCount++;
+    }
+  }
+  const passed=newCount+dupeCount;
+  pruneRegistry();
+  window.api.siSaveRegistry(S.routeRegistry);
+  renderRoutes();updateStats();
+  RLOG('[SI-IMPORT] File: '+filename+' | Total in file: '+total+' | Passed filters: '+passed+' | New: '+newCount+' | Duplicates: '+dupeCount+' | Filtered out: '+filtered);
+  if(newCount>0){
+    showImportResult('green','Import complete — '+newCount+' new route'+(newCount!==1?'s':'')+' added, '+dupeCount+' duplicate'+(dupeCount!==1?'s':'')+' updated, '+filtered+' filtered out (wrong aircraft or airport)');
+  }else if(dupeCount>0){
+    showImportResult('amber','Import complete — 0 new routes. All '+dupeCount+' route'+(dupeCount!==1?'s were':' was')+' already in your registry.');
+  }else{
+    showImportResult('amber','Import complete — 0 new routes. All '+total+' route'+(total!==1?'s':'')+' filtered out (wrong aircraft or airport).');
+  }
+}
+
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.4.7</div>
+  pointer-events:none;">v4.4.8</div>
 </body></html>
