@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.9</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.0</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -374,6 +374,9 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   </div>
   <div class="fbar">
     <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
+    <select id="airline-f" onchange="setAirlineFilter(this.value)">
+      <option value="">All Airlines</option>
+    </select>
     <select id="dur-f" onchange="renderRoutes()">
       <option value="">Duration: Any</option>
       <option value="1">Under 1h</option>
@@ -606,6 +609,7 @@ const S={
   chDep:'',chMaxMins:0,
   showIgnored:false,
   regionFilter:'all',
+  acFilter:'',
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -1124,6 +1128,7 @@ function getRoutes(){
     if(S.regionFilter==='europe'&&!/^[ELGB]/.test(dep)&&!/^[ELGB]/.test(arr))return false;
     if(S.regionFilter==='namerica'&&!'KCP'.includes(dep[0])&&!'KCP'.includes(arr[0]))return false;
     if(q&&!([dep,arr,r.airline||'',r.callsign||'',r.description||''].some(x=>x.toLowerCase().includes(q))))return false;
+    if(S.acFilter&&r.airline!==S.acFilter)return false;
     return true;
   });
   rs.sort((a,b)=>
@@ -1134,7 +1139,20 @@ function getRoutes(){
   return rs;
 }
 
+function populateAirlineDropdown(){
+  const sel=document.getElementById('airline-f');
+  if(!sel)return;
+  const prev=S.acFilter;
+  S.acFilter='';
+  const base=getRoutes();
+  S.acFilter=prev;
+  const airlines=[...new Set(base.map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  if(prev&&!airlines.includes(prev))S.acFilter='';
+}
+
 function renderRoutes(){
+  populateAirlineDropdown();
   const rs=getRoutes();
   const cnt=rs.length;
   const regSize=Object.keys(S.routeRegistry).length;
@@ -1225,9 +1243,10 @@ function togR(i){
   }
 }
 
-function setAcft(v){S.acft=v;document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
-function setMode(v){S.mode=v;document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
-function setRegion(v){S.regionFilter=v;document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
+function setAirlineFilter(v){S.acFilter=v;S.openRoute=null;renderRoutes();}
+function setAcft(v){S.acft=v;S.acFilter='';document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
+function setMode(v){S.mode=v;S.acFilter='';document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
+function setRegion(v){S.regionFilter=v;S.acFilter='';document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
 
 function exportCSV(){
   const rs=getRoutes();
@@ -1597,5 +1616,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.4.9</div>
+  pointer-events:none;">v4.5.0</div>
 </body></html>
