@@ -921,11 +921,8 @@ function toggleFleet(code,checked){
     FLEET_DEF.forEach(f=>{S.cfg.myFleet[f.code]=f.def;});
   }
   S.cfg.myFleet[code]=checked;
-  // If the active chip's sim key has no more active codes, reset to 'all'
-  if(S.acft!=='all'){
-    const active=getActiveFleet();
-    if(!FLEET_DEF.some(f=>active.has(f.code)&&SI_ACFT_MAP[f.code]===S.acft))S.acft='all';
-  }
+  // If the selected chip's API code is no longer active, reset to 'all'
+  if(S.acft!=='all'&&!getActiveFleet().has(S.acft))S.acft='all';
   // Update chips and routes immediately — no await needed for instant feedback
   renderFleetChips();
   renderRoutes();
@@ -935,24 +932,14 @@ function toggleFleet(code,checked){
 function renderFleetChips(){
   const row=document.getElementById('acft-chips-row');
   if(!row)return;
+  // One chip per checked API code in FLEET_DEF order — no dedup by sim key.
+  // getActiveFleet() returns defaults when myFleet is unconfigured, so no
+  // hardcoded fallback list is needed.
   const active=getActiveFleet();
-  const seen=new Set();
-  const items=[];
-  for(const entry of FLEET_DEF){
-    if(!active.has(entry.code))continue;
-    const simKey=SI_ACFT_MAP[entry.code];
-    if(!simKey||seen.has(simKey))continue;
-    seen.add(simKey);
-    items.push({simKey,label:entry.label});
-  }
-  // Fallback to hardcoded defaults if fleet not configured
-  const chips=items.length?items:[
-    {simKey:'a319',label:'Fenix A319'},{simKey:'a320',label:'Fenix A320'},
-    {simKey:'a321',label:'Fenix A321'},{simKey:'b738',label:'PMDG 737-800'},
-  ];
+  const chips=FLEET_DEF.filter(e=>active.has(e.code));
   row.innerHTML='<span class="clbl">Aircraft</span>'
     +`<div class="chip ${S.acft==='all'?'on':''}" data-acft="all" onclick="setAcft('all')">All</div>`
-    +chips.map(({simKey,label})=>`<div class="chip ${S.acft===simKey?'on':''}" data-acft="${simKey}" onclick="setAcft('${simKey}')">${label}</div>`).join('');
+    +chips.map(e=>`<div class="chip ${S.acft===e.code?'on':''}" data-acft="${e.code}" onclick="setAcft('${e.code}')">${e.label}</div>`).join('');
 }
 
 function processPage(routes){
@@ -1001,27 +988,11 @@ function showSIError(msg){
   const b=document.getElementById('si-banner');
   const m=document.getElementById('si-banner-msg');
   if(!b)return;
-  if(m)m.textContent=msg||'Cookie expired — paste a new cookie in Settings.';
+  if(m)m.textContent=msg||'Route fetch failed — cookie may be expired. Paste a new cookie in Settings.';
   b.style.display='flex';
 }
-function isAuthFail(res){
-  return res.expired||res.status===401||res.status===403;
-}
-
-// Fetch a single page with up to 3 attempts on 429 (5s then 10s back-off).
-// Returns the final response regardless of outcome — caller decides what to do.
-async function fetchPageWithRetry(pg){
-  let res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
-  if(res.ok||res.status!==429)return res;
-  setSt('Rate limited — slowing down... (retry 1 of 2)','var(--acc)');
-  RLOG('si page '+pg+' 429, waiting 5s');
-  await new Promise(r=>setTimeout(r,5000));
-  res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
-  if(res.ok||res.status!==429)return res;
-  setSt('Rate limited — slowing down... (retry 2 of 2)','var(--acc)');
-  RLOG('si page '+pg+' 429 again, waiting 10s');
-  await new Promise(r=>setTimeout(r,10000));
-  return window.api.siFetchPage({page:pg,cookie:S.siCookie});
+function isFatalStatus(res){
+  return res.expired||res.status===401||res.status===403||res.status===429;
 }
 
 async function fetchSIRoutes(){
@@ -1031,14 +1002,12 @@ async function fetchSIRoutes(){
   const btn=document.getElementById('fetch-btn');
   btn.disabled=true;siSetProg(0);
   setSt('Fetching page 1...','var(--acc)');
-  const p1=await fetchPageWithRetry(1);
+  const p1=await window.api.siFetchPage({page:1,cookie:S.siCookie});
   if(!p1.ok){
     btn.disabled=false;siSetProg(-1);
-    if(isAuthFail(p1)){
-      setSt('Fetch failed — cookie expired.','var(--red)');
+    if(isFatalStatus(p1)){
+      setSt('Fetch failed — cookie expired or rate limited.','var(--red)');
       showSIError();
-    }else if(p1.status===429){
-      setSt('Fetch failed — rate limited. Wait a moment and try again.','var(--red)');
     }else{
       setSt('Fetch failed: '+(p1.error||'HTTP '+p1.status),'var(--red)');
     }
@@ -1052,16 +1021,14 @@ async function fetchSIRoutes(){
   for(let pg=2;pg<=totalPages;pg++){
     setSt('Fetching page '+pg+' of '+totalPages+'...','var(--acc)');
     await new Promise(r=>setTimeout(r,500));
-    const res=await fetchPageWithRetry(pg);
+    const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
     if(!res.ok){
       RLOG('si page '+pg+' failed: status='+(res.status||res.error));
-      if(isAuthFail(res)){
-        setSt('Fetch stopped — cookie expired (page '+pg+').','var(--red)');
+      if(isFatalStatus(res)){
+        setSt('Fetch stopped — cookie expired or rate limited (page '+pg+').','var(--red)');
         showSIError();
         btn.disabled=false;siSetProg(-1);return;
       }
-      // 429 exhausted or other error — skip page, keep going
-      if(res.status===429)RLOG('si page '+pg+' still 429 after 3 attempts, skipping');
       continue;
     }
     processPage(res.data?.data||res.data?.routes||[]);
@@ -1104,8 +1071,7 @@ function getRoutes(){
     const di=S.selICAOs.has(dep),ai=S.selICAOs.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
     if(S.mode==='1'&&!(di||ai))return false;
-    const simAcft=SI_ACFT_MAP[r.aircraft_type];
-    if(S.acft!=='all'&&simAcft!==S.acft)return false;
+    if(S.acft!=='all'&&r.aircraft_type!==S.acft)return false;
     const fl=parseInt(r.flight_length)||0;
     if(durMaxHrs&&fl>durMaxHrs*60)return false;
     if(S.regionFilter==='europe'&&!/^[ELGB]/.test(dep)&&!/^[ELGB]/.test(arr))return false;
