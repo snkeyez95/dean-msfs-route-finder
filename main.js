@@ -122,8 +122,22 @@ ipcMain.handle('scan-folder', async (_,p)=>{
 });
 
 const CFG=path.join(os.homedir(),'.dean_msfs_v4.json');
-ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' routeCache airports='+(Object.keys(c.routeCache||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
-ipcMain.handle('save-config',(_,cfg)=>{try{fs.writeFileSync(CFG,JSON.stringify(cfg,null,2));LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);}catch(e){LOG.error('save-config failed:',e.message);}});
+ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' registry='+(Object.keys(c.routeRegistry||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
+ipcMain.handle('save-config',(_,cfg)=>{
+  try{
+    // Read existing file so we never clobber routeRegistry, which is written
+    // independently by si-save-registry and is not held in the renderer's S.cfg.
+    let existing={};
+    try{existing=JSON.parse(fs.readFileSync(CFG,'utf8'));}catch(e){}
+    const merged=Object.assign({},existing,cfg);
+    // Carry forward routeRegistry if the incoming cfg doesn't include it
+    if(existing.routeRegistry&&!cfg.routeRegistry)merged.routeRegistry=existing.routeRegistry;
+    // Remove retired AirLabs key
+    delete merged.routeCache;
+    fs.writeFileSync(CFG,JSON.stringify(merged,null,2));
+    LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);
+  }catch(e){LOG.error('save-config failed:',e.message);}
+});
 
 ipcMain.handle('si-fetch-page', (_, {page, cookie}) => new Promise(resolve => {
   LOG.info('si-fetch-page: page=' + page + ' cookie=***REDACTED***');
@@ -165,7 +179,7 @@ ipcMain.handle('si-get-registry', () => {
   try {
     const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
     const reg = c.routeRegistry || {};
-    LOG.info('si-get-registry: loaded ' + Object.keys(reg).length + ' entries');
+    LOG.info('[SI] Registry loaded: ' + Object.keys(reg).length + ' entries');
     return reg;
   } catch(e) {
     LOG.warn('si-get-registry: error', e.message);
@@ -178,8 +192,11 @@ ipcMain.handle('si-save-registry', (_, registry) => {
     let c = {};
     try { c = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(e) {}
     c.routeRegistry = registry;
+    // Remove retired AirLabs key
+    delete c.routeCache;
+    LOG.info('[SI] Saving registry: ' + Object.keys(registry).length + ' entries');
     fs.writeFileSync(CFG, JSON.stringify(c, null, 2));
-    LOG.info('si-save-registry: saved ' + Object.keys(registry).length + ' entries');
+    LOG.info('[SI] Registry saved successfully');
   } catch(e) {
     LOG.error('si-save-registry failed:', e.message);
   }
