@@ -240,7 +240,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.3</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.4</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -592,13 +592,17 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
+  // Initialise myFleet only when the key is absent from config (first run, or
+  // config predates the fleet feature). Never overwrite an existing saved state,
+  // even if it is partially filled — the user's choices must survive updates.
+  if(!S.cfg.myFleet){
+    S.cfg.myFleet={};
+    FLEET_DEF.forEach(f=>{S.cfg.myFleet[f.code]=f.def;});
+    window.api.saveConfig(S.cfg);
+    RLOG('myFleet initialised with defaults (first run)');
+  }
   renderFleetPanel();
   renderFleetChips();
-  {
-    const active=getActiveFleet();
-    const codes=FLEET_DEF.filter(f=>active.has(f.code)).map(f=>f.code);
-    RLOG('myFleet: '+codes.length+' checked aircraft: '+codes.join(', '));
-  }
   if(S.cfg.siCookie){
     S.siCookie=S.cfg.siCookie;
     document.getElementById('si-cookie-inp').value='••••••••••••••••';
@@ -621,19 +625,6 @@ window.addEventListener('DOMContentLoaded',async()=>{
     }catch(e){ console.error('Session restore error:',e); }
   }
   buildChSB();renderCD(0);updateStats();renderRoutes();
-  {
-    const active=getActiveFleet();
-    const counts=FLEET_DEF
-      .filter(f=>active.has(f.code))
-      .map(f=>{
-        const n=Object.values(S.routeRegistry).filter(r=>
-          r.aircraft_type===f.code&&
-          (S.selICAOs.has(r.departure_airport)||S.selICAOs.has(r.arrival_airport))
-        ).length;
-        return f.code+'='+n;
-      });
-    RLOG('Routes matched by aircraft: '+counts.join(', '));
-  }
   // Background diff-check
   if(S.cfg.folder){
     (async()=>{
@@ -934,10 +925,7 @@ function renderFleetPanel(){
 }
 
 function toggleFleet(code,checked){
-  if(!S.cfg.myFleet||!Object.keys(S.cfg.myFleet).length){
-    S.cfg.myFleet={};
-    FLEET_DEF.forEach(f=>{S.cfg.myFleet[f.code]=f.def;});
-  }
+  if(!S.cfg.myFleet)S.cfg.myFleet={};  // defensive; normally set on startup
   S.cfg.myFleet[code]=checked;
   // If the selected chip's API code is no longer active, reset to 'all'
   if(S.acft!=='all'&&!getActiveFleet().has(S.acft))S.acft='all';
@@ -1483,5 +1471,5 @@ async function unignoreFolder(folder){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.4.3</div>
+  pointer-events:none;">v4.4.4</div>
 </body></html>
