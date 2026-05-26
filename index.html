@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.0</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.1</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -365,6 +365,12 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <span class="clbl">Mode</span>
     <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
     <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+  </div>
+  <div class="crow">
+    <span class="clbl">Direction</span>
+    <div class="chip sq on" data-dir="either" onclick="setDirFilter('either')">Either</div>
+    <div class="chip sq" data-dir="dep" onclick="setDirFilter('dep')">Departing from library</div>
+    <div class="chip sq" data-dir="arr" onclick="setDirFilter('arr')">Arriving at library</div>
   </div>
   <div class="crow">
     <span class="clbl">Region</span>
@@ -609,6 +615,7 @@ const S={
   chDep:'',chMaxMins:0,
   showIgnored:false,
   regionFilter:'all',
+  dirFilter:'either',
   acFilter:'',
 };
 
@@ -1122,6 +1129,8 @@ function getRoutes(){
     const di=S.selICAOs.has(dep),ai=S.selICAOs.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
     if(S.mode==='1'&&!(di||ai))return false;
+    if(S.dirFilter==='dep'&&!di)return false;
+    if(S.dirFilter==='arr'&&!ai)return false;
     if(S.acft!=='all'&&r.aircraft_type!==S.acft)return false;
     const fl=parseInt(r.flight_length)||0;
     if(durMaxHrs&&fl>durMaxHrs*60)return false;
@@ -1244,6 +1253,7 @@ function togR(i){
 }
 
 function setAirlineFilter(v){S.acFilter=v;S.openRoute=null;renderRoutes();}
+function setDirFilter(v){S.dirFilter=v;S.acFilter='';document.querySelectorAll('[data-dir]').forEach(e=>e.classList.toggle('on',e.dataset.dir===v));S.openRoute=null;renderRoutes();}
 function setAcft(v){S.acft=v;S.acFilter='';document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
 function setMode(v){S.mode=v;S.acFilter='';document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
 function setRegion(v){S.regionFilter=v;S.acFilter='';document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
@@ -1616,5 +1626,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.0</div>
+  pointer-events:none;">v4.5.1</div>
 </body></html>
