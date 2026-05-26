@@ -240,7 +240,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.1</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.4.2</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -575,11 +575,14 @@ window.addEventListener('DOMContentLoaded',async()=>{
   if(S.cfg.siCookie){
     S.siCookie=S.cfg.siCookie;
     document.getElementById('si-cookie-inp').value='••••••••••••••••';
-    setSt('Cookie saved. Click Refresh Routes after scanning.','var(--grn)');
     document.getElementById('fetch-btn').disabled=false;
   }
   // Load route registry
   S.routeRegistry=await window.api.siGetRegistry();
+  {
+    const _n=Object.keys(S.routeRegistry).length;
+    if(S.cfg.siCookie)setSt(_n>0?'Cookie saved — '+_n+' routes in registry.':'Cookie saved. Click Refresh Routes to build your database.','var(--grn)');
+  }
   if(S.cfg.savedRows&&S.cfg.savedRows.length){
     try{
       S.allRows=S.cfg.savedRows;
@@ -634,7 +637,12 @@ window.addEventListener('DOMContentLoaded',async()=>{
 function sw(t){
   document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));
   document.querySelectorAll('.pane').forEach(e=>e.classList.toggle('on',e.id==='pane-'+t));
-  if(t==='routes')renderRoutes();
+  if(t==='routes'){
+    (async()=>{
+      S.routeRegistry=await window.api.siGetRegistry();
+      renderRoutes();updateStats();
+    })();
+  }
   if(t==='challenges')buildChDepSelect();
 }
 
@@ -1337,5 +1345,5 @@ async function unignoreFolder(folder){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.4.1</div>
+  pointer-events:none;">v4.4.2</div>
 </body></html>
