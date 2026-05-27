@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.16</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.17</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -456,6 +456,23 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <div class="si-drop-txt"><strong>Drop SayIntentions JSON file here to import routes</strong><br>Accepts .txt and .json files</div>
   </div>
   <div id="si-import-result" class="si-import-result"></div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-top:1px solid var(--sep);padding-top:24px;margin-top:10px">Rate Limit Diagnostic</div>
+  <div class="api-pan" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleRLDiag()">
+      <span class="api-t" style="margin-bottom:0">Rate Limit Diagnostic</span>
+      <span id="rl-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9654; expand</span>
+    </div>
+    <div id="rl-diag-panel" style="display:none;margin-top:14px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Measures SayIntentions.AI rate limit window size and reset duration. Requires a valid cookie.</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button class="btn bg bsm" id="rl-run-btn" onclick="runRLDiag()">Run Diagnostic</button>
+        <button class="btn bg bsm" id="rl-stop-btn" onclick="stopRLDiag()" disabled>Stop</button>
+        <span id="rl-elapsed" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+      </div>
+      <div id="rl-log" style="background:#0a0a0a;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ccc;max-height:300px;overflow-y:auto;padding:8px;border-radius:var(--r2);border:1px solid var(--sep);margin-bottom:10px;white-space:pre-wrap;min-height:48px"></div>
+      <div id="rl-results" style="display:none;background:var(--acc3);border:1px solid rgba(245,166,35,.25);border-radius:var(--r2);padding:14px;font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;line-height:1.8"></div>
+    </div>
+  </div>
 </div></div>
 
 </div><script>
@@ -1862,7 +1879,133 @@ function importSIFile(filename,text){
 }
 
 
+
+// ── RATE LIMIT DIAGNOSTIC ────────────────────────────────────────────────────
+let _rlRunning=false,_rlStop=false,_rlPhase=0,_rlElTimer=null,_rlStart=0;
+
+function toggleRLDiag(){
+  const p=document.getElementById('rl-diag-panel');
+  const ic=document.getElementById('rl-toggle-icon');
+  if(!p)return;
+  const open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  ic.innerHTML=open?'&#9654; expand':'&#9660; collapse';
+}
+
+function _rlLog(msg){
+  const el=document.getElementById('rl-log');
+  if(el){el.textContent+=msg+'\n';el.scrollTop=el.scrollHeight;}
+  RLOG('[RL-TEST] '+msg);
+}
+
+function _rlTS(){return new Date().toTimeString().slice(0,8);}
+function _rlFmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+'m '+(s%60)+'s';}
+
+function _rlFinish(){
+  _rlRunning=false;
+  clearInterval(_rlElTimer);
+  const run=document.getElementById('rl-run-btn');
+  const stop=document.getElementById('rl-stop-btn');
+  const el=document.getElementById('rl-elapsed');
+  if(run)run.disabled=false;
+  if(stop)stop.disabled=true;
+  if(el)el.textContent='';
+  _rlLog('--- Diagnostic ended ---');
+}
+
+function stopRLDiag(){
+  _rlStop=true;
+  _rlLog('Stopped by user at phase '+_rlPhase);
+}
+
+async function runRLDiag(){
+  if(_rlRunning)return;
+  if(!S.siCookie){_rlLog('ERROR: No cookie — save your SayIntentions cookie first.');return;}
+  _rlRunning=true;_rlStop=false;_rlPhase=1;_rlStart=Date.now();
+  document.getElementById('rl-log').textContent='';
+  document.getElementById('rl-results').style.display='none';
+  document.getElementById('rl-run-btn').disabled=true;
+  document.getElementById('rl-stop-btn').disabled=false;
+  const elEl=document.getElementById('rl-elapsed');
+  _rlElTimer=setInterval(()=>{if(elEl)elEl.textContent='Running: '+_rlFmt(Date.now()-_rlStart);},1000);
+
+  // ── Phase 1: find limit ──
+  _rlLog('=== Phase 1: Finding rate limit ===');
+  let limitPage=0,limitTime=0;
+  for(let pg=1;pg<=500&&!_rlStop;pg++){
+    const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+    if(res.ok){
+      _rlLog('✅ Page '+pg+' — 200 — '+_rlTS());
+    }else if(res.status===429||res.expired){
+      _rlLog('❌ Page '+pg+' — 429 — '+_rlTS()+' — LIMIT HIT after '+pg+' requests');
+      limitPage=pg;limitTime=Date.now();
+      break;
+    }else{
+      _rlLog('⚠️ Page '+pg+' — '+(res.status||'ERR')+' — '+_rlTS()+' — stopping');
+      break;
+    }
+    await new Promise(r=>setTimeout(r,500));
+  }
+  if(_rlStop||!limitPage){_rlFinish();return;}
+
+  // ── Phase 2: probe reset ──
+  _rlPhase=2;
+  _rlLog('\n=== Phase 2: Probing reset every 30s ===');
+  let resetMs=0,probe=0;
+  outer2:while(!_rlStop){
+    for(let i=0;i<30&&!_rlStop;i++)await new Promise(r=>setTimeout(r,1000));
+    if(_rlStop)break;
+    probe++;
+    const elapsed=Date.now()-limitTime;
+    const res=await window.api.siFetchPage({page:limitPage,cookie:S.siCookie});
+    if(res.ok){
+      resetMs=elapsed;
+      _rlLog('✅ '+_rlTS()+' — Probe '+probe+' — 200 — RESET after '+_rlFmt(elapsed));
+      break outer2;
+    }else{
+      _rlLog('⏳ '+_rlTS()+' — Probe '+probe+' — 429 — '+_rlFmt(elapsed)+' elapsed');
+    }
+  }
+  if(_rlStop||!resetMs){_rlFinish();return;}
+
+  // ── Phase 3: confirm window size ──
+  _rlPhase=3;
+  _rlLog('\n=== Phase 3: Confirming window size ===');
+  let winSize=0,confirmed=0;
+  for(let pg=1;pg<=200&&!_rlStop;pg++){
+    const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+    if(res.ok){
+      confirmed++;
+      _rlLog('✅ Page '+pg+' — 200 — '+_rlTS());
+    }else if(res.status===429||res.expired){
+      winSize=confirmed;
+      _rlLog('❌ Window confirmed: '+winSize+' requests per window — '+_rlTS());
+      break;
+    }else{
+      _rlLog('⚠️ Page '+pg+' — '+(res.status||'ERR')+' — '+_rlTS()+' — stopping');
+      break;
+    }
+    await new Promise(r=>setTimeout(r,500));
+  }
+
+  // ── Results ──
+  if(!_rlStop&&winSize>0&&resetMs>0){
+    const wm=Math.floor(resetMs/60000),ws=Math.floor((resetMs%60000)/1000);
+    const totalPg=174,batches=Math.ceil(totalPg/winSize);
+    const totalSec=batches*(winSize*0.5)+(batches-1)*(resetMs/1000);
+    const totalMin=Math.round(totalSec/60);
+    const html='<div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:10px">Results</div>'+
+      '<div>Window duration: <strong style="color:var(--acc)">'+wm+'m '+ws+'s</strong></div>'+
+      '<div>Requests per window: <strong style="color:var(--acc)">'+winSize+'</strong></div>'+
+      '<div>Recommended strategy: fetch <strong style="color:var(--acc)">'+winSize+' pages</strong>, wait <strong style="color:var(--acc)">'+wm+'m '+ws+'s</strong>, repeat</div>'+
+      '<div style="margin-top:8px">Estimated full fetch for '+totalPg+' pages: <strong style="color:var(--acc)">~'+totalMin+' min</strong></div>';
+    const rEl=document.getElementById('rl-results');
+    if(rEl){rEl.innerHTML=html;rEl.style.display='block';}
+    RLOG('[RL-TEST] Results: window='+wm+'m '+ws+'s requests='+winSize+' est=~'+totalMin+'min for '+totalPg+' pages');
+  }
+  _rlFinish();
+}
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.16</div>
+  pointer-events:none;">v4.5.17</div>
 </body></html>
