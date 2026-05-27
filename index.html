@@ -1199,7 +1199,7 @@ function renderRoutes(){
     if(!isO)return[main];
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
-    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
+    const sbU=`https://dispatch.simbrief.com/options/custom?airline=${sbAirline}&fltnum=${sbFltnum}&type=${r.aircraft_type}&orig=${r.departure_airport}&dest=${r.arrival_airport}&reg=&callsign=${r.callsign||''}&pax=AUTO&cargo=AUTO&fl=AUTO`;
     const faU=`https://www.flightaware.com/live/findflight/?origin=${r.departure_airport}&destination=${r.arrival_airport}`;
     const svU=`https://skyvector.com/?fpl=${r.departure_airport}%20${r.arrival_airport}`;
     const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' → '+r.gate_destination:(r.gate_origin||r.gate_destination||'—');
@@ -1276,7 +1276,7 @@ function exportCSV(){
     return[r.callsign,r.airline,r.departure_airport,r.arrival_airport,
       r.aircraft_type,SIM_LBL[simAcft]||'',fmtFlightLen(r.flight_length),
       r.distance_nm?Math.round(r.distance_nm)+'nm':'',
-      (()=>{const al=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';const fn=(r.callsign||'').replace(/^[A-Z]+/,'');let u=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${SIM_SB[simAcft]||'A320'}`;if(al)u+=`&airline=${al}`;if(fn)u+=`&fltnum=${fn}`;return u;})()
+      (()=>{const al=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';const fn=(r.callsign||'').replace(/^[A-Z]+/,'');return`https://dispatch.simbrief.com/options/custom?airline=${al}&fltnum=${fn}&type=${SIM_SB[simAcft]||'A320'}&orig=${r.departure_airport}&dest=${r.arrival_airport}&reg=&callsign=${r.callsign||''}&pax=AUTO&cargo=AUTO&fl=AUTO`;})()
     ].join(',');
   });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...rows].join('\n')],{type:'text/csv'}));
@@ -1422,7 +1422,7 @@ function renderCD(idx){
 
   const sbType=SIM_SB['a320'];
   const sbDep=S.chDep||'EGKK';
-  const sbU=`https://dispatch.simbrief.com/options/custom?orig=${sbDep}&dest=${ch.icao}&type=${sbType}`;
+  const sbU=`https://dispatch.simbrief.com/options/custom?airline=&fltnum=&type=${sbType}&orig=${sbDep}&dest=${ch.icao}&reg=&callsign=&pax=AUTO&cargo=AUTO&fl=AUTO`;
   const svU=`https://skyvector.com/?ll=${ch.lat},${ch.lon}&chart=301&zoom=4`;
 
   document.getElementById('ch-det').innerHTML=`
