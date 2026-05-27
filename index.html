@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.2</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.3</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -1197,7 +1197,9 @@ function renderRoutes(){
       <td style="font-size:12px;color:var(--ink2)">${dist}</td>
     </tr>`;
     if(!isO)return[main];
-    const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`;
+    const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
+    const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
     const faU=`https://www.flightaware.com/live/findflight/?origin=${r.departure_airport}&destination=${r.arrival_airport}`;
     const svU=`https://skyvector.com/?fpl=${r.departure_airport}%20${r.arrival_airport}`;
     const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' → '+r.gate_destination:(r.gate_origin||r.gate_destination||'—');
@@ -1274,7 +1276,7 @@ function exportCSV(){
     return[r.callsign,r.airline,r.departure_airport,r.arrival_airport,
       r.aircraft_type,SIM_LBL[simAcft]||'',fmtFlightLen(r.flight_length),
       r.distance_nm?Math.round(r.distance_nm)+'nm':'',
-      `https://www.simbrief.com/system/dispatch.php?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${SIM_SB[simAcft]||'A320'}`
+      (()=>{const al=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';const fn=(r.callsign||'').replace(/^[A-Z]+/,'');let u=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${SIM_SB[simAcft]||'A320'}`;if(al)u+=`&airline=${al}`;if(fn)u+=`&fltnum=${fn}`;return u;})()
     ].join(',');
   });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...rows].join('\n')],{type:'text/csv'}));
@@ -1420,7 +1422,7 @@ function renderCD(idx){
 
   const sbType=SIM_SB['a320'];
   const sbDep=S.chDep||'EGKK';
-  const sbU=`https://www.simbrief.com/system/dispatch.php?orig=${sbDep}&dest=${ch.icao}&type=${sbType}`;
+  const sbU=`https://dispatch.simbrief.com/options/custom?orig=${sbDep}&dest=${ch.icao}&type=${sbType}`;
   const svU=`https://skyvector.com/?ll=${ch.lat},${ch.lon}&chart=301&zoom=4`;
 
   document.getElementById('ch-det').innerHTML=`
@@ -1634,5 +1636,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.2</div>
+  pointer-events:none;">v4.5.3</div>
 </body></html>
