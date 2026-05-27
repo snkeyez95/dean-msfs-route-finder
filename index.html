@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.15</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.16</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -375,10 +375,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   <div class="scroll" style="padding-top:12px">
     <div class="rhdl">
       <div class="rcnt" id="rcnt">No routes loaded</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span id="wx-age"></span>
-        <div class="lpill"><div class="ldot"></div>SayIntentions.AI traffic</div>
-      </div>
+      <span id="wx-age"></span>
     </div>
     <div class="rwrap">
       <table class="rtbl">
@@ -1526,14 +1523,15 @@ async function fetchMetarBatch(){
 function updateWxAge(){
   const el=document.getElementById('wx-age');
   if(!el)return;
+  const ps='display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#32d74b;background:#0d2a0d;border:0.5px solid #32d74b44;border-radius:20px;padding:3px 9px;font-family:\'JetBrains Mono\',monospace';
   if(S.wxFetching){
-    el.innerHTML='<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace;animation:pulse 1.2s ease-in-out infinite">Weather updating…</span>';
+    el.innerHTML='<span style="'+ps+';animation:pulse 1.2s ease-in-out infinite">&#9679; Updating weather…</span>';
     return;
   }
   if(!S.metarLastFetch){el.innerHTML='';return;}
   const mins=Math.floor((Date.now()-S.metarLastFetch)/60000);
   const timeStr=mins<1?'just now':mins+'m ago';
-  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#32d74b;display:inline-block;flex-shrink:0"></span><span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">Weather updated '+timeStr+'</span><button onclick="fetchMetarBatch()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;vertical-align:middle" title="Refresh weather">&#8634;</button></span>';
+  el.innerHTML='<span style="'+ps+'">&#9679; Weather updated '+timeStr+' <button onclick="fetchMetarBatch()" style="background:none;border:none;color:#32d74b;cursor:pointer;font-size:11px;padding:0;line-height:1;font-family:\'JetBrains Mono\',monospace" title="Refresh weather">&#8634;</button></span>';
 }
 
 function parseWind(m){
@@ -1866,5 +1864,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.15</div>
+  pointer-events:none;">v4.5.16</div>
 </body></html>
