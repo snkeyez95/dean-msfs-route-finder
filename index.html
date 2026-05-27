@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.8</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.9</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -1190,6 +1190,7 @@ function populateAirlineDropdown(){
 }
 
 function renderRoutes(){
+  console.log(`[WX] metarCache has ${Object.keys(S.metarCache).length} entries`);
   populateAirlineDropdown();
   const rs=getRoutes();
   const cnt=rs.length;
@@ -1210,8 +1211,9 @@ function renderRoutes(){
     const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
     const depM=S.metarCache[(r.departure_airport||'').toUpperCase()];
     const arrM=S.metarCache[(r.arrival_airport||'').toUpperCase()];
-    const depScore=scoreMETAR(depM),arrScore=scoreMETAR(arrM);
+    const depScore=scoreMETAR(depM,r.departure_airport),arrScore=scoreMETAR(arrM,r.arrival_airport);
     const combined=Math.max(0,depScore+arrScore);
+    console.log(`[WX] Row ${r.departure_airport}→${r.arrival_airport}: depScore=${depScore} arrScore=${arrScore} combined=${combined}`);
     const worstCat=getWorstCategory(r.departure_airport,r.arrival_airport);
     const hasWxData=S.metarLastFetch&&(depM||arrM);
     const pc=combined<=2?{bg:'#1a3a1a',text:'#32d74b',border:'#32d74b44'}:combined<=6?{bg:'#0a1a3a',text:'#0a84ff',border:'#0a84ff44'}:combined<=12?{bg:'#2a1a00',text:'#f5a623',border:'#f5a62344'}:combined<=18?{bg:'#2a1000',text:'#ff6b35',border:'#ff6b3544'}:{bg:'#2a0a0a',text:'#ff453a',border:'#ff453a44'};
@@ -1346,7 +1348,7 @@ async function fetchMetar(icao,idx,side){
 }
 
 // ── WEATHER SCORING ──────────────────────────────────────────────────────────
-function scoreMETAR(m){
+function scoreMETAR(m,icao){
   if(!m)return 0;
   let s={LIFR:8,IFR:6,MVFR:3,VFR:1}[(m.fltcat||'').toUpperCase()]||0;
   const tokens=(m.wxString||'').split(/\s+/).filter(t=>t);
@@ -1376,7 +1378,9 @@ function scoreMETAR(m){
   if(gs>40)s+=4;else if(gs>30)s+=3;else if(gs>20)s+=2;
   if(sp>30)s+=3;else if(sp>=20)s+=2;else if(sp>=15)s+=1;
   if((m.clouds||[]).some(c=>c.cover==='SKC'||c.cover==='CLR'||c.cover==='CAVOK')||/\bCAVOK\b/.test(m.rawOb||''))s-=1;
-  return Math.max(0,s);
+  const result=Math.max(0,s);
+  if(icao)console.log(`[WX] scoreMETAR(${icao}): score=${result} category=${(m.fltcat||'?').toUpperCase()}`);
+  return result;
 }
 
 function getWorstCategory(depICAO,arrICAO){
@@ -1455,18 +1459,22 @@ async function fetchMetarBatch(){
     if(r.arrival_airport)icaoSet.add(r.arrival_airport.toUpperCase());
   });
   const icaos=[...icaoSet].filter(Boolean);
-  if(!icaos.length)return;
+  if(!icaos.length){console.log('[WX] Fetch skipped — no ICAOs available');return;}
+  console.log(`[WX] Fetching METARs for ${icaos.length} airports: ${icaos.join(',')}`);
   try{
     const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icaos.join(',')+'&format=json');
-    if(!res.ok)return;
+    if(!res.ok){console.log(`[WX] Fetch failed: HTTP ${res.status}`);return;}
     const data=await res.json();
-    if(!Array.isArray(data))return;
+    if(!Array.isArray(data)){console.log('[WX] Fetch failed: response was not an array');return;}
     S.metarCache={};
     data.forEach(m=>{if(m.icaoId)S.metarCache[m.icaoId.toUpperCase()]=m;});
     S.metarLastFetch=Date.now();
+    const cachedKeys=new Set(Object.keys(S.metarCache));
+    console.log(`[WX] Cached ${cachedKeys.size} METARs successfully`);
+    icaos.forEach(id=>{if(!cachedKeys.has(id))console.log(`[WX] No METAR returned for: ${id}`);});
     updateWxAge();
     renderRoutes();
-  }catch(e){}
+  }catch(e){console.log(`[WX] Fetch failed: ${e.message}`);}
 }
 
 function updateWxAge(){
@@ -1805,5 +1813,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.8</div>
+  pointer-events:none;">v4.5.9</div>
 </body></html>
