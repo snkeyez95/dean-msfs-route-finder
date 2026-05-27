@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.3</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.4</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -369,7 +369,10 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
   </div>
   <div class="rhdl">
-    <div class="rcnt" id="rcnt">No routes loaded</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="rcnt" id="rcnt">No routes loaded</div>
+      <span id="wx-age" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    </div>
     <div class="lpill"><div class="ldot"></div>SayIntentions.AI traffic</div>
   </div>
   <div class="rwrap">
@@ -379,6 +382,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
         <th style="width:130px">Route</th>
         <th>Airline</th>
         <th style="width:130px">Aircraft</th>
+        <th style="width:40px;text-align:center">WX</th>
         <th style="width:85px">Duration</th>
         <th style="width:90px">Distance</th>
       </tr></thead>
@@ -625,6 +629,8 @@ const S={
   regionFilter:'all',
   dirFilter:'either',
   acFilter:'',
+  metarCache:{},
+  metarLastFetch:0,
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -665,6 +671,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
     }catch(e){ console.error('Session restore error:',e); }
   }
   buildChSB();renderCD(0);updateStats();renderRoutes();
+  fetchMetarBatch();
+  setInterval(()=>{if(S.selICAOs.size)fetchMetarBatch();},30*60*1000);
+  setInterval(updateWxAge,60000);
   // Background diff-check
   if(S.cfg.folder){
     (async()=>{
@@ -713,6 +722,7 @@ function sw(t){
     (async()=>{
       S.routeRegistry=await window.api.siGetRegistry();
       renderRoutes();updateStats();
+      fetchMetarBatch();
     })();
   }
   if(t==='challenges')buildChDepSelect();
@@ -1176,7 +1186,7 @@ function renderRoutes(){
   document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(regSize?'':' — paste cookie and click Refresh Routes');
   if(!cnt){
     const msg=!regSize?'Paste your SayIntentions cookie above and click Refresh Routes.':'No routes match your current filters.';
-    document.getElementById('rt-body').innerHTML=`<tr><td colspan="6"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
+    document.getElementById('rt-body').innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
     updateStats();return;
   }
   document.getElementById('rt-body').innerHTML=rs.flatMap((r,i)=>{
@@ -1187,23 +1197,32 @@ function renderRoutes(){
     const simLbl=FLEET_LBL[r.aircraft_type]||SIM_LBL[simAcft]||r.aircraft_type;
     const dur=fmtFlightLen(r.flight_length);
     const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
+    const depM=S.metarCache[(r.departure_airport||'').toUpperCase()];
+    const arrM=S.metarCache[(r.arrival_airport||'').toUpperCase()];
+    const hasWxData=S.metarLastFetch&&(depM||arrM);
+    const wxScore=scoreMETAR(depM)+scoreMETAR(arrM);
+    const wxCol=hasWxData?wxColor(wxScore):'';
+    const wxDot=hasWxData
+      ?`<div style="width:8px;height:8px;border-radius:50%;background:${wxCol};margin:0 auto;box-shadow:0 0 5px ${wxCol}88"></div>`
+      :`<div style="width:8px;height:8px;border-radius:50%;background:var(--bg4);margin:0 auto"></div>`;
     const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</div>
           <div class="rc">${da[1]||r.departure_airport} &rarr; ${aa[1]||r.arrival_airport}</div></td>
       <td><div class="ra">${r.airline||r.callsign||'—'}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
+      <td style="text-align:center;vertical-align:middle;padding:0 8px">${wxDot}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
       <td style="font-size:12px;color:var(--ink2)">${dist}</td>
     </tr>`;
     if(!isO)return[main];
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
-    const sbU=`https://dispatch.simbrief.com/options/custom?airline=${sbAirline}&fltnum=${sbFltnum}&type=${r.aircraft_type}&orig=${r.departure_airport}&dest=${r.arrival_airport}&reg=&callsign=${r.callsign||''}&pax=AUTO&cargo=AUTO&fl=AUTO`;
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
     const faU=`https://www.flightaware.com/live/findflight/?origin=${r.departure_airport}&destination=${r.arrival_airport}`;
     const svU=`https://skyvector.com/?fpl=${r.departure_airport}%20${r.arrival_airport}`;
     const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' → '+r.gate_destination:(r.gate_origin||r.gate_destination||'—');
-    const det=`<tr class="det-row"><td colspan="6"><div class="det-pan">
+    const det=`<tr class="det-row"><td colspan="7"><div class="det-pan">
       <div class="dp-strip">
         <div class="dp-apt"><div class="dp-icao">${r.departure_airport}</div><div class="dp-city">${da[1]||''}</div></div>
         <div class="dp-line"><div class="dp-dash"></div>
@@ -1229,6 +1248,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
+          <div id="wx-pills-dep-${i}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div>
         </div>
         <div class="dp-sec">
           <div class="dp-st">Arrival &mdash; ${r.arrival_airport}</div>
@@ -1237,6 +1257,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
+          <div id="wx-pills-arr-${i}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div>
         </div>
       </div>
       <div class="dp-acts">
@@ -1276,7 +1297,7 @@ function exportCSV(){
     return[r.callsign,r.airline,r.departure_airport,r.arrival_airport,
       r.aircraft_type,SIM_LBL[simAcft]||'',fmtFlightLen(r.flight_length),
       r.distance_nm?Math.round(r.distance_nm)+'nm':'',
-      (()=>{const al=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';const fn=(r.callsign||'').replace(/^[A-Z]+/,'');return`https://dispatch.simbrief.com/options/custom?airline=${al}&fltnum=${fn}&type=${SIM_SB[simAcft]||'A320'}&orig=${r.departure_airport}&dest=${r.arrival_airport}&reg=&callsign=${r.callsign||''}&pax=AUTO&cargo=AUTO&fl=AUTO`;})()
+      (()=>{const al=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';const fn=(r.callsign||'').replace(/^[A-Z]+/,'');let u=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${SIM_SB[simAcft]||'A320'}`;if(al)u+=`&airline=${al}`;if(fn)u+=`&fltnum=${fn}`;return u;})()
     ].join(',');
   });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...rows].join('\n')],{type:'text/csv'}));
@@ -1288,23 +1309,123 @@ async function fetchMetar(icao,idx,side){
   const rawEl=document.getElementById('metar-'+side+'-'+idx);
   const rwyEl=document.getElementById('rwy-'+side+'-'+idx);
   const windEl=document.getElementById('wind-'+side+'-'+idx);
+  const pillsEl=document.getElementById('wx-pills-'+side+'-'+idx);
   if(!rawEl)return;
-  try{
-    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
-    const text=(await res.text()).trim();
-    if(!text){rawEl.textContent='No METAR for '+icao;return;}
-    rawEl.textContent=text;
-    const w=parseWind(text);
-    if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
-    const best=bestRwy(icao,w.dir,w.spd);
-    if(rwyEl)rwyEl.textContent=best;
-    if(windEl){
-      const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
-      const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
-      const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
-      windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` — ${xw}kt crosswind`:''}</div>`;
+  const cached=S.metarCache[(icao||'').toUpperCase()];
+  let rawText=cached?cached.rawOb:null;
+  if(!rawText){
+    try{
+      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
+      rawText=(await res.text()).trim();
+    }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  }
+  if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
+  rawEl.textContent=rawText;
+  const w=parseWind(rawText);
+  if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  const best=bestRwy(icao,w.dir,w.spd);
+  if(rwyEl)rwyEl.textContent=best;
+  if(windEl){
+    const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
+    const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
+    const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
+    windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` — ${xw}kt crosswind`:''}</div>`;
+  }
+  if(pillsEl&&cached){
+    const pills=metarPills(cached);
+    const col=wxColor(scoreMETAR(cached));
+    if(pills.length)pillsEl.innerHTML=pills.map(p=>`<span style="background:${col}22;border:1px solid ${col}55;color:${col};font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;white-space:nowrap">${p}</span>`).join('');
+  }
+}
+
+// ── WEATHER SCORING ──────────────────────────────────────────────────────────
+function scoreMETAR(m){
+  if(!m)return 0;
+  let s={LIFR:8,IFR:6,MVFR:3,VFR:1}[(m.fltcat||'').toUpperCase()]||0;
+  const tokens=(m.wxString||'').split(/\s+/).filter(t=>t);
+  for(const t of tokens){
+    if(/\+TS|\+TSRA/.test(t))s+=6;
+    else if(/TS/.test(t))s+=5;
+    if(/FZRA/.test(t))s+=5;
+    if(t==='GR'||t==='+GR')s+=6;
+    if(!t.includes('TS')&&!t.includes('FZ')){
+      if(t==='+RA')s+=4;
+      else if(t==='RA')s+=2;
+      else if(t==='-RA')s+=1;
     }
-  }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';}
+    if(t==='+SN')s+=5;
+    else if(t==='SN')s+=3;
+    else if(t==='-SN')s+=2;
+    if(/FZDZ/.test(t))s+=3;
+    if(t==='PL'||t==='+PL')s+=4;
+    if(t==='VA')s+=5;
+    if(t==='FZFG')s+=4;
+    else if(t==='FG')s+=3;
+    if(t==='BR')s+=1;
+    if(t==='HZ')s+=1;
+    if(t==='DU'||t==='SA')s+=1;
+  }
+  const sp=m.wspd||0,gs=m.wgst||0;
+  if(gs>40)s+=4;else if(gs>30)s+=3;else if(gs>20)s+=2;
+  if(sp>30)s+=3;else if(sp>=20)s+=2;else if(sp>=15)s+=1;
+  if((m.clouds||[]).some(c=>c.cover==='SKC'||c.cover==='CLR'))s-=1;
+  return Math.max(0,s);
+}
+
+function wxColor(score){
+  if(score>=19)return'#ff453a';
+  if(score>=13)return'#ff6b35';
+  if(score>=7)return'#f5a623';
+  if(score>=3)return'#0a84ff';
+  return'#32d74b';
+}
+
+function metarPills(m){
+  if(!m)return[];
+  const pills=[];
+  const tokens=(m.wxString||'').split(/\s+/).filter(t=>t);
+  for(const t of tokens){
+    if(t.includes('FZRA')){pills.push('Freezing rain');continue;}
+    if(t.includes('FZFG')){pills.push('Fog');continue;}
+    if(t.includes('TS')){if(!pills.includes('Thunderstorm'))pills.push('Thunderstorm');continue;}
+    if(t==='GR'||t==='+GR'){pills.push('Hail');continue;}
+    if(t==='+RA'){pills.push('Heavy rain');continue;}
+    if(t==='RA'){pills.push('Rain');continue;}
+    if(t==='-RA'){pills.push('Light rain');continue;}
+    if(t==='+SN'){pills.push('Heavy snow');continue;}
+    if(t==='SN'){pills.push('Snow');continue;}
+    if(t==='-SN'){pills.push('Light snow');continue;}
+    if(t==='FG'){pills.push('Fog');continue;}
+    if(t==='BR'){pills.push('Mist');continue;}
+    if(t==='HZ'){pills.push('Haze');continue;}
+    if(t==='VA'){pills.push('Volcanic ash');continue;}
+  }
+  if((m.wgst||0)>30)pills.push('Gusts '+m.wgst+'kt');
+  if((m.clouds||[]).some(c=>c.cover==='SKC'||c.cover==='CLR'))pills.push('Clear skies');
+  return pills;
+}
+
+async function fetchMetarBatch(){
+  const icaos=[...S.selICAOs].filter(Boolean);
+  if(!icaos.length)return;
+  try{
+    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icaos.join(',')+'&format=json');
+    if(!res.ok)return;
+    const data=await res.json();
+    if(!Array.isArray(data))return;
+    S.metarCache={};
+    data.forEach(m=>{if(m.icaoId)S.metarCache[m.icaoId.toUpperCase()]=m;});
+    S.metarLastFetch=Date.now();
+    updateWxAge();
+    renderRoutes();
+  }catch(e){}
+}
+
+function updateWxAge(){
+  const el=document.getElementById('wx-age');
+  if(!el||!S.metarLastFetch)return;
+  const mins=Math.floor((Date.now()-S.metarLastFetch)/60000);
+  el.textContent=mins<1?'Weather just updated':'Weather updated '+mins+'m ago';
 }
 
 function parseWind(m){
@@ -1422,7 +1543,7 @@ function renderCD(idx){
 
   const sbType=SIM_SB['a320'];
   const sbDep=S.chDep||'EGKK';
-  const sbU=`https://dispatch.simbrief.com/options/custom?airline=&fltnum=&type=${sbType}&orig=${sbDep}&dest=${ch.icao}&reg=&callsign=&pax=AUTO&cargo=AUTO&fl=AUTO`;
+  const sbU=`https://dispatch.simbrief.com/options/custom?orig=${sbDep}&dest=${ch.icao}&type=${sbType}`;
   const svU=`https://skyvector.com/?ll=${ch.lat},${ch.lon}&chart=301&zoom=4`;
 
   document.getElementById('ch-det').innerHTML=`
@@ -1636,5 +1757,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.3</div>
+  pointer-events:none;">v4.5.4</div>
 </body></html>
