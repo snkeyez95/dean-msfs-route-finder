@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.5</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.6</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -327,71 +327,75 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 </div></div>
 
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
-<div class="pane on" id="pane-routes"><div class="scroll">
-  <div class="crow" id="acft-chips-row">
-    <span class="clbl">Aircraft</span>
-  </div>
-  <div class="crow">
-    <span class="clbl">Mode</span>
-    <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
-    <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
-  </div>
-  <div class="crow">
-    <span class="clbl">Direction</span>
-    <div class="chip sq on" data-dir="either" onclick="setDirFilter('either')">Either</div>
-    <div class="chip sq" data-dir="dep" onclick="setDirFilter('dep')">Departing from library</div>
-    <div class="chip sq" data-dir="arr" onclick="setDirFilter('arr')">Arriving at library</div>
-  </div>
-  <div class="crow">
-    <span class="clbl">Region</span>
-    <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
-    <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
-    <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
-  </div>
-  <div class="fbar">
-    <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
-    <select id="airline-f" onchange="setAirlineFilter(this.value)">
-      <option value="">All Airlines</option>
-    </select>
-    <select id="dur-f" onchange="renderRoutes()">
-      <option value="">Duration: Any</option>
-      <option value="1">Under 1h</option>
-      <option value="2">Under 2h</option>
-      <option value="3">Under 3h</option>
-      <option value="4">Under 4h</option>
-      <option value="6">Under 6h</option>
-    </select>
-    <select id="sort-f" onchange="renderRoutes()">
-      <option value="dur">Sort: Duration</option>
-      <option value="airline">Sort: Airline</option>
-      <option value="dist">Sort: Distance</option>
-      <option value="wx-worst">Sort: Worst weather</option>
-      <option value="wx-best">Sort: Best weather</option>
-    </select>
-    <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
-  </div>
-  <div class="rhdl">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="rcnt" id="rcnt">No routes loaded</div>
-      <span id="wx-age" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+<div class="pane on" id="pane-routes">
+  <div style="padding:24px 40px 0;flex-shrink:0">
+    <div class="crow" id="acft-chips-row">
+      <span class="clbl">Aircraft</span>
     </div>
-    <div class="lpill"><div class="ldot"></div>SayIntentions.AI traffic</div>
+    <div class="crow">
+      <span class="clbl">Mode</span>
+      <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
+      <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+    </div>
+    <div class="crow">
+      <span class="clbl">Direction</span>
+      <div class="chip sq on" data-dir="either" onclick="setDirFilter('either')">Either</div>
+      <div class="chip sq" data-dir="dep" onclick="setDirFilter('dep')">Departing from library</div>
+      <div class="chip sq" data-dir="arr" onclick="setDirFilter('arr')">Arriving at library</div>
+    </div>
+    <div class="crow">
+      <span class="clbl">Region</span>
+      <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
+      <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
+      <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
+    </div>
+    <div class="fbar">
+      <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
+      <select id="airline-f" onchange="setAirlineFilter(this.value)">
+        <option value="">All Airlines</option>
+      </select>
+      <select id="dur-f" onchange="renderRoutes()">
+        <option value="">Duration: Any</option>
+        <option value="1">Under 1h</option>
+        <option value="2">Under 2h</option>
+        <option value="3">Under 3h</option>
+        <option value="4">Under 4h</option>
+        <option value="6">Under 6h</option>
+      </select>
+      <select id="sort-f" onchange="renderRoutes()">
+        <option value="dur">Sort: Duration</option>
+        <option value="airline">Sort: Airline</option>
+        <option value="dist">Sort: Distance</option>
+        <option value="wx-worst">Sort: Worst weather</option>
+        <option value="wx-best">Sort: Best weather</option>
+      </select>
+      <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
+    </div>
   </div>
-  <div class="rwrap">
-    <table class="rtbl">
-      <thead><tr>
-        <th style="width:24px"></th>
-        <th style="width:130px">Route</th>
-        <th>Airline</th>
-        <th style="width:130px">Aircraft</th>
-        <th style="width:40px;text-align:center">WX</th>
-        <th style="width:85px">Duration</th>
-        <th style="width:90px">Distance</th>
-      </tr></thead>
+  <div class="scroll" style="padding-top:12px">
+    <div class="rhdl">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="rcnt" id="rcnt">No routes loaded</div>
+        <span id="wx-age" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+      </div>
+      <div class="lpill"><div class="ldot"></div>SayIntentions.AI traffic</div>
+    </div>
+    <div class="rwrap">
+      <table class="rtbl">
+        <thead><tr>
+          <th style="width:24px"></th>
+          <th style="width:130px">Route</th>
+          <th>Airline</th>
+          <th style="width:130px">Aircraft</th>
+          <th style="width:40px;text-align:center">WX</th>
+          <th style="width:85px">Duration</th>
+          <th style="width:90px">Distance</th>
+        </tr></thead>
       <tbody id="rt-body"></tbody>
     </table>
+    </div>
   </div>
-</div></div>
+</div>
 
 <!-- ── TAB 3: CHALLENGING APPROACHES ── -->
 <div class="pane" id="pane-challenges">
@@ -1422,7 +1426,7 @@ function pillColor(p){
 
 function wxBlock(m){
   if(!m)return'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">Weather unavailable</div>';
-  const score=scoreMETAR(m);
+  const score=Math.max(0,scoreMETAR(m));
   const col=wxColor(score);
   const fc=(m.fltcat||'VFR').toUpperCase();
   const fcCol={VFR:'#32d74b',MVFR:'#0a84ff',IFR:'#f5a623',LIFR:'#ff453a'}[fc]||'#32d74b';
@@ -1432,7 +1436,12 @@ function wxBlock(m){
 }
 
 async function fetchMetarBatch(){
-  const icaos=[...S.selICAOs].filter(Boolean);
+  const icaoSet=new Set([...S.selICAOs]);
+  Object.values(S.routeRegistry).forEach(r=>{
+    if(r.departure_airport)icaoSet.add(r.departure_airport.toUpperCase());
+    if(r.arrival_airport)icaoSet.add(r.arrival_airport.toUpperCase());
+  });
+  const icaos=[...icaoSet].filter(Boolean);
   if(!icaos.length)return;
   try{
     const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icaos.join(',')+'&format=json');
@@ -1783,5 +1792,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.5</div>
+  pointer-events:none;">v4.5.6</div>
 </body></html>
