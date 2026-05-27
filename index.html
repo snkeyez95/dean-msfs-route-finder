@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.13</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.14</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -1803,11 +1803,12 @@ function importSIFile(filename,text){
     RLOG('[SI-IMPORT] File: '+filename+' | Parse error: '+e.message);
     return;
   }
-  if(!data.success||!Array.isArray(data.routes)){
+  if(!Array.isArray(data.routes)||data.routes.length===0){
     showImportResult('red','Import failed — Invalid file format — expected SayIntentions route JSON');
-    RLOG('[SI-IMPORT] File: '+filename+' | Validation failed: success='+data.success+' routes='+(Array.isArray(data.routes)?'present':'missing'));
+    RLOG('[SI-IMPORT] File: '+filename+' | Validation failed: routes '+(Array.isArray(data.routes)?'array empty':'missing'));
     return;
   }
+  RLOG('[SI-IMPORT] Validation: routes found = '+data.routes.length);
   const total=data.routes.length;
   const now=new Date().toISOString();
   let newCount=0,dupeCount=0,filtered=0;
@@ -1854,5 +1855,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.13</div>
+  pointer-events:none;">v4.5.14</div>
 </body></html>
