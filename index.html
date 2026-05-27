@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.13</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.12</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -1387,20 +1387,26 @@ function getWorstCategory(depICAO,arrICAO){
 }
 
 function getWxPill(r,idx){
-  const dep=S.metarCache&&S.metarCache[r.departure_airport];
-  const arr=S.metarCache&&S.metarCache[r.arrival_airport];
-  const ds=dep?scoreMETAR(dep):0;
-  const as=arr?scoreMETAR(arr):0;
-  const combined=Math.max(0,ds+as);
-  const depCat=dep?(dep.fltCat||'VFR'):'VFR';
-  const arrCat=arr?(arr.fltCat||'VFR'):'VFR';
-  const pri={LIFR:3,IFR:2,MVFR:1,VFR:0};
-  const worstCat=(pri[depCat]||0)>=(pri[arrCat]||0)?depCat:arrCat;
-  const tc=combined<=2?'#32d74b':combined<=6?'#0a84ff':combined<=12?'#f5a623':combined<=18?'#ff6b35':'#ff453a';
-  const bg=combined<=2?'#1a3a1a':combined<=6?'#0a1a3a':combined<=12?'#2a1a00':combined<=18?'#2a1000':'#2a0a0a';
-  if(idx<3)console.log('[WX] Row render: dep='+r.departure_airport+' depHit='+(!!dep)+' arr='+r.arrival_airport+' arrHit='+(!!arr)+' combined='+combined);
-  if(!dep&&!arr)return '<span style="color:#444;font-size:10px;font-family:monospace;pointer-events:none">&#9679; N/A</span>';
-  return '<span style="background:'+bg+';color:'+tc+';border:0.5px solid '+tc+'44;font-family:monospace;font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;pointer-events:none" title="Dep:'+ds+'+Arr:'+as+'=Total:'+combined+'">&#9679; '+(worstCat||'VFR')+'</span>';
+  try{
+    const dep=S.metarCache&&S.metarCache[r.departure_airport];
+    const arr=S.metarCache&&S.metarCache[r.arrival_airport];
+    const ds=dep?scoreMETAR(dep):0;
+    const as=arr?scoreMETAR(arr):0;
+    const combined=Math.max(0,ds+as);
+    const depCat=dep?(dep.fltCat||'VFR'):'VFR';
+    const arrCat=arr?(arr.fltCat||'VFR'):'VFR';
+    const pri={LIFR:3,IFR:2,MVFR:1,VFR:0};
+    const worstCat=(pri[depCat]||0)>=(pri[arrCat]||0)?depCat:arrCat;
+    const tc=combined<=2?'#32d74b':combined<=6?'#0a84ff':combined<=12?'#f5a623':combined<=18?'#ff6b35':'#ff453a';
+    const bg=combined<=2?'#1a3a1a':combined<=6?'#0a1a3a':combined<=12?'#2a1a00':combined<=18?'#2a1000':'#2a0a0a';
+    if(idx<3)console.log('[WX] Row render: dep='+r.departure_airport+' depHit='+(!!dep)+' arr='+r.arrival_airport+' arrHit='+(!!arr)+' combined='+combined);
+    if(!dep&&!arr)return '<span style="color:#444;font-size:10px;font-family:monospace;pointer-events:none">&#9679; N/A</span>';
+    return '<span style="background:'+bg+';color:'+tc+';border:0.5px solid '+tc+'44;font-family:monospace;font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;pointer-events:none" title="Dep:'+ds+'+Arr:'+as+'=Total:'+combined+'">&#9679; '+(worstCat||'VFR')+'</span>';
+  }catch(e){
+    console.error('[WX] getWxPill error:',e.message);
+    RLOG('[WX] getWxPill error: '+e.message);
+    return '<span style="color:#444;font-size:10px;pointer-events:none">&#9679; ?</span>';
+  }
 }
 
 function wxColor(score){
@@ -1848,5 +1854,5 @@ function importSIFile(filename,text){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.13</div>
+  pointer-events:none;">v4.5.12</div>
 </body></html>
