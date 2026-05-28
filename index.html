@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.24</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.25</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -392,6 +392,7 @@ html[data-theme="light"] .theme-knob{left:30px}
         <option value="dist">Sort: Distance</option>
         <option value="wx-worst">Sort: Worst weather</option>
         <option value="wx-best">Sort: Best weather</option>
+        <option value="reliable">Sort: Most reliable</option>
       </select>
       <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
     </div>
@@ -1501,6 +1502,7 @@ function getRoutes(){
   rs.sort((a,b)=>{
     if(srt==='airline')return(a.airline||'').localeCompare(b.airline||'');
     if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
+    if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
     if(srt==='wx-worst'||srt==='wx-best'){
       const sa=scoreMETAR(S.metarCache[(a.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(a.arrival_airport||'').toUpperCase()]);
       const sb=scoreMETAR(S.metarCache[(b.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(b.arrival_airport||'').toUpperCase()]);
@@ -1807,10 +1809,17 @@ function wxBlock(m){
 }
 
 async function fetchMetarBatch(){
-  const icaoSet=new Set([...S.selICAOs]);
+  const libICAOs=new Set([...S.selICAOs]);
+  const icaoSet=new Set([...libICAOs]);
+  let matchedRoutes=0;
   Object.values(S.routeRegistry).forEach(r=>{
-    if(r.departure_airport)icaoSet.add(r.departure_airport.toUpperCase());
-    if(r.arrival_airport)icaoSet.add(r.arrival_airport.toUpperCase());
+    const dep=(r.departure_airport||'').toUpperCase();
+    const arr=(r.arrival_airport||'').toUpperCase();
+    if(libICAOs.has(dep)||libICAOs.has(arr)){
+      if(dep)icaoSet.add(dep);
+      if(arr)icaoSet.add(arr);
+      matchedRoutes++;
+    }
   });
   const icaos=[...icaoSet].filter(Boolean);
   if(!icaos.length){
@@ -1818,7 +1827,7 @@ async function fetchMetarBatch(){
     RLOG('[WX] Fetch skipped — no ICAOs available');
     return;
   }
-  const msg=`[WX] Starting METAR fetch for ${icaos.length} airports`;
+  const msg=`[WX] METAR fetch scoped to ${icaos.length} airports (derived from ${libICAOs.size} library airports, ${matchedRoutes} registry routes)`;
   console.log(msg);RLOG(msg);
   S.wxFetching=true;updateWxAge();
   try{
@@ -1982,6 +1991,46 @@ function buildChSB(){
   }
 }
 
+function chRoutesHTML(ch){
+  const activeFleet=getActiveFleet();
+  const routes=Object.values(S.routeRegistry)
+    .filter(r=>r.arrival_airport===ch.icao&&activeFleet.has(r.aircraft_type))
+    .sort((a,b)=>(a.distance_nm||0)-(b.distance_nm||0))
+    .slice(0,10);
+  const uid='chr-'+ch.icao;
+  const count=routes.length;
+  if(count===0){
+    return`<div style="border:1px solid var(--sep);border-radius:var(--r2);padding:9px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace">Real Routes</span>
+      <span style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace;margin-left:auto">No routes yet</span>
+    </div>`;
+  }
+  const badge=`<span style="font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)">${count} route${count!==1?'s':''} available</span>`;
+  const rowsHTML=routes.map(r=>{
+    const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
+    const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
+    const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep);font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--acc);white-space:nowrap;flex-shrink:0">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</span>
+      <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.airline||r.callsign||'&mdash;'}</span>
+      <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${r.aircraft_type}</span>
+      <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${dist}</span>
+      <button class="btn bg bxs" onclick="window.api.openExternal('${sbU}')" style="flex-shrink:0">&rarr; SimBrief</button>
+    </div>`;
+  }).join('');
+  return`<div style="border:1px solid var(--sep);border-radius:var(--r2);margin-bottom:12px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;user-select:none;background:var(--bg2)" onclick="const b=document.getElementById('${uid}');const ic=this.querySelector('.chr-ic');b.style.display=b.style.display==='none'?'block':'none';ic.textContent=b.style.display==='none'?'▶':'▼'">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink0);font-family:'JetBrains Mono',monospace">Real Routes</span>
+      ${badge}
+      <span class="chr-ic" style="margin-left:auto;font-size:10px;color:var(--ink3)">&#9654;</span>
+    </div>
+    <div id="${uid}" style="display:none;padding:0 14px 8px">
+      ${rowsHTML}
+    </div>
+  </div>`;
+}
+
 function renderCD(idx){
   const ch=CH[idx];
   if(!ch){document.getElementById('ch-det').innerHTML='';return;}
@@ -2017,7 +2066,7 @@ function renderCD(idx){
       </div>
     </div>
     <div class="cd-desc"><div class="cd-app">RWY ${ch.rwy} &bull; ${ch.approach}</div><div class="cd-txt">${ch.desc}</div></div>
-
+    ${chRoutesHTML(ch)}
     ${realRoute?`<div class="ft-card">
       <div class="ft-t">&#9989; Route in your registry</div>
       <div class="ft-sched">
@@ -2399,5 +2448,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.24</div>
+  pointer-events:none;">v4.5.25</div>
 </body></html>
