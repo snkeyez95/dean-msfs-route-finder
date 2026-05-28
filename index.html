@@ -1684,6 +1684,13 @@ function metarPills(m){
   }
   if((m.wgst||0)>20)pills.push('Gusts '+m.wgst+'kt');
   if((m.clouds||[]).some(c=>c.cover==='SKC'||c.cover==='CLR'||c.cover==='CAVOK')||/\bCAVOK\b/.test(m.rawOb||''))pills.push('Clear skies');
+  if(!pills.includes('Clear skies')){
+    const covers=m.clouds||[];
+    if(covers.some(c=>c.cover==='OVC'))pills.push('Overcast');
+    else if(covers.some(c=>c.cover==='BKN'))pills.push('Broken clouds');
+    else if(covers.some(c=>c.cover==='SCT'))pills.push('Scattered clouds');
+    else if(covers.some(c=>c.cover==='FEW'))pills.push('Few clouds');
+  }
   return pills;
 }
 
@@ -1696,18 +1703,18 @@ function pillColor(p){
   if(p==='Hail'||p==='Volcanic ash')return'#ff6b35';
   if(p.startsWith('Gusts'))return'#f5a623';
   if(p==='Clear skies')return'#32d74b';
+  if(p==='Overcast'||p==='Broken clouds')return'#8e8e93';
+  if(p==='Scattered clouds'||p==='Few clouds')return'#c7c7cc';
   return'#8e8e93';
 }
 
 function wxBlock(m){
   if(!m)return'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">Weather unavailable</div>';
-  const score=Math.max(0,scoreMETAR(m));
-  const col=wxColor(score);
   const fc=(m.fltcat||'VFR').toUpperCase();
   const fcCol={VFR:'#32d74b',MVFR:'#0a84ff',IFR:'#f5a623',LIFR:'#ff453a'}[fc]||'#32d74b';
   const pills=metarPills(m);
   const pillHTML=pills.map(p=>{const pc=pillColor(p);return`<span style="background:${pc}22;border:1px solid ${pc}55;color:${pc};font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;white-space:nowrap">${p}</span>`;}).join('');
-  return`<div style="display:flex;align-items:center;gap:6px;margin-top:6px"><div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;box-shadow:0 0 4px ${col}88"></div><span style="font-size:11px;font-weight:700;color:${fcCol};font-family:'JetBrains Mono',monospace">${fc}</span><span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace">&mdash; Score: ${score}</span></div>${pills.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${pillHTML}</div>`:''}`;
+  return`<div style="display:flex;align-items:center;gap:6px;margin-top:6px"><div style="width:8px;height:8px;border-radius:50%;background:${fcCol};flex-shrink:0;box-shadow:0 0 4px ${fcCol}88"></div><span style="font-size:11px;font-weight:700;color:${fcCol};font-family:'JetBrains Mono',monospace">${fc}</span></div>${pills.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${pillHTML}</div>`:''}`;
 }
 
 async function fetchMetarBatch(){
@@ -1760,6 +1767,13 @@ async function fetchMetarBatch(){
     const callMsg='[WX] buildRouteList called after cache populated';
     console.log(callMsg);RLOG(callMsg);
     renderRoutes();
+    if(S.openRoute!==null){
+      const _or=getRoutes()[S.openRoute];
+      if(_or){
+        fetchMetar(_or.departure_airport,S.openRoute,'dep');
+        fetchMetar(_or.arrival_airport,S.openRoute,'arr');
+      }
+    }
   }catch(e){
     const err=`[WX] Fetch failed: ${e.message}`;
     console.log(err);RLOG(err);
