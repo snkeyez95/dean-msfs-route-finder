@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.26</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.27</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -502,6 +502,17 @@ html[data-theme="light"] .theme-knob{left:30px}
     <div class="si-drop-txt"><strong>Drop SayIntentions JSON file here to import routes</strong><br>Accepts .txt and .json files</div>
   </div>
   <div id="si-import-result" class="si-import-result"></div>
+  <div style="margin-top:10px">
+    <div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" onclick="toggleCommunityRoutes()">
+      <span id="cr-toggle-icon" style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace">&#9654;</span>
+      <span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace">Community Routes</span>
+    </div>
+    <div id="cr-panel" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
+      <div style="font-size:13px;color:var(--ink3);margin-bottom:10px;line-height:1.6">Download a community-sourced route database. Useful if you have no SI cookie or want a baseline dataset.</div>
+      <button class="btn bg bsm" id="cr-btn" onclick="downloadCommunityRoutes()">&#11015; Download Community Routes</button>
+      <div id="cr-status" style="margin-top:8px;font-size:12px;color:var(--ink3);font-family:'JetBrains Mono',monospace;min-height:16px"></div>
+    </div>
+  </div>
   <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--sep)">
     <div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" onclick="toggleAdvanced()">
       <span id="adv-toggle-icon" style="font-size:10px;color:var(--ink3);font-family:'JetBrains Mono',monospace">&#9654;</span>
@@ -803,7 +814,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   window.api.onUpdateAvailable(ver=>{
     const b=document.getElementById('upd-banner');
     const m=document.getElementById('upd-msg');
-    if(b&&m){m.textContent='Update available: v'+ver+' — run update.bat to install';b.style.display='flex';}
+    if(b&&m){m.textContent='⟳ Update available — v'+ver+' is ready. Run update.bat to update.';b.style.display='flex';}
   });
   // SI cookie expiry
   window.api.onSiCookieExpired(()=>{
@@ -2278,6 +2289,72 @@ function importSIFile(filename,text){
 
 
 
+// ── COMMUNITY ROUTES DOWNLOAD ────────────────────────────────────────────────
+function toggleCommunityRoutes(){
+  const p=document.getElementById('cr-panel');
+  const ic=document.getElementById('cr-toggle-icon');
+  if(!p)return;
+  const open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  ic.innerHTML=open?'&#9654;':'&#9660;';
+}
+async function downloadCommunityRoutes(){
+  const btn=document.getElementById('cr-btn');
+  const st=document.getElementById('cr-status');
+  btn.disabled=true;
+  btn.innerHTML='&#8987; Downloading...';
+  st.textContent='Downloading community routes...';
+  st.style.color='var(--ink3)';
+  try{
+    const res=await fetch('https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main/community_routes.json');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!Array.isArray(data.routes)||data.routes.length===0)throw new Error('invalid data format');
+    const now=new Date().toISOString();
+    let newCount=0,dupeCount=0,filtered=0;
+    for(const r of data.routes){
+      if(r.type!=='carrier'){filtered++;continue;}
+      if(!SI_ACFT_MAP[r.aircraft_type]){filtered++;continue;}
+      const dep=(r.departure_airport||'').toUpperCase();
+      const arr=(r.arrival_airport||'').toUpperCase();
+      if(!S.selICAOs.has(dep)&&!S.selICAOs.has(arr)){filtered++;continue;}
+      const id=String(r.id);
+      if(S.routeRegistry[id]){
+        S.routeRegistry[id].last_seen=now;
+        S.routeRegistry[id].times_seen=(S.routeRegistry[id].times_seen||1)+1;
+        dupeCount++;
+      }else{
+        S.routeRegistry[id]={
+          id:r.id,callsign:r.callsign,type:r.type,
+          airline:r.airline,aircraft_type:r.aircraft_type,
+          aircraft_category:r.aircraft_category,
+          departure_airport:dep,arrival_airport:arr,
+          gate_origin:r.gate_origin,gate_destination:r.gate_destination,
+          distance_nm:r.distance_nm,flight_length:r.flight_length,
+          description:r.description,
+          departure_country:r.departure_country,arrival_country:r.arrival_country,
+          first_seen:now,last_seen:now,times_seen:1,
+        };
+        newCount++;
+      }
+    }
+    pruneRegistry();
+    window.api.siSaveRegistry(S.routeRegistry);
+    mergeIntoSnapshot(S.routeRegistry);
+    window.api.siSaveSnapshot(S.routeRegistrySnapshot);
+    renderRoutes();updateStats();updateSnapshotInfo();
+    RLOG('[SI] Community routes download: '+newCount+' new, '+dupeCount+' duplicates, '+filtered+' filtered');
+    st.textContent='Done — '+newCount+' new route'+(newCount!==1?'s':'')+' added';
+    st.style.color='var(--grn)';
+  }catch(err){
+    RLOG('[SI] Community routes download failed: '+err.message);
+    st.textContent='Download failed — check your internet connection';
+    st.style.color='var(--red)';
+  }
+  btn.disabled=false;
+  btn.innerHTML='&#11015; Download Community Routes';
+}
+
 // ── RATE LIMIT DIAGNOSTIC ────────────────────────────────────────────────────
 let _rlRunning=false,_rlStop=false,_rlPhase=0,_rlElTimer=null,_rlStart=0;
 let _rlPage=1,_rlTotalPages=133;
@@ -2449,5 +2526,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.26</div>
+  pointer-events:none;">v4.5.27</div>
 </body></html>

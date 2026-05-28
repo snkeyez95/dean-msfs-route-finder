@@ -74,6 +74,7 @@ function checkForUpdate() {
         const remoteVer = remoteMatch[1];
         LOG.info(`Version check: local=v${localVer} remote=v${remoteVer}`);
         if (isNewer(remoteVer, localVer) && win && !win.isDestroyed()) {
+          LOG.info(`Update available: remote=v${remoteVer} local=v${localVer}`);
           win.webContents.send('update-available', remoteVer);
         }
       });
