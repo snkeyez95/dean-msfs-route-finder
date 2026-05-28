@@ -163,7 +163,7 @@ ipcMain.handle('si-fetch-page', (_, {page, cookie}) => new Promise(resolve => {
       }
       try {
         const parsed = JSON.parse(data);
-        resolve({ok: res.statusCode < 300, status: res.statusCode, data: parsed});
+        resolve({ok: res.statusCode < 300, status: res.statusCode, data: parsed, bytes: data.length});
       } catch(e) {
         LOG.error('si-fetch-page parse error: status=' + res.statusCode + ' raw=' + data.slice(0, 200));
         resolve({ok: false, status: res.statusCode, data: null});

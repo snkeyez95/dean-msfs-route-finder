@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.21</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.22</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -1241,7 +1241,10 @@ async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResu
   while(true){
     if(stopFn&&stopFn())return{ok:false,stopped:true};
     const res=await window.api.siFetchPage({page,cookie});
-    if(res.ok)return res;
+    if(res.ok){
+      if(page===1&&typeof res.bytes==='number'&&res.bytes<1000)return{ok:false,tooSmall:true,bytes:res.bytes,fatal:true};
+      return res;
+    }
     if(res.expired||res.status===401||res.status===403)return{ok:false,status:res.status,expired:true,fatal:true};
     if(res.status===503){
       attempts503++;
@@ -1302,6 +1305,24 @@ async function fetchSIRoutes({autoMode=false}={}){
   const p1=await siFetchPageSmart(1,S.siCookie,mkH(null));
   if(!p1.ok){
     stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
+    if(p1.tooSmall){
+      RLOG('[SI] Page 1 response too small ('+p1.bytes+'bytes) — cookie likely expired');
+      setSt('⚠ Last refresh: just now — cookie may have expired','var(--acc)');
+      showSIError('SayIntentions cookie may have expired — paste new cookie in the Settings tab');
+      if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+      S.cfg.autoRefreshEnabled=false;
+      await window.api.saveConfig(S.cfg);
+      const _cb=document.getElementById('auto-refresh-cb');if(_cb)_cb.checked=false;
+      const _arInf=document.getElementById('auto-refresh-info');if(_arInf)_arInf.style.display='none';
+      let _note=document.getElementById('ar-cookie-note');
+      if(!_note){
+        _note=document.createElement('div');_note.id='ar-cookie-note';
+        _note.style.cssText='margin-top:4px;margin-left:22px;font-size:12px;color:var(--acc);font-family:"JetBrains Mono",monospace;';
+        const _wrap=document.getElementById('auto-refresh-wrap');if(_wrap)_wrap.appendChild(_note);
+      }
+      _note.textContent='Auto-refresh paused — cookie expired. Re-enter cookie to resume.';
+      return;
+    }
     if(p1.expired){setSt('Fetch failed — cookie expired.','var(--red)');showSIError();}
     else setSt('Fetch failed (page 1): HTTP '+(p1.status||p1.error||'?'),'var(--red)');
     return;
@@ -2197,6 +2218,10 @@ async function _rlFetchCycle(maxPages,label){
       _rlPage++;
     }else if(res.stopped){
       break;
+    }else if(res.tooSmall){
+      _rlLog('⚠ Page '+pg+' — response too small ('+res.bytes+' bytes) — cookie likely expired. Diagnostic stopped.');
+      RLOG('[RL-TEST] Page 1 too small ('+res.bytes+' bytes) — cookie likely expired');
+      _rlStop=true;break;
     }else if(res.expired){
       _rlLog('❌ Page '+pg+' — cookie expired — stopping');
       _rlStop=true;break;
@@ -2252,5 +2277,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.21</div>
+  pointer-events:none;">v4.5.22</div>
 </body></html>
