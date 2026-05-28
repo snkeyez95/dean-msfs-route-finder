@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.18</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.19</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -463,7 +463,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <span id="rl-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9654; expand</span>
     </div>
     <div id="rl-diag-panel" style="display:none;margin-top:14px">
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Empirically measures SayIntentions.AI rate limit behavior across 7 phases and 3+ cycles. Captures routes as a side effect. Requires a valid cookie.</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Fetches all SayIntentions.AI route pages with smart retry on 503/429 rate limits. Tracks wait events, error types, and pages-per-window. Captures routes as a side effect. Requires a valid cookie.</div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <button class="btn bg bsm" id="rl-run-btn" onclick="runRLDiag()">Run Diagnostic</button>
         <button class="btn bg bsm" id="rl-stop-btn" onclick="stopRLDiag()" disabled>Stop</button>
@@ -1089,8 +1089,47 @@ function showSIError(msg){
   if(m)m.textContent=msg||'Route fetch failed — cookie may be expired. Paste a new cookie in Settings.';
   b.style.display='flex';
 }
-function isFatalStatus(res){
-  return res.expired||res.status===401||res.status===403||res.status===429;
+// Cancellable 1-second-tick sleep; returns false if stopFn fires before time elapses
+async function _rlWait(ms,stopFn){
+  const end=Date.now()+ms;
+  while(Date.now()<end){
+    if(stopFn&&stopFn())return false;
+    await new Promise(r=>setTimeout(r,1000));
+  }
+  return true;
+}
+
+// Smart page fetch: 503 → retry 3×30s → 65s rate-limit wait → repeat; 429 → 65s wait up to 3×
+async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResume}={}){
+  let attempts503=0,attempts429=0;
+  while(true){
+    if(stopFn&&stopFn())return{ok:false,stopped:true};
+    const res=await window.api.siFetchPage({page,cookie});
+    if(res.ok)return res;
+    if(res.expired||res.status===401||res.status===403)return{ok:false,status:res.status,expired:true,fatal:true};
+    if(res.status===503){
+      attempts503++;
+      if(attempts503<=3){
+        if(onRetry503)onRetry503(page,attempts503);
+        if(!await _rlWait(30000,stopFn))return{ok:false,stopped:true};
+        continue;
+      }
+      if(onRateWait)onRateWait(page,503);
+      if(!await _rlWait(65000,stopFn))return{ok:false,stopped:true};
+      attempts503=0;
+      if(onResume)onResume(page);
+      continue;
+    }
+    if(res.status===429){
+      attempts429++;
+      if(attempts429>3)return{ok:false,status:429,fatal:true,rateLimited:true};
+      if(onRateWait)onRateWait(page,429,attempts429);
+      if(!await _rlWait(65000,stopFn))return{ok:false,stopped:true};
+      if(onResume)onResume(page,attempts429);
+      continue;
+    }
+    return{ok:false,status:res.status,fatal:true};
+  }
 }
 
 async function fetchSIRoutes(){
@@ -1099,38 +1138,53 @@ async function fetchSIRoutes(){
   if(!S.selICAOs.size){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
   const btn=document.getElementById('fetch-btn');
   btn.disabled=true;siSetProg(0);
+  const cntBefore=Object.keys(S.routeRegistry).length;
+  let rateLimitWaits=0,pagesFetched=0;
+  const mkH=(tot)=>({
+    stopFn:()=>false,
+    onRetry503:(p,n)=>{
+      setSt('Page '+p+(tot?'/'+tot:'')+' — 503 — retry '+n+'/3 in 30s...','var(--acc)');
+      RLOG('[SI] 503 on page '+p+' — retry '+n+'/3 in 30s');
+    },
+    onRateWait:(p,status)=>{
+      rateLimitWaits++;
+      setSt('Page '+p+(tot?'/'+tot:'')+' — rate limit ('+status+'), waiting 65s...','var(--acc)');
+      RLOG('[SI] '+(status===503?'Repeated 503 on page '+p+' — treating as rate limit, waiting 65s before continuing':'429 rate limit on page '+p+' — waiting 65s before retry'));
+    },
+    onResume:(p)=>{
+      setSt('Rate limit wait complete — resuming from page '+p+(tot?'/'+tot:'')+'...','var(--acc)');
+      RLOG('[SI] Resuming from page '+p+' after rate limit wait');
+    },
+  });
   setSt('Fetching page 1...','var(--acc)');
-  const p1=await window.api.siFetchPage({page:1,cookie:S.siCookie});
+  const p1=await siFetchPageSmart(1,S.siCookie,mkH(null));
   if(!p1.ok){
     btn.disabled=false;siSetProg(-1);
-    if(isFatalStatus(p1)){
-      setSt('Fetch failed — cookie expired or rate limited.','var(--red)');
-      showSIError();
-    }else{
-      setSt('Fetch failed: '+(p1.error||'HTTP '+p1.status),'var(--red)');
-    }
+    if(p1.expired){setSt('Fetch failed — cookie expired.','var(--red)');showSIError();}
+    else{setSt('Fetch failed (page 1): HTTP '+(p1.status||p1.error||'?'),'var(--red)');}
     return;
   }
   const pagination=p1.data?.pagination||{};
   const totalPages=pagination.totalPages||pagination.total_pages||1;
   RLOG('fetchSIRoutes: totalPages='+totalPages);
   processPage(p1.data?.data||p1.data?.routes||[]);
-  siSetProg(Math.round(1/totalPages*100));
+  pagesFetched++;siSetProg(Math.round(1/totalPages*100));
   for(let pg=2;pg<=totalPages;pg++){
     setSt('Fetching page '+pg+' of '+totalPages+'...','var(--acc)');
     await new Promise(r=>setTimeout(r,500));
-    const res=await window.api.siFetchPage({page:pg,cookie:S.siCookie});
+    const res=await siFetchPageSmart(pg,S.siCookie,mkH(totalPages));
     if(!res.ok){
       RLOG('si page '+pg+' failed: status='+(res.status||res.error));
-      if(isFatalStatus(res)){
-        setSt('Fetch stopped — cookie expired or rate limited (page '+pg+').','var(--red)');
-        showSIError();
+      if(res.expired){setSt('Fetch stopped — cookie expired (page '+pg+').','var(--red)');showSIError();btn.disabled=false;siSetProg(-1);return;}
+      if(res.fatal){
+        if(res.status===429)RLOG('[SI] 429 persisted after 3 waits — stopping');
+        setSt('Fetch stopped — HTTP '+(res.status||'?')+' on page '+pg+'.','var(--red)');
         btn.disabled=false;siSetProg(-1);return;
       }
       continue;
     }
     processPage(res.data?.data||res.data?.routes||[]);
-    siSetProg(Math.round(pg/totalPages*100));
+    pagesFetched++;siSetProg(Math.round(pg/totalPages*100));
   }
   pruneRegistry();
   await window.api.siSaveRegistry(S.routeRegistry);
@@ -1138,8 +1192,10 @@ async function fetchSIRoutes(){
   await window.api.saveConfig(S.cfg);
   btn.disabled=false;siSetProg(-1);
   const cnt=Object.keys(S.routeRegistry).length;
-  setSt('Done — '+cnt+' routes in registry.','var(--grn)');
-  RLOG('fetchSIRoutes complete: registry='+cnt);
+  const newRoutes=cnt-cntBefore;
+  const wStr=rateLimitWaits>0?' — '+rateLimitWaits+' rate limit wait'+(rateLimitWaits!==1?'s':''):'';
+  setSt('Fetched '+pagesFetched+'/'+totalPages+' pages — '+newRoutes+' new routes added'+wStr+'.','var(--grn)');
+  RLOG('fetchSIRoutes complete: registry='+cnt+' rateLimitWaits='+rateLimitWaits);
   renderRoutes();updateStats();
 }
 
@@ -1883,8 +1939,8 @@ function importSIFile(filename,text){
 
 // ── RATE LIMIT DIAGNOSTIC ────────────────────────────────────────────────────
 let _rlRunning=false,_rlStop=false,_rlPhase=0,_rlElTimer=null,_rlStart=0;
-let _rlPage=1,_rlTotalPages=174;
-let _rlData={cycles:[],resets:[],totalFetched:0,routesBefore:0};
+let _rlPage=1,_rlTotalPages=133;
+let _rlData={totalFetched:0,routesBefore:0,rateLimitEvents:[],totalWaitMs:0};
 
 function toggleRLDiag(){
   const p=document.getElementById('rl-diag-panel');
@@ -1911,116 +1967,96 @@ function _rlUpdateResults(){
   const regTotal=Object.keys(S.routeRegistry).length;
   const routesAdded=regTotal-d.routesBefore;
   const sep='━'.repeat(33);
-
-  const cycleLines=d.cycles.length
-    ?d.cycles.map((c,i)=>'  Cycle '+(i+1)+': '+c.count+' requests').join('\n')
-    :'  (none yet)';
-  let cyclePattern='(measuring...)';
-  if(d.cycles.length>=2){
-    if(d.cycles.every(c=>c.count===d.cycles[0].count))cyclePattern='consistent';
-    else if(d.cycles.every((c,i)=>i===0||c.count<d.cycles[i-1].count))cyclePattern='decreasing';
-    else if(d.cycles.every((c,i)=>i===0||c.count>d.cycles[i-1].count))cyclePattern='increasing';
-    else cyclePattern='inconsistent';
-  }
-
-  const resetLines=d.resets.length
-    ?d.resets.map((r,i)=>{
-      const cmp=i===0?'':(r.durationMs<d.resets[0].durationMs-5000?' (shorter)':r.durationMs>d.resets[0].durationMs+5000?' (longer)':' (same)');
-      return '  Reset '+(i+1)+': '+_rlFmt(r.durationMs)+cmp;
-    }).join('\n')
-    :'  (none yet)';
-  let resetPattern='(measuring...)';
-  if(d.resets.length>=2){
-    if(d.resets.every(r=>Math.abs(r.durationMs-d.resets[0].durationMs)<5000))resetPattern='consistent';
-    else if(d.resets.every((r,i)=>i===0||r.durationMs>d.resets[i-1].durationMs+5000))resetPattern='escalating';
-    else resetPattern='random';
-  }
-
+  const rlCount=d.rateLimitEvents.length;
+  const has503=d.rateLimitEvents.some(e=>e.status===503);
+  const has429=d.rateLimitEvents.some(e=>e.status===429);
+  const errorType=rlCount===0?'(none yet)':has503&&has429?'Mixed (503 + 429)':has503?'503 (server throttle)':'429 (rate limit header)';
+  const avgPages=rlCount>0?Math.round(d.totalFetched/rlCount):'N/A';
+  const totalWaitSec=Math.round(d.totalWaitMs/1000);
+  const waitStr=totalWaitSec>0?Math.floor(totalWaitSec/60)+'m '+(totalWaitSec%60)+'s':'0s';
   let strategy='(collecting data...)';
-  if(d.cycles.length>=1&&d.resets.length>=1){
-    const escalating=d.resets.length>=2&&d.resets.every((r,i)=>i===0||r.durationMs>d.resets[i-1].durationMs+5000);
-    if(escalating){
-      strategy='Escalating penalties detected — recommend manual import only';
+  if(d.totalFetched>0){
+    if(rlCount===0){
+      strategy='No rate limits hit — all '+d.totalFetched+' pages fetched cleanly.';
     }else{
-      const avgCycle=Math.round(d.cycles.reduce((a,c)=>a+c.count,0)/d.cycles.length);
-      const avgReset=Math.round(d.resets.reduce((a,r)=>a+r.durationMs,0)/d.resets.length);
-      const batches=Math.ceil(_rlTotalPages/avgCycle);
-      const totalSec=batches*(avgCycle*0.5)+(batches-1)*(avgReset/1000);
-      strategy='Fetch '+avgCycle+' pages, wait '+_rlFmt(avgReset)+', repeat\n  Estimated full fetch (~'+_rlTotalPages+' pages): ~'+Math.round(totalSec/60)+' min';
+      const apc=typeof avgPages==='number'?avgPages:24;
+      const batches=Math.ceil(_rlTotalPages/apc);
+      const activeSec=Math.round(_rlTotalPages*0.5);
+      const waitSec=(batches-1)*65;
+      strategy='SI rate-limits at ~'+apc+' pages per window.\n  Full '+_rlTotalPages+'-page fetch takes ~'+batches+' cycles (~'+Math.round(activeSec/60*10)/10+'m active + ~'+Math.round(waitSec/60*10)/10+'m waiting).\n  Use Refresh Routes for automatic full harvest.';
     }
   }
-
   rEl.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:11px;line-height:1.7">'+
     sep+'\nRATE LIMIT DIAGNOSTIC RESULTS\n'+sep+'\n\n'+
-    'Requests per window:\n'+cycleLines+'\n  Pattern: '+cyclePattern+'\n\n'+
-    'Reset durations:\n'+resetLines+'\n  Pattern: '+resetPattern+'\n\n'+
     'Total pages fetched: '+d.totalFetched+' of '+_rlTotalPages+'\n'+
     'Routes captured: '+routesAdded+' new routes added\n'+
     'Registry total: '+regTotal+'\n\n'+
+    'Rate limit events: '+rlCount+(rlCount>0?' (all via '+errorType+')':'')+'\n'+
+    'Error type observed: '+errorType+'\n'+
+    'Avg pages before rate limit: '+avgPages+'\n'+
+    'Total wait time: '+waitStr+'\n\n'+
     'Recommended fetch strategy:\n  '+strategy+'\n'+
     sep+'</pre>';
   rEl.style.display='block';
 }
 
-// Fetch up to maxPages sequentially starting at _rlPage; returns {count,hit429,limitPage,limitTime}
+// Fetch up to maxPages from _rlPage using smart 503/429 retry; never stops on rate limits
 async function _rlFetchCycle(maxPages,label){
   const regBefore=Object.keys(S.routeRegistry).length;
-  let count=0,limitPage=0,limitTime=0;
+  let count=0;
   for(let i=0;i<maxPages&&!_rlStop;i++){
     if(_rlPage>_rlTotalPages){
-      _rlLog('✅ Full dataset reached — no further limits');
+      _rlLog('✅ Full dataset reached — all '+_rlTotalPages+' pages fetched');
       RLOG('[RL-TEST] Full dataset reached at page '+_rlPage);
       break;
     }
-    _rlSetStatus('Phase '+_rlPhase+' — '+label+' (page '+_rlPage+')');
-    const res=await window.api.siFetchPage({page:_rlPage,cookie:S.siCookie});
+    const pg=_rlPage;
+    _rlSetStatus('Phase '+_rlPhase+' — '+label+' (page '+pg+')');
+    const res=await siFetchPageSmart(pg,S.siCookie,{
+      stopFn:()=>_rlStop,
+      onRetry503:(p,n)=>{
+        _rlLog('⚠ Page '+p+' — 503 — retrying ('+n+'/3) in 30s...');
+        RLOG('[RL-TEST] 503 on page '+p+' — retry '+n+'/3 in 30s');
+        _rlSetStatus('Phase '+_rlPhase+' — 503 retry '+n+'/3 (page '+p+')');
+      },
+      onRateWait:(p,status)=>{
+        _rlData.rateLimitEvents.push({page:p,status});
+        _rlData.totalWaitMs+=65000;
+        if(status===503){
+          _rlLog('⏱ Page '+p+' — repeated 503 → rate limit — waiting 65s...');
+          RLOG('[RL-TEST] Repeated 503 on page '+p+' — treating as rate limit, waiting 65s before continuing');
+        }else{
+          _rlLog('⏱ Page '+p+' — 429 rate limit — waiting 65s...');
+          RLOG('[RL-TEST] 429 rate limit on page '+p+' — waiting 65s before retry');
+        }
+        _rlSetStatus('Phase '+_rlPhase+' — rate limit wait (page '+p+')');
+        _rlUpdateResults();
+      },
+      onResume:(p)=>{
+        _rlLog('⏱ Rate limit wait 65s complete — resuming from page '+p);
+        RLOG('[RL-TEST] Resuming from page '+p);
+      },
+    });
     if(res.ok){
-      if(_rlPage===1){const pg=res.data?.pagination||{};const tp=pg.totalPages||pg.total_pages||0;if(tp>0)_rlTotalPages=tp;}
+      if(pg===1){const pgr=res.data?.pagination||{};const tp=pgr.totalPages||pgr.total_pages||0;if(tp>0)_rlTotalPages=tp;}
       processPage(res.data?.data||res.data?.routes||[]);
       count++;_rlData.totalFetched++;
-      _rlLog('✅ Page '+_rlPage+' — 200 — '+_rlTS());
+      _rlLog('✅ Page '+pg+' — 200 — '+_rlTS());
       _rlPage++;
-    }else if(res.status===429||res.expired){
-      limitPage=_rlPage;limitTime=Date.now();
-      _rlLog('❌ LIMIT HIT — Page '+_rlPage+' — after '+count+' requests — '+_rlTS());
-      RLOG('[RL-TEST] '+label+': LIMIT HIT after '+count+' requests at page '+_rlPage);
+    }else if(res.stopped){
       break;
-    }else{
-      _rlLog('⚠️ Page '+_rlPage+' — '+(res.status||'ERR')+' — '+_rlTS()+' — stopping');
+    }else if(res.expired){
+      _rlLog('❌ Page '+pg+' — cookie expired — stopping');
+      _rlStop=true;break;
+    }else if(res.fatal){
+      _rlLog('❌ Page '+pg+' — '+(res.status===429?'429 persisted after 3 waits':'HTTP '+(res.status||'?'))+' — stopping');
       break;
     }
     await new Promise(r=>setTimeout(r,500));
   }
   const regAfter=Object.keys(S.routeRegistry).length;
   RLOG('[RL-TEST] Routes captured this cycle: '+(regAfter-regBefore)+' — Registry total: '+regAfter);
-  return{count,hit429:!!limitPage,limitPage,limitTime};
-}
-
-// Probe limitPage every 10s until 200; returns durationMs or 0 if stopped
-async function _rlProbeReset(limitPage,limitTime,resetNum){
-  _rlPhase=resetNum*2;
-  _rlLog('\n=== Phase '+_rlPhase+': Probing reset (every 10s) ===');
-  RLOG('[RL-TEST] === Phase '+_rlPhase+' started ===');
-  let probe=0;
-  while(!_rlStop){
-    for(let cd=10;cd>0&&!_rlStop;cd--){
-      _rlSetStatus('Phase '+_rlPhase+' — Probing reset window... Next probe in '+cd+'s');
-      await new Promise(r=>setTimeout(r,1000));
-    }
-    if(_rlStop)break;
-    probe++;
-    const elapsed=Date.now()-limitTime;
-    const res=await window.api.siFetchPage({page:limitPage,cookie:S.siCookie});
-    if(res.ok){
-      const dur=Date.now()-limitTime;
-      _rlLog('✅ '+_rlTS()+' — Probe '+probe+' — 200 — RESET confirmed after '+_rlFmt(dur));
-      RLOG('[RL-TEST] Reset '+resetNum+' confirmed after '+_rlFmt(dur));
-      return dur;
-    }else{
-      _rlLog('⏳ '+_rlTS()+' — Probe '+probe+' — 429 — '+_rlFmt(elapsed)+' elapsed');
-    }
-  }
-  return 0;
+  return{count};
 }
 
 function _rlFinish(){
@@ -2047,94 +2083,22 @@ function stopRLDiag(){
 
 async function runRLDiag(){
   if(_rlRunning)return;
-  if(!S.siCookie){
-    document.getElementById('rl-log').textContent='ERROR: No cookie — save your SayIntentions cookie first.\n';
-    return;
-  }
+  if(!S.siCookie){document.getElementById('rl-log').textContent='ERROR: No cookie — save your SayIntentions cookie first.\n';return;}
   _rlRunning=true;_rlStop=false;_rlPhase=1;_rlStart=Date.now();
-  _rlPage=1;_rlTotalPages=174;
-  _rlData={cycles:[],resets:[],totalFetched:0,routesBefore:Object.keys(S.routeRegistry).length};
+  _rlPage=1;_rlTotalPages=133;
+  _rlData={totalFetched:0,routesBefore:Object.keys(S.routeRegistry).length,rateLimitEvents:[],totalWaitMs:0};
   document.getElementById('rl-log').textContent='';
   document.getElementById('rl-results').style.display='none';
   document.getElementById('rl-run-btn').disabled=true;
   document.getElementById('rl-stop-btn').disabled=false;
   const elEl=document.getElementById('rl-elapsed');
   _rlElTimer=setInterval(()=>{if(elEl)elEl.textContent='Running: '+_rlFmt(Date.now()-_rlStart);},1000);
-
-  // ── Phase 1: Establish baseline ──
-  _rlPhase=1;
-  _rlLog('=== Phase 1: Establish baseline ===');
+  _rlLog('=== Rate Limit Diagnostic — fetching all pages with smart retry ===');
   RLOG('[RL-TEST] === Phase 1 started ===');
-  const r1=await _rlFetchCycle(500,'Establishing baseline');
-  if(_rlStop){_rlFinish();return;}
-  if(!r1.hit429){_rlLog('No rate limit hit — dataset exhausted or unexpected response');_rlFinish();return;}
-  _rlData.cycles.push({count:r1.count});
-  _rlLog('Cycle 1: '+r1.count+' requests before limit');
-  RLOG('[RL-TEST] Cycle 1 complete: '+r1.count+' requests');
-  _rlUpdateResults();
-
-  // ── Phase 2: Discover reset window ──
-  const reset1=await _rlProbeReset(r1.limitPage,r1.limitTime,1);
-  if(_rlStop||!reset1){_rlFinish();return;}
-  _rlData.resets.push({durationMs:reset1});
-  RLOG('[RL-TEST] Cycle 1 complete: '+r1.count+' requests, reset after '+_rlFmt(reset1));
-  _rlUpdateResults();
-
-  // ── Phase 3: Second cycle ──
-  _rlPhase=3;
-  _rlLog('\n=== Phase 3: Second cycle ===');
-  RLOG('[RL-TEST] === Phase 3 started ===');
-  const r2=await _rlFetchCycle(35,'Cycle 2');
-  if(_rlStop){_rlFinish();return;}
-  _rlData.cycles.push({count:r2.count});
-  _rlLog('Cycle 2: '+r2.count+' requests'+(r2.hit429?' before limit':' — no limit in 35 pages'));
-  RLOG('[RL-TEST] Cycle 2 complete: '+r2.count+' requests');
-  _rlUpdateResults();
-  if(!r2.hit429){_rlFinish();return;}
-
-  // ── Phase 4: Second reset ──
-  const reset2=await _rlProbeReset(r2.limitPage,r2.limitTime,2);
-  if(_rlStop||!reset2){_rlFinish();return;}
-  _rlData.resets.push({durationMs:reset2});
-  const cmp2=reset2<reset1-5000?'shorter than':reset2>reset1+5000?'longer than':'same as';
-  _rlLog('Reset 2 duration: '+_rlFmt(reset2)+' — '+cmp2+' Reset 1');
-  RLOG('[RL-TEST] Reset 2: '+_rlFmt(reset2)+' — '+cmp2+' Reset 1');
-  _rlUpdateResults();
-
-  // ── Phase 5: Third cycle ──
-  _rlPhase=5;
-  _rlLog('\n=== Phase 5: Third cycle ===');
-  RLOG('[RL-TEST] === Phase 5 started ===');
-  const r3=await _rlFetchCycle(35,'Cycle 3');
-  if(_rlStop){_rlFinish();return;}
-  _rlData.cycles.push({count:r3.count});
-  _rlLog('Cycle 3: '+r3.count+' requests'+(r3.hit429?' before limit':' — no limit in 35 pages'));
-  RLOG('[RL-TEST] Cycle 3 complete: '+r3.count+' requests');
-  _rlUpdateResults();
-  if(!r3.hit429){_rlFinish();return;}
-
-  // ── Phase 6: Third reset ──
-  const reset3=await _rlProbeReset(r3.limitPage,r3.limitTime,3);
-  if(_rlStop||!reset3){_rlFinish();return;}
-  _rlData.resets.push({durationMs:reset3});
-  const cmp3=reset3<reset1-5000?'shorter than':reset3>reset1+5000?'longer than':'same as';
-  _rlLog('Reset 3 duration: '+_rlFmt(reset3)+' — '+cmp3+' Reset 1');
-  RLOG('[RL-TEST] Reset 3: '+_rlFmt(reset3)+' — '+cmp3+' Reset 1');
-  _rlUpdateResults();
-
-  // ── Phase 7: Full continuation ──
-  _rlPhase=7;
-  _rlLog('\n=== Phase 7: Attempt full continuation ===');
-  RLOG('[RL-TEST] === Phase 7 started ===');
-  const r4=await _rlFetchCycle(_rlTotalPages+10,'Full continuation');
-  if(r4.hit429){
-    _rlData.cycles.push({count:r4.count});
-    _rlLog('Cycle 4 limit hit at page '+r4.limitPage);
-    RLOG('[RL-TEST] Cycle 4 limit hit at page '+r4.limitPage);
-  }
+  await _rlFetchCycle(_rlTotalPages+10,'Full fetch');
   _rlFinish();
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.18</div>
+  pointer-events:none;">v4.5.19</div>
 </body></html>
