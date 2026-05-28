@@ -487,6 +487,16 @@ html[data-theme="light"] .theme-knob{left:30px}
       </div>
     </div>
   </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Route Backup</div>
+  <div class="api-pan" style="margin-bottom:24px">
+    <div class="api-t">Route Snapshot</div>
+    <div class="api-s">Permanent backup of all routes ever seen. Never pruned — survives registry resets and 7-day pruning.</div>
+    <div id="snapshot-info" style="font-size:12px;color:var(--ink3);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Snapshot: empty</div>
+    <div style="display:flex;gap:7px;align-items:center">
+      <button class="btn bg bsm" onclick="exportSnapshot()">&#11015; Export Snapshot</button>
+      <button class="btn bg bsm" onclick="restoreFromSnapshot()">&#8635; Restore from Snapshot</button>
+    </div>
+  </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Manual Import</div>
   <div id="si-drop-zone" class="si-drop"
     ondragover="onSIDragOver(event)" ondragleave="onSIDragLeave(event)" ondrop="onSIDrop(event)">
@@ -690,6 +700,7 @@ const S={
   acft:'all',mode:'1',openRoute:null,
   selChall:0,cfg:{},siCookie:'',
   routeRegistry:{},
+  routeRegistrySnapshot:{},
   chDep:'',chMaxMins:0,
   showIgnored:false,
   regionFilter:'all',
@@ -737,6 +748,14 @@ window.addEventListener('DOMContentLoaded',async()=>{
     const _n=Object.keys(S.routeRegistry).length;
     if(S.cfg.siCookie)setSt(_n>0?'Cookie saved — '+_n+' routes in registry.':'Cookie saved. Click Refresh Routes to build your database.','var(--grn)');
   }
+  // Load snapshot; seed from registry if first time
+  S.routeRegistrySnapshot=await window.api.siGetSnapshot();
+  if(Object.keys(S.routeRegistrySnapshot).length===0&&Object.keys(S.routeRegistry).length>0){
+    RLOG('[SI] Seeding snapshot from existing registry ('+Object.keys(S.routeRegistry).length+' entries)');
+    for(const[id,r] of Object.entries(S.routeRegistry))S.routeRegistrySnapshot[id]={...r};
+    await window.api.siSaveSnapshot(S.routeRegistrySnapshot);
+    RLOG('[SI] Snapshot seeded: '+Object.keys(S.routeRegistrySnapshot).length+' total routes in snapshot');
+  }
   if(S.cfg.savedRows&&S.cfg.savedRows.length){
     try{
       S.allRows=S.cfg.savedRows;
@@ -747,6 +766,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     }catch(e){ console.error('Session restore error:',e); }
   }
   buildChSB();renderCD(0);updateStats();renderRoutes();
+  updateSnapshotInfo();
   fetchMetarBatch();
   setInterval(async()=>{if(S.selICAOs.size){RLOG('[WX] Auto-refresh triggered');await fetchMetarBatch();RLOG('[WX] Auto-refresh complete: '+Object.keys(S.metarCache).length+' cached');}},30*60*1000);
   setInterval(updateWxAge,60000);
@@ -1222,6 +1242,55 @@ function pruneRegistry(){
   if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
 }
 
+function mergeIntoSnapshot(srcRegistry){
+  const MAX=10000;
+  let snapSize=Object.keys(S.routeRegistrySnapshot).length;
+  for(const[id,r] of Object.entries(srcRegistry)){
+    if(S.routeRegistrySnapshot[id]){
+      S.routeRegistrySnapshot[id].last_seen=r.last_seen;
+      S.routeRegistrySnapshot[id].times_seen=r.times_seen;
+    }else{
+      if(snapSize>=MAX){RLOG('[SI] Snapshot cap (10000) reached — not adding more until user exports');break;}
+      S.routeRegistrySnapshot[id]={...r};
+      snapSize++;
+    }
+  }
+  RLOG('[SI] Snapshot updated: '+snapSize+' total routes in snapshot');
+}
+
+function updateSnapshotInfo(){
+  const el=document.getElementById('snapshot-info');
+  if(!el)return;
+  const snapCount=Object.keys(S.routeRegistrySnapshot).length;
+  const regCount=Object.keys(S.routeRegistry).length;
+  if(snapCount===0){el.textContent='Snapshot: empty — Registry: '+regCount.toLocaleString()+' routes';return;}
+  let latest='';
+  for(const r of Object.values(S.routeRegistrySnapshot)){if(!latest||r.last_seen>latest)latest=r.last_seen;}
+  const mins=latest?Math.floor((Date.now()-new Date(latest).getTime())/60000):null;
+  const age=mins===null?'unknown':(mins<1?'just now':mins<60?mins+'m ago':Math.floor(mins/60)+'h ago');
+  el.textContent='Snapshot: '+snapCount.toLocaleString()+' routes — Registry: '+regCount.toLocaleString()+' routes — last updated: '+age;
+}
+
+async function exportSnapshot(){
+  const count=Object.keys(S.routeRegistrySnapshot).length;
+  if(count===0){alert('Snapshot is empty — nothing to export.');return;}
+  const res=await window.api.siExportSnapshot(S.routeRegistrySnapshot);
+  if(res.ok)alert('Snapshot exported to:\n'+res.path);
+  else alert('Export failed: '+res.error);
+}
+
+function restoreFromSnapshot(){
+  const snapCount=Object.keys(S.routeRegistrySnapshot).length;
+  const regCount=Object.keys(S.routeRegistry).length;
+  if(snapCount===0){alert('Snapshot is empty — nothing to restore.');return;}
+  if(!confirm('This will replace your current route registry ('+regCount.toLocaleString()+' routes) with the snapshot ('+snapCount.toLocaleString()+' routes). Continue?'))return;
+  S.routeRegistry={};
+  for(const[id,r] of Object.entries(S.routeRegistrySnapshot))S.routeRegistry[id]={...r};
+  window.api.siSaveRegistry(S.routeRegistry);
+  RLOG('[SI] Registry restored from snapshot: '+Object.keys(S.routeRegistry).length+' routes');
+  renderRoutes();updateStats();updateSnapshotInfo();
+}
+
 function fmtFirstSeen(ts){
   if(!ts)return'unknown';
   const days=Math.floor((Date.now()-new Date(ts).getTime())/86400000);
@@ -1386,8 +1455,10 @@ async function fetchSIRoutes({autoMode=false}={}){
   setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' routes added'+wStr+'.','var(--grn)');
   RLOG('fetchSIRoutes complete: registry='+cnt+' newRoutes='+newRoutes+' rateLimitWaits='+rateLimitWaits);
   if(autoMode)RLOG('[SI] Auto-refresh complete: '+newRoutes+' new routes added');
+  mergeIntoSnapshot(S.routeRegistry);
+  await window.api.siSaveSnapshot(S.routeRegistrySnapshot);
   updateAutoRefreshInfo();
-  renderRoutes();updateStats();
+  renderRoutes();updateStats();updateSnapshotInfo();
 }
 
 function fmtFlightLen(fl){
@@ -2052,6 +2123,7 @@ function updateStats(){
   const regSize=Object.keys(S.routeRegistry).length;
   document.getElementById('rbadge').textContent=regSize?getRoutes().length:0;
   updateUnknownCount();
+  updateSnapshotInfo();
 }
 async function ignoreFolder(folder){
   if(!S.cfg.ignoredFolders)S.cfg.ignoredFolders=[];
@@ -2141,7 +2213,9 @@ function importSIFile(filename,text){
   const passed=newCount+dupeCount;
   pruneRegistry();
   window.api.siSaveRegistry(S.routeRegistry);
-  renderRoutes();updateStats();
+  mergeIntoSnapshot(S.routeRegistry);
+  window.api.siSaveSnapshot(S.routeRegistrySnapshot);
+  renderRoutes();updateStats();updateSnapshotInfo();
   RLOG('[SI-IMPORT] File: '+filename+' | Total in file: '+total+' | Passed filters: '+passed+' | New: '+newCount+' | Duplicates: '+dupeCount+' | Filtered out: '+filtered);
   if(newCount>0){
     showImportResult('green','Import complete — '+newCount+' new route'+(newCount!==1?'s':'')+' added, '+dupeCount+' duplicate'+(dupeCount!==1?'s':'')+' updated, '+filtered+' filtered out (wrong aircraft or airport)');

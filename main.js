@@ -202,6 +202,46 @@ ipcMain.handle('si-save-registry', (_, registry) => {
   }
 });
 
+ipcMain.handle('si-get-snapshot', () => {
+  try {
+    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+    const snap = c.routeRegistrySnapshot || {};
+    LOG.info('[SI] Snapshot loaded: ' + Object.keys(snap).length + ' entries');
+    return snap;
+  } catch(e) {
+    LOG.warn('si-get-snapshot: error', e.message);
+    return {};
+  }
+});
+
+ipcMain.handle('si-save-snapshot', (_, snapshot) => {
+  try {
+    let c = {};
+    try { c = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(e) {}
+    c.routeRegistrySnapshot = snapshot;
+    delete c.routeCache;
+    LOG.info('[SI] Saving snapshot: ' + Object.keys(snapshot).length + ' entries');
+    fs.writeFileSync(CFG, JSON.stringify(c, null, 2));
+  } catch(e) {
+    LOG.error('si-save-snapshot failed:', e.message);
+  }
+});
+
+ipcMain.handle('si-export-snapshot', (_, snapshot) => {
+  try {
+    const downloadsPath = app.getPath('downloads');
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = 'dean_msfs_snapshot_' + date + '.json';
+    const filepath = path.join(downloadsPath, filename);
+    fs.writeFileSync(filepath, JSON.stringify({routes: Object.values(snapshot)}, null, 2));
+    LOG.info('[SI] Snapshot exported: ' + filepath);
+    return {ok: true, path: filepath};
+  } catch(e) {
+    LOG.error('si-export-snapshot failed:', e.message);
+    return {ok: false, error: e.message};
+  }
+});
+
 ipcMain.handle('get-log-path',()=>LOG_PATH);
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
