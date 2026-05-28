@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.23</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.24</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -475,10 +475,11 @@ html[data-theme="light"] .theme-knob{left:30px}
       <div id="si-fp-added" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);margin-top:2px"></div>
     </div>
     <div class="api-st" id="api-st"></div>
+    <div id="si-unknown-count" style="display:none;font-size:11px;color:var(--ink3);margin-top:3px;font-family:'JetBrains Mono',monospace"></div>
     <div id="auto-refresh-wrap" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--sep)">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;color:var(--ink2)">
         <input type="checkbox" id="auto-refresh-cb" onchange="onAutoRefreshToggle()" style="accent-color:var(--acc);cursor:pointer">
-        Auto-refresh routes every 8 hours
+        <span id="ar-running-dot" style="display:none;width:7px;height:7px;border-radius:50%;background:#32d74b;animation:pulse 1.2s ease-in-out infinite;flex-shrink:0"></span>Auto-refresh routes every 8 hours
       </label>
       <div id="auto-refresh-info" style="display:none;margin-top:5px;margin-left:22px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);line-height:1.9">
         <div id="ar-last-refresh"></div>
@@ -1084,7 +1085,10 @@ function scheduleAutoRefresh(){
 async function runAutoRefresh(){
   _arTimer=null;
   if(!S.siCookie){RLOG('[SI] Auto-refresh skipped — cookie expired');showSIError();return;}
+  const _dot=document.getElementById('ar-running-dot');
+  if(_dot)_dot.style.display='inline-block';
   await fetchSIRoutes({autoMode:true});
+  if(_dot)_dot.style.display='none';
 }
 function onAutoRefreshToggle(){
   const cb=document.getElementById('auto-refresh-cb');
@@ -1218,6 +1222,15 @@ function pruneRegistry(){
   if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
 }
 
+function fmtFirstSeen(ts){
+  if(!ts)return'unknown';
+  const days=Math.floor((Date.now()-new Date(ts).getTime())/86400000);
+  if(days<1)return'today';
+  if(days<7)return days+' day'+(days!==1?'s':'')+' ago';
+  const weeks=Math.floor(days/7);
+  return weeks+' week'+(weeks!==1?'s':'')+' ago';
+}
+
 function showSIError(msg){
   const b=document.getElementById('si-banner');
   const m=document.getElementById('si-banner-msg');
@@ -1242,10 +1255,14 @@ async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResu
     if(stopFn&&stopFn())return{ok:false,stopped:true};
     const res=await window.api.siFetchPage({page,cookie});
     if(res.ok){
-      if(page===1&&typeof res.bytes==='number'&&res.bytes<1000)return{ok:false,tooSmall:true,bytes:res.bytes,fatal:true};
+      if(page===1){
+        const routes=res.data?.data||res.data?.routes;
+        if(Array.isArray(routes)&&routes.length===0)return{ok:false,emptyRoutes:true,fatal:true};
+      }
       return res;
     }
     if(res.expired||res.status===401||res.status===403)return{ok:false,status:res.status,expired:true,fatal:true};
+    if(page===1&&typeof res.bytes==='number'&&res.bytes<1000)return{ok:false,tooSmall:true,bytes:res.bytes,fatal:true};
     if(res.status===503){
       attempts503++;
       if(attempts503<=3){
@@ -1305,8 +1322,9 @@ async function fetchSIRoutes({autoMode=false}={}){
   const p1=await siFetchPageSmart(1,S.siCookie,mkH(null));
   if(!p1.ok){
     stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
-    if(p1.tooSmall){
-      RLOG('[SI] Page 1 response too small ('+p1.bytes+'bytes) — cookie likely expired');
+    if(p1.tooSmall||p1.emptyRoutes){
+      if(p1.emptyRoutes)RLOG('[SI] Empty routes array in response — cookie likely expired');
+      else RLOG('[SI] Page 1 response too small ('+p1.bytes+'bytes) — cookie likely expired');
       setSt('⚠ Last refresh: just now — cookie may have expired','var(--acc)');
       showSIError('SayIntentions cookie may have expired — paste new cookie in the Settings tab');
       if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
@@ -1490,7 +1508,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'—'}</span></div>
           <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
           <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
-          <div class="dpr"><span class="dl">Times seen</span><span class="dv2">${r.times_seen}</span></div>
+          <div class="dpr"><span class="dl">First seen</span><span class="dv2" title="Seen ${r.times_seen} time${r.times_seen!==1?'s':''}">${fmtFirstSeen(r.first_seen)}</span></div>
           ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
         </div>
         <div class="dp-sec">
@@ -2013,6 +2031,17 @@ async function fetchChMetar(ch){
   }catch(e){raw.textContent='METAR unavailable.';}
 }
 
+function updateUnknownCount(){
+  const el=document.getElementById('si-unknown-count');
+  if(!el)return;
+  const total=Object.keys(S.routeRegistry).length;
+  if(!total){el.style.display='none';return;}
+  const unknown=Object.values(S.routeRegistry).filter(r=>!SI_ACFT_MAP[r.aircraft_type]).length;
+  if(unknown===0){el.style.display='none';return;}
+  el.style.display='block';
+  el.textContent=total.toLocaleString()+' routes in registry — '+unknown.toLocaleString()+' not shown (unknown aircraft type)';
+}
+
 function updateStats(){
   const ignored=new Set(S.cfg.ignoredFolders||[]);
   const nonNoise=S.allRows.filter(r=>r.method!=='noise'&&!ignored.has(r.folder));
@@ -2022,6 +2051,7 @@ function updateStats(){
   document.getElementById('st-un').textContent=nonNoise.filter(r=>!r.icao).length;
   const regSize=Object.keys(S.routeRegistry).length;
   document.getElementById('rbadge').textContent=regSize?getRoutes().length:0;
+  updateUnknownCount();
 }
 async function ignoreFolder(folder){
   if(!S.cfg.ignoredFolders)S.cfg.ignoredFolders=[];
@@ -2232,6 +2262,10 @@ async function _rlFetchCycle(maxPages,label){
       _rlPage++;
     }else if(res.stopped){
       break;
+    }else if(res.emptyRoutes){
+      _rlLog('⚠ Page '+pg+' — empty routes array — cookie likely expired. Diagnostic stopped.');
+      RLOG('[RL-TEST] Page 1 empty routes array — cookie likely expired');
+      _rlStop=true;break;
     }else if(res.tooSmall){
       _rlLog('⚠ Page '+pg+' — response too small ('+res.bytes+' bytes) — cookie likely expired. Diagnostic stopped.');
       RLOG('[RL-TEST] Page 1 too small ('+res.bytes+' bytes) — cookie likely expired');
@@ -2291,5 +2325,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.23</div>
+  pointer-events:none;">v4.5.24</div>
 </body></html>
