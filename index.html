@@ -254,7 +254,7 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.19</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.20</div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -444,9 +444,22 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
       <button class="btn bg bsm" id="save-cookie-btn" onclick="saveSICookie()">Save Cookie</button>
       <button class="btn bp bsm" id="fetch-btn" onclick="fetchSIRoutes()" disabled>Refresh Routes</button>
     </div>
+    <div id="si-fetch-panel" style="display:none;margin-top:10px">
+      <div id="si-fp-progress" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink2);margin-bottom:5px"></div>
+      <div class="prog"><div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div></div>
+      <div id="si-fp-rl" style="display:none;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--acc);margin-top:5px"></div>
+      <div id="si-fp-added" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);margin-top:2px"></div>
+    </div>
     <div class="api-st" id="api-st"></div>
-    <div id="si-prog" style="display:none" class="prog">
-      <div class="pt"><div class="pf" id="si-prog-fill" style="width:0%"></div></div>
+    <div id="auto-refresh-wrap" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--sep)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;color:var(--ink2)">
+        <input type="checkbox" id="auto-refresh-cb" onchange="onAutoRefreshToggle()" style="accent-color:var(--acc);cursor:pointer">
+        Auto-refresh routes every 8 hours
+      </label>
+      <div id="auto-refresh-info" style="display:none;margin-top:5px;margin-left:22px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);line-height:1.9">
+        <div id="ar-last-refresh"></div>
+        <div id="ar-next-refresh"></div>
+      </div>
     </div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Manual Import</div>
@@ -456,22 +469,29 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <div class="si-drop-txt"><strong>Drop SayIntentions JSON file here to import routes</strong><br>Accepts .txt and .json files</div>
   </div>
   <div id="si-import-result" class="si-import-result"></div>
-  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-top:1px solid var(--sep);padding-top:24px;margin-top:10px">Rate Limit Diagnostic</div>
-  <div class="api-pan" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleRLDiag()">
-      <span class="api-t" style="margin-bottom:0">Rate Limit Diagnostic</span>
-      <span id="rl-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9654; expand</span>
+  <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--sep)">
+    <div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" onclick="toggleAdvanced()">
+      <span id="adv-toggle-icon" style="font-size:10px;color:var(--ink3);font-family:'JetBrains Mono',monospace">&#9654;</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.35);font-family:'JetBrains Mono',monospace">Advanced</span>
     </div>
-    <div id="rl-diag-panel" style="display:none;margin-top:14px">
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Fetches all SayIntentions.AI route pages with smart retry on 503/429 rate limits. Tracks wait events, error types, and pages-per-window. Captures routes as a side effect. Requires a valid cookie.</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <button class="btn bg bsm" id="rl-run-btn" onclick="runRLDiag()">Run Diagnostic</button>
-        <button class="btn bg bsm" id="rl-stop-btn" onclick="stopRLDiag()" disabled>Stop</button>
-        <span id="rl-elapsed" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    <div id="adv-panel" style="display:none;margin-top:14px">
+      <div class="api-pan" style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleRLDiag()">
+          <span class="api-t" style="margin-bottom:0">Rate Limit Diagnostic</span>
+          <span id="rl-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9654; expand</span>
+        </div>
+        <div id="rl-diag-panel" style="display:none;margin-top:14px">
+          <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Fetches all SayIntentions.AI route pages with smart retry on 503/429 rate limits. Tracks wait events, error types, and pages-per-window. Captures routes as a side effect. Requires a valid cookie.</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <button class="btn bg bsm" id="rl-run-btn" onclick="runRLDiag()">Run Diagnostic</button>
+            <button class="btn bg bsm" id="rl-stop-btn" onclick="stopRLDiag()" disabled>Stop</button>
+            <span id="rl-elapsed" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+          </div>
+          <div id="rl-status" style="font-size:11px;color:var(--acc);font-family:'JetBrains Mono',monospace;margin-bottom:6px;min-height:16px"></div>
+          <div id="rl-log" style="background:#0a0a0a;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ccc;max-height:300px;overflow-y:auto;padding:8px;border-radius:var(--r2);border:1px solid var(--sep);margin-bottom:10px;white-space:pre-wrap;min-height:48px"></div>
+          <div id="rl-results" style="display:none;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:14px;font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;line-height:1.7"></div>
+        </div>
       </div>
-      <div id="rl-status" style="font-size:11px;color:var(--acc);font-family:'JetBrains Mono',monospace;margin-bottom:6px;min-height:16px"></div>
-      <div id="rl-log" style="background:#0a0a0a;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ccc;max-height:300px;overflow-y:auto;padding:8px;border-radius:var(--r2);border:1px solid var(--sep);margin-bottom:10px;white-space:pre-wrap;min-height:48px"></div>
-      <div id="rl-results" style="display:none;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:14px;font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;line-height:1.7"></div>
     </div>
   </div>
 </div></div>
@@ -696,6 +716,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
   fetchMetarBatch();
   setInterval(async()=>{if(S.selICAOs.size){RLOG('[WX] Auto-refresh triggered');await fetchMetarBatch();RLOG('[WX] Auto-refresh complete: '+Object.keys(S.metarCache).length+' cached');}},30*60*1000);
   setInterval(updateWxAge,60000);
+  // Auto-refresh routes
+  updateAutoRefreshInfo();
+  scheduleAutoRefresh();
   // Background diff-check
   if(S.cfg.folder){
     (async()=>{
@@ -958,12 +981,92 @@ async function saveRowIcao(val,folder){
 }
 
 // ── SAYINTENTIONS ────────────────────────────────────────────────────────────
-function setSt(msg,c){const e=document.getElementById('api-st');e.textContent=msg;e.style.color=c;}
-function siSetProg(pct){
-  const w=document.getElementById('si-prog'),f=document.getElementById('si-prog-fill');
-  if(!w||!f)return;
-  if(pct<0){w.style.display='none';return;}
-  w.style.display='block';f.style.width=pct+'%';
+function setSt(msg,c){const e=document.getElementById('api-st');if(e){e.textContent=msg;e.style.color=c;}}
+
+let _siRlCdTimer=null;
+function siShowFetchPanel(show){
+  const p=document.getElementById('si-fetch-panel'),s=document.getElementById('api-st');
+  if(p)p.style.display=show?'block':'none';
+  if(s)s.style.display=show?'none':'block';
+}
+function siSetFetchProgress(text,pct){
+  const fp=document.getElementById('si-fp-progress');if(fp)fp.textContent=text;
+  const f=document.getElementById('si-prog-fill');if(f)f.style.width=pct+'%';
+}
+function siSetFetchAdded(n){
+  const el=document.getElementById('si-fp-added');
+  if(el)el.textContent=n>0?n.toLocaleString()+' new routes added so far':'';
+}
+function startRlCountdown(sec){
+  stopRlCountdown();
+  const el=document.getElementById('si-fp-rl');if(!el)return;
+  el.style.display='block';let r=sec;
+  el.textContent='Rate limit reached — resuming in '+r+'s';
+  _siRlCdTimer=setInterval(()=>{r--;if(r<=0){stopRlCountdown();return;}el.textContent='Rate limit reached — resuming in '+r+'s';},1000);
+}
+function stopRlCountdown(){
+  if(_siRlCdTimer){clearInterval(_siRlCdTimer);_siRlCdTimer=null;}
+  const el=document.getElementById('si-fp-rl');if(el)el.style.display='none';
+}
+
+let _arTimer=null;
+function updateAutoRefreshInfo(){
+  const cb=document.getElementById('auto-refresh-cb'),info=document.getElementById('auto-refresh-info');
+  if(!cb||!info)return;
+  cb.checked=!!S.cfg.autoRefreshEnabled;
+  info.style.display=S.cfg.autoRefreshEnabled?'block':'none';
+  if(!S.cfg.autoRefreshEnabled)return;
+  const lastEl=document.getElementById('ar-last-refresh'),nextEl=document.getElementById('ar-next-refresh');
+  const ls=S.cfg.siLastFetch;
+  if(lastEl){
+    if(ls){
+      const dt=new Date(ls);
+      const ts=dt.toLocaleDateString([],{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+      const added=S.cfg.siLastFetchAdded;
+      lastEl.textContent='Last refresh: '+ts+(added!==undefined?' — '+added.toLocaleString()+' routes added':'');
+    }else lastEl.textContent='Last refresh: Never';
+  }
+  if(nextEl){
+    if(ls){
+      const ndt=new Date(new Date(ls).getTime()+8*60*60*1000);
+      const now=new Date(),tom=new Date(now);tom.setDate(tom.getDate()+1);
+      const day=ndt.toDateString()===now.toDateString()?'Today':ndt.toDateString()===tom.toDateString()?'Tomorrow':ndt.toLocaleDateString([],{month:'short',day:'numeric'});
+      nextEl.textContent='Next refresh: '+day+' '+ndt.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    }else nextEl.textContent='Next refresh: Starting soon';
+  }
+}
+function scheduleAutoRefresh(){
+  if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+  if(!S.cfg.autoRefreshEnabled||!S.siCookie)return;
+  const last=S.cfg.siLastFetch?new Date(S.cfg.siLastFetch).getTime():0;
+  const delay=last?Math.max(0,last+8*60*60*1000-Date.now()):0;
+  if(delay===0){
+    RLOG('[SI] Auto-refresh scheduled immediately (overdue or first run)');
+    _arTimer=setTimeout(()=>{RLOG('[SI] Auto-refresh triggered (scheduled)');runAutoRefresh();},5000);
+  }else{
+    RLOG('[SI] Auto-refresh scheduled in '+Math.round(delay/60000)+'min');
+    _arTimer=setTimeout(()=>{RLOG('[SI] Auto-refresh triggered (scheduled)');runAutoRefresh();},delay);
+  }
+}
+async function runAutoRefresh(){
+  _arTimer=null;
+  if(!S.siCookie){RLOG('[SI] Auto-refresh skipped — cookie expired');showSIError();return;}
+  await fetchSIRoutes({autoMode:true});
+}
+function onAutoRefreshToggle(){
+  const cb=document.getElementById('auto-refresh-cb');
+  S.cfg.autoRefreshEnabled=cb?cb.checked:false;
+  window.api.saveConfig(S.cfg);
+  updateAutoRefreshInfo();
+  if(S.cfg.autoRefreshEnabled)scheduleAutoRefresh();
+  else if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+}
+function toggleAdvanced(){
+  const p=document.getElementById('adv-panel'),ic=document.getElementById('adv-toggle-icon');
+  if(!p)return;
+  const open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  if(ic)ic.innerHTML=open?'&#9654;':'&#9660;';
 }
 
 function setCookieBtnSaved(saved){
@@ -1069,7 +1172,7 @@ function processPage(routes){
 }
 
 function pruneRegistry(){
-  const cutoff=new Date(Date.now()-14*24*60*60*1000).toISOString();
+  const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
   for(const id of Object.keys(S.routeRegistry)){
     if(S.routeRegistry[id].last_seen<cutoff)delete S.routeRegistry[id];
   }
@@ -1132,70 +1235,86 @@ async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResu
   }
 }
 
-async function fetchSIRoutes(){
-  RLOG('fetchSIRoutes started');
-  if(!S.siCookie){setSt('No cookie — save your SayIntentions cookie first.','var(--acc)');return;}
-  if(!S.selICAOs.size){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
+async function fetchSIRoutes({autoMode=false}={}){
+  RLOG('fetchSIRoutes started'+(autoMode?' (auto)':''));
+  if(!S.siCookie){
+    if(autoMode){RLOG('[SI] Auto-refresh skipped — cookie expired');showSIError();}
+    else setSt('No cookie — save your SayIntentions cookie first.','var(--acc)');
+    return;
+  }
+  if(!autoMode&&!S.selICAOs.size){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
   const btn=document.getElementById('fetch-btn');
-  btn.disabled=true;siSetProg(0);
+  if(btn)btn.disabled=true;
+  siShowFetchPanel(true);
   const cntBefore=Object.keys(S.routeRegistry).length;
-  let rateLimitWaits=0,pagesFetched=0;
+  let rateLimitWaits=0,pagesFetched=0,totalPages=1;
+  siSetFetchProgress('Refreshing... fetching page 1',0);siSetFetchAdded(0);
   const mkH=(tot)=>({
     stopFn:()=>false,
     onRetry503:(p,n)=>{
-      setSt('Page '+p+(tot?'/'+tot:'')+' — 503 — retry '+n+'/3 in 30s...','var(--acc)');
+      siSetFetchProgress('Page '+p+(tot?'/'+tot:'')+' — 503 retry '+n+'/3',tot?Math.round(p/tot*100):0);
       RLOG('[SI] 503 on page '+p+' — retry '+n+'/3 in 30s');
     },
     onRateWait:(p,status)=>{
       rateLimitWaits++;
-      setSt('Page '+p+(tot?'/'+tot:'')+' — rate limit ('+status+'), waiting 65s...','var(--acc)');
+      startRlCountdown(65);
       RLOG('[SI] '+(status===503?'Repeated 503 on page '+p+' — treating as rate limit, waiting 65s before continuing':'429 rate limit on page '+p+' — waiting 65s before retry'));
     },
     onResume:(p)=>{
-      setSt('Rate limit wait complete — resuming from page '+p+(tot?'/'+tot:'')+'...','var(--acc)');
+      stopRlCountdown();
+      siSetFetchProgress('Refreshing... Page '+p+(tot?'/'+tot:''),tot?Math.round((p-1)/tot*100):0);
       RLOG('[SI] Resuming from page '+p+' after rate limit wait');
     },
   });
-  setSt('Fetching page 1...','var(--acc)');
   const p1=await siFetchPageSmart(1,S.siCookie,mkH(null));
   if(!p1.ok){
-    btn.disabled=false;siSetProg(-1);
+    stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
     if(p1.expired){setSt('Fetch failed — cookie expired.','var(--red)');showSIError();}
-    else{setSt('Fetch failed (page 1): HTTP '+(p1.status||p1.error||'?'),'var(--red)');}
+    else setSt('Fetch failed (page 1): HTTP '+(p1.status||p1.error||'?'),'var(--red)');
     return;
   }
   const pagination=p1.data?.pagination||{};
-  const totalPages=pagination.totalPages||pagination.total_pages||1;
+  totalPages=pagination.totalPages||pagination.total_pages||1;
   RLOG('fetchSIRoutes: totalPages='+totalPages);
   processPage(p1.data?.data||p1.data?.routes||[]);
-  pagesFetched++;siSetProg(Math.round(1/totalPages*100));
+  pagesFetched++;
+  siSetFetchProgress('Refreshing... Page 1 / '+totalPages,Math.round(1/totalPages*100));
   for(let pg=2;pg<=totalPages;pg++){
-    setSt('Fetching page '+pg+' of '+totalPages+'...','var(--acc)');
+    siSetFetchProgress('Refreshing... Page '+pg+' / '+totalPages,Math.round(pg/totalPages*100));
     await new Promise(r=>setTimeout(r,500));
     const res=await siFetchPageSmart(pg,S.siCookie,mkH(totalPages));
     if(!res.ok){
       RLOG('si page '+pg+' failed: status='+(res.status||res.error));
-      if(res.expired){setSt('Fetch stopped — cookie expired (page '+pg+').','var(--red)');showSIError();btn.disabled=false;siSetProg(-1);return;}
+      if(res.expired){
+        stopRlCountdown();siShowFetchPanel(false);
+        setSt('Fetch stopped — cookie expired (page '+pg+').','var(--red)');showSIError();
+        if(btn)btn.disabled=false;return;
+      }
       if(res.fatal){
+        stopRlCountdown();siShowFetchPanel(false);
         if(res.status===429)RLOG('[SI] 429 persisted after 3 waits — stopping');
         setSt('Fetch stopped — HTTP '+(res.status||'?')+' on page '+pg+'.','var(--red)');
-        btn.disabled=false;siSetProg(-1);return;
+        if(btn)btn.disabled=false;return;
       }
       continue;
     }
     processPage(res.data?.data||res.data?.routes||[]);
-    pagesFetched++;siSetProg(Math.round(pg/totalPages*100));
+    pagesFetched++;
+    siSetFetchAdded(Object.keys(S.routeRegistry).length-cntBefore);
   }
   pruneRegistry();
   await window.api.siSaveRegistry(S.routeRegistry);
   S.cfg.siLastFetch=new Date().toISOString();
-  await window.api.saveConfig(S.cfg);
-  btn.disabled=false;siSetProg(-1);
   const cnt=Object.keys(S.routeRegistry).length;
   const newRoutes=cnt-cntBefore;
+  S.cfg.siLastFetchAdded=newRoutes;
+  await window.api.saveConfig(S.cfg);
+  stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
   const wStr=rateLimitWaits>0?' — '+rateLimitWaits+' rate limit wait'+(rateLimitWaits!==1?'s':''):'';
-  setSt('Fetched '+pagesFetched+'/'+totalPages+' pages — '+newRoutes+' new routes added'+wStr+'.','var(--grn)');
-  RLOG('fetchSIRoutes complete: registry='+cnt+' rateLimitWaits='+rateLimitWaits);
+  setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' routes added'+wStr+'.','var(--grn)');
+  RLOG('fetchSIRoutes complete: registry='+cnt+' newRoutes='+newRoutes+' rateLimitWaits='+rateLimitWaits);
+  if(autoMode)RLOG('[SI] Auto-refresh complete: '+newRoutes+' new routes added');
+  updateAutoRefreshInfo();
   renderRoutes();updateStats();
 }
 
@@ -2100,5 +2219,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.19</div>
+  pointer-events:none;">v4.5.20</div>
 </body></html>
