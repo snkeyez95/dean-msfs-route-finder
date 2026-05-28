@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.27</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.28</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -511,31 +511,6 @@ html[data-theme="light"] .theme-knob{left:30px}
       <div style="font-size:13px;color:var(--ink3);margin-bottom:10px;line-height:1.6">Download a community-sourced route database. Useful if you have no SI cookie or want a baseline dataset.</div>
       <button class="btn bg bsm" id="cr-btn" onclick="downloadCommunityRoutes()">&#11015; Download Community Routes</button>
       <div id="cr-status" style="margin-top:8px;font-size:12px;color:var(--ink3);font-family:'JetBrains Mono',monospace;min-height:16px"></div>
-    </div>
-  </div>
-  <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--sep)">
-    <div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" onclick="toggleAdvanced()">
-      <span id="adv-toggle-icon" style="font-size:10px;color:var(--ink3);font-family:'JetBrains Mono',monospace">&#9654;</span>
-      <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.35);font-family:'JetBrains Mono',monospace">Advanced</span>
-    </div>
-    <div id="adv-panel" style="display:none;margin-top:14px">
-      <div class="api-pan" style="margin-bottom:24px">
-        <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleRLDiag()">
-          <span class="api-t" style="margin-bottom:0">Rate Limit Diagnostic</span>
-          <span id="rl-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9654; expand</span>
-        </div>
-        <div id="rl-diag-panel" style="display:none;margin-top:14px">
-          <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Fetches all SayIntentions.AI route pages with smart retry on 503/429 rate limits. Tracks wait events, error types, and pages-per-window. Captures routes as a side effect. Requires a valid cookie.</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <button class="btn bg bsm" id="rl-run-btn" onclick="runRLDiag()">Run Diagnostic</button>
-            <button class="btn bg bsm" id="rl-stop-btn" onclick="stopRLDiag()" disabled>Stop</button>
-            <span id="rl-elapsed" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
-          </div>
-          <div id="rl-status" style="font-size:11px;color:var(--acc);font-family:'JetBrains Mono',monospace;margin-bottom:6px;min-height:16px"></div>
-          <div id="rl-log" style="background:#0a0a0a;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ccc;max-height:300px;overflow-y:auto;padding:8px;border-radius:var(--r2);border:1px solid var(--sep);margin-bottom:10px;white-space:pre-wrap;min-height:48px"></div>
-          <div id="rl-results" style="display:none;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:14px;font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;line-height:1.7"></div>
-        </div>
-      </div>
     </div>
   </div>
 </div></div>
@@ -1126,13 +1101,6 @@ function onAutoRefreshToggle(){
   updateAutoRefreshInfo();
   if(S.cfg.autoRefreshEnabled)scheduleAutoRefresh();
   else if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
-}
-function toggleAdvanced(){
-  const p=document.getElementById('adv-panel'),ic=document.getElementById('adv-toggle-icon');
-  if(!p)return;
-  const open=p.style.display!=='none';
-  p.style.display=open?'none':'block';
-  if(ic)ic.innerHTML=open?'&#9654;':'&#9660;';
 }
 
 function setCookieBtnSaved(saved){
@@ -2355,176 +2323,8 @@ async function downloadCommunityRoutes(){
   btn.innerHTML='&#11015; Download Community Routes';
 }
 
-// ── RATE LIMIT DIAGNOSTIC ────────────────────────────────────────────────────
-let _rlRunning=false,_rlStop=false,_rlPhase=0,_rlElTimer=null,_rlStart=0;
-let _rlPage=1,_rlTotalPages=133;
-let _rlData={totalFetched:0,routesBefore:0,rateLimitEvents:[],totalWaitMs:0};
 
-function toggleRLDiag(){
-  const p=document.getElementById('rl-diag-panel');
-  const ic=document.getElementById('rl-toggle-icon');
-  if(!p)return;
-  const open=p.style.display!=='none';
-  p.style.display=open?'none':'block';
-  ic.innerHTML=open?'&#9654; expand':'&#9660; collapse';
-}
-
-function _rlLog(msg){
-  const el=document.getElementById('rl-log');
-  if(el){el.textContent+=msg+'\n';el.scrollTop=el.scrollHeight;}
-  RLOG('[RL-TEST] '+msg);
-}
-function _rlTS(){return new Date().toTimeString().slice(0,8);}
-function _rlFmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+'m '+(s%60)+'s';}
-function _rlSetStatus(t){const el=document.getElementById('rl-status');if(el)el.textContent=t;}
-
-function _rlUpdateResults(){
-  const rEl=document.getElementById('rl-results');
-  if(!rEl)return;
-  const d=_rlData;
-  const regTotal=Object.keys(S.routeRegistry).length;
-  const routesAdded=regTotal-d.routesBefore;
-  const sep='━'.repeat(33);
-  const rlCount=d.rateLimitEvents.length;
-  const has503=d.rateLimitEvents.some(e=>e.status===503);
-  const has429=d.rateLimitEvents.some(e=>e.status===429);
-  const errorType=rlCount===0?'(none yet)':has503&&has429?'Mixed (503 + 429)':has503?'503 (server throttle)':'429 (rate limit header)';
-  const avgPages=rlCount>0?Math.round(d.totalFetched/rlCount):'N/A';
-  const totalWaitSec=Math.round(d.totalWaitMs/1000);
-  const waitStr=totalWaitSec>0?Math.floor(totalWaitSec/60)+'m '+(totalWaitSec%60)+'s':'0s';
-  let strategy='(collecting data...)';
-  if(d.totalFetched>0){
-    if(rlCount===0){
-      strategy='No rate limits hit — all '+d.totalFetched+' pages fetched cleanly.';
-    }else{
-      const apc=typeof avgPages==='number'?avgPages:24;
-      const batches=Math.ceil(_rlTotalPages/apc);
-      const activeSec=Math.round(_rlTotalPages*0.5);
-      const waitSec=(batches-1)*65;
-      strategy='SI rate-limits at ~'+apc+' pages per window.\n  Full '+_rlTotalPages+'-page fetch takes ~'+batches+' cycles (~'+Math.round(activeSec/60*10)/10+'m active + ~'+Math.round(waitSec/60*10)/10+'m waiting).\n  Use Refresh Routes for automatic full harvest.';
-    }
-  }
-  rEl.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:11px;line-height:1.7">'+
-    sep+'\nRATE LIMIT DIAGNOSTIC RESULTS\n'+sep+'\n\n'+
-    'Total pages fetched: '+d.totalFetched+' of '+_rlTotalPages+'\n'+
-    'Routes captured: '+routesAdded+' new routes added\n'+
-    'Registry total: '+regTotal+'\n\n'+
-    'Rate limit events: '+rlCount+(rlCount>0?' (all via '+errorType+')':'')+'\n'+
-    'Error type observed: '+errorType+'\n'+
-    'Avg pages before rate limit: '+avgPages+'\n'+
-    'Total wait time: '+waitStr+'\n\n'+
-    'Recommended fetch strategy:\n  '+strategy+'\n'+
-    sep+'</pre>';
-  rEl.style.display='block';
-}
-
-// Fetch up to maxPages from _rlPage using smart 503/429 retry; never stops on rate limits
-async function _rlFetchCycle(maxPages,label){
-  const regBefore=Object.keys(S.routeRegistry).length;
-  let count=0;
-  for(let i=0;i<maxPages&&!_rlStop;i++){
-    if(_rlPage>_rlTotalPages){
-      _rlLog('✅ Full dataset reached — all '+_rlTotalPages+' pages fetched');
-      RLOG('[RL-TEST] Full dataset reached at page '+_rlPage);
-      break;
-    }
-    const pg=_rlPage;
-    _rlSetStatus('Phase '+_rlPhase+' — '+label+' (page '+pg+')');
-    const res=await siFetchPageSmart(pg,S.siCookie,{
-      stopFn:()=>_rlStop,
-      onRetry503:(p,n)=>{
-        _rlLog('⚠ Page '+p+' — 503 — retrying ('+n+'/3) in 30s...');
-        RLOG('[RL-TEST] 503 on page '+p+' — retry '+n+'/3 in 30s');
-        _rlSetStatus('Phase '+_rlPhase+' — 503 retry '+n+'/3 (page '+p+')');
-      },
-      onRateWait:(p,status)=>{
-        _rlData.rateLimitEvents.push({page:p,status});
-        _rlData.totalWaitMs+=65000;
-        if(status===503){
-          _rlLog('⏱ Page '+p+' — repeated 503 → rate limit — waiting 65s...');
-          RLOG('[RL-TEST] Repeated 503 on page '+p+' — treating as rate limit, waiting 65s before continuing');
-        }else{
-          _rlLog('⏱ Page '+p+' — 429 rate limit — waiting 65s...');
-          RLOG('[RL-TEST] 429 rate limit on page '+p+' — waiting 65s before retry');
-        }
-        _rlSetStatus('Phase '+_rlPhase+' — rate limit wait (page '+p+')');
-        _rlUpdateResults();
-      },
-      onResume:(p)=>{
-        _rlLog('⏱ Rate limit wait 65s complete — resuming from page '+p);
-        RLOG('[RL-TEST] Resuming from page '+p);
-      },
-    });
-    if(res.ok){
-      if(pg===1){const pgr=res.data?.pagination||{};const tp=pgr.totalPages||pgr.total_pages||0;if(tp>0)_rlTotalPages=tp;}
-      processPage(res.data?.data||res.data?.routes||[]);
-      count++;_rlData.totalFetched++;
-      _rlLog('✅ Page '+pg+' — 200 — '+_rlTS());
-      _rlPage++;
-    }else if(res.stopped){
-      break;
-    }else if(res.emptyRoutes){
-      _rlLog('⚠ Page '+pg+' — empty routes array — cookie likely expired. Diagnostic stopped.');
-      RLOG('[RL-TEST] Page 1 empty routes array — cookie likely expired');
-      _rlStop=true;break;
-    }else if(res.tooSmall){
-      _rlLog('⚠ Page '+pg+' — response too small ('+res.bytes+' bytes) — cookie likely expired. Diagnostic stopped.');
-      RLOG('[RL-TEST] Page 1 too small ('+res.bytes+' bytes) — cookie likely expired');
-      _rlStop=true;break;
-    }else if(res.expired){
-      _rlLog('❌ Page '+pg+' — cookie expired — stopping');
-      _rlStop=true;break;
-    }else if(res.fatal){
-      _rlLog('❌ Page '+pg+' — '+(res.status===429?'429 persisted after 3 waits':'HTTP '+(res.status||'?'))+' — stopping');
-      break;
-    }
-    await new Promise(r=>setTimeout(r,500));
-  }
-  const regAfter=Object.keys(S.routeRegistry).length;
-  RLOG('[RL-TEST] Routes captured this cycle: '+(regAfter-regBefore)+' — Registry total: '+regAfter);
-  return{count};
-}
-
-function _rlFinish(){
-  _rlRunning=false;
-  clearInterval(_rlElTimer);
-  const run=document.getElementById('rl-run-btn');
-  const stop=document.getElementById('rl-stop-btn');
-  if(run)run.disabled=false;
-  if(stop)stop.disabled=true;
-  document.getElementById('rl-elapsed').textContent='';
-  _rlSetStatus('');
-  _rlUpdateResults();
-  window.api.siSaveRegistry(S.routeRegistry);
-  renderRoutes();updateStats();
-  _rlLog('\n--- Diagnostic ended ---');
-  RLOG('[RL-TEST] Diagnostic ended');
-}
-
-function stopRLDiag(){
-  _rlStop=true;
-  _rlLog('Stopped by user at phase '+_rlPhase);
-  RLOG('[RL-TEST] Stopped by user at phase '+_rlPhase);
-}
-
-async function runRLDiag(){
-  if(_rlRunning)return;
-  if(!S.siCookie){document.getElementById('rl-log').textContent='ERROR: No cookie — save your SayIntentions cookie first.\n';return;}
-  _rlRunning=true;_rlStop=false;_rlPhase=1;_rlStart=Date.now();
-  _rlPage=1;_rlTotalPages=133;
-  _rlData={totalFetched:0,routesBefore:Object.keys(S.routeRegistry).length,rateLimitEvents:[],totalWaitMs:0};
-  document.getElementById('rl-log').textContent='';
-  document.getElementById('rl-results').style.display='none';
-  document.getElementById('rl-run-btn').disabled=true;
-  document.getElementById('rl-stop-btn').disabled=false;
-  const elEl=document.getElementById('rl-elapsed');
-  _rlElTimer=setInterval(()=>{if(elEl)elEl.textContent='Running: '+_rlFmt(Date.now()-_rlStart);},1000);
-  _rlLog('=== Rate Limit Diagnostic — fetching all pages with smart retry ===');
-  RLOG('[RL-TEST] === Phase 1 started ===');
-  await _rlFetchCycle(_rlTotalPages+10,'Full fetch');
-  _rlFinish();
-}
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.27</div>
+  pointer-events:none;">v4.5.28</div>
 </body></html>

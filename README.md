@@ -1,4 +1,4 @@
-# Dean's MSFS Route Finder — v4.5.27
+# Dean's MSFS Route Finder — v4.5.28
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -163,6 +163,7 @@ Key log prefixes:
 
 ## Changelog
 
+v4.5.28  Remove rate limit diagnostic UI
 v4.5.27  Community Routes download, update available banner
 v4.5.26  Challenging Approaches real routes from library airports, README rewrite
 v4.5.25  METAR scope optimization, sort by reliability, Challenging Approaches SI integration
