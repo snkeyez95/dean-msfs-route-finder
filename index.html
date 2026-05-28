@@ -15,6 +15,15 @@
   --ink0:#fff;--ink1:#f2f2f7;--ink2:#c7c7cc;--ink3:#8e8e93;--ink4:#3a3a3c;
   --r:12px;--r2:9px;--r3:6px;
 }
+html[data-theme="light"]{
+  --bg0:#f5f5f5;--bg1:#ffffff;--bg2:#fafafa;--bg3:#f0f0f0;--bg4:#e8e8e8;
+  --sep:rgba(0,0,0,.1);--sep2:rgba(0,0,0,.18);
+  --acc:#c47d00;--acc2:rgba(196,125,0,.12);--acc3:rgba(196,125,0,.06);
+  --grn:#1a9e35;--grn2:rgba(26,158,53,.12);
+  --red:#cc2200;--red2:rgba(204,34,0,.1);
+  --blu:#0060cc;--blu2:rgba(0,96,204,.12);
+  --ink0:#0d0d0d;--ink1:#1c1c1c;--ink2:#444444;--ink3:#888888;--ink4:#bbbbbb;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg0);color:var(--ink1);
@@ -247,6 +256,16 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 .sir-grn{background:var(--grn2);color:var(--grn);border:1px solid rgba(50,215,75,.25)}
 .sir-amb{background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)}
 .sir-red{background:var(--red2);color:var(--red);border:1px solid rgba(255,69,58,.25)}
+/* THEME TOGGLE */
+.theme-pill{-webkit-app-region:no-drag;margin-left:auto;display:flex;align-items:center;
+  width:52px;height:26px;border-radius:13px;background:var(--bg4);border:1px solid var(--sep2);
+  cursor:pointer;padding:0 6px;justify-content:space-between;flex-shrink:0;
+  position:relative;user-select:none;transition:background .2s}
+.theme-pill>span{font-size:11px;z-index:1;pointer-events:none;line-height:1}
+.theme-knob{position:absolute;width:18px;height:18px;border-radius:50%;
+  background:var(--ink2);left:4px;top:50%;transform:translateY(-50%);
+  transition:left .2s ease;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div class="tbar">
   <div class="wbtns">
@@ -254,7 +273,12 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.20</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.21</div>
+  <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
+    <span>🌙</span>
+    <span>☀️</span>
+    <div class="theme-knob"></div>
+  </div>
 </div>
 <div id="upd-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="upd-msg"></span>
@@ -676,8 +700,17 @@ const S={
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme')||'dark';
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  S.cfg.theme=next;
+  window.api.saveConfig(S.cfg);
+}
+
 window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
+  document.documentElement.setAttribute('data-theme',S.cfg.theme||'dark');
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
   // Initialise myFleet only when the key is absent from config (first run, or
@@ -2219,5 +2252,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.20</div>
+  pointer-events:none;">v4.5.21</div>
 </body></html>
