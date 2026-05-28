@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.25</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.26</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -425,9 +425,6 @@ html[data-theme="light"] .theme-knob{left:30px}
     <div class="chsb">
       <div class="chsb-filters">
         <h3>Challenging Approaches</h3>
-        <select class="ch-sel" id="ch-dep" onchange="filterChallenges()">
-          <option value="">Departure: Any airport</option>
-        </select>
         <div class="crow" style="margin-bottom:0;gap:5px">
           <span class="clbl" style="font-size:9px">Max Time</span>
           <div class="chip on" style="font-size:11px;padding:4px 10px" data-ct="0" onclick="setCT(0)">Any</div>
@@ -1929,6 +1926,7 @@ function flightMins(nm){return Math.round((nm/450)*60*1.10);}
 
 function buildChDepSelect(){
   const sel=document.getElementById('ch-dep');
+  if(!sel)return;
   const prev=sel.value;
   sel.innerHTML='<option value="">Departure: Any airport</option>';
   [...S.selICAOs].sort().forEach(icao=>{
@@ -1994,18 +1992,21 @@ function buildChSB(){
 function chRoutesHTML(ch){
   const activeFleet=getActiveFleet();
   const routes=Object.values(S.routeRegistry)
-    .filter(r=>r.arrival_airport===ch.icao&&activeFleet.has(r.aircraft_type))
+    .filter(r=>r.arrival_airport===ch.icao&&S.selICAOs.has(r.departure_airport)&&activeFleet.has(r.aircraft_type))
     .sort((a,b)=>(a.distance_nm||0)-(b.distance_nm||0))
     .slice(0,10);
   const uid='chr-'+ch.icao;
   const count=routes.length;
   if(count===0){
-    return`<div style="border:1px solid var(--sep);border-radius:var(--r2);padding:9px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace">Real Routes</span>
-      <span style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace;margin-left:auto">No routes yet</span>
+    return`<div style="border:1px solid var(--sep);border-radius:var(--r2);padding:9px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace">Real Routes</span>
+        <span style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace;margin-left:auto">No routes yet</span>
+      </div>
+      <div style="font-size:11px;color:var(--ink4);font-family:'JetBrains Mono',monospace;line-height:1.5">No routes in your registry depart from your library airports to this destination yet</div>
     </div>`;
   }
-  const badge=`<span style="font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)">${count} route${count!==1?'s':''} available</span>`;
+  const badge=`<span style="font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)">${count} route${count!==1?'s':''} from your library</span>`;
   const rowsHTML=routes.map(r=>{
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
@@ -2448,5 +2449,5 @@ async function runRLDiag(){
 }
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.25</div>
+  pointer-events:none;">v4.5.26</div>
 </body></html>
