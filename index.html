@@ -273,7 +273,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.28</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.29</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -1021,7 +1021,7 @@ async function saveRowIcao(val,folder){
 // ── SAYINTENTIONS ────────────────────────────────────────────────────────────
 function setSt(msg,c){const e=document.getElementById('api-st');if(e){e.textContent=msg;e.style.color=c;}}
 
-let _siRlCdTimer=null;
+let _siRlCdTimer=null,_siNetCdTimer=null;
 function siShowFetchPanel(show){
   const p=document.getElementById('si-fetch-panel'),s=document.getElementById('api-st');
   if(p)p.style.display=show?'block':'none';
@@ -1044,7 +1044,15 @@ function startRlCountdown(sec){
 }
 function stopRlCountdown(){
   if(_siRlCdTimer){clearInterval(_siRlCdTimer);_siRlCdTimer=null;}
+  if(_siNetCdTimer){clearInterval(_siNetCdTimer);_siNetCdTimer=null;}
   const el=document.getElementById('si-fp-rl');if(el)el.style.display='none';
+}
+function startNetworkCountdown(sec,page){
+  stopRlCountdown();
+  const el=document.getElementById('si-fp-rl');if(!el)return;
+  el.style.display='block';let r=sec;
+  el.textContent='Network error on page '+page+' — retrying in '+r+'s';
+  _siNetCdTimer=setInterval(()=>{r--;if(r<=0){stopRlCountdown();return;}el.textContent='Network error on page '+page+' — retrying in '+r+'s';},1000);
 }
 
 let _arTimer=null;
@@ -1294,9 +1302,9 @@ async function _rlWait(ms,stopFn){
   return true;
 }
 
-// Smart page fetch: 503 → retry 3×30s → 65s rate-limit wait → repeat; 429 → 65s wait up to 3×
-async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResume}={}){
-  let attempts503=0,attempts429=0;
+// Smart page fetch: 503 → retry 3×30s → 65s rate-limit wait → repeat; 429 → 65s wait up to 3×; network error → retry 3×30s → 65s → stop
+async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResume,onNetworkError,onNetworkWait,onNetworkResume}={}){
+  let attempts503=0,attempts429=0,attemptsNet=0;
   while(true){
     if(stopFn&&stopFn())return{ok:false,stopped:true};
     const res=await window.api.siFetchPage({page,cookie});
@@ -1309,6 +1317,25 @@ async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResu
     }
     if(res.expired||res.status===401||res.status===403)return{ok:false,status:res.status,expired:true,fatal:true};
     if(page===1&&typeof res.bytes==='number'&&res.bytes<1000)return{ok:false,tooSmall:true,bytes:res.bytes,fatal:true};
+    if(res.status===undefined&&res.error!==undefined){
+      attemptsNet++;
+      const errCode=res.error||'network error';
+      if(attemptsNet<=3){
+        RLOG('[SI] Network error on page '+page+' ('+errCode+') — retry '+attemptsNet+'/3 in 30s');
+        if(onNetworkError)onNetworkError(page,attemptsNet,errCode);
+        if(!await _rlWait(30000,stopFn))return{ok:false,stopped:true};
+        continue;
+      }
+      if(attemptsNet===4){
+        RLOG('[SI] Network error on page '+page+' ('+errCode+') — all 3 retries failed, waiting 65s');
+        if(onNetworkWait)onNetworkWait(page,errCode);
+        if(!await _rlWait(65000,stopFn))return{ok:false,stopped:true};
+        if(onNetworkResume)onNetworkResume(page);
+        continue;
+      }
+      RLOG('[SI] Page '+page+' failed after 4 attempts — stopping');
+      return{ok:false,networkFailed:true,error:errCode,fatal:true};
+    }
     if(res.status===503){
       attempts503++;
       if(attempts503<=3){
@@ -1364,6 +1391,19 @@ async function fetchSIRoutes({autoMode=false}={}){
       siSetFetchProgress('Refreshing... Page '+p+(tot?'/'+tot:''),tot?Math.round((p-1)/tot*100):0);
       RLOG('[SI] Resuming from page '+p+' after rate limit wait');
     },
+    onNetworkError:(p,n,errCode)=>{
+      siSetFetchProgress('Network error on page '+p+(tot?'/'+tot:'')+' — retrying...',tot?Math.round(p/tot*100):0);
+      startNetworkCountdown(30,p);
+    },
+    onNetworkWait:(p,errCode)=>{
+      startNetworkCountdown(65,p);
+      RLOG('[SI] Network error on page '+p+' — waiting 65s before final attempt');
+    },
+    onNetworkResume:(p)=>{
+      stopRlCountdown();
+      siSetFetchProgress('Refreshing... Page '+p+(tot?'/'+tot:''),tot?Math.round((p-1)/tot*100):0);
+      RLOG('[SI] Resuming page '+p+' after network error recovery');
+    },
   });
   const p1=await siFetchPageSmart(1,S.siCookie,mkH(null));
   if(!p1.ok){
@@ -1387,8 +1427,9 @@ async function fetchSIRoutes({autoMode=false}={}){
       _note.textContent='Auto-refresh paused — cookie expired. Re-enter cookie to resume.';
       return;
     }
+    if(p1.networkFailed){setSt('Fetch interrupted — network error on page 1','var(--acc)');return;}
     if(p1.expired){setSt('Fetch failed — cookie expired.','var(--red)');showSIError();}
-    else setSt('Fetch failed (page 1): HTTP '+(p1.status||p1.error||'?'),'var(--red)');
+    else setSt('Fetch failed (page 1): HTTP '+p1.status,'var(--red)');
     return;
   }
   const pagination=p1.data?.pagination||{};
@@ -1402,16 +1443,21 @@ async function fetchSIRoutes({autoMode=false}={}){
     await new Promise(r=>setTimeout(r,500));
     const res=await siFetchPageSmart(pg,S.siCookie,mkH(totalPages));
     if(!res.ok){
-      RLOG('si page '+pg+' failed: status='+(res.status||res.error));
+      RLOG('si page '+pg+' failed: status='+(res.status!==undefined?res.status:res.error||'network error'));
       if(res.expired){
         stopRlCountdown();siShowFetchPanel(false);
         setSt('Fetch stopped — cookie expired (page '+pg+').','var(--red)');showSIError();
         if(btn)btn.disabled=false;return;
       }
+      if(res.networkFailed){
+        stopRlCountdown();siShowFetchPanel(false);
+        setSt('Fetch interrupted — network error on page '+pg+'.','var(--acc)');
+        if(btn)btn.disabled=false;return;
+      }
       if(res.fatal){
         stopRlCountdown();siShowFetchPanel(false);
         if(res.status===429)RLOG('[SI] 429 persisted after 3 waits — stopping');
-        setSt('Fetch stopped — HTTP '+(res.status||'?')+' on page '+pg+'.','var(--red)');
+        setSt('Fetch stopped — HTTP '+res.status+' on page '+pg+'.','var(--red)');
         if(btn)btn.disabled=false;return;
       }
       continue;
@@ -2326,5 +2372,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.28</div>
+  pointer-events:none;">v4.5.29</div>
 </body></html>
