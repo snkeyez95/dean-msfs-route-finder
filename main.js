@@ -231,8 +231,7 @@ ipcMain.handle('si-save-snapshot', (_, snapshot) => {
 ipcMain.handle('si-export-snapshot', (_, snapshot) => {
   try {
     const downloadsPath = app.getPath('downloads');
-    const date = new Date().toISOString().slice(0, 10);
-    const filename = 'dean_msfs_snapshot_' + date + '.json';
+    const filename = 'dean_msfs_snapshot.json';
     const filepath = path.join(downloadsPath, filename);
     fs.writeFileSync(filepath, JSON.stringify({routes: Object.values(snapshot)}, null, 2));
     LOG.info('[SI] Snapshot exported: ' + filepath);
