@@ -266,6 +266,26 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
   background:var(--ink2);left:4px;top:50%;transform:translateY(-50%);
   transition:left .2s ease;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 html[data-theme="light"] .theme-knob{left:30px}
+/* FREE ROUTE MODE */
+.fr-toggle{background:transparent;border:1px solid var(--sep);border-radius:20px;color:var(--ink3);
+  padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-family:'Inter',sans-serif}
+.fr-toggle:hover{border-color:var(--sep2);color:var(--ink0)}
+.fr-toggle.on{background:var(--acc);border-color:var(--acc);color:#000;font-weight:600}
+.fr-field-lbl{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-bottom:5px}
+.fr-inp{background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);
+  padding:9px 14px;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;
+  color:var(--acc);width:110px;letter-spacing:.06em;text-transform:uppercase;transition:border-color .2s}
+.fr-inp:focus{outline:none;border-color:rgba(245,166,35,.5)}
+.fr-inp::placeholder{color:var(--ink4);font-weight:400;font-size:14px;letter-spacing:0;text-transform:none}
+.fr-hint{font-size:11px;color:var(--ink3);min-height:16px;margin-top:4px;line-height:1.5}
+.fr-lib{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--acc);
+  background:var(--acc2);border:1px solid rgba(245,166,35,.25);border-radius:20px;
+  padding:1px 7px;margin-top:2px;font-family:'JetBrains Mono',monospace}
+.fr-mode-lbl{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--acc);font-family:'JetBrains Mono',monospace;display:inline-flex;align-items:center;
+  gap:5px;padding:3px 10px;background:var(--acc2);border:1px solid rgba(245,166,35,.25);border-radius:20px}
 </style></head><body>
 <div class="tbar">
   <div class="wbtns">
@@ -273,7 +293,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.30</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.31</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -353,28 +373,46 @@ html[data-theme="light"] .theme-knob{left:30px}
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
 <div class="pane on" id="pane-routes">
   <div style="padding:24px 40px 0;flex-shrink:0">
-    <div class="crow" id="acft-chips-row">
-      <span class="clbl">Aircraft</span>
+    <div id="normal-filter-rows">
+      <div class="crow" id="acft-chips-row">
+        <span class="clbl">Aircraft</span>
+      </div>
+      <div class="crow">
+        <span class="clbl">Mode</span>
+        <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
+        <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+      </div>
+      <div class="crow">
+        <span class="clbl">Direction</span>
+        <div class="chip sq on" data-dir="either" onclick="setDirFilter('either')">Either</div>
+        <div class="chip sq" data-dir="dep" onclick="setDirFilter('dep')">Departing from library</div>
+        <div class="chip sq" data-dir="arr" onclick="setDirFilter('arr')">Arriving at library</div>
+      </div>
+      <div class="crow">
+        <span class="clbl">Region</span>
+        <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
+        <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
+        <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
+      </div>
     </div>
-    <div class="crow">
-      <span class="clbl">Mode</span>
-      <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
-      <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
-    </div>
-    <div class="crow">
-      <span class="clbl">Direction</span>
-      <div class="chip sq on" data-dir="either" onclick="setDirFilter('either')">Either</div>
-      <div class="chip sq" data-dir="dep" onclick="setDirFilter('dep')">Departing from library</div>
-      <div class="chip sq" data-dir="arr" onclick="setDirFilter('arr')">Arriving at library</div>
-    </div>
-    <div class="crow">
-      <span class="clbl">Region</span>
-      <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
-      <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
-      <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
+    <div id="fr-inputs-wrap" style="display:none;margin-bottom:12px">
+      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div>
+          <div class="fr-field-lbl">DEP &mdash; Departure</div>
+          <input id="fr-dep" class="fr-inp" maxlength="4" placeholder="ICAO" oninput="onFrInput('dep')" onkeydown="onFrKey(event)">
+          <div id="fr-dep-hint" class="fr-hint"></div>
+        </div>
+        <div style="align-self:center;font-size:26px;color:var(--acc);padding-top:10px">&rarr;</div>
+        <div>
+          <div class="fr-field-lbl">ARR &mdash; Arrival</div>
+          <input id="fr-arr" class="fr-inp" maxlength="4" placeholder="ICAO" oninput="onFrInput('arr')" onkeydown="onFrKey(event)">
+          <div id="fr-arr-hint" class="fr-hint"></div>
+        </div>
+        <button class="btn bp" id="fr-search-btn" onclick="doFreeRouteSearch()" disabled style="align-self:flex-end;margin-bottom:2px">Search</button>
+      </div>
     </div>
     <div class="fbar">
-      <div class="srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
+      <div class="srch" id="normal-srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
       <select id="airline-f" onchange="setAirlineFilter(this.value)">
         <option value="">All Airlines</option>
       </select>
@@ -386,7 +424,7 @@ html[data-theme="light"] .theme-knob{left:30px}
         <option value="4">Under 4h</option>
         <option value="6">Under 6h</option>
       </select>
-      <select id="sort-f" onchange="renderRoutes()">
+      <select id="sort-f" onchange="onSortChange()">
         <option value="dur">Sort: Duration</option>
         <option value="airline">Sort: Airline</option>
         <option value="dist">Sort: Distance</option>
@@ -394,10 +432,16 @@ html[data-theme="light"] .theme-knob{left:30px}
         <option value="wx-best">Sort: Best weather</option>
         <option value="reliable">Sort: Most reliable</option>
       </select>
-      <button class="btn bg bsm" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
+      <button class="btn bg bsm" id="normal-export" onclick="exportCSV()" style="margin-left:auto">&#11015; Export CSV</button>
+      <button class="fr-toggle" id="fr-toggle-btn" onclick="toggleFreeRoute()" title="Search any ICAO pair — not limited to your library">&#9992; Free Route</button>
     </div>
   </div>
   <div class="scroll" style="padding-top:12px">
+    <div id="fr-airline-row" style="display:none;margin-bottom:8px">
+      <select id="fr-airline-f" onchange="setFrAirlineFilter(this.value)">
+        <option value="">All Airlines</option>
+      </select>
+    </div>
     <div class="rhdl">
       <div class="rcnt" id="rcnt">No routes loaded</div>
       <span id="wx-age"></span>
@@ -598,6 +642,122 @@ const COMMERCIAL_EXTRA=new Set([
 ["EDDB","EDDH","LEBL","LEAL","LEMG","GCTS","LTFM","LGTS","LCPH","LLBG","OMDB","OERK","OTHH","WSSS","RJTT","RJAA","RKSI","ZBAA","ZSPD","VIDP","VABB","YSSY","YMML","NZAA","KIAH","KHOU","KFLL","KTPA","KMSY","KDTW","KBWI","KRDU","KSLC","KBNA","KCLT"].forEach(c=>IS.add(c));
 const CM={"heathrow":"EGLL","gatwick":"EGKK","stansted":"EGSS","manchester":"EGCC","liverpool":"EGGP","southampton":"EGHI","birmingham":"EGBB","edinburgh":"EGPH","amsterdam":"EHAM","frankfurt":"EDDF","munich":"EDDM","dusseldorf":"EDDL","paris":"LFPG","madrid":"LEMD","barcelona":"LEBL","rome":"LIRF","milan":"LIMC","vienna":"LOWW","zurich":"LSZH","lisbon":"LPPT","athens":"LGAV","dublin":"EIDW","brussels":"EBBR","copenhagen":"EKCH","stockholm":"ESSA","helsinki":"EFHK","warsaw":"EPWA","prague":"LKPR","budapest":"LHBP","toronto":"CYYZ","calgary":"CYYC","vancouver":"CYVR","montreal":"CYUL","newyork":"KJFK","losangeles":"KLAX","chicago":"KORD","dallas":"KDFW","miami":"KMIA","seattle":"KSEA","denver":"KDEN","sanfrancisco":"KSFO","lasvegas":"KLAS","portland":"KPDX","minneapolis":"KMSP","boston":"KBOS","sanantonio":"KSAT","atlanta":"KATL","orlando":"KMCO","dulles":"KIAD","newark":"KEWR","phoenix":"KPHX","sandiego":"KSAN","innsbruck":"LOWI","zakynthos":"LGZA","zante":"LGZA"};
 
+// Airport name lookup for Free Route mode — ICAO → display name
+// AI{} is checked first (has [name,city,...]), FR_EXTRA covers the rest
+const FR_EXTRA={
+  // UK regional
+  "EGPH":"Edinburgh Airport","EGPF":"Glasgow International","EGNT":"Newcastle Airport",
+  "EGBB":"Birmingham Airport","EGTE":"Exeter International","EGGD":"Bristol Airport",
+  // Scandinavia / Nordic
+  "ENGM":"Oslo Gardermoen","ENFR":"Bergen Flesland","ESGG":"Gothenburg Landvetter",
+  "ESMS":"Malmö Airport","ENVA":"Trondheim Vaernes","ENBO":"Bodø Airport",
+  "EFTP":"Tampere-Pirkkala","EFTU":"Turku Airport","EVRA":"Riga International",
+  "EYVI":"Vilnius International","EETN":"Tallinn Lennart Meri",
+  // Germany
+  "EDDB":"Berlin Brandenburg","EDDH":"Hamburg Airport","EDDS":"Stuttgart Airport",
+  "EDDN":"Nuremberg Airport","EDDP":"Leipzig Halle","EDDC":"Dresden Airport","EDDV":"Hannover Airport",
+  // France
+  "LFML":"Marseille Provence","LFMN":"Nice Cote d'Azur","LFBO":"Toulouse Blagnac",
+  "LFRS":"Nantes Atlantique","LFLL":"Lyon Saint-Exupery","LFBD":"Bordeaux Merignac",
+  // Spain / Canaries / Balearics
+  "LEBL":"Barcelona El Prat","LEAL":"Alicante Elche","LEMG":"Malaga Costa del Sol",
+  "GCTS":"Tenerife South","GCFV":"Fuerteventura Airport","GCRR":"Lanzarote Airport",
+  "GCXO":"Tenerife North","GCLA":"La Palma Airport","LEPA":"Palma de Mallorca",
+  "LEIB":"Ibiza Airport","LEMH":"Menorca Airport",
+  // Portugal
+  "LPFR":"Faro Airport","LPMA":"Madeira Cristiano Ronaldo","LPPR":"Porto Francisco Sa Carneiro",
+  // Italy
+  "LIPZ":"Venice Marco Polo","LIPE":"Bologna Guglielmo Marconi","LICJ":"Palermo Falcone Borsellino",
+  "LIME":"Bergamo Orio al Serio","LIRA":"Rome Ciampino","LIML":"Milan Linate",
+  // Greece / Aegean
+  "LGTS":"Thessaloniki Macedonia","LGRP":"Rhodes Diagoras","LGKR":"Corfu Ioannis Kapodistrias",
+  "LGML":"Mykonos Airport","LGSK":"Skiathos Airport","LGSR":"Santorini Airport",
+  "LGSM":"Samos Airport","LGHI":"Chios Island",
+  // Eastern Europe / Balkans
+  "LROP":"Bucharest Henri Coanda","LBSF":"Sofia Airport","LYBT":"Belgrade Nikola Tesla",
+  "LDSP":"Split Airport","LDDU":"Dubrovnik Airport","LDZD":"Zadar Airport",
+  "LJLJ":"Ljubljana Joze Pucnik","LZIB":"Bratislava Airport",
+  "EPKK":"Krakow John Paul II","EPGD":"Gdansk Lech Walesa","EPWR":"Wroclaw Copernicus",
+  // Turkey / Cyprus / Israel
+  "LTFM":"Istanbul Airport","LTAI":"Antalya Airport","LTBJ":"Izmir Adnan Menderes","LTAC":"Ankara Esenboga",
+  "LCPH":"Paphos International","LCLK":"Larnaca International","LLBG":"Ben Gurion Tel Aviv",
+  // Middle East
+  "OMDB":"Dubai International","OMAA":"Abu Dhabi International","OMDW":"Dubai World Central",
+  "OERK":"King Khalid Riyadh","OEJN":"King Abdulaziz Jeddah","OEDF":"Dammam King Fahd",
+  "OTHH":"Hamad International Doha","OBBI":"Bahrain International","OKBK":"Kuwait International",
+  "OJAI":"Queen Alia Amman","OMMC":"Muscat Seeb","OLBA":"Beirut Rafic Hariri",
+  // Africa
+  "HECA":"Cairo International","HAAB":"Addis Ababa Bole","FAOR":"Johannesburg OR Tambo",
+  "FACT":"Cape Town International","DNMM":"Lagos Murtala Muhammed","DNAA":"Abuja Nnamdi Azikiwe",
+  "GMMN":"Casablanca Mohammed V","GMME":"Rabat-Sale Airport","DTTA":"Tunis Carthage",
+  "DTMB":"Monastir Habib Bourguiba","DIAP":"Abidjan Felix Houphouet-Boigny",
+  // Asia — East
+  "RJTT":"Tokyo Haneda","RJAA":"Tokyo Narita","RJBB":"Osaka Kansai","RJOO":"Osaka Itami",
+  "RJCC":"Sapporo Chitose","RKSI":"Seoul Incheon","RKSS":"Seoul Gimpo",
+  "RCTP":"Taipei Taoyuan","RCSS":"Taipei Songshan","VHHH":"Hong Kong International",
+  "ZBAA":"Beijing Capital","ZSPD":"Shanghai Pudong","ZSSS":"Shanghai Hongqiao",
+  "ZGGG":"Guangzhou Baiyun","ZGSZ":"Shenzhen Bao'an","ZUUU":"Chengdu Tianfu",
+  "ZUCK":"Chongqing Jiangbei","ZBTJ":"Tianjin Binhai",
+  // Asia — Southeast
+  "WSSS":"Singapore Changi","WMKK":"Kuala Lumpur International","VTBS":"Bangkok Suvarnabhumi",
+  "VTBD":"Bangkok Don Mueang","VVNB":"Hanoi Noi Bai","VVTS":"Ho Chi Minh Tan Son Nhat",
+  "RPLL":"Manila Ninoy Aquino","WADD":"Bali Ngurah Rai","WIII":"Jakarta Soekarno-Hatta",
+  "WBKK":"Kota Kinabalu International","WMSA":"Subang Sultan Abdul Aziz Shah",
+  // Asia — South
+  "VIDP":"Delhi Indira Gandhi","VABB":"Mumbai CSIA","VOBL":"Bangalore Kempegowda",
+  "VOMM":"Chennai International","VCBI":"Colombo Bandaranaike","VNKT":"Kathmandu Tribhuvan",
+  "VQPR":"Paro International Bhutan","VNLK":"Tenzing-Hillary Lukla",
+  "VOHY":"Hyderabad Rajiv Gandhi","VOCI":"Kochi International",
+  // Australia / Pacific
+  "YSSY":"Sydney Kingsford Smith","YMML":"Melbourne Tullamarine","YBBN":"Brisbane International",
+  "YPPH":"Perth International","YPAD":"Adelaide International","NZAA":"Auckland International",
+  "NZCH":"Christchurch International","NZWN":"Wellington International","NZQN":"Queenstown Airport",
+  // Canada
+  "CYEG":"Edmonton International","CYWG":"Winnipeg Richardson","CYHZ":"Halifax Stanfield",
+  "CYOW":"Ottawa Macdonald-Cartier","CYYJ":"Victoria International","CYXE":"Saskatoon Diefenbaker",
+  "CYQB":"Quebec City Jean Lesage","CYQR":"Regina International","CYLW":"Kelowna International",
+  // Mexico / Central America / Caribbean
+  "MMMX":"Mexico City Benito Juarez","MMUN":"Cancun International","MMGL":"Guadalajara Miguel Hidalgo",
+  "MMMY":"Monterrey Escobedo","MMTJ":"Tijuana Rodriguez","MRLB":"Liberia Daniel Oduber",
+  "MROC":"San Jose Juan Santamaria","MGGT":"Guatemala City La Aurora",
+  "TNCM":"Princess Juliana Sint Maarten","TBPB":"Grantley Adams Barbados",
+  "MDSD":"Santo Domingo Las Americas","MKJP":"Norman Manley Kingston",
+  "TJSJ":"San Juan Luis Munoz Marin","MYNN":"Nassau Lynden Pindling",
+  // South America
+  "SBGR":"Sao Paulo Guarulhos","SBGL":"Rio de Janeiro Galeao","SBSP":"Sao Paulo Congonhas",
+  "SBRJ":"Santos Dumont Rio de Janeiro","SAEZ":"Buenos Aires Ezeiza",
+  "SCEL":"Santiago Arturo Merino Benitez","SKBO":"Bogota El Dorado",
+  "SPJC":"Lima Jorge Chavez","SVMI":"Caracas Simon Bolivar","SUAA":"Montevideo Carrasco",
+  // US additional
+  "KLGA":"LaGuardia","KFLL":"Fort Lauderdale Hollywood","KIAH":"Houston Bush Intercontinental",
+  "KHOU":"Houston Hobby","KMSY":"Louis Armstrong New Orleans","KDTW":"Detroit Metropolitan",
+  "KBWI":"Baltimore Washington","KRDU":"Raleigh-Durham","KSLC":"Salt Lake City",
+  "KBNA":"Nashville","KCLT":"Charlotte Douglas","KAUS":"Austin-Bergstrom",
+  "KABQ":"Albuquerque Sunport","PHNL":"Honolulu Daniel K Inouye","PANC":"Anchorage Ted Stevens",
+  "PHOG":"Kahului Maui","KMCI":"Kansas City International","KIND":"Indianapolis International",
+  "KMEM":"Memphis International","KPIT":"Pittsburgh International","KBUF":"Buffalo Niagara",
+  "KCLE":"Cleveland Hopkins","KCMH":"Columbus John Glenn","KSTL":"St Louis Lambert",
+  "KSMF":"Sacramento International","KRSW":"Southwest Florida","KPBI":"Palm Beach",
+  "KTPA":"Tampa International","KDCA":"Ronald Reagan Washington","KBUR":"Hollywood Burbank",
+  "KONT":"Ontario International","KSJC":"San Jose Mineta","KRNO":"Reno-Tahoe",
+  "KELP":"El Paso International","KJAX":"Jacksonville International","KLIT":"Clinton National",
+  "KTUL":"Tulsa International","KGRR":"Grand Rapids Gerald R Ford","KOMA":"Omaha Eppley",
+  "KBDL":"Bradley International Hartford","KMKE":"Milwaukee Mitchell",
+  // Challenging approaches not in AI
+  "LXGB":"Gibraltar International","LFLJ":"Courchevel Altiport","VHHX":"Kai Tak Hong Kong",
+  "BIKF":"Keflavik International","EGPD":"Aberdeen Dyce","LEPA":"Palma de Mallorca",
+  "TNCM":"Princess Juliana Sint Maarten","SBRJ":"Santos Dumont Rio de Janeiro",
+};
+
+function frAptName(icao){
+  if(AI[icao])return AI[icao][0];
+  return FR_EXTRA[icao]||null;
+}
+function frAptCity(icao){
+  if(AI[icao])return AI[icao][1]||'';
+  return '';
+}
+
 // SayIntentions aircraft_type → sim key (all known types)
 const SI_ACFT_MAP={
   'B739':'b738','B738':'b738','B38M':'b738','B737':'b738','B39M':'b738',
@@ -693,6 +853,10 @@ const S={
   metarCache:{},
   metarLastFetch:0,
   wxFetching:false,
+  freeRouteMode:false,
+  frDep:'',frArr:'',
+  frOpenRoute:null,
+  frAcFilter:'',
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -720,6 +884,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   }
   renderFleetPanel();
   renderFleetChips();
+  S.freeRouteMode=!!S.cfg.freeRouteMode;
+  if(S.freeRouteMode)applyFreeRouteMode();
   if(S.cfg.siCookie){
     S.siCookie=S.cfg.siCookie;
     document.getElementById('si-cookie-inp').value='••••••••••••••••';
@@ -1548,6 +1714,7 @@ function populateAirlineDropdown(){
 }
 
 function renderRoutes(){
+  if(S.freeRouteMode){renderFreeRouteResults();updateStats();return;}
   console.log('[WX] buildRouteList: metarCache has',Object.keys(S.metarCache||{}).length,'entries');
   populateAirlineDropdown();
   const rs=getRoutes();
@@ -1667,6 +1834,261 @@ function exportCSV(){
   });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...rows].join('\n')],{type:'text/csv'}));
   a.download='dean_msfs_routes.csv';a.click();
+}
+
+// ── FREE ROUTE MODE ──────────────────────────────────────────────────────────
+function toggleFreeRoute(){
+  S.freeRouteMode=!S.freeRouteMode;
+  S.cfg.freeRouteMode=S.freeRouteMode;
+  window.api.saveConfig(S.cfg);
+  applyFreeRouteMode();
+}
+
+function applyFreeRouteMode(){
+  const on=S.freeRouteMode;
+  const nfr=document.getElementById('normal-filter-rows');
+  if(nfr)nfr.style.display=on?'none':'';
+  const frw=document.getElementById('fr-inputs-wrap');
+  if(frw)frw.style.display=on?'block':'none';
+  const ns=document.getElementById('normal-srch');
+  if(ns)ns.style.display=on?'none':'';
+  const ne=document.getElementById('normal-export');
+  if(ne)ne.style.display=on?'none':'';
+  const af=document.getElementById('airline-f');
+  if(af)af.style.display=on?'none':'';
+  const df=document.getElementById('dur-f');
+  if(df)df.style.display=on?'none':'';
+  const btn=document.getElementById('fr-toggle-btn');
+  if(btn)btn.classList.toggle('on',on);
+  if(!on){
+    S.frDep='';S.frArr='';S.frOpenRoute=null;S.frAcFilter='';
+    const di=document.getElementById('fr-dep');if(di)di.value='';
+    const ai=document.getElementById('fr-arr');if(ai)ai.value='';
+    const dh=document.getElementById('fr-dep-hint');if(dh)dh.innerHTML='';
+    const ah=document.getElementById('fr-arr-hint');if(ah)ah.innerHTML='';
+    const far=document.getElementById('fr-airline-row');if(far)far.style.display='none';
+    renderRoutes();
+  }else{
+    renderFreeRouteResults();
+    updateStats();
+  }
+}
+
+function onSortChange(){renderRoutes();}
+
+function onFrInput(field){
+  const inp=document.getElementById('fr-'+field);
+  if(!inp)return;
+  inp.value=inp.value.toUpperCase().replace(/[^A-Z]/g,'');
+  const icao=inp.value;
+  if(field==='dep')S.frDep=icao;else S.frArr=icao;
+  const hint=document.getElementById('fr-'+field+'-hint');
+  if(hint){
+    if(icao.length===4){
+      const name=frAptName(icao);
+      const inLib=S.selICAOs.has(icao);
+      hint.innerHTML=(name?`<span style="color:var(--ink2)">${name}</span>`:'')
+        +(inLib?`<br><span class="fr-lib">&#10003; In your library</span>`:'');
+    }else{
+      hint.innerHTML='';
+    }
+  }
+  const sbtn=document.getElementById('fr-search-btn');
+  if(sbtn)sbtn.disabled=(S.frDep.length<2||S.frArr.length<2);
+}
+
+function onFrKey(e){
+  if(e.key==='Enter'){const sbtn=document.getElementById('fr-search-btn');if(sbtn&&!sbtn.disabled)doFreeRouteSearch();}
+}
+
+function doFreeRouteSearch(){
+  if(S.frDep.length<2||S.frArr.length<2)return;
+  S.frOpenRoute=null;S.frAcFilter='';
+  renderFreeRouteResults();
+}
+
+function getFreeRouteResults(){
+  if(!S.frDep||!S.frArr)return[];
+  const activeFleet=getActiveFleet();
+  const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
+  let rs=Object.values(S.routeRegistry).filter(r=>{
+    if(!activeFleet.has(r.aircraft_type))return false;
+    if(r.departure_airport!==S.frDep||r.arrival_airport!==S.frArr)return false;
+    if(S.frAcFilter&&r.airline!==S.frAcFilter)return false;
+    return true;
+  });
+  rs.sort((a,b)=>{
+    if(srt==='airline')return(a.airline||'').localeCompare(b.airline||'');
+    if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
+    if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
+    if(srt==='wx-worst'||srt==='wx-best'){
+      const sa=scoreMETAR(S.metarCache[(a.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(a.arrival_airport||'').toUpperCase()]);
+      const sb=scoreMETAR(S.metarCache[(b.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(b.arrival_airport||'').toUpperCase()]);
+      return srt==='wx-worst'?sb-sa:sa-sb;
+    }
+    return(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0);
+  });
+  return rs;
+}
+
+function setFrAirlineFilter(v){S.frAcFilter=v;S.frOpenRoute=null;renderFreeRouteResults();}
+
+function updateFrAirlineDropdown(rs){
+  const sel=document.getElementById('fr-airline-f');
+  const row=document.getElementById('fr-airline-row');
+  if(!sel)return;
+  const prev=S.frAcFilter;
+  const airlines=[...new Set(rs.map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  if(prev&&!airlines.includes(prev))S.frAcFilter='';
+  if(row)row.style.display=(rs.length>0&&airlines.length>1)?'':'none';
+}
+
+function renderFreeRouteResults(){
+  const body=document.getElementById('rt-body');
+  const rcnt=document.getElementById('rcnt');
+  if(!body||!rcnt)return;
+  // No search yet — prompt user
+  if(!S.frDep||!S.frArr||S.frDep.length<4||S.frArr.length<4){
+    rcnt.innerHTML='<span class="fr-mode-lbl">&#9992; Free Route</span>';
+    updateFrAirlineDropdown([]);
+    body.innerHTML=`<tr><td colspan="7"><div class="empty">
+      <div class="ei">&#9992;</div>
+      <div class="et">Free Route Search</div>
+      <div class="es">Enter any departure and arrival ICAO above — not limited to your library.<br>Results come from your route registry.</div>
+    </div></td></tr>`;
+    return;
+  }
+  const rs=getFreeRouteResults();
+  const cnt=rs.length;
+  rcnt.innerHTML=`<span class="fr-mode-lbl">&#9992; Free Route</span> <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink3)">${cnt} route${cnt!==1?'s':''} found for ${S.frDep} &rarr; ${S.frArr}</span>`;
+  updateFrAirlineDropdown(rs);
+  if(cnt===0){
+    const sbU='https://dispatch.simbrief.com/options/custom?orig='+S.frDep+'&dest='+S.frArr;
+    body.innerHTML=`<tr><td colspan="7"><div class="empty">
+      <div class="ei">&#9992;</div>
+      <div class="et">No registry match</div>
+      <div class="es">No routes found for ${S.frDep} &rarr; ${S.frArr} with your active fleet.<br>You can still open SimBrief and plan this route manually.</div>
+      <div style="margin-top:14px"><button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button></div>
+    </div></td></tr>`;
+    return;
+  }
+  body.innerHTML=rs.flatMap((r,i)=>{
+    const isO=S.frOpenRoute===i;
+    const depName=frAptName(r.departure_airport)||r.departure_airport;
+    const arrName=frAptName(r.arrival_airport)||r.arrival_airport;
+    const depCity=frAptCity(r.departure_airport);
+    const arrCity=frAptCity(r.arrival_airport);
+    const simAcft=SI_ACFT_MAP[r.aircraft_type]||'a320';
+    const simLbl=FLEET_LBL[r.aircraft_type]||SIM_LBL[simAcft]||r.aircraft_type;
+    const dur=fmtFlightLen(r.flight_length);
+    const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
+    const dep=r.departure_airport,arr=r.arrival_airport;
+    const depM=S.metarCache[dep.toUpperCase()];
+    const arrM=S.metarCache[arr.toUpperCase()];
+    const _wxPill=(depM||arrM)?getWxPill(r,-1):'<span style="color:#444;font-size:10px;font-family:monospace;pointer-events:none;min-width:86px;display:inline-block;text-align:center">&#9679; WX N/A</span>';
+    const main=`<tr class="dr${isO?' open':''}" onclick="togFrR(${i})">
+      <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
+      <td><div class="rp">${dep}&thinsp;&rarr;&thinsp;${arr}</div>
+          <div class="rc">${depCity||depName} &rarr; ${arrCity||arrName}</div></td>
+      <td><div class="ra">${r.airline||r.callsign||'&mdash;'}</div></td>
+      <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
+      <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
+      <td style="font-size:12px;color:var(--ink2)">${dist}</td>
+    </tr>`;
+    if(!isO)return[main];
+    const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
+    const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${dep}&dest=${arr}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
+    const faU=`https://www.flightaware.com/live/findflight/?origin=${dep}&destination=${arr}`;
+    const svU=`https://skyvector.com/?fpl=${dep}%20${arr}`;
+    const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' &rarr; '+r.gate_destination:(r.gate_origin||r.gate_destination||'&mdash;');
+    const depWx=depM?wxBlock(depM):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>';
+    const arrWx=arrM?wxBlock(arrM):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>';
+    const det=`<tr class="det-row"><td colspan="7"><div class="det-pan">
+      <div class="dp-strip">
+        <div class="dp-apt"><div class="dp-icao">${dep}</div><div class="dp-city">${depCity}</div></div>
+        <div class="dp-line"><div class="dp-dash"></div>
+          <div class="dp-mid"><div class="dp-plane">&#9992;</div><div class="dp-info">${dur} &bull; ${dist}</div></div>
+        <div class="dp-dash"></div></div>
+        <div class="dp-apt"><div class="dp-icao">${arr}</div><div class="dp-city">${arrCity}</div></div>
+      </div>
+      <div class="dp-grid">
+        <div class="dp-sec">
+          <div class="dp-st">Flight Info</div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airline||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
+          <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
+          <div class="dpr"><span class="dl">First seen</span><span class="dv2" title="Seen ${r.times_seen} time${r.times_seen!==1?'s':''}">${fmtFirstSeen(r.first_seen)}</span></div>
+          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
+        </div>
+        <div class="dp-sec">
+          <div class="dp-st">Departure &mdash; ${dep}</div>
+          <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${depName}</span></div>
+          <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_origin||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="frrwy-dep-${i}">fetching&hellip;</span></div>
+          <div class="metar-raw" id="frmetar-dep-${i}"></div>
+          <div id="frwind-dep-${i}"></div>
+          ${depWx}
+        </div>
+        <div class="dp-sec">
+          <div class="dp-st">Arrival &mdash; ${arr}</div>
+          <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${arrName}</span></div>
+          <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_destination||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="frrwy-arr-${i}">fetching&hellip;</span></div>
+          <div class="metar-raw" id="frmetar-arr-${i}"></div>
+          <div id="frwind-arr-${i}"></div>
+          ${arrWx}
+        </div>
+      </div>
+      <div class="dp-acts">
+        <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
+        <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
+      </div>
+      <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
+    </div></td></tr>`;
+    return[main,det];
+  }).join('');
+}
+
+function togFrR(i){
+  S.frOpenRoute=S.frOpenRoute===i?null:i;
+  renderFreeRouteResults();
+  if(S.frOpenRoute!==null){
+    const rs=getFreeRouteResults();
+    const r=rs[S.frOpenRoute];
+    if(r){fetchFrMetar(r.departure_airport,S.frOpenRoute,'dep');fetchFrMetar(r.arrival_airport,S.frOpenRoute,'arr');}
+  }
+}
+
+async function fetchFrMetar(icao,idx,side){
+  const rawEl=document.getElementById('frmetar-'+side+'-'+idx);
+  const rwyEl=document.getElementById('frrwy-'+side+'-'+idx);
+  const windEl=document.getElementById('frwind-'+side+'-'+idx);
+  if(!rawEl)return;
+  const cached=S.metarCache[(icao||'').toUpperCase()];
+  let rawText=cached?cached.rawOb:null;
+  if(!rawText){
+    try{
+      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
+      rawText=(await res.text()).trim();
+    }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  }
+  if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
+  rawEl.textContent=rawText;
+  const w=parseWind(rawText);
+  if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  const best=bestRwy(icao,w.dir,w.spd);
+  if(rwyEl)rwyEl.textContent=best;
+  if(windEl){
+    const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
+    const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
+    const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
+    windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` &mdash; ${xw}kt crosswind`:''}</div>`;
+  }
 }
 
 // ── METAR ────────────────────────────────────────────────────────────────────
@@ -2372,5 +2794,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.30</div>
+  pointer-events:none;">v4.5.31</div>
 </body></html>
