@@ -293,7 +293,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.31</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.32</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -460,6 +460,62 @@ html[data-theme="light"] .theme-knob{left:30px}
       <tbody id="rt-body"></tbody>
     </table>
     </div>
+
+    <!-- ── TRIP PLANNER ── -->
+    <div id="tp-section" style="margin-top:22px;border-top:1px solid var(--sep);padding-top:14px;padding-bottom:24px">
+      <div onclick="toggleTripPlanner()" style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px">
+        <span id="tp-icon" style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace">&#9654;</span>
+        <span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;letter-spacing:.04em">Trip Planner</span>
+      </div>
+      <div id="tp-panel" style="display:none;margin-top:14px">
+        <!-- Input state -->
+        <div id="tp-input-state">
+          <div class="fbar" style="margin-bottom:10px">
+            <span class="clbl" style="white-space:nowrap">Carrier</span>
+            <select id="tp-carrier" onchange="onTpInput()"><option value="">Select airline&hellip;</option></select>
+            <button class="btn bp bsm" id="tp-build-btn" onclick="buildTrip()" disabled>Build Trip</button>
+            <button class="btn bg bsm" id="tp-clear-btn" style="display:none;color:var(--red);border-color:rgba(255,69,58,.35)" onclick="clearTrip()">Clear Trip</button>
+          </div>
+          <textarea id="tp-paste" rows="5"
+            style="width:100%;background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);
+              padding:11px 14px;font-family:'Inter',sans-serif;font-size:14px;color:var(--ink1);
+              resize:vertical;line-height:1.7;transition:border-color .2s;outline:none"
+            onfocus="this.style.borderColor='rgba(245,166,35,.5)'" onblur="this.style.borderColor=''"
+            placeholder="Paste your itinerary here — one leg per line. Use ICAOs (KATL to KBWI) or city names (Atlanta to Baltimore)."
+            oninput="onTpInput()"></textarea>
+        </div>
+        <!-- Resolve / ambiguity state -->
+        <div id="tp-resolve-state" style="display:none">
+          <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">Review each leg &mdash; resolve any ambiguities before building your trip.</div>
+          <div id="tp-resolve-list"></div>
+          <div style="display:flex;gap:7px;margin-top:10px">
+            <button class="btn bg bsm" onclick="tpBackToInput()">&#8592; Edit</button>
+            <button class="btn bp bsm" id="tp-confirm-btn" onclick="confirmTrip()" disabled>&#10003; Build Trip</button>
+          </div>
+        </div>
+        <!-- Active trip card -->
+        <div id="tp-card" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div>
+              <span style="font-size:13px;font-weight:700;color:var(--acc);font-family:'JetBrains Mono',monospace;letter-spacing:.03em" id="tp-carrier-lbl"></span>
+              <span style="font-size:11px;color:var(--ink3);margin-left:10px;font-family:'JetBrains Mono',monospace" id="tp-leg-count"></span>
+            </div>
+            <button class="btn bg bsm" style="color:var(--red);border-color:rgba(255,69,58,.35);font-size:12px" onclick="clearTrip()">Clear Trip</button>
+          </div>
+          <div class="rwrap">
+            <table class="rtbl">
+              <thead><tr>
+                <th style="width:34px"></th><th style="width:24px"></th><th style="width:70px">Leg</th>
+                <th style="min-width:160px">Route</th><th>Airline</th>
+                <th style="width:120px">Aircraft</th><th style="width:70px;text-align:center">WX</th><th style="width:80px">Distance</th>
+              </tr></thead>
+              <tbody id="tp-legs"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -857,6 +913,9 @@ const S={
   frDep:'',frArr:'',
   frOpenRoute:null,
   frAcFilter:'',
+  tpOpenLeg:null,
+  tpCarrierSel:'',
+  tripParsed:[],
 };
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -886,6 +945,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderFleetChips();
   S.freeRouteMode=!!S.cfg.freeRouteMode;
   if(S.freeRouteMode)applyFreeRouteMode();
+  restoreTripPlan();
   if(S.cfg.siCookie){
     S.siCookie=S.cfg.siCookie;
     document.getElementById('si-cookie-inp').value='••••••••••••••••';
@@ -2091,6 +2151,394 @@ async function fetchFrMetar(icao,idx,side){
   }
 }
 
+// ── TRIP PLANNER ──────────────────────────────────────────────────────────────
+// Ambiguous city → multiple plausible airports (flagged for user confirmation)
+const FR_AMBIGUOUS={
+  "chicago":[["KORD","O'Hare"],["KMDW","Midway"]],
+  "new york":[["KJFK","JFK"],["KLGA","LaGuardia"],["KEWR","Newark"]],
+  "london":[["EGLL","Heathrow"],["EGKK","Gatwick"],["EGSS","Stansted"],["EGLC","City"]],
+  "paris":[["LFPG","Charles de Gaulle"],["LFPO","Orly"]],
+  "tokyo":[["RJTT","Haneda"],["RJAA","Narita"]],
+  "osaka":[["RJBB","Kansai"],["RJOO","Itami"]],
+  "milan":[["LIMC","Malpensa"],["LIME","Bergamo"],["LIML","Linate"]],
+  "rome":[["LIRF","Fiumicino"],["LIRA","Ciampino"]],
+  "washington":[["KIAD","Dulles"],["KDCA","Reagan"]],
+  "houston":[["KIAH","Bush Intercontinental"],["KHOU","Hobby"]],
+  "dallas":[["KDFW","DFW"],["KDAL","Love Field"]],
+  "los angeles":[["KLAX","LAX"],["KBUR","Burbank"]],
+  "san francisco":[["KSFO","SFO"],["KSJC","San Jose"]],
+};
+
+// City-name supplement for trip planner resolution (ICAO already in AI or CM are preferred)
+const TP_CITY={
+  "baltimore":"KBWI","charlotte":"KCLT","nashville":"KBNA","memphis":"KMEM",
+  "pittsburgh":"KPIT","cleveland":"KCLE","indianapolis":"KIND","milwaukee":"KMKE",
+  "columbus":"KCMH","raleigh":"KRDU","tampa":"KTPA","fortlauderdale":"KFLL",
+  "sacramento":"KSMF","sanjose":"KSJC","saltlake":"KSLC","albuquerque":"KABQ",
+  "tulsa":"KTUL","omaha":"KOMA","kansascity":"KMCI","stlouis":"KSTL",
+  "buffalo":"KBUF","hartford":"KBDL","jacksonville":"KJAX","neworleans":"KMSY",
+  "anchorage":"PANC","honolulu":"PHNL","maui":"PHOG",
+  "edmonton":"CYEG","winnipeg":"CYWG","ottawa":"CYOW","halifax":"CYHZ",
+  "edinburgh":"EGPH","glasgow":"EGPF","newcastle":"EGNT","bristol":"EGGD","aberdeen":"EGPD","belfast":"EGAA",
+  "oslo":"ENGM","bergen":"ENFR","gothenburg":"ESGG","trondheim":"ENVA",
+  "tallinn":"EETN","riga":"EVRA","vilnius":"EYVI",
+  "hamburg":"EDDH","berlin":"EDDB","hannover":"EDDV","nuremberg":"EDDN",
+  "marseille":"LFML","nice":"LFMN","toulouse":"LFBO","nantes":"LFRS","lyon":"LFLL","bordeaux":"LFBD",
+  "barcelona":"LEBL","alicante":"LEAL","malaga":"LEMG","tenerife":"GCTS",
+  "palma":"LEPA","ibiza":"LEIB","porto":"LPPR","faro":"LPFR","funchal":"LPMA","madeira":"LPMA",
+  "venice":"LIPZ","bologna":"LIPE","palermo":"LICJ","bergamo":"LIME",
+  "thessaloniki":"LGTS","rhodes":"LGRP","corfu":"LGKR","mykonos":"LGML","santorini":"LGSR",
+  "belgrade":"LYBT","split":"LDSP","dubrovnik":"LDDU","bucharest":"LROP","sofia":"LBSF",
+  "krakow":"EPKK","gdansk":"EPGD",
+  "istanbul":"LTFM","antalya":"LTAI","izmir":"LTBJ","ankara":"LTAC",
+  "paphos":"LCPH","telviv":"LLBG","amman":"OJAI","beirut":"OLBA",
+  "dubai":"OMDB","abudhabi":"OMAA","riyadh":"OERK","jeddah":"OEJN",
+  "doha":"OTHH","muscat":"OMMC","cairo":"HECA",
+  "johannesburg":"FAOR","capetown":"FACT","lagos":"DNMM","casablanca":"GMMN",
+  "singapore":"WSSS","kualalumpur":"WMKK","bangkok":"VTBS",
+  "hanoi":"VVNB","hochiminh":"VVTS","manila":"RPLL","bali":"WADD","jakarta":"WIII",
+  "delhi":"VIDP","mumbai":"VABB","bangalore":"VOBL","colombo":"VCBI","kathmandu":"VNKT",
+  "hongkong":"VHHH","taipei":"RCTP","beijing":"ZBAA","shanghai":"ZSPD","guangzhou":"ZGGG",
+  "sapporo":"RJCC","sydney":"YSSY","melbourne":"YMML","brisbane":"YBBN","perth":"YPPH",
+  "auckland":"NZAA","christchurch":"NZCH","wellington":"NZWN","queenstown":"NZQN",
+  "cancun":"MMUN","guadalajara":"MMGL","monterrey":"MMMY",
+  "sanjuan":"TJSJ","nassau":"MYNN","santiago":"SCEL","bogota":"SKBO",
+  "lima":"SPJC","saopaulo":"SBGR","rio":"SBGL","buenosaires":"SAEZ",
+};
+
+function resolveIcao(raw){
+  const t=(raw||'').trim();
+  // 4-char uppercase letters = treat as direct ICAO
+  const up=t.toUpperCase().replace(/[^A-Z]/g,'');
+  if(/^[A-Z]{4}$/.test(up))return{icao:up,status:'resolved'};
+  const low=t.toLowerCase().replace(/[^a-z ]/g,'').trim();
+  const nospace=low.replace(/\s+/g,'');
+  // Check ambiguous cities first
+  for(const[city,opts] of Object.entries(FR_AMBIGUOUS)){
+    const cs=city.replace(/\s+/g,'');
+    if(low===city||nospace===cs||low.startsWith(city))return{icao:null,status:'ambiguous',city:t,options:opts};
+  }
+  // CM lookup (strip spaces)
+  if(CM[nospace])return{icao:CM[nospace],status:'resolved'};
+  // TP_CITY supplement
+  if(TP_CITY[nospace])return{icao:TP_CITY[nospace],status:'resolved'};
+  // AI city field — exact match
+  for(const[icao,info] of Object.entries(AI)){
+    if(info[1]&&info[1].toLowerCase()===low)return{icao,status:'resolved'};
+  }
+  // AI city field — partial match
+  for(const[icao,info] of Object.entries(AI)){
+    if(info[1]&&low.length>3&&low.includes(info[1].toLowerCase()))return{icao,status:'resolved'};
+  }
+  return{icao:null,status:'unknown',city:t};
+}
+
+function parseTpLine(line){
+  const sep=/\s+to\s+|->|→|—|–/i;
+  const parts=line.split(sep);
+  if(parts.length<2)return null;
+  const dep=resolveIcao(parts[0].trim());
+  const arr=resolveIcao(parts[parts.length-1].trim());
+  if(dep.status==='unknown'&&arr.status==='unknown')return null;
+  return{dep,arr};
+}
+
+function toggleTripPlanner(){
+  const panel=document.getElementById('tp-panel');
+  const icon=document.getElementById('tp-icon');
+  if(!panel)return;
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  if(icon)icon.textContent=open?'&#9660;':'&#9654;';
+  if(open){
+    populateTpCarrier();
+    if(S.cfg.activeTripPlan&&S.cfg.activeTripPlan.legs&&S.cfg.activeTripPlan.legs.length)renderTripCard();
+  }
+}
+
+function populateTpCarrier(){
+  const sel=document.getElementById('tp-carrier');
+  if(!sel)return;
+  const prev=sel.value;
+  const airlines=[...new Set(Object.values(S.routeRegistry).map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML='<option value="">Select airline&hellip;</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+}
+
+function onTpInput(){
+  const carrier=(document.getElementById('tp-carrier')||{}).value||'';
+  const text=((document.getElementById('tp-paste')||{}).value||'').trim();
+  const hasTrip=!!(S.cfg.activeTripPlan&&S.cfg.activeTripPlan.legs&&S.cfg.activeTripPlan.legs.length);
+  const btn=document.getElementById('tp-build-btn');
+  if(btn)btn.disabled=!(carrier&&text);
+  const clr=document.getElementById('tp-clear-btn');
+  if(clr)clr.style.display=hasTrip?'':'none';
+}
+
+function buildTrip(){
+  const carrier=(document.getElementById('tp-carrier')||{}).value||'';
+  const text=((document.getElementById('tp-paste')||{}).value||'').trim();
+  if(!carrier||!text)return;
+  S.tpCarrierSel=carrier;
+  S.tripParsed=text.split('\n').map(l=>l.trim()).filter(l=>l).map(parseTpLine).filter(Boolean);
+  if(!S.tripParsed.length){alert('No valid legs found.\n\nFormat: KATL to KBWI, or Atlanta to Baltimore — one per line.');return;}
+  const hasIssue=S.tripParsed.some(l=>l.dep.status!=='resolved'||l.arr.status!=='resolved');
+  if(hasIssue){showTpResolveState();}else{tpConfirmAndBuild();}
+}
+
+function showTpResolveState(){
+  document.getElementById('tp-input-state').style.display='none';
+  document.getElementById('tp-card').style.display='none';
+  document.getElementById('tp-resolve-state').style.display='block';
+  renderResolveList();
+}
+
+function renderResolveList(){
+  const list=document.getElementById('tp-resolve-list');
+  if(!list)return;
+  list.innerHTML=S.tripParsed.map((leg,i)=>{
+    const allOk=leg.dep.status==='resolved'&&leg.arr.status==='resolved';
+    return`<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;padding:10px 12px;border-radius:var(--r2);border:1px solid ${allOk?'var(--sep)':'rgba(245,166,35,.3)'};background:${allOk?'var(--bg2)':'var(--acc3)'}">
+      <div style="font-size:14px;color:${allOk?'var(--grn)':'var(--acc)'};margin-top:2px;flex-shrink:0">${allOk?'&#10003;':'&#9888;'}</div>
+      <div style="flex:1;display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        ${tpSideHtml(leg.dep,i,'dep')}
+        <span style="color:var(--ink3);font-size:18px;align-self:center">&rarr;</span>
+        ${tpSideHtml(leg.arr,i,'arr')}
+      </div>
+    </div>`;
+  }).join('');
+  const allOk=S.tripParsed.every(l=>l.dep.status==='resolved'&&l.arr.status==='resolved');
+  const btn=document.getElementById('tp-confirm-btn');
+  if(btn)btn.disabled=!allOk;
+}
+
+function tpSideHtml(side,legIdx,which){
+  if(side.status==='resolved'){
+    const name=frAptName(side.icao);
+    return`<span style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--acc)">${side.icao}</span>${name?`<span style="font-size:11px;color:var(--ink3)">${name}</span>`:''}</span>`;
+  }
+  if(side.status==='ambiguous'){
+    return`<span style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12px;color:var(--acc);font-weight:500">${side.city}</span><span style="display:flex;gap:5px;flex-wrap:wrap">`
+      +side.options.map(([icao,lbl])=>`<button class="btn bg bxs" onclick="tpChoose(${legIdx},'${which}','${icao}')" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${icao} <span style="color:var(--ink3);font-weight:400;font-family:'Inter',sans-serif">${lbl}</span></button>`).join('')
+      +'</span></span>';
+  }
+  return`<span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--red)">${side.city||'?'} &mdash; not recognized</span>
+    <input type="text" maxlength="4" placeholder="Type ICAO" style="width:70px;background:var(--bg0);border:1px solid rgba(255,69,58,.5);border-radius:4px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--acc);text-transform:uppercase;outline:none"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'');tpManualIcao(${legIdx},'${which}',this.value)"></span>`;
+}
+
+function tpChoose(legIdx,which,icao){
+  if(!S.tripParsed[legIdx])return;
+  S.tripParsed[legIdx][which]={icao,status:'resolved'};
+  renderResolveList();
+}
+
+function tpManualIcao(legIdx,which,val){
+  if(!S.tripParsed[legIdx])return;
+  if(/^[A-Z]{4}$/.test(val)){S.tripParsed[legIdx][which]={icao:val,status:'resolved'};renderResolveList();}
+}
+
+function tpBackToInput(){
+  document.getElementById('tp-resolve-state').style.display='none';
+  document.getElementById('tp-input-state').style.display='block';
+}
+
+function confirmTrip(){tpConfirmAndBuild();}
+
+function tpConfirmAndBuild(){
+  const carrier=S.tpCarrierSel||(document.getElementById('tp-carrier')||{}).value||'';
+  const legs=S.tripParsed.filter(l=>l.dep.status==='resolved'&&l.arr.status==='resolved').map(l=>{
+    const dep=l.dep.icao,arr=l.arr.icao;
+    const match=Object.values(S.routeRegistry).find(r=>r.departure_airport===dep&&r.arrival_airport===arr&&r.airline===carrier);
+    return{dep,arr,completed:false,routeId:match?String(match.id):null};
+  });
+  if(!legs.length){alert('No valid legs to build.');return;}
+  S.cfg.activeTripPlan={carrier,legs};
+  window.api.saveConfig(S.cfg);
+  S.tpOpenLeg=null;
+  document.getElementById('tp-resolve-state').style.display='none';
+  document.getElementById('tp-input-state').style.display='none';
+  document.getElementById('tp-card').style.display='block';
+  renderTripCard();
+}
+
+function renderTripCard(){
+  const plan=S.cfg.activeTripPlan;
+  if(!plan||!plan.legs||!plan.legs.length)return;
+  const lbl=document.getElementById('tp-carrier-lbl');
+  const cnt=document.getElementById('tp-leg-count');
+  if(lbl)lbl.textContent=plan.carrier;
+  const done=plan.legs.filter(l=>l.completed).length;
+  if(cnt)cnt.textContent=done+' / '+plan.legs.length+' legs complete';
+  const firstUnchecked=plan.legs.findIndex(l=>!l.completed);
+  const body=document.getElementById('tp-legs');
+  if(!body)return;
+  body.innerHTML=plan.legs.flatMap((leg,i)=>{
+    const isOpen=S.tpOpenLeg===i;
+    const isDone=leg.completed;
+    const isHere=i===firstUnchecked;
+    const depInLib=S.selICAOs.has(leg.dep);
+    const arrInLib=S.selICAOs.has(leg.arr);
+    const libTag=`<span style="display:inline-flex;align-items:center;font-size:9px;font-weight:700;color:var(--acc);background:var(--acc2);border:1px solid rgba(245,166,35,.25);border-radius:20px;padding:0 5px;margin-left:3px;font-family:'JetBrains Mono',monospace">&#10003;</span>`;
+    const route=leg.routeId?S.routeRegistry[leg.routeId]||null:null;
+    const simLbl=route?(FLEET_LBL[route.aircraft_type]||SIM_LBL[SI_ACFT_MAP[route.aircraft_type]]||route.aircraft_type):'—';
+    const dist=route&&route.distance_nm?Math.round(route.distance_nm)+' nm':'—';
+    const airline=route?route.airline:plan.carrier;
+    const depM=S.metarCache[leg.dep];
+    const arrM=S.metarCache[leg.arr];
+    const wxPill=route&&(depM||arrM)?getWxPill(route,-1):'<span style="color:#444;font-size:10px;font-family:monospace;pointer-events:none;min-width:60px;display:inline-block;text-align:center">&mdash;</span>';
+    const mainStyle=isDone?'opacity:.45':'';
+    const textStyle=isDone?'text-decoration:line-through':'';
+    const main=`<tr class="dr${isOpen?' open':''}" style="${mainStyle}" onclick="togTpLeg(${i})">
+      <td onclick="event.stopPropagation()" style="padding:10px 6px 10px 12px;vertical-align:middle">
+        <input type="checkbox" ${isDone?'checked':''} onchange="togTpComplete(${i})" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer">
+      </td>
+      <td style="color:var(--ink3);font-size:11px;text-align:center;vertical-align:middle;padding:0 4px">${isOpen?'&#9660;':'&#9658;'}</td>
+      <td style="padding:10px 8px;vertical-align:middle">
+        ${isHere?`<div style="font-size:9px;font-weight:700;letter-spacing:.07em;color:var(--acc);font-family:'JetBrains Mono',monospace;margin-bottom:2px">&#9658; HERE</div>`:''}
+        <span style="font-size:11px;font-weight:600;color:var(--ink3);font-family:'JetBrains Mono',monospace">Leg ${i+1}</span>
+      </td>
+      <td style="padding:10px 8px;vertical-align:middle">
+        <div class="rp" style="${textStyle}">${leg.dep}${depInLib?libTag:''}&thinsp;&rarr;&thinsp;${leg.arr}${arrInLib?libTag:''}</div>
+        <div class="rc">${frAptCity(leg.dep)||frAptName(leg.dep)||leg.dep} &rarr; ${frAptCity(leg.arr)||frAptName(leg.arr)||leg.arr}</div>
+      </td>
+      <td style="padding:10px 8px;vertical-align:middle"><div class="ra" style="${textStyle}">${airline||'&mdash;'}</div></td>
+      <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace;padding:10px 8px;vertical-align:middle">${simLbl}</td>
+      <td style="text-align:center;vertical-align:middle;padding:0 6px">${wxPill}</td>
+      <td style="font-size:12px;color:var(--ink2);padding:10px 8px;vertical-align:middle">${dist}</td>
+    </tr>`;
+    if(!isOpen)return[main];
+    const sbType=route?route.aircraft_type:'A320';
+    const sbAirline=route?(route.airline||'').match(/\(([^)]+)\)/)?.[1]||'':'';
+    const sbFltnum=route?(route.callsign||'').replace(/^[A-Z]+/,''):'';
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${leg.dep}&dest=${leg.arr}&type=${sbType}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
+    const faU=`https://www.flightaware.com/live/findflight/?origin=${leg.dep}&destination=${leg.arr}`;
+    const svU=`https://skyvector.com/?fpl=${leg.dep}%20${leg.arr}`;
+    let detContent;
+    if(route){
+      const dur=fmtFlightLen(route.flight_length);
+      const gates=(route.gate_origin&&route.gate_destination)?route.gate_origin+' &rarr; '+route.gate_destination:(route.gate_origin||route.gate_destination||'&mdash;');
+      const depM2=S.metarCache[leg.dep];
+      const arrM2=S.metarCache[leg.arr];
+      detContent=`<div class="dp-strip">
+        <div class="dp-apt"><div class="dp-icao">${leg.dep}</div><div class="dp-city">${frAptCity(leg.dep)}</div></div>
+        <div class="dp-line"><div class="dp-dash"></div>
+          <div class="dp-mid"><div class="dp-plane">&#9992;</div><div class="dp-info">${dur} &bull; ${dist}</div></div>
+        <div class="dp-dash"></div></div>
+        <div class="dp-apt"><div class="dp-icao">${leg.arr}</div><div class="dp-city">${frAptCity(leg.arr)}</div></div>
+      </div>
+      <div class="dp-grid">
+        <div class="dp-sec">
+          <div class="dp-st">Flight Info</div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${route.airline||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${route.callsign||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${route.aircraft_type} &mdash; ${simLbl}</span></div>
+          <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
+          <div class="dpr"><span class="dl">First seen</span><span class="dv2">${fmtFirstSeen(route.first_seen)}</span></div>
+        </div>
+        <div class="dp-sec">
+          <div class="dp-st">Departure &mdash; ${leg.dep}</div>
+          <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${frAptName(leg.dep)||leg.dep}</span></div>
+          <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${route.gate_origin||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="tprwy-dep-${i}">fetching&hellip;</span></div>
+          <div class="metar-raw" id="tpmetar-dep-${i}"></div>
+          <div id="tpwind-dep-${i}"></div>
+          ${depM2?wxBlock(depM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}
+        </div>
+        <div class="dp-sec">
+          <div class="dp-st">Arrival &mdash; ${leg.arr}</div>
+          <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${frAptName(leg.arr)||leg.arr}</span></div>
+          <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${route.gate_destination||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="tprwy-arr-${i}">fetching&hellip;</span></div>
+          <div class="metar-raw" id="tpmetar-arr-${i}"></div>
+          <div id="tpwind-arr-${i}"></div>
+          ${arrM2?wxBlock(arrM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}
+        </div>
+      </div>`;
+    }else{
+      detContent=`<div style="padding:4px 0 10px;font-size:13px;color:var(--ink3)">No route found for <strong style="color:var(--ink0)">${plan.carrier}</strong> on ${leg.dep} &rarr; ${leg.arr} in your registry. You can still plan this leg in SimBrief.</div>`;
+    }
+    const det=`<tr class="det-row"><td colspan="8"><div class="det-pan">
+      ${detContent}
+      <div class="dp-acts">
+        <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; FlightAware</button>
+        <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
+      </div>
+    </div></td></tr>`;
+    return[main,det];
+  }).join('');
+}
+
+function togTpLeg(i){
+  S.tpOpenLeg=S.tpOpenLeg===i?null:i;
+  renderTripCard();
+  if(S.tpOpenLeg!==null){
+    const plan=S.cfg.activeTripPlan;
+    if(!plan||!plan.legs[S.tpOpenLeg])return;
+    const leg=plan.legs[S.tpOpenLeg];
+    if(leg.routeId&&S.routeRegistry[leg.routeId]){
+      fetchTpMetar(leg.dep,S.tpOpenLeg,'dep');
+      fetchTpMetar(leg.arr,S.tpOpenLeg,'arr');
+    }
+  }
+}
+
+async function fetchTpMetar(icao,idx,side){
+  const rawEl=document.getElementById('tpmetar-'+side+'-'+idx);
+  const rwyEl=document.getElementById('tprwy-'+side+'-'+idx);
+  const windEl=document.getElementById('tpwind-'+side+'-'+idx);
+  if(!rawEl)return;
+  const cached=S.metarCache[(icao||'').toUpperCase()];
+  let rawText=cached?cached.rawOb:null;
+  if(!rawText){
+    try{
+      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
+      rawText=(await res.text()).trim();
+    }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  }
+  if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
+  rawEl.textContent=rawText;
+  const w=parseWind(rawText);
+  if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  const best=bestRwy(icao,w.dir,w.spd);
+  if(rwyEl)rwyEl.textContent=best;
+  if(windEl){
+    const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
+    const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
+    const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
+    windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` &mdash; ${xw}kt crosswind`:''}</div>`;
+  }
+}
+
+function togTpComplete(i){
+  const plan=S.cfg.activeTripPlan;
+  if(!plan||!plan.legs[i])return;
+  plan.legs[i].completed=!plan.legs[i].completed;
+  window.api.saveConfig(S.cfg);
+  renderTripCard();
+}
+
+function clearTrip(){
+  if(!confirm('Clear this trip and start over?'))return;
+  delete S.cfg.activeTripPlan;
+  window.api.saveConfig(S.cfg);
+  S.tpOpenLeg=null;S.tripParsed=[];S.tpCarrierSel='';
+  document.getElementById('tp-card').style.display='none';
+  document.getElementById('tp-resolve-state').style.display='none';
+  document.getElementById('tp-input-state').style.display='block';
+  const clr=document.getElementById('tp-clear-btn');if(clr)clr.style.display='none';
+  const btn=document.getElementById('tp-build-btn');if(btn)btn.disabled=true;
+}
+
+function restoreTripPlan(){
+  const plan=S.cfg.activeTripPlan;
+  if(!plan||!plan.legs||!plan.legs.length)return;
+  S.tpOpenLeg=null;
+  // Panel stays collapsed (toggled by user) — prepare card state for when they open it
+  document.getElementById('tp-input-state').style.display='none';
+  document.getElementById('tp-card').style.display='block';
+}
+
 // ── METAR ────────────────────────────────────────────────────────────────────
 async function fetchMetar(icao,idx,side){
   const rawEl=document.getElementById('metar-'+side+'-'+idx);
@@ -2794,5 +3242,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.31</div>
+  pointer-events:none;">v4.5.32</div>
 </body></html>
