@@ -87,7 +87,7 @@ Contains: folder path, siCookie, savedRows, myFleet, routeRegistry,
 
 ## Route Data
 
-- Primary registry: up to 5,000 routes, 7-day pruning
+- Primary registry: up to 5,000 routes, 21-day pruning
 - Snapshot registry: up to 20,000 routes, never pruned
 - Auto-refresh: every 8 hours when enabled, fires immediately if overdue on launch
 - SI dataset: ~140-165 pages × 100 routes = ~15,000 total routes
