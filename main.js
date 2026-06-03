@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
-const path  = require('path');
-const fs    = require('fs');
-const os    = require('os');
-const https = require('https');
+const path   = require('path');
+const fs     = require('fs');
+const os     = require('os');
+const https  = require('https');
+const { spawn } = require('child_process');
 
 // ── FILE LOGGER ──────────────────────────────────────────────────────────────
 const LOG_PATH = path.join(__dirname, 'dean_msfs_debug.log');
@@ -230,14 +231,38 @@ ipcMain.handle('si-save-snapshot', (_, snapshot) => {
 
 ipcMain.handle('si-export-snapshot', (_, snapshot) => {
   try {
-    const downloadsPath = app.getPath('downloads');
-    const filename = 'dean_msfs_snapshot.json';
-    const filepath = path.join(downloadsPath, filename);
-    fs.writeFileSync(filepath, JSON.stringify({routes: Object.values(snapshot)}, null, 2));
-    LOG.info('[SI] Snapshot exported: ' + filepath);
-    return {ok: true, path: filepath};
+    const outPath = path.join(__dirname, 'community_routes.json');
+    const routes = Object.values(snapshot);
+    fs.writeFileSync(outPath, JSON.stringify({routes}, null, 2));
+    LOG.info('[SI] community_routes.json exported: ' + routes.length + ' routes written to app folder');
+    return {ok: true, path: outPath};
   } catch(e) {
     LOG.error('si-export-snapshot failed:', e.message);
+    return {ok: false, error: e.message};
+  }
+});
+
+ipcMain.handle('si-write-community-routes', (_, snapshot) => {
+  try {
+    const outPath = path.join(__dirname, 'community_routes.json');
+    const routes = Object.values(snapshot);
+    fs.writeFileSync(outPath, JSON.stringify({routes}, null, 2));
+    LOG.info('[SI] community_routes.json updated: ' + routes.length + ' routes written to app folder');
+    // Silent auto-publish — no visible window, no UI notification
+    const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat')], {
+      windowsHide: true,
+      shell: false,
+      cwd: __dirname,
+      stdio: 'ignore',
+    });
+    pub.on('close', code => {
+      if (code === 0) LOG.info('[SI] Community routes published to GitHub successfully');
+      else LOG.warn('[SI] Community routes publish failed — will retry next refresh');
+    });
+    pub.on('error', e => LOG.error('[SI] Community routes publish error:', e.message));
+    return {ok: true, count: routes.length};
+  } catch(e) {
+    LOG.error('[SI] si-write-community-routes failed:', e.message);
     return {ok: false, error: e.message};
   }
 });

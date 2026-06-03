@@ -293,7 +293,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.33</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.34</div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -588,10 +588,10 @@ html[data-theme="light"] .theme-knob{left:30px}
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Route Backup</div>
   <div class="api-pan" style="margin-bottom:24px">
     <div class="api-t">Route Snapshot</div>
-    <div class="api-s">Permanent backup of all routes ever seen. Never pruned — survives registry resets and 21-day pruning.</div>
+    <div class="api-s">Permanent backup of all routes ever seen. Never pruned — survives registry resets and 21-day pruning. Saves to <strong>community_routes.json</strong> in the app folder for publishing to GitHub.</div>
     <div id="snapshot-info" style="font-size:12px;color:var(--ink3);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Snapshot: empty</div>
     <div style="display:flex;gap:7px;align-items:center">
-      <button class="btn bg bsm" onclick="exportSnapshot()">&#11015; Export Snapshot</button>
+      <button class="btn bg bsm" onclick="exportSnapshot()">&#11015; Export to community_routes.json</button>
       <button class="btn bg bsm" onclick="restoreFromSnapshot()">&#8635; Restore from Snapshot</button>
     </div>
   </div>
@@ -1486,7 +1486,7 @@ async function exportSnapshot(){
   const count=Object.keys(S.routeRegistrySnapshot).length;
   if(count===0){alert('Snapshot is empty — nothing to export.');return;}
   const res=await window.api.siExportSnapshot(S.routeRegistrySnapshot);
-  if(res.ok)alert('Snapshot exported to:\n'+res.path);
+  if(res.ok)alert('community_routes.json written to app folder:\n'+res.path+'\n\nRun publish.bat to push to GitHub.');
   else alert('Export failed: '+res.error);
 }
 
@@ -1704,8 +1704,16 @@ async function fetchSIRoutes({autoMode=false}={}){
   setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' routes added'+wStr+'.','var(--grn)');
   RLOG('fetchSIRoutes complete: registry='+cnt+' newRoutes='+newRoutes+' rateLimitWaits='+rateLimitWaits);
   if(autoMode)RLOG('[SI] Auto-refresh complete: '+newRoutes+' new routes added');
+  const _snapBefore=Object.keys(S.routeRegistrySnapshot).length;
   mergeIntoSnapshot(S.routeRegistry);
   await window.api.siSaveSnapshot(S.routeRegistrySnapshot);
+  const _newSnap=Object.keys(S.routeRegistrySnapshot).length-_snapBefore;
+  if(_newSnap>=50){
+    RLOG('[SI] community_routes.json: '+_newSnap+' new snapshot routes — writing to app folder');
+    window.api.siWriteCommunityRoutes(S.routeRegistrySnapshot);
+  }else{
+    RLOG('[SI] community_routes.json skipped: only '+_newSnap+' new routes added (threshold: 50)');
+  }
   updateAutoRefreshInfo();
   renderRoutes();updateStats();updateSnapshotInfo();
 }
@@ -3273,5 +3281,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.33</div>
+  pointer-events:none;">v4.5.34</div>
 </body></html>

@@ -1,4 +1,4 @@
-# Dean's MSFS Route Finder — v4.5.33
+# Dean's MSFS Route Finder — v4.5.34
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -75,6 +75,27 @@ The app maintains a local database of routes saved to `%USERPROFILE%\.dean_msfs_
 - Registry grows automatically via auto-refresh and manual Refresh Routes runs
 
 **Exporting and restoring:** In *Settings → Route Backup*, click **Export Snapshot** to save a JSON file. This file can be dragged onto the Manual Import zone to restore routes on any install.
+
+---
+
+## Community Routes
+
+Dean's MSFS Route Finder includes a community route database that allows users without a SayIntentions.AI cookie to get a full route database instantly.
+
+**For users without an SI cookie:**
+1. Go to **Settings → Manual Import**
+2. Expand the **Community Routes** section
+3. Click **Download Community Routes**
+4. Routes merge into your registry immediately
+5. Your **Plan a Flight** tab populates based on your installed scenery
+
+The community database contains 10,000–20,000 real commercial routes covering major airports worldwide, with a focus on narrowbody operations (737 family, A320 family). It is updated automatically whenever the app owner runs a live route refresh and 50 or more new routes are captured.
+
+You do not need an SI cookie to use the app. The community routes provide a solid baseline that works immediately after install.
+
+If you have an SI cookie, your own live refreshes supplement and eventually supersede the community data through normal auto-refresh operation.
+
+**For the app owner:** After each successful route refresh, `community_routes.json` is written to the app folder automatically and pushed to GitHub silently. You can also export manually via *Settings → Route Backup → Export to community_routes.json*, then run `publish.bat` to push.
 
 ---
 
@@ -173,6 +194,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v4.5.34  Auto community_routes.json export + silent GitHub publish, publish.bat
 v4.5.33  Smart disambiguation with registry-aware route counts, 21-day pruning
 v4.5.32  Trip Planner — paste itinerary, resolve ambiguities, track legs with checkboxes
 v4.5.31  Free Route mode — search any ICAO pair, not limited to your library

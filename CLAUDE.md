@@ -34,9 +34,12 @@ package.json      — Electron app config and version number
 CLAUDE.md         — this file, read automatically every session
 README.md         — user-facing documentation
 start.bat         — launch the app
+setup.bat         — install Node dependencies (first run)
 update.bat        — pull latest from GitHub and relaunch
+publish.bat       — git add/commit/push community_routes.json to GitHub
 _updater.ps1      — PowerShell updater script
 build.bat         — electron-builder for .exe packaging (future)
+community_routes.json — shared route database; auto-written after each refresh (50+ new snapshot routes)
 dean_msfs_debug.log — written to app folder, fresh each session (API keys redacted)
 
 Config saved to: C:\Users\MultiBotPC\.dean_msfs_v4.json (dot prefix, not underscore)
@@ -99,22 +102,23 @@ Contains: folder path, siCookie, savedRows, myFleet, routeRegistry,
 ## Current Feature Queue
 
 Priority order:
-1. Free Route mode in Plan a Flight (ICAO input, bypasses library filter)
-2. Trip Planner (multi-leg itinerary, collapsed section in Plan a Flight)
-3. Phase 2: .exe build + electron-updater for tester distribution
-4. BookmarkDrop bookmarklet (eliminates cookie dependency)
-5. Weather condition pill filter
-6. Sort by Most Reliable (times_seen) — meaningful after 1+ week of auto-refresh data
+1. Phase 2: .exe build + electron-updater for tester distribution
+2. BookmarkDrop bookmarklet (eliminates cookie dependency)
+3. Weather condition pill filter
 
 ---
 
 ## Features Already Built
 
 - My Airports: scenery folder scan, auto ICAO matching, fuzzy fallback
-- Plan a Flight: 1,700+ routes filtered by fleet/library/region/airline/duration
+- Plan a Flight: routes filtered by fleet/library/region/airline/duration, live weather scoring
+- Free Route mode: search any ICAO pair — not limited to library
+- Trip Planner: paste multi-leg itinerary, city/ICAO resolution, ambiguity confirmation, leg tracking
 - Challenging Approaches: 20 curated approaches, live METAR, real routes from library
-- Route Registry: rolling 7-day database, smart SI fetch with rate limit handling
-- Route Snapshot: permanent 20,000 route backup, export/restore
+- Route Registry: rolling 21-day database, smart SI fetch with rate limit handling
+- Route Snapshot: permanent 20,000 route backup, auto-written as community_routes.json
+- Auto-publish: community_routes.json pushed to GitHub silently after each successful refresh (≥50 new)
+- publish.bat: manual publish to GitHub in one click
 - Auto-refresh: 8-hour schedule, background silent, pulsing indicator
 - Live Weather: METAR from aviationweather.gov, VFR/MVFR/IFR/LIFR scoring
 - SimBrief integration: one-click pre-filled flight plan
