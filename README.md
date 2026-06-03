@@ -1,4 +1,4 @@
-# Dean's MSFS Route Finder — v4.5.34
+# Dean's MSFS Route Finder — v4.5.35
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -101,13 +101,7 @@ If you have an SI cookie, your own live refreshes supplement and eventually supe
 
 ## Manual Route Import
 
-In *Settings → Manual Import*, drag and drop a SayIntentions JSON file or a previously exported snapshot onto the drop zone. The app merges new routes and reports how many were added.
-
-To manually fetch a page of routes from SayIntentions in a browser:
-```
-https://p2.sayintentions.ai/p2/api/commercial-routes/list?page=1&limit=100
-```
-Copy the response, save as `.txt` or `.json`, and drag onto the import zone.
+In *Settings → Manual Import*, drag and drop a SayIntentions JSON file or a previously exported snapshot file onto the drop zone. The app merges new routes and reports how many were added. For users without an SI cookie, use the **Download Community Routes** option instead.
 
 ---
 
@@ -194,6 +188,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v4.5.35  Remove SI API endpoint URL from README
 v4.5.34  Auto community_routes.json export + silent GitHub publish, publish.bat
 v4.5.33  Smart disambiguation with registry-aware route counts, 21-day pruning
 v4.5.32  Trip Planner — paste itinerary, resolve ambiguities, track legs with checkboxes
