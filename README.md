@@ -101,7 +101,7 @@ If you have an SI cookie, your own live refreshes supplement and eventually supe
 
 ## Manual Route Import
 
-In *Settings → Manual Import*, drag and drop a SayIntentions JSON file or a previously exported snapshot file onto the drop zone. The app merges new routes and reports how many were added. For users without an SI cookie, use the **Download Community Routes** option instead.
+In *Settings → Manual Import*, drag and drop a previously exported snapshot file onto the drop zone. The app merges new routes and reports how many were added. For users without an SI cookie, use the **Download Community Routes** option instead.
 
 ---
 
