@@ -103,11 +103,16 @@ If you have an SI cookie, your own live refreshes supplement and eventually supe
 
 **Getting routes without a SayIntentions cookie**
 
-Go to *Settings → Manual Import → Community Routes* and click **Download Community Routes**. This pulls a shared database of 10,000–20,000 real commercial routes directly from GitHub and merges them into your registry immediately.
+1. Go to the **Settings** tab
+2. Scroll down to **Manual Import**
+3. Click the **▶ Community Routes** toggle to expand it
+4. Click **Download Community Routes**
+
+This pulls a shared database of 10,000–20,000 real commercial routes directly from GitHub and merges them into your registry immediately. No cookie required.
 
 **Importing a snapshot from another install**
 
-If you have a previously exported `community_routes.json` file, drag and drop it onto the drop zone in *Settings → Manual Import*. The app will merge routes and report how many were added.
+Drag and drop a `community_routes.json` or any exported snapshot file onto the drop zone in *Settings → Manual Import*. The app will merge routes and report how many were added.
 
 ---
 
