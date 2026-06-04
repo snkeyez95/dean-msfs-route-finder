@@ -2381,6 +2381,26 @@
       "times_seen": 2
     },
     {
+      "id": "4314",
+      "callsign": "KLM68J",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDM",
+      "arrival_airport": "EHAM",
+      "gate_origin": "D1",
+      "gate_destination": "C11",
+      "distance_nm": 413,
+      "flight_length": 71,
+      "description": "Transport 180 passengers from Munich to Amsterdam on a 737-800. Departs from gate D1 and arrives at gate C11.",
+      "departure_country": "Germany",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "4318",
       "callsign": "DLH1304",
       "type": "carrier",
@@ -2481,6 +2501,26 @@
       "times_seen": 2
     },
     {
+      "id": "4327",
+      "callsign": "DLH2UV",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDM",
+      "arrival_airport": "EGLL",
+      "gate_origin": "L9",
+      "gate_destination": null,
+      "distance_nm": 586,
+      "flight_length": 79,
+      "description": "Transport 153 passengers from Munich to London on a A320neo. Departs from gate L9.",
+      "departure_country": "Germany",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
       "id": "4332",
       "callsign": "DLH71X",
       "type": "carrier",
@@ -2519,6 +2559,26 @@
       "first_seen": "2026-05-29T13:48:50.258Z",
       "last_seen": "2026-05-29T13:48:51.858Z",
       "times_seen": 2
+    },
+    {
+      "id": "4337",
+      "callsign": "BEL9FU",
+      "type": "carrier",
+      "airline": "Brussels Airlines (BEL)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDM",
+      "arrival_airport": "EBBR",
+      "gate_origin": "K12",
+      "gate_destination": "A57",
+      "distance_nm": 371,
+      "flight_length": 57,
+      "description": "Transport 140 passengers from Munich to Zaventem on a A319. Departs from gate K12 and arrives at gate A57.",
+      "departure_country": "Germany",
+      "arrival_country": "Belgium",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
     },
     {
       "id": "4338",
@@ -3457,7 +3517,7 @@
       "departure_country": "Germany",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -3497,7 +3557,7 @@
       "departure_country": "Germany",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -3957,7 +4017,7 @@
       "departure_country": "Germany",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -6801,6 +6861,26 @@
       "times_seen": 1
     },
     {
+      "id": "6643",
+      "callsign": "BAW552F",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "LIRF",
+      "gate_origin": "10E",
+      "gate_destination": null,
+      "distance_nm": 899,
+      "flight_length": 120,
+      "description": "Transport 158 passengers from London to Rome on a A320neo. Departs from gate 10E.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Italy",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "6660",
       "callsign": "DLH8NP",
       "type": "carrier",
@@ -6841,6 +6921,26 @@
       "times_seen": 1
     },
     {
+      "id": "6675",
+      "callsign": "IBE07FP",
+      "type": "carrier",
+      "airline": "Iberia (IBE)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "LEMD",
+      "gate_origin": "A18",
+      "gate_destination": "S26",
+      "distance_nm": 774,
+      "flight_length": 127,
+      "description": "Transport 153 passengers from London to Madrid on a A320. Departs from gate A18 and arrives at gate S26.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "6676",
       "callsign": "DLH9HX",
       "type": "carrier",
@@ -6858,6 +6958,186 @@
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-26T13:12:20.321Z",
       "last_seen": "2026-05-26T13:12:20.321Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6678",
+      "callsign": "DLH2XN",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "EDDM",
+      "gate_origin": "A17",
+      "gate_destination": "L5",
+      "distance_nm": 586,
+      "flight_length": 96,
+      "description": "Transport 172 passengers from London to Munich on a A320neo. Departs from gate A17 and arrives at gate L5.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6681",
+      "callsign": "BAW828Y",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "EIDW",
+      "gate_origin": "10A",
+      "gate_destination": null,
+      "distance_nm": 279,
+      "flight_length": 71,
+      "description": "Transport 159 passengers from London to Dublin on a A320neo. Departs from gate 10A.",
+      "departure_country": "United Kingdom",
+      "arrival_country": null,
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6684",
+      "callsign": "BAW448",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "LEIB",
+      "gate_origin": "A12",
+      "gate_destination": null,
+      "distance_nm": 876,
+      "flight_length": 129,
+      "description": "Transport 171 passengers from London to Ibiza (Eivissa) on a A320. Departs from gate A12.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6693",
+      "callsign": "BAW864",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "LHBP",
+      "gate_origin": "3",
+      "gate_destination": null,
+      "distance_nm": 926,
+      "flight_length": 134,
+      "description": "Transport 167 passengers from London to Budapest on a A320. Departs from gate 3.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Hungary",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6696",
+      "callsign": "KMM101",
+      "type": "carrier",
+      "airline": "KM Malta Airlines (KMM)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "LMML",
+      "gate_origin": "21",
+      "gate_destination": null,
+      "distance_nm": 1308,
+      "flight_length": 186,
+      "description": "Transport 156 passengers from London to Valletta on a A320neo. Departs from gate 21.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Malta",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6699",
+      "callsign": "BAW814L",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "EKCH",
+      "gate_origin": "A19",
+      "gate_destination": "C30",
+      "distance_nm": 609,
+      "flight_length": 98,
+      "description": "Transport 172 passengers from London to Copenhagen on a A320neo. Departs from gate A19 and arrives at gate C30.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Denmark",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6705",
+      "callsign": "BAW990G",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "EDDB",
+      "gate_origin": "B44",
+      "gate_destination": "Y6",
+      "distance_nm": 599,
+      "flight_length": 88,
+      "description": "Transport 157 passengers from London to Berlin on a A320. Departs from gate B44 and arrives at gate Y6.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6707",
+      "callsign": "BAW630",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "LGAV",
+      "gate_origin": "A13",
+      "gate_destination": null,
+      "distance_nm": 1510,
+      "flight_length": 188,
+      "description": "Transport 156 passengers from London to Athens on a A320neo. Departs from gate A13.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Greece",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6729",
+      "callsign": "SAS804",
+      "type": "carrier",
+      "airline": "Scandinavian Airlines (SAS)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGLL",
+      "arrival_airport": "ENGM",
+      "gate_origin": "A24",
+      "gate_destination": "BUSS",
+      "distance_nm": 750,
+      "flight_length": 110,
+      "description": "Transport 177 passengers from London to Oslo on a A320neo. Departs from gate A24 and arrives at gate BUSS.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Norway",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
       "times_seen": 1
     },
     {
@@ -6981,6 +7261,206 @@
       "times_seen": 1
     },
     {
+      "id": "6900",
+      "callsign": "CFG1EN",
+      "type": "carrier",
+      "airline": "Condor Flugdienst (CFG)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "LGKV",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 999,
+      "flight_length": 130,
+      "description": "Transport 142 passengers from Frankfurt am Main to Kavala on a A319.",
+      "departure_country": "Germany",
+      "arrival_country": "Greece",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6902",
+      "callsign": "SXS7JP",
+      "type": "carrier",
+      "airline": "SunExpress (SXS)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "LTAI",
+      "gate_origin": "C4",
+      "gate_destination": null,
+      "distance_nm": 1430,
+      "flight_length": 190,
+      "description": "Transport 157 passengers from Frankfurt am Main to Antalya on a 737-800. Departs from gate C4.",
+      "departure_country": "Germany",
+      "arrival_country": "Turkey",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6954",
+      "callsign": "DLH4YE",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A321",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "EPWA",
+      "gate_origin": "A36",
+      "gate_destination": null,
+      "distance_nm": 559,
+      "flight_length": 67,
+      "description": "Transport 196 passengers from Frankfurt am Main to Warsaw on a A321. Departs from gate A36.",
+      "departure_country": "Germany",
+      "arrival_country": "Poland",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6968",
+      "callsign": "DLH5EV",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "ESGG",
+      "gate_origin": "A54",
+      "gate_destination": "16",
+      "distance_nm": 550,
+      "flight_length": 71,
+      "description": "Transport 153 passengers from Frankfurt am Main to Gothenburg on a A320. Departs from gate A54 and arrives at gate 16.",
+      "departure_country": "Germany",
+      "arrival_country": "Sweden",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6971",
+      "callsign": "CFG7TD",
+      "type": "carrier",
+      "airline": "Condor Flugdienst (CFG)",
+      "aircraft_type": "A321",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "GCLP",
+      "gate_origin": "B2",
+      "gate_destination": null,
+      "distance_nm": 1980,
+      "flight_length": 272,
+      "description": "Transport 216 passengers from Frankfurt am Main to Gran Canaria Island on a A321. Departs from gate B2.",
+      "departure_country": "Germany",
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6988",
+      "callsign": "DLH878",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "ENTC",
+      "gate_origin": "B13",
+      "gate_destination": null,
+      "distance_nm": 1402,
+      "flight_length": 172,
+      "description": "Transport 158 passengers from Frankfurt am Main to Tromsø on a A320. Departs from gate B13.",
+      "departure_country": "Germany",
+      "arrival_country": "Norway",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6991",
+      "callsign": "DLH2HH",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "EDDB",
+      "gate_origin": "A5",
+      "gate_destination": "B10",
+      "distance_nm": 270,
+      "flight_length": 47,
+      "description": "Transport passengers from Frankfurt am Main to Berlin on a A321neo. Departs from gate A5 and arrives at gate B10.",
+      "departure_country": "Germany",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "6999",
+      "callsign": "BEL4LZ",
+      "type": "carrier",
+      "airline": "Brussels Airlines (BEL)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "EBBR",
+      "gate_origin": "A21",
+      "gate_destination": "A46",
+      "distance_nm": 189,
+      "flight_length": 44,
+      "description": "Transport 137 passengers from Frankfurt am Main to Zaventem on a A319. Departs from gate A21 and arrives at gate A46.",
+      "departure_country": "Germany",
+      "arrival_country": "Belgium",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "7014",
+      "callsign": "CFG2LV",
+      "type": "carrier",
+      "airline": "Condor Flugdienst (CFG)",
+      "aircraft_type": "A321",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "GCTS",
+      "gate_origin": "B4",
+      "gate_destination": null,
+      "distance_nm": 2013,
+      "flight_length": 301,
+      "description": "Transport 205 passengers from Frankfurt am Main to Tenerife on a A321. Departs from gate B4.",
+      "departure_country": "Germany",
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "7020",
+      "callsign": "CFG30",
+      "type": "carrier",
+      "airline": "Condor Flugdienst (CFG)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDF",
+      "arrival_airport": "HEGN",
+      "gate_origin": "B61",
+      "gate_destination": null,
+      "distance_nm": 2068,
+      "flight_length": 254,
+      "description": "Transport 155 passengers from Frankfurt am Main to Hurghada on a A320. Departs from gate B61.",
+      "departure_country": "Germany",
+      "arrival_country": "Egypt",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "7326",
       "callsign": "BAW638",
       "type": "carrier",
@@ -7017,7 +7497,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -7037,7 +7517,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -7077,7 +7557,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -7097,7 +7577,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Sweden",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -7137,7 +7617,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -7157,7 +7637,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -7217,7 +7697,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -7877,7 +8357,7 @@
       "departure_country": "Germany",
       "arrival_country": "Morocco",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -7917,7 +8397,7 @@
       "departure_country": "Germany",
       "arrival_country": "Serbia",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -7957,7 +8437,7 @@
       "departure_country": "Germany",
       "arrival_country": "Hungary",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -8057,7 +8537,7 @@
       "departure_country": "Germany",
       "arrival_country": "Croatia",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -8077,7 +8557,7 @@
       "departure_country": "Germany",
       "arrival_country": "Germany",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -8097,7 +8577,7 @@
       "departure_country": "Germany",
       "arrival_country": "Sweden",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -8137,7 +8617,7 @@
       "departure_country": "Germany",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -8177,7 +8657,7 @@
       "departure_country": "Germany",
       "arrival_country": "Germany",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -8217,7 +8697,7 @@
       "departure_country": "Germany",
       "arrival_country": "Tunisia",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -9757,7 +10237,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Luxembourg",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -12577,7 +13057,7 @@
       "departure_country": "Germany",
       "arrival_country": "Greece",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -12617,7 +13097,7 @@
       "departure_country": "Germany",
       "arrival_country": "Switzerland",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -24401,6 +24881,106 @@
       "times_seen": 2
     },
     {
+      "id": "16174",
+      "callsign": "KLM99C",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "EGPH",
+      "gate_origin": "D56",
+      "gate_destination": null,
+      "distance_nm": 415,
+      "flight_length": 72,
+      "description": "Transport 164 passengers from Amsterdam to Edinburgh on a 737-800. Departs from gate D56.",
+      "departure_country": "Netherlands",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "16180",
+      "callsign": "ITY121",
+      "type": "carrier",
+      "airline": "ITA Airways (ITY)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "LIML",
+      "gate_origin": "C12",
+      "gate_destination": null,
+      "distance_nm": 517,
+      "flight_length": 88,
+      "description": "Transport 139 passengers from Amsterdam to Milan on a A319. Departs from gate C12.",
+      "departure_country": "Netherlands",
+      "arrival_country": "Italy",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "16208",
+      "callsign": "ROT362Q",
+      "type": "carrier",
+      "airline": "TAROM (ROT)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "LROP",
+      "gate_origin": "C15",
+      "gate_destination": null,
+      "distance_nm": 1110,
+      "flight_length": 145,
+      "description": "Transport 156 passengers from Amsterdam to Bucharest on a 737-800. Departs from gate C15.",
+      "departure_country": "Netherlands",
+      "arrival_country": "Romania",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "16217",
+      "callsign": "KMM395",
+      "type": "carrier",
+      "airline": "KM Malta Airlines (KMM)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "LMML",
+      "gate_origin": "C16",
+      "gate_destination": null,
+      "distance_nm": 1233,
+      "flight_length": 161,
+      "description": "Transport 175 passengers from Amsterdam to Valletta on a A320neo. Departs from gate C16.",
+      "departure_country": "Netherlands",
+      "arrival_country": "Malta",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "16221",
+      "callsign": "KLM77F",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "LOWW",
+      "gate_origin": "D84",
+      "gate_destination": null,
+      "distance_nm": 597,
+      "flight_length": 84,
+      "description": "Transport 159 passengers from Amsterdam to Vienna on a 737-800. Departs from gate D84.",
+      "departure_country": "Netherlands",
+      "arrival_country": "Austria",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "16223",
       "callsign": "EDW29Y",
       "type": "carrier",
@@ -24419,6 +24999,46 @@
       "first_seen": "2026-05-29T13:48:50.258Z",
       "last_seen": "2026-05-29T13:48:51.858Z",
       "times_seen": 2
+    },
+    {
+      "id": "16224",
+      "callsign": "KLM23F",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "ENBR",
+      "gate_origin": "C8",
+      "gate_destination": null,
+      "distance_nm": 553,
+      "flight_length": 83,
+      "description": "Transport 183 passengers from Amsterdam to Bergen on a 737-900. Departs from gate C8.",
+      "departure_country": "Netherlands",
+      "arrival_country": "Norway",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "16229",
+      "callsign": "BAW41R",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EHAM",
+      "arrival_airport": "EGLL",
+      "gate_origin": "D16",
+      "gate_destination": null,
+      "distance_nm": 230,
+      "flight_length": 42,
+      "description": "Transport 169 passengers from Amsterdam to London on a A320neo. Departs from gate D16.",
+      "departure_country": "Netherlands",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
     },
     {
       "id": "16788",
@@ -24857,7 +25477,7 @@
       "departure_country": "Netherlands",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -24937,7 +25557,7 @@
       "departure_country": "Netherlands",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -24997,7 +25617,7 @@
       "departure_country": "Netherlands",
       "arrival_country": null,
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -25097,7 +25717,7 @@
       "departure_country": "Netherlands",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -25117,7 +25737,7 @@
       "departure_country": "Netherlands",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -25197,7 +25817,7 @@
       "departure_country": "Netherlands",
       "arrival_country": "Sweden",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -25598,6 +26218,26 @@
       "arrival_country": "Denmark",
       "first_seen": "2026-06-03T15:21:58.981Z",
       "last_seen": "2026-06-03T15:21:58.981Z",
+      "times_seen": 1
+    },
+    {
+      "id": "17480",
+      "callsign": "KLM1920",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LSZH",
+      "arrival_airport": "EHAM",
+      "gate_origin": "A86",
+      "gate_destination": "D66",
+      "distance_nm": 375,
+      "flight_length": 72,
+      "description": "Transport 179 passengers from Zurich to Amsterdam on a 737-800. Departs from gate A86 and arrives at gate D66.",
+      "departure_country": "Switzerland",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
       "times_seen": 1
     },
     {
@@ -31257,7 +31897,7 @@
       "departure_country": "Switzerland",
       "arrival_country": "Germany",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -39797,7 +40437,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -39817,7 +40457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -39857,7 +40497,7 @@
       "departure_country": "United States",
       "arrival_country": "Mexico",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -39877,7 +40517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:12.518Z",
-      "last_seen": "2026-06-03T15:25:34.935Z",
+      "last_seen": "2026-05-27T19:20:12.518Z",
       "times_seen": 1
     },
     {
@@ -39917,7 +40557,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -39937,7 +40577,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -39997,7 +40637,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -41617,7 +42257,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -48977,7 +49617,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -49037,7 +49677,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -53001,6 +53641,26 @@
       "times_seen": 2
     },
     {
+      "id": "31853",
+      "callsign": "EZY89JT",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGKK",
+      "arrival_airport": "EGNS",
+      "gate_origin": "55E",
+      "gate_destination": null,
+      "distance_nm": 275,
+      "flight_length": 59,
+      "description": "Transport 136 passengers from London to Castletown on a A319. Departs from gate 55E.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "31881",
       "callsign": "FFT3021",
       "type": "carrier",
@@ -53059,6 +53719,106 @@
       "first_seen": "2026-05-29T13:46:11.496Z",
       "last_seen": "2026-05-29T13:46:13.785Z",
       "times_seen": 2
+    },
+    {
+      "id": "31903",
+      "callsign": "WJA51",
+      "type": "carrier",
+      "airline": "WestJet (WJA)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGKK",
+      "arrival_airport": "CYYT",
+      "gate_origin": "52",
+      "gate_destination": "1",
+      "distance_nm": 2328,
+      "flight_length": 330,
+      "description": "Transport 170 passengers from London to St. John's on a 737 MAX 8. Departs from gate 52 and arrives at gate 1.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Canada",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "31914",
+      "callsign": "EZY78UG",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGKK",
+      "arrival_airport": "HEGN",
+      "gate_origin": "55D",
+      "gate_destination": null,
+      "distance_nm": 2426,
+      "flight_length": 276,
+      "description": "Transport 165 passengers from London to Hurghada on a A320. Departs from gate 55D.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Egypt",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "31917",
+      "callsign": "THY3XR",
+      "type": "carrier",
+      "airline": "Turkish Airlines (THY)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGKK",
+      "arrival_airport": "LTFM",
+      "gate_origin": "18",
+      "gate_destination": null,
+      "distance_nm": 1530,
+      "flight_length": 220,
+      "description": "Transport passengers from London to Arnavutköy, Istanbul on a A321neo. Departs from gate 18.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Turkey",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "31919",
+      "callsign": "EZY85JY",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGKK",
+      "arrival_airport": "LDDU",
+      "gate_origin": "683",
+      "gate_destination": null,
+      "distance_nm": 1051,
+      "flight_length": 126,
+      "description": "Transport 132 passengers from London to Dubrovnik on a A319. Departs from gate 683.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Croatia",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "31933",
+      "callsign": "RYS9802",
+      "type": "carrier",
+      "airline": "Buzz (RYS)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGKK",
+      "arrival_airport": "EPRZ",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 973,
+      "flight_length": 122,
+      "description": "Transport 160 passengers from London to Rzeszów on a 737-800.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Poland",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
     },
     {
       "id": "31945",
@@ -53277,7 +54037,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Turkey",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -53297,7 +54057,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": null,
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -53317,7 +54077,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Norway",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -53337,7 +54097,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -53357,7 +54117,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": null,
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -53397,7 +54157,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -53417,7 +54177,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Portugal",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -53437,7 +54197,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -53457,7 +54217,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Portugal",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -53477,7 +54237,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Norway",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -60861,6 +61621,26 @@
       "times_seen": 1
     },
     {
+      "id": "35912",
+      "callsign": "FFT2510",
+      "type": "carrier",
+      "airline": "Frontier Airlines (FFT)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KATL",
+      "arrival_airport": "KBWI",
+      "gate_origin": "E2",
+      "gate_destination": "D2",
+      "distance_nm": 639,
+      "flight_length": 82,
+      "description": "Transport passengers from Atlanta to Baltimore on a A321neo. Departs from gate E2 and arrives at gate D2.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "35950",
       "callsign": "DAL818",
       "type": "carrier",
@@ -61257,7 +62037,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:54.984Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -61277,7 +62057,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -61317,7 +62097,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -63921,6 +64701,46 @@
       "times_seen": 1
     },
     {
+      "id": "38826",
+      "callsign": "DLH6PL",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGCC",
+      "arrival_airport": "EDDM",
+      "gate_origin": "A1",
+      "gate_destination": "L22",
+      "distance_nm": 703,
+      "flight_length": 87,
+      "description": "Transport 168 passengers from Manchester to Munich on a A320. Departs from gate A1 and arrives at gate L22.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "38829",
+      "callsign": "THY9XY",
+      "type": "carrier",
+      "airline": "Turkish Airlines (THY)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGCC",
+      "arrival_airport": "LTFM",
+      "gate_origin": "A7",
+      "gate_destination": null,
+      "distance_nm": 1658,
+      "flight_length": 230,
+      "description": "Transport passengers from Manchester to Arnavutköy, Istanbul on a A321neo. Departs from gate A7.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Turkey",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "38830",
       "callsign": "FFT3045",
       "type": "carrier",
@@ -63939,6 +64759,46 @@
       "first_seen": "2026-06-03T12:08:38.473Z",
       "last_seen": "2026-06-03T15:13:58.918Z",
       "times_seen": 3
+    },
+    {
+      "id": "38832",
+      "callsign": "RYR73EJ",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGCC",
+      "arrival_airport": "LIPZ",
+      "gate_origin": "53",
+      "gate_destination": null,
+      "distance_nm": 850,
+      "flight_length": 120,
+      "description": "Transport 169 passengers from Manchester to Venice on a 737-800. Departs from gate 53.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Italy",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "38837",
+      "callsign": "RUK4Q",
+      "type": "carrier",
+      "airline": "Ryanair UK (RUK)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGCC",
+      "arrival_airport": "ENTO",
+      "gate_origin": "51",
+      "gate_destination": null,
+      "distance_nm": 626,
+      "flight_length": 90,
+      "description": "Transport 169 passengers from Manchester to Sandefjord on a 737-800. Departs from gate 51.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Norway",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
     },
     {
       "id": "38875",
@@ -64257,7 +65117,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Portugal",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -64317,7 +65177,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Netherlands",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -64897,7 +65757,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -65097,7 +65957,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Germany",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -69657,7 +70517,7 @@
       "departure_country": "France",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -75957,7 +76817,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -75977,7 +76837,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -75997,7 +76857,7 @@
       "departure_country": "United States",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -76017,7 +76877,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -76037,7 +76897,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:01.048Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:01.048Z",
       "times_seen": 1
     },
     {
@@ -76117,7 +76977,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -76157,7 +77017,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -76237,7 +77097,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -76317,7 +77177,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -98597,7 +99457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -98617,7 +99477,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -98637,7 +99497,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:07.732Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:07.732Z",
       "times_seen": 1
     },
     {
@@ -98677,7 +99537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -98757,7 +99617,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:01.048Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:01.048Z",
       "times_seen": 1
     },
     {
@@ -98777,7 +99637,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -98817,7 +99677,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -98857,7 +99717,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -98877,7 +99737,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -98897,7 +99757,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -98917,7 +99777,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:01.048Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:01.048Z",
       "times_seen": 1
     },
     {
@@ -98937,7 +99797,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -98997,7 +99857,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -99097,7 +99957,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -99117,7 +99977,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -99137,7 +99997,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -99157,7 +100017,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -99197,7 +100057,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -99237,7 +100097,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -102437,7 +103297,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -102897,7 +103757,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -103277,7 +104137,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -103337,7 +104197,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -103377,7 +104237,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -103397,7 +104257,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -103457,7 +104317,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -103497,7 +104357,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -103557,7 +104417,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -103637,7 +104497,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -103717,7 +104577,7 @@
       "departure_country": "United States",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -103857,7 +104717,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -103897,7 +104757,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -103937,7 +104797,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -103977,7 +104837,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -104017,7 +104877,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -104117,7 +104977,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -104497,7 +105357,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -104737,7 +105597,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -104777,7 +105637,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -104837,7 +105697,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -109417,7 +110277,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -124621,6 +125481,126 @@
       "times_seen": 1
     },
     {
+      "id": "65541",
+      "callsign": "DAL2303",
+      "type": "carrier",
+      "airline": "Delta Airlines (DAL)",
+      "aircraft_type": "A321",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KBOS",
+      "arrival_airport": "KMSP",
+      "gate_origin": "A18",
+      "gate_destination": "G15",
+      "distance_nm": 1122,
+      "flight_length": 159,
+      "description": "Transport 196 passengers from Boston to Minneapolis on a A321. Departs from gate A18 and arrives at gate G15.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:48.951Z",
+      "last_seen": "2026-06-04T05:17:48.951Z",
+      "times_seen": 1
+    },
+    {
+      "id": "65542",
+      "callsign": "AAL624",
+      "type": "carrier",
+      "airline": "American Airlines (AAL)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KBOS",
+      "arrival_airport": "KCLT",
+      "gate_origin": "B8",
+      "gate_destination": "B11",
+      "distance_nm": 728,
+      "flight_length": 135,
+      "description": "Transport 173 passengers from Boston to Charlotte on a 737-800. Departs from gate B8 and arrives at gate B11.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "65543",
+      "callsign": "DAL1019",
+      "type": "carrier",
+      "airline": "Delta Airlines (DAL)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KBOS",
+      "arrival_airport": "KDTW",
+      "gate_origin": "A9",
+      "gate_destination": "A21",
+      "distance_nm": 631,
+      "flight_length": 99,
+      "description": "Transport 202 passengers from Boston to Detroit on a 737-900. Departs from gate A9 and arrives at gate A21.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "65544",
+      "callsign": "UAL1734",
+      "type": "carrier",
+      "airline": "United Airlines (UAL)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KBOS",
+      "arrival_airport": "KIAD",
+      "gate_origin": "B25",
+      "gate_destination": "D12",
+      "distance_nm": 413,
+      "flight_length": 79,
+      "description": "Transport 183 passengers from Boston to Dulles on a 737-900. Departs from gate B25 and arrives at gate D12.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "65545",
+      "callsign": "DAL2242",
+      "type": "carrier",
+      "airline": "Delta Airlines (DAL)",
+      "aircraft_type": "A321",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KBOS",
+      "arrival_airport": "KATL",
+      "gate_origin": "A15",
+      "gate_destination": "E35",
+      "distance_nm": 946,
+      "flight_length": 149,
+      "description": "Transport 189 passengers from Boston to Atlanta on a A321. Departs from gate A15 and arrives at gate E35.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "65546",
+      "callsign": "SWA900",
+      "type": "carrier",
+      "airline": "Southwest Airlines (SWA)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KBOS",
+      "arrival_airport": "KSTL",
+      "gate_origin": "B32",
+      "gate_destination": "E31",
+      "distance_nm": 1045,
+      "flight_length": 169,
+      "description": "Transport 158 passengers from Boston to St Louis on a 737 MAX 8. Departs from gate B32 and arrives at gate E31.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "65555",
       "callsign": "EIN138",
       "type": "carrier",
@@ -125017,7 +125997,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -125037,7 +126017,7 @@
       "departure_country": "United States",
       "arrival_country": "Panama",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -125077,7 +126057,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -125117,7 +126097,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -125137,7 +126117,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -125177,7 +126157,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:54.984Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -125217,7 +126197,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -125817,7 +126797,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -142297,7 +143277,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -142317,7 +143297,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -142337,7 +143317,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -142397,7 +143377,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -142417,7 +143397,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -142437,7 +143417,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -142477,7 +143457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -142537,7 +143517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -142557,7 +143537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -142637,7 +143617,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -142657,7 +143637,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -142697,7 +143677,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -142797,7 +143777,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -142817,7 +143797,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -142877,7 +143857,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -142917,7 +143897,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -142957,7 +143937,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -142977,7 +143957,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -142997,7 +143977,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -143097,7 +144077,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -144757,7 +145737,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -145237,7 +146217,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -145557,7 +146537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -155161,6 +156141,26 @@
       "times_seen": 2
     },
     {
+      "id": "78239",
+      "callsign": "EWG9QR",
+      "type": "carrier",
+      "airline": "Eurowings Europe (EWL)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDL",
+      "arrival_airport": "LEIB",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 898,
+      "flight_length": 130,
+      "description": "Transport 156 passengers from Düsseldorf to Ibiza (Eivissa) on a A320.",
+      "departure_country": "Germany",
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "78241",
       "callsign": "AAL1693",
       "type": "carrier",
@@ -163457,7 +164457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -163477,7 +164477,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:12.518Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:12.518Z",
       "times_seen": 1
     },
     {
@@ -163497,7 +164497,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -163517,7 +164517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -163537,7 +164537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -167461,6 +168461,26 @@
       "times_seen": 1
     },
     {
+      "id": "87728",
+      "callsign": "EIN6CE",
+      "type": "carrier",
+      "airline": "Aer Lingus (EIN)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LOWW",
+      "arrival_airport": "EIDW",
+      "gate_origin": "D24",
+      "gate_destination": null,
+      "distance_nm": 1059,
+      "flight_length": 155,
+      "description": "Transport 163 passengers from Vienna to Dublin on a A320. Departs from gate D24.",
+      "departure_country": "Austria",
+      "arrival_country": null,
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
       "id": "87743",
       "callsign": "RYR2CK",
       "type": "carrier",
@@ -168421,6 +169441,206 @@
       "times_seen": 1
     },
     {
+      "id": "88274",
+      "callsign": "RYR98",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "EPWR",
+      "gate_origin": "102",
+      "gate_destination": null,
+      "distance_nm": 989,
+      "flight_length": 130,
+      "description": "Transport 154 passengers from Dublin to Wroc?aw on a 737 MAX 8. Departs from gate 102.",
+      "departure_country": null,
+      "arrival_country": "Poland",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88293",
+      "callsign": "RYR94VW",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "LGKR",
+      "gate_origin": "110",
+      "gate_destination": null,
+      "distance_nm": 1556,
+      "flight_length": 205,
+      "description": "Transport 167 passengers from Dublin to Kerkyra Island on a 737-800. Departs from gate 110.",
+      "departure_country": null,
+      "arrival_country": "Greece",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88327",
+      "callsign": "THY1MW",
+      "type": "carrier",
+      "airline": "Turkish Airlines (THY)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "LTFM",
+      "gate_origin": "214",
+      "gate_destination": null,
+      "distance_nm": 1818,
+      "flight_length": 242,
+      "description": "Transport 151 passengers from Dublin to Arnavutköy, Istanbul on a 737 MAX 8. Departs from gate 214.",
+      "departure_country": null,
+      "arrival_country": "Turkey",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88332",
+      "callsign": "RYR56FX",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "LEIB",
+      "gate_origin": "109",
+      "gate_destination": null,
+      "distance_nm": 1069,
+      "flight_length": 155,
+      "description": "Transport 160 passengers from Dublin to Ibiza (Eivissa) on a 737 MAX 8. Departs from gate 109.",
+      "departure_country": null,
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88334",
+      "callsign": "RYR1LC",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "EHAM",
+      "gate_origin": "104",
+      "gate_destination": "H6",
+      "distance_nm": 467,
+      "flight_length": 80,
+      "description": "Transport 167 passengers from Dublin to Amsterdam on a 737 MAX 8. Departs from gate 104 and arrives at gate H6.",
+      "departure_country": null,
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88336",
+      "callsign": "RYR9689",
+      "type": "carrier",
+      "airline": "Buzz (RYS)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "EYKA",
+      "gate_origin": "103",
+      "gate_destination": null,
+      "distance_nm": 1223,
+      "flight_length": 165,
+      "description": "Transport 164 passengers from Dublin to Kaunas on a 737-800. Departs from gate 103.",
+      "departure_country": null,
+      "arrival_country": "Lithuania",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88337",
+      "callsign": "RYR812",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "EGPH",
+      "gate_origin": "102",
+      "gate_destination": null,
+      "distance_nm": 210,
+      "flight_length": 50,
+      "description": "Transport 164 passengers from Dublin to Edinburgh on a 737-800. Departs from gate 102.",
+      "departure_country": null,
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88339",
+      "callsign": "DLH3LX",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "EDDM",
+      "gate_origin": "224",
+      "gate_destination": "H26",
+      "distance_nm": 859,
+      "flight_length": 119,
+      "description": "Transport 166 passengers from Dublin to Munich on a A320neo. Departs from gate 224 and arrives at gate H26.",
+      "departure_country": null,
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88342",
+      "callsign": "JBU354",
+      "type": "carrier",
+      "airline": "JetBlue Airways (JBU)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "KBOS",
+      "gate_origin": "USPC",
+      "gate_destination": "C23",
+      "distance_nm": 2988,
+      "flight_length": 402,
+      "description": "Transport passengers from Dublin to Boston on a A321neo. Departs from gate USPC and arrives at gate C23.",
+      "departure_country": null,
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "88344",
+      "callsign": "WJA47",
+      "type": "carrier",
+      "airline": "WestJet (WJA)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EIDW",
+      "arrival_airport": "CYYZ",
+      "gate_origin": "113",
+      "gate_destination": "C39A",
+      "distance_nm": 3273,
+      "flight_length": 440,
+      "description": "Transport 170 passengers from Dublin to Toronto on a 737 MAX 8. Departs from gate 113 and arrives at gate C39A.",
+      "departure_country": null,
+      "arrival_country": "Canada",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "88564",
       "callsign": "RYR71LE",
       "type": "carrier",
@@ -168577,7 +169797,7 @@
       "departure_country": null,
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -168677,7 +169897,7 @@
       "departure_country": null,
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -168737,7 +169957,7 @@
       "departure_country": null,
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -177681,6 +178901,126 @@
       "times_seen": 1
     },
     {
+      "id": "96313",
+      "callsign": "KLM92W",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EKCH",
+      "arrival_airport": "EHAM",
+      "gate_origin": "A12",
+      "gate_destination": "D85",
+      "distance_nm": 394,
+      "flight_length": 67,
+      "description": "Transport 197 passengers from Copenhagen to Amsterdam on a 737-900. Departs from gate A12 and arrives at gate D85.",
+      "departure_country": "Denmark",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "96323",
+      "callsign": "SAS182Y",
+      "type": "carrier",
+      "airline": "Scandinavian Airlines (SAS)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EKCH",
+      "arrival_airport": "ENTC",
+      "gate_origin": "D1",
+      "gate_destination": "19",
+      "distance_nm": 992,
+      "flight_length": 130,
+      "description": "Transport 133 passengers from Copenhagen to Tromsø on a A319. Departs from gate D1 and arrives at gate 19.",
+      "departure_country": "Denmark",
+      "arrival_country": "Norway",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "96327",
+      "callsign": "SAS42E",
+      "type": "carrier",
+      "airline": "Scandinavian Airlines (SAS)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EKCH",
+      "arrival_airport": "ESSA",
+      "gate_origin": "A6",
+      "gate_destination": "F39",
+      "distance_nm": 340,
+      "flight_length": 55,
+      "description": "Transport 161 passengers from Copenhagen to Stockholm on a A320. Departs from gate A6 and arrives at gate F39.",
+      "departure_country": "Denmark",
+      "arrival_country": "Sweden",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "96330",
+      "callsign": "SAS50G",
+      "type": "carrier",
+      "airline": "Scandinavian Airlines (SAS)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EKCH",
+      "arrival_airport": "ENGM",
+      "gate_origin": "B6",
+      "gate_destination": "D9",
+      "distance_nm": 322,
+      "flight_length": 50,
+      "description": "Transport 158 passengers from Copenhagen to Oslo on a A320neo. Departs from gate B6 and arrives at gate D9.",
+      "departure_country": "Denmark",
+      "arrival_country": "Norway",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "96333",
+      "callsign": "TVF13HR",
+      "type": "carrier",
+      "airline": "Transavia France (TVF)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EKCH",
+      "arrival_airport": "LFPO",
+      "gate_origin": "F6",
+      "gate_destination": null,
+      "distance_nm": 645,
+      "flight_length": 111,
+      "description": "Transport 166 passengers from Copenhagen to Paris on a A320neo. Departs from gate F6.",
+      "departure_country": "Denmark",
+      "arrival_country": "France",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "96336",
+      "callsign": "RYR1KH",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EKCH",
+      "arrival_airport": "LHBP",
+      "gate_origin": "F",
+      "gate_destination": null,
+      "distance_nm": 632,
+      "flight_length": 90,
+      "description": "Transport 158 passengers from Copenhagen to Budapest on a 737 MAX 8. Departs from gate F.",
+      "departure_country": "Denmark",
+      "arrival_country": "Hungary",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "96598",
       "callsign": "NSZ3152",
       "type": "carrier",
@@ -178117,7 +179457,7 @@
       "departure_country": "Denmark",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -178797,7 +180137,7 @@
       "departure_country": "Denmark",
       "arrival_country": "Germany",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -178957,7 +180297,7 @@
       "departure_country": "Denmark",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -178977,7 +180317,7 @@
       "departure_country": "Denmark",
       "arrival_country": "Czech Republic",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -185221,6 +186561,46 @@
       "times_seen": 1
     },
     {
+      "id": "98518",
+      "callsign": "THY8SU",
+      "type": "carrier",
+      "airline": "Turkish Airlines (THY)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGPH",
+      "arrival_airport": "LTFM",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 1760,
+      "flight_length": 238,
+      "description": "Transport passengers from Edinburgh to Arnavutköy, Istanbul on a A321neo.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Turkey",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
+      "id": "98522",
+      "callsign": "EJU17FM",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGPH",
+      "arrival_airport": "LIMC",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 886,
+      "flight_length": 127,
+      "description": "Transport 137 passengers from Edinburgh to Milan on a A319.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Italy",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "98600",
       "callsign": "SAS33K",
       "type": "carrier",
@@ -185317,7 +186697,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -185437,7 +186817,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -185877,7 +187257,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Slovakia",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -185897,7 +187277,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -190477,7 +191857,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -190497,7 +191877,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -190557,7 +191937,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -190837,7 +192217,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:57.987Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -194721,6 +196101,26 @@
       "times_seen": 1
     },
     {
+      "id": "112327",
+      "callsign": "RYR601W",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LEBL",
+      "arrival_airport": "EKCH",
+      "gate_origin": "U33",
+      "gate_destination": "F8A",
+      "distance_nm": 1100,
+      "flight_length": 170,
+      "description": "Transport 173 passengers from Barcelona to Copenhagen on a 737-800. Departs from gate U33 and arrives at gate F8A.",
+      "departure_country": "Spain",
+      "arrival_country": "Denmark",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "112853",
       "callsign": "DLH04C",
       "type": "carrier",
@@ -194817,7 +196217,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -194857,7 +196257,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -202037,7 +203437,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -202057,7 +203457,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -202077,7 +203477,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -204817,7 +206217,7 @@
       "departure_country": "Canada",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -207237,7 +208637,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -207277,7 +208677,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -208817,7 +210217,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -215721,6 +217121,26 @@
       "times_seen": 1
     },
     {
+      "id": "120300",
+      "callsign": "TAP641",
+      "type": "carrier",
+      "airline": "TAP Air Portugal (TAP)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EBBR",
+      "arrival_airport": "LPPT",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 1068,
+      "flight_length": 154,
+      "description": "Transport 163 passengers from Zaventem to Lisbon on a A320.",
+      "departure_country": "Belgium",
+      "arrival_country": "Portugal",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "120305",
       "callsign": "AAL2646",
       "type": "carrier",
@@ -215738,6 +217158,26 @@
       "arrival_country": "Mexico",
       "first_seen": "2026-05-26T13:12:17.756Z",
       "last_seen": "2026-05-26T13:12:17.756Z",
+      "times_seen": 1
+    },
+    {
+      "id": "120309",
+      "callsign": "ITY159",
+      "type": "carrier",
+      "airline": "ITA Airways (ITY)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EBBR",
+      "arrival_airport": "LIRF",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 729,
+      "flight_length": 109,
+      "description": "Transport 166 passengers from Zaventem to Rome on a A320neo.",
+      "departure_country": "Belgium",
+      "arrival_country": "Italy",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
       "times_seen": 1
     },
     {
@@ -217397,7 +218837,7 @@
       "departure_country": "Belgium",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -218057,7 +219497,7 @@
       "departure_country": "Belgium",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -218337,7 +219777,7 @@
       "departure_country": "Belgium",
       "arrival_country": "Sweden",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -218357,7 +219797,7 @@
       "departure_country": "Belgium",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -222281,6 +223721,26 @@
       "times_seen": 1
     },
     {
+      "id": "125305",
+      "callsign": "OCN517",
+      "type": "carrier",
+      "airline": "Discover Airlines (OCN)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LEPA",
+      "arrival_airport": "EDDF",
+      "gate_origin": "D80",
+      "gate_destination": null,
+      "distance_nm": 778,
+      "flight_length": 108,
+      "description": "Transport 176 passengers from Palma de Mallorca to Frankfurt am Main on a A320. Departs from gate D80.",
+      "departure_country": "Spain",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "125355",
       "callsign": "BAW995",
       "type": "carrier",
@@ -222517,7 +223977,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -224061,6 +225521,46 @@
       "times_seen": 1
     },
     {
+      "id": "126452",
+      "callsign": "DLH9KK",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A321",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDB",
+      "arrival_airport": "EDDF",
+      "gate_origin": "B21",
+      "gate_destination": "B10",
+      "distance_nm": 270,
+      "flight_length": 44,
+      "description": "Transport 201 passengers from Berlin to Frankfurt am Main on a A321. Departs from gate B21 and arrives at gate B10.",
+      "departure_country": "Germany",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "126455",
+      "callsign": "CFG9VN",
+      "type": "carrier",
+      "airline": "Condor Flugdienst (CFG)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDB",
+      "arrival_airport": "EDDF",
+      "gate_origin": "A37",
+      "gate_destination": null,
+      "distance_nm": 270,
+      "flight_length": 45,
+      "description": "Transport 163 passengers from Berlin to Frankfurt am Main on a A320neo. Departs from gate A37.",
+      "departure_country": "Germany",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "126459",
       "callsign": "TOM5TC",
       "type": "carrier",
@@ -224078,6 +225578,26 @@
       "arrival_country": "United Kingdom",
       "first_seen": "2026-06-03T06:00:16.411Z",
       "last_seen": "2026-06-03T06:00:16.411Z",
+      "times_seen": 1
+    },
+    {
+      "id": "126460",
+      "callsign": "BEL4NK",
+      "type": "carrier",
+      "airline": "Brussels Airlines (BEL)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDB",
+      "arrival_airport": "EBBR",
+      "gate_origin": "A3",
+      "gate_destination": "A55",
+      "distance_nm": 401,
+      "flight_length": 65,
+      "description": "Transport 178 passengers from Berlin to Zaventem on a A320. Departs from gate A3 and arrives at gate A55.",
+      "departure_country": "Germany",
+      "arrival_country": "Belgium",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
       "times_seen": 1
     },
     {
@@ -226221,6 +227741,26 @@
       "times_seen": 1
     },
     {
+      "id": "131037",
+      "callsign": "BAW327",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LFMN",
+      "arrival_airport": "EGLL",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 648,
+      "flight_length": 92,
+      "description": "Transport passengers from Nice to London on a A321neo.",
+      "departure_country": "France",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "131142",
       "callsign": "DLH88P",
       "type": "carrier",
@@ -226297,7 +227837,7 @@
       "departure_country": "France",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -226317,7 +227857,7 @@
       "departure_country": "France",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -228557,7 +230097,7 @@
       "departure_country": "Sweden",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -232521,6 +234061,26 @@
       "times_seen": 1
     },
     {
+      "id": "146513",
+      "callsign": "FFT4017",
+      "type": "carrier",
+      "airline": "Frontier Airlines (FFT)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KMCO",
+      "arrival_airport": "KDFW",
+      "gate_origin": "11",
+      "gate_destination": "E21",
+      "distance_nm": 1232,
+      "flight_length": 160,
+      "description": "Transport 155 passengers from Orlando to Dallas-Fort Worth on a A320neo. Departs from gate 11 and arrives at gate E21.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:40.943Z",
+      "last_seen": "2026-06-04T05:17:40.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "146550",
       "callsign": "SWA679",
       "type": "carrier",
@@ -232617,7 +234177,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -232637,7 +234197,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -234181,6 +235741,26 @@
       "times_seen": 1
     },
     {
+      "id": "151141",
+      "callsign": "RYR990N",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LPPT",
+      "arrival_airport": "EGPH",
+      "gate_origin": "212",
+      "gate_destination": null,
+      "distance_nm": 1217,
+      "flight_length": 170,
+      "description": "Transport 159 passengers from Lisbon to Edinburgh on a 737 MAX 8. Departs from gate 212.",
+      "departure_country": "Portugal",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:41.943Z",
+      "last_seen": "2026-06-04T05:17:41.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "151355",
       "callsign": "KLM44L",
       "type": "carrier",
@@ -234257,7 +235837,7 @@
       "departure_country": "Portugal",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -240861,6 +242441,26 @@
       "times_seen": 1
     },
     {
+      "id": "154839",
+      "callsign": "RYR63XH",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGSS",
+      "arrival_airport": "LGKR",
+      "gate_origin": "30",
+      "gate_destination": null,
+      "distance_nm": 1267,
+      "flight_length": 170,
+      "description": "Transport 157 passengers from London to Kerkyra Island on a 737-800. Departs from gate 30.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Greece",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "154844",
       "callsign": "DAL2967",
       "type": "carrier",
@@ -240941,6 +242541,46 @@
       "times_seen": 1
     },
     {
+      "id": "154866",
+      "callsign": "THY9ML",
+      "type": "carrier",
+      "airline": "Turkish Airlines (THY)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGSS",
+      "arrival_airport": "LTFM",
+      "gate_origin": "7",
+      "gate_destination": null,
+      "distance_nm": 1527,
+      "flight_length": 215,
+      "description": "Transport passengers from London to Arnavutköy, Istanbul on a A321neo. Departs from gate 7.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Turkey",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
+      "id": "154871",
+      "callsign": "RYR2ZX",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGSS",
+      "arrival_airport": "LERS",
+      "gate_origin": "34",
+      "gate_destination": null,
+      "distance_nm": 744,
+      "flight_length": 115,
+      "description": "Transport 170 passengers from London to Reus on a 737-800. Departs from gate 34.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Spain",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "155133",
       "callsign": "DAL2287",
       "type": "carrier",
@@ -241017,7 +242657,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -241137,7 +242777,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -241177,7 +242817,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -241197,7 +242837,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Austria",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:31.934Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -241217,7 +242857,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -241257,7 +242897,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Czech Republic",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -241277,7 +242917,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -241337,7 +242977,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -241357,7 +242997,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -241777,7 +243417,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Spain",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -242177,7 +243817,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -242197,7 +243837,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "Italy",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -243437,7 +245077,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -243517,7 +245157,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -243597,7 +245237,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -243717,7 +245357,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -251837,7 +253477,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:09.643Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:09.643Z",
       "times_seen": 1
     },
     {
@@ -251857,7 +253497,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -251877,7 +253517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -251897,7 +253537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -251917,7 +253557,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:51.980Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -252157,7 +253797,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -253461,6 +255101,26 @@
       "times_seen": 1
     },
     {
+      "id": "163717",
+      "callsign": "AAL2728",
+      "type": "carrier",
+      "airline": "American Airlines (AAL)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KEWR",
+      "arrival_airport": "KDFW",
+      "gate_origin": "A10",
+      "gate_destination": "A18",
+      "distance_nm": 1371,
+      "flight_length": 230,
+      "description": "Transport 174 passengers from Newark to Dallas-Fort Worth on a 737-800. Departs from gate A10 and arrives at gate A18.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
       "id": "163772",
       "callsign": "DAL908",
       "type": "carrier",
@@ -254237,7 +255897,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -255217,7 +256877,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:12.518Z",
-      "last_seen": "2026-06-03T15:25:34.935Z",
+      "last_seen": "2026-05-27T19:20:12.518Z",
       "times_seen": 1
     },
     {
@@ -255257,7 +256917,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -256577,7 +258237,7 @@
       "departure_country": "Finland",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -258197,7 +259857,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -258217,7 +259877,7 @@
       "departure_country": "United States",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -259517,7 +261177,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:01.048Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:01.048Z",
       "times_seen": 1
     },
     {
@@ -259537,7 +261197,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -260101,6 +261761,26 @@
       "times_seen": 1
     },
     {
+      "id": "181959",
+      "callsign": "BAW843",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EPWA",
+      "arrival_airport": "EGLL",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 914,
+      "flight_length": 131,
+      "description": "Transport 145 passengers from Warsaw to London on a A319.",
+      "departure_country": "Poland",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "182180",
       "callsign": "WZZ2114",
       "type": "carrier",
@@ -260217,7 +261897,7 @@
       "departure_country": "Poland",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -261117,7 +262797,7 @@
       "departure_country": "Germany",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -261337,7 +263017,7 @@
       "departure_country": "Italy",
       "arrival_country": "Belgium",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -263701,6 +265381,46 @@
       "times_seen": 1
     },
     {
+      "id": "188201",
+      "callsign": "BEL47P",
+      "type": "carrier",
+      "airline": "Brussels Airlines (BEL)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LKPR",
+      "arrival_airport": "EBBR",
+      "gate_origin": "D2",
+      "gate_destination": "A58",
+      "distance_nm": 433,
+      "flight_length": 70,
+      "description": "Transport 146 passengers from Prague to Zaventem on a A319. Departs from gate D2 and arrives at gate A58.",
+      "departure_country": "Czech Republic",
+      "arrival_country": "Belgium",
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
+      "id": "188207",
+      "callsign": "EIN643",
+      "type": "carrier",
+      "airline": "Aer Lingus (EIN)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LKPR",
+      "arrival_airport": "EIDW",
+      "gate_origin": "A8",
+      "gate_destination": null,
+      "distance_nm": 905,
+      "flight_length": 135,
+      "description": "Transport 167 passengers from Prague to Dublin on a A320. Departs from gate A8.",
+      "departure_country": "Czech Republic",
+      "arrival_country": null,
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
       "id": "188263",
       "callsign": "ROU1770",
       "type": "carrier",
@@ -263737,7 +265457,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -263757,7 +265477,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -264237,7 +265957,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -264317,7 +266037,7 @@
       "departure_country": "Canada",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:48.980Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -265977,7 +267697,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -266177,7 +267897,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -266497,7 +268217,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -269897,7 +271617,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -269917,7 +271637,7 @@
       "departure_country": "United States",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -269957,7 +271677,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
@@ -269997,7 +271717,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -270281,6 +272001,26 @@
       "times_seen": 1
     },
     {
+      "id": "199633",
+      "callsign": "THY1ZL",
+      "type": "carrier",
+      "airline": "Turkish Airlines (THY)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LTFM",
+      "arrival_airport": "EBBR",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 1332,
+      "flight_length": 190,
+      "description": "Transport 167 passengers from Arnavutköy, Istanbul to Zaventem on a 737-800.",
+      "departure_country": "Turkey",
+      "arrival_country": "Belgium",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
       "id": "199644",
       "callsign": "UAL468",
       "type": "carrier",
@@ -270317,7 +272057,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T18:18:10.065Z",
-      "last_seen": "2026-06-03T15:15:58.926Z",
+      "last_seen": "2026-05-27T18:18:10.065Z",
       "times_seen": 1
     },
     {
@@ -272697,7 +274437,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -274481,6 +276221,46 @@
       "times_seen": 1
     },
     {
+      "id": "208914",
+      "callsign": "DAL2791",
+      "type": "carrier",
+      "airline": "Delta Airlines (DAL)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KPHL",
+      "arrival_airport": "KMSP",
+      "gate_origin": "D15",
+      "gate_destination": "G18",
+      "distance_nm": 979,
+      "flight_length": 147,
+      "description": "Transport 209 passengers from Philadelphia to Minneapolis on a 737-900. Departs from gate D15 and arrives at gate G18.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
+      "id": "208917",
+      "callsign": "SWA2557",
+      "type": "carrier",
+      "airline": "Southwest Airlines (SWA)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KPHL",
+      "arrival_airport": "KDEN",
+      "gate_origin": "E16",
+      "gate_destination": "C46",
+      "distance_nm": 1555,
+      "flight_length": 215,
+      "description": "Transport 160 passengers from Philadelphia to Denver on a 737-800. Departs from gate E16 and arrives at gate C46.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:41.943Z",
+      "last_seen": "2026-06-04T05:17:41.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "208986",
       "callsign": "UAL3750",
       "type": "carrier",
@@ -274637,7 +276417,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -274657,7 +276437,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -274677,7 +276457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -274697,7 +276477,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -277957,7 +279737,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -277997,7 +279777,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:49.985Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -282381,6 +284161,46 @@
       "times_seen": 1
     },
     {
+      "id": "220317",
+      "callsign": "SWA2693",
+      "type": "carrier",
+      "airline": "Southwest Airlines (SWA)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KFLL",
+      "arrival_airport": "KSTL",
+      "gate_origin": "B2",
+      "gate_destination": "E18",
+      "distance_nm": 1059,
+      "flight_length": 147,
+      "description": "Transport 154 passengers from Fort Lauderdale to St Louis on a 737 MAX 8. Departs from gate B2 and arrives at gate E18.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
+      "id": "220320",
+      "callsign": "SWA2209",
+      "type": "carrier",
+      "airline": "Southwest Airlines (SWA)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KFLL",
+      "arrival_airport": "KHOU",
+      "gate_origin": "B8",
+      "gate_destination": "42",
+      "distance_nm": 957,
+      "flight_length": 141,
+      "description": "Transport 154 passengers from Fort Lauderdale to Houston on a 737 MAX 8. Departs from gate B8 and arrives at gate 42.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "220326",
       "callsign": "AAY228",
       "type": "carrier",
@@ -282657,7 +284477,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -282677,7 +284497,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -282697,7 +284517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -282717,7 +284537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -282797,7 +284617,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:58.987Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -286561,6 +288381,26 @@
       "times_seen": 1
     },
     {
+      "id": "224540",
+      "callsign": "EXS84GV",
+      "type": "carrier",
+      "airline": "Jet2.com (EXS)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "ENBR",
+      "arrival_airport": "EGCC",
+      "gate_origin": "F23",
+      "gate_destination": "B12",
+      "distance_nm": 557,
+      "flight_length": 78,
+      "description": "Transport 173 passengers from Bergen to Manchester on a 737-800. Departs from gate F23 and arrives at gate B12.",
+      "departure_country": "Norway",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
+      "times_seen": 1
+    },
+    {
       "id": "224632",
       "callsign": "DLH7VT",
       "type": "carrier",
@@ -290277,7 +292117,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:01.048Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:01.048Z",
       "times_seen": 1
     },
     {
@@ -290297,7 +292137,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:49.985Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -293341,6 +295181,26 @@
       "times_seen": 1
     },
     {
+      "id": "231094",
+      "callsign": "ASA302",
+      "type": "carrier",
+      "airline": "Alaska Airlines (ASA)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "PANC",
+      "arrival_airport": "KPDX",
+      "gate_origin": "C4",
+      "gate_destination": "C15",
+      "distance_nm": 1541,
+      "flight_length": 214,
+      "description": "Transport 169 passengers from Anchorage to Portland on a 737-800. Departs from gate C4 and arrives at gate C15.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
+      "times_seen": 1
+    },
+    {
       "id": "231116",
       "callsign": "AAL1787",
       "type": "carrier",
@@ -293737,7 +295597,7 @@
       "departure_country": "France",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -294041,6 +295901,26 @@
       "times_seen": 1
     },
     {
+      "id": "237818",
+      "callsign": "EZY54KC",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGGD",
+      "arrival_airport": "EKCH",
+      "gate_origin": null,
+      "gate_destination": "F104",
+      "distance_nm": 695,
+      "flight_length": 87,
+      "description": "Transport 166 passengers from Bristol to Copenhagen on a A320 and arrives at gate F104.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "Denmark",
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
       "id": "237885",
       "callsign": "DLH16N",
       "type": "carrier",
@@ -294137,7 +296017,7 @@
       "departure_country": "United Kingdom",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -294401,6 +296281,26 @@
       "times_seen": 1
     },
     {
+      "id": "238469",
+      "callsign": "EZY61TU",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LFML",
+      "arrival_airport": "EGKK",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 590,
+      "flight_length": 78,
+      "description": "Transport passengers from Marseille to London on a A321neo.",
+      "departure_country": "France",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:43.940Z",
+      "last_seen": "2026-06-04T05:17:43.940Z",
+      "times_seen": 1
+    },
+    {
       "id": "238535",
       "callsign": "BEL1PD",
       "type": "carrier",
@@ -294457,7 +296357,7 @@
       "departure_country": "France",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -294961,6 +296861,46 @@
       "times_seen": 1
     },
     {
+      "id": "239746",
+      "callsign": "EXS84N",
+      "type": "carrier",
+      "airline": "Jet2.com (EXS)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LPMA",
+      "arrival_airport": "EGSS",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 1578,
+      "flight_length": 181,
+      "description": "Transport 157 passengers from Funchal to London on a 737-800.",
+      "departure_country": "Portugal",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
+      "id": "239749",
+      "callsign": "TRA25W",
+      "type": "carrier",
+      "airline": "Transavia (TRA)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LPMA",
+      "arrival_airport": "EHAM",
+      "gate_origin": null,
+      "gate_destination": "C16",
+      "distance_nm": 1731,
+      "flight_length": 231,
+      "description": "Transport passengers from Funchal to Amsterdam on a A321neo and arrives at gate C16.",
+      "departure_country": "Portugal",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
+      "times_seen": 1
+    },
+    {
       "id": "239870",
       "callsign": "CFG4PH",
       "type": "carrier",
@@ -295221,6 +297161,26 @@
       "times_seen": 1
     },
     {
+      "id": "241337",
+      "callsign": "BAW16MT",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LFBO",
+      "arrival_airport": "EGLL",
+      "gate_origin": "56",
+      "gate_destination": null,
+      "distance_nm": 549,
+      "flight_length": 92,
+      "description": "Transport 166 passengers from Toulouse/Blagnac to London on a A320. Departs from gate 56.",
+      "departure_country": "France",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
+      "times_seen": 1
+    },
+    {
       "id": "241496",
       "callsign": "RYR4RZ",
       "type": "carrier",
@@ -295438,6 +297398,26 @@
       "arrival_country": "Belgium",
       "first_seen": "2026-06-03T00:28:50.186Z",
       "last_seen": "2026-06-03T03:53:02.027Z",
+      "times_seen": 1
+    },
+    {
+      "id": "241805",
+      "callsign": "EZY817V",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGGW",
+      "arrival_airport": "EGPH",
+      "gate_origin": "7",
+      "gate_destination": null,
+      "distance_nm": 307,
+      "flight_length": 45,
+      "description": "Transport 133 passengers from London to Edinburgh on a A319. Departs from gate 7.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
       "times_seen": 1
     },
     {
@@ -295897,7 +297877,7 @@
       "departure_country": "Iceland",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -296497,7 +298477,7 @@
       "departure_country": "Spain",
       "arrival_country": "Netherlands",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -296517,7 +298497,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.037Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.037Z",
       "times_seen": 1
     },
     {
@@ -299041,6 +301021,46 @@
       "times_seen": 1
     },
     {
+      "id": "252561",
+      "callsign": "RYR7FJ",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LEMG",
+      "arrival_airport": "EGPH",
+      "gate_origin": "C40",
+      "gate_destination": null,
+      "distance_nm": 1334,
+      "flight_length": 180,
+      "description": "Transport 173 passengers from Málaga to Edinburgh on a 737 MAX 8. Departs from gate C40.",
+      "departure_country": "Spain",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
+      "times_seen": 1
+    },
+    {
+      "id": "252574",
+      "callsign": "BAW421",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A20N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LEMG",
+      "arrival_airport": "EGLL",
+      "gate_origin": "C31",
+      "gate_destination": null,
+      "distance_nm": 1043,
+      "flight_length": 145,
+      "description": "Transport 176 passengers from Málaga to London on a A320neo. Departs from gate C31.",
+      "departure_country": "Spain",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:44.939Z",
+      "last_seen": "2026-06-04T05:17:44.939Z",
+      "times_seen": 1
+    },
+    {
       "id": "252744",
       "callsign": "VLG6YG",
       "type": "carrier",
@@ -299177,7 +301197,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -299197,7 +301217,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -299237,7 +301257,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -301937,7 +303957,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -302697,7 +304717,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:49.985Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -302777,7 +304797,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -303258,6 +305278,46 @@
       "arrival_country": "United States",
       "first_seen": "2026-06-03T11:56:26.113Z",
       "last_seen": "2026-06-03T11:56:26.113Z",
+      "times_seen": 1
+    },
+    {
+      "id": "257457",
+      "callsign": "KLM54H",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LIPZ",
+      "arrival_airport": "EHAM",
+      "gate_origin": "10",
+      "gate_destination": "C15",
+      "distance_nm": 583,
+      "flight_length": 95,
+      "description": "Transport 169 passengers from Venice to Amsterdam on a 737-800. Departs from gate 10 and arrives at gate C15.",
+      "departure_country": "Italy",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:44.939Z",
+      "last_seen": "2026-06-04T05:17:44.939Z",
+      "times_seen": 1
+    },
+    {
+      "id": "257462",
+      "callsign": "CFG6DA",
+      "type": "carrier",
+      "airline": "Condor Flugdienst (CFG)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LIPZ",
+      "arrival_airport": "EDDF",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 359,
+      "flight_length": 70,
+      "description": "Transport 157 passengers from Venice to Frankfurt am Main on a A320.",
+      "departure_country": "Italy",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
       "times_seen": 1
     },
     {
@@ -304157,7 +306217,7 @@
       "departure_country": "Italy",
       "arrival_country": null,
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -305297,7 +307357,7 @@
       "departure_country": "Canada",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:08.684Z",
-      "last_seen": "2026-06-03T15:25:30.936Z",
+      "last_seen": "2026-05-27T19:20:08.684Z",
       "times_seen": 1
     },
     {
@@ -305397,7 +307457,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -305437,7 +307497,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -305457,7 +307517,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -309541,6 +311601,26 @@
       "times_seen": 1
     },
     {
+      "id": "261669",
+      "callsign": "KLM78B",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EPKK",
+      "arrival_airport": "EHAM",
+      "gate_origin": "2",
+      "gate_destination": "C18",
+      "distance_nm": 668,
+      "flight_length": 100,
+      "description": "Transport 161 passengers from Kraków to Amsterdam on a 737-800. Departs from gate 2 and arrives at gate C18.",
+      "departure_country": "Poland",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
       "id": "261682",
       "callsign": "UAL1068",
       "type": "carrier",
@@ -309598,6 +311678,26 @@
       "arrival_country": "United States",
       "first_seen": "2026-05-28T15:18:06.757Z",
       "last_seen": "2026-05-28T15:18:06.757Z",
+      "times_seen": 1
+    },
+    {
+      "id": "261730",
+      "callsign": "EIN45N",
+      "type": "carrier",
+      "airline": "Aer Lingus (EIN)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LIRN",
+      "arrival_airport": "EIDW",
+      "gate_origin": "B9",
+      "gate_destination": null,
+      "distance_nm": 1290,
+      "flight_length": 185,
+      "description": "Transport 155 passengers from Napoli to Dublin on a A320. Departs from gate B9.",
+      "departure_country": "Italy",
+      "arrival_country": null,
+      "first_seen": "2026-06-04T05:17:41.943Z",
+      "last_seen": "2026-06-04T05:17:41.943Z",
       "times_seen": 1
     },
     {
@@ -309897,7 +311997,7 @@
       "departure_country": "Italy",
       "arrival_country": "Denmark",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -310237,7 +312337,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -310597,7 +312697,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:01.048Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:01.048Z",
       "times_seen": 1
     },
     {
@@ -312357,7 +314457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:55.272Z",
-      "last_seen": "2026-06-03T15:23:49.985Z",
+      "last_seen": "2026-05-27T19:19:55.272Z",
       "times_seen": 1
     },
     {
@@ -312417,7 +314517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -312437,7 +314537,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -313797,7 +315897,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -313817,7 +315917,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:15.370Z",
-      "last_seen": "2026-06-03T15:25:37.959Z",
+      "last_seen": "2026-05-27T19:20:15.370Z",
       "times_seen": 1
     },
     {
@@ -314617,7 +316717,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:32.935Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -315877,7 +317977,7 @@
       "departure_country": "Portugal",
       "arrival_country": "Netherlands",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -316578,6 +318678,26 @@
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-28T15:18:03.456Z",
       "last_seen": "2026-05-28T15:18:03.456Z",
+      "times_seen": 1
+    },
+    {
+      "id": "277270",
+      "callsign": "EZY23RV",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGAA",
+      "arrival_airport": "EGHI",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 327,
+      "flight_length": 30,
+      "description": "Transport 171 passengers from Belfast to Southampton on a A320.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
       "times_seen": 1
     },
     {
@@ -317601,6 +319721,26 @@
       "times_seen": 1
     },
     {
+      "id": "278855",
+      "callsign": "EZY41GH",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LEAL",
+      "arrival_airport": "EGCC",
+      "gate_origin": "B31",
+      "gate_destination": "A7",
+      "distance_nm": 1046,
+      "flight_length": 137,
+      "description": "Transport 156 passengers from Alicante to Manchester on a A320. Departs from gate B31 and arrives at gate A7.",
+      "departure_country": "Spain",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:41.943Z",
+      "last_seen": "2026-06-04T05:17:41.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "278917",
       "callsign": "VLG4GZ",
       "type": "carrier",
@@ -317717,7 +319857,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -318898,6 +321038,26 @@
       "arrival_country": "Denmark",
       "first_seen": "2026-05-28T15:18:09.242Z",
       "last_seen": "2026-05-28T15:18:09.242Z",
+      "times_seen": 1
+    },
+    {
+      "id": "281618",
+      "callsign": "KLM84M",
+      "type": "carrier",
+      "airline": "KLM Royal Dutch Airlines (KLM)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LFBD",
+      "arrival_airport": "EHAM",
+      "gate_origin": "2",
+      "gate_destination": "C12",
+      "distance_nm": 575,
+      "flight_length": 97,
+      "description": "Transport 169 passengers from Bordeaux/Mérignac to Amsterdam on a 737-800. Departs from gate 2 and arrives at gate C12.",
+      "departure_country": "France",
+      "arrival_country": "Netherlands",
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
       "times_seen": 1
     },
     {
@@ -320277,7 +322437,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.997Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:02.997Z",
       "times_seen": 1
     },
     {
@@ -320297,7 +322457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:12.518Z",
-      "last_seen": "2026-06-03T15:25:34.935Z",
+      "last_seen": "2026-05-27T19:20:12.518Z",
       "times_seen": 1
     },
     {
@@ -320877,7 +323037,7 @@
       "departure_country": "Puerto Rico",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -321397,7 +323557,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -321417,7 +323577,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -321437,7 +323597,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -323477,7 +325637,7 @@
       "departure_country": "Mexico",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:12.518Z",
-      "last_seen": "2026-06-03T15:25:34.935Z",
+      "last_seen": "2026-05-27T19:20:12.518Z",
       "times_seen": 1
     },
     {
@@ -325077,7 +327237,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:03.921Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:03.921Z",
       "times_seen": 1
     },
     {
@@ -325699,6 +327859,26 @@
       "first_seen": "2026-06-03T12:02:04.156Z",
       "last_seen": "2026-06-03T12:06:01.570Z",
       "times_seen": 2
+    },
+    {
+      "id": "298457",
+      "callsign": "SHT15D",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGJJ",
+      "arrival_airport": "EGLL",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 175,
+      "flight_length": 40,
+      "description": "Transport 144 passengers from Saint Helier to London on a A319.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
     },
     {
       "id": "298458",
@@ -326501,6 +328681,26 @@
       "times_seen": 1
     },
     {
+      "id": "299529",
+      "callsign": "BAW889",
+      "type": "carrier",
+      "airline": "British Airways (BAW)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDV",
+      "arrival_airport": "EGLL",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 437,
+      "flight_length": 76,
+      "description": "Transport 145 passengers from Hannover to London on a A319.",
+      "departure_country": "Germany",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
       "id": "299554",
       "callsign": "DLH49",
       "type": "carrier",
@@ -326537,7 +328737,7 @@
       "departure_country": "Germany",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -327617,7 +329817,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -328221,6 +330421,26 @@
       "times_seen": 1
     },
     {
+      "id": "304025",
+      "callsign": "RYR5TP",
+      "type": "carrier",
+      "airline": "Ryanair (RYR)",
+      "aircraft_type": "B38M",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "GCTS",
+      "arrival_airport": "EIDW",
+      "gate_origin": "C36",
+      "gate_destination": null,
+      "distance_nm": 1832,
+      "flight_length": 235,
+      "description": "Transport 154 passengers from Tenerife to Dublin on a 737 MAX 8. Departs from gate C36.",
+      "departure_country": "Spain",
+      "arrival_country": null,
+      "first_seen": "2026-06-04T05:17:47.945Z",
+      "last_seen": "2026-06-04T05:17:47.945Z",
+      "times_seen": 1
+    },
+    {
       "id": "304216",
       "callsign": "TOM8EX",
       "type": "carrier",
@@ -328237,7 +330457,7 @@
       "departure_country": "Spain",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -328277,7 +330497,7 @@
       "departure_country": "Spain",
       "arrival_country": null,
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -330137,7 +332357,7 @@
       "departure_country": "Portugal",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:03.921Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:03.921Z",
       "times_seen": 1
     },
     {
@@ -330177,7 +332397,7 @@
       "departure_country": "Portugal",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:20:03.921Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:03.921Z",
       "times_seen": 1
     },
     {
@@ -330898,6 +333118,26 @@
       "arrival_country": "Germany",
       "first_seen": "2026-05-28T15:19:32.894Z",
       "last_seen": "2026-05-28T15:19:32.894Z",
+      "times_seen": 1
+    },
+    {
+      "id": "310089",
+      "callsign": "DLH5YU",
+      "type": "carrier",
+      "airline": "Lufthansa (DLH)",
+      "aircraft_type": "A319",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EDDN",
+      "arrival_airport": "EDDF",
+      "gate_origin": "A14",
+      "gate_destination": "A",
+      "distance_nm": 119,
+      "flight_length": 38,
+      "description": "Transport 130 passengers from Nuremberg to Frankfurt am Main on a A319. Departs from gate A14 and arrives at gate A.",
+      "departure_country": "Germany",
+      "arrival_country": "Germany",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
       "times_seen": 1
     },
     {
@@ -332037,7 +334277,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -333101,6 +335341,26 @@
       "times_seen": 1
     },
     {
+      "id": "314706",
+      "callsign": "WZZ126",
+      "type": "carrier",
+      "airline": "Wizz Air  (WZZ)",
+      "aircraft_type": "A21N",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LCLK",
+      "arrival_airport": "EPWA",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 1350,
+      "flight_length": 199,
+      "description": "Transport passengers from Larnaca to Warsaw on a A321neo.",
+      "departure_country": "Cyprus",
+      "arrival_country": "Poland",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
+      "times_seen": 1
+    },
+    {
       "id": "314891",
       "callsign": "EZY15JF",
       "type": "carrier",
@@ -333581,6 +335841,26 @@
       "times_seen": 1
     },
     {
+      "id": "321645",
+      "callsign": "DAL1504",
+      "type": "carrier",
+      "airline": "Delta Airlines (DAL)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KPIT",
+      "arrival_airport": "KATL",
+      "gate_origin": "D1",
+      "gate_destination": "B19",
+      "distance_nm": 527,
+      "flight_length": 82,
+      "description": "Transport 209 passengers from Pittsburgh to Atlanta on a 737-900. Departs from gate D1 and arrives at gate B19.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:41.943Z",
+      "last_seen": "2026-06-04T05:17:41.943Z",
+      "times_seen": 1
+    },
+    {
       "id": "321825",
       "callsign": "SWA897",
       "type": "carrier",
@@ -333597,7 +335877,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -333981,6 +336261,26 @@
       "times_seen": 1
     },
     {
+      "id": "324733",
+      "callsign": "EZY79GK",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LMML",
+      "arrival_airport": "EGKK",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": 1283,
+      "flight_length": 166,
+      "description": "Transport 164 passengers from Valletta to London on a A320.",
+      "departure_country": "Malta",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:36.062Z",
+      "last_seen": "2026-06-04T05:17:36.062Z",
+      "times_seen": 1
+    },
+    {
       "id": "324813",
       "callsign": "DLH3HP",
       "type": "carrier",
@@ -334017,7 +336317,7 @@
       "departure_country": "Malta",
       "arrival_country": "United Kingdom",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -335637,7 +337937,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:54.984Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -336101,6 +338401,26 @@
       "times_seen": 1
     },
     {
+      "id": "329366",
+      "callsign": "DAL2441",
+      "type": "carrier",
+      "airline": "Delta Airlines (DAL)",
+      "aircraft_type": "B739",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "KCVG",
+      "arrival_airport": "KATL",
+      "gate_origin": "B15",
+      "gate_destination": "C55",
+      "distance_nm": 375,
+      "flight_length": 64,
+      "description": "Transport 196 passengers from Cincinnati / Covington to Atlanta on a 737-900. Departs from gate B15 and arrives at gate C55.",
+      "departure_country": "United States",
+      "arrival_country": "United States",
+      "first_seen": "2026-06-04T05:17:46.962Z",
+      "last_seen": "2026-06-04T05:17:46.962Z",
+      "times_seen": 1
+    },
+    {
       "id": "329463",
       "callsign": "FFT3521",
       "type": "carrier",
@@ -336137,7 +338457,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:13.458Z",
-      "last_seen": "2026-06-03T15:25:35.932Z",
+      "last_seen": "2026-05-27T19:20:13.458Z",
       "times_seen": 1
     },
     {
@@ -336157,7 +338477,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -336177,7 +338497,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -336698,6 +339018,26 @@
       "arrival_country": "Turkey",
       "first_seen": "2026-05-28T15:17:57.559Z",
       "last_seen": "2026-05-28T15:17:57.559Z",
+      "times_seen": 1
+    },
+    {
+      "id": "330201",
+      "callsign": "EXS034F",
+      "type": "carrier",
+      "airline": "Jet2.com (EXS)",
+      "aircraft_type": "B738",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "EGNM",
+      "arrival_airport": "EGNM",
+      "gate_origin": null,
+      "gate_destination": null,
+      "distance_nm": null,
+      "flight_length": 160,
+      "description": "Transport 170 passengers from Leeds to Leeds on a 737-800.",
+      "departure_country": "United Kingdom",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:38.946Z",
+      "last_seen": "2026-06-04T05:17:38.946Z",
       "times_seen": 1
     },
     {
@@ -338697,7 +341037,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:57.107Z",
-      "last_seen": "2026-06-03T15:23:50.992Z",
+      "last_seen": "2026-05-27T19:19:57.107Z",
       "times_seen": 1
     },
     {
@@ -339777,7 +342117,7 @@
       "departure_country": "Canada",
       "arrival_country": "Canada",
       "first_seen": "2026-05-27T19:20:10.590Z",
-      "last_seen": "2026-06-03T15:25:33.940Z",
+      "last_seen": "2026-05-27T19:20:10.590Z",
       "times_seen": 1
     },
     {
@@ -340577,7 +342917,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:14.403Z",
-      "last_seen": "2026-06-03T15:25:36.921Z",
+      "last_seen": "2026-05-27T19:20:14.403Z",
       "times_seen": 1
     },
     {
@@ -340637,7 +342977,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -340657,7 +342997,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -342217,7 +344557,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:59.987Z",
-      "last_seen": "2026-06-03T15:23:53.992Z",
+      "last_seen": "2026-05-27T19:19:59.987Z",
       "times_seen": 1
     },
     {
@@ -342717,7 +345057,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -344177,7 +346517,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:11.558Z",
-      "last_seen": "2026-06-03T15:25:33.940Z",
+      "last_seen": "2026-05-27T19:20:11.558Z",
       "times_seen": 1
     },
     {
@@ -345597,7 +347937,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:03.921Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:03.921Z",
       "times_seen": 1
     },
     {
@@ -346377,7 +348717,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:03.921Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:03.921Z",
       "times_seen": 1
     },
     {
@@ -346397,7 +348737,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:19:58.948Z",
-      "last_seen": "2026-06-03T15:23:52.992Z",
+      "last_seen": "2026-05-27T19:19:58.948Z",
       "times_seen": 1
     },
     {
@@ -347601,6 +349941,26 @@
       "times_seen": 1
     },
     {
+      "id": "350365",
+      "callsign": "EZY82ZY",
+      "type": "carrier",
+      "airline": "easyJet UK (EZY)",
+      "aircraft_type": "A320",
+      "aircraft_category": "Narrow Body",
+      "departure_airport": "LICC",
+      "arrival_airport": "EGPH",
+      "gate_origin": "20",
+      "gate_destination": null,
+      "distance_nm": 1538,
+      "flight_length": 194,
+      "description": "Transport 158 passengers from Catania to Edinburgh on a A320. Departs from gate 20.",
+      "departure_country": "Italy",
+      "arrival_country": "United Kingdom",
+      "first_seen": "2026-06-04T05:17:44.939Z",
+      "last_seen": "2026-06-04T05:17:44.939Z",
+      "times_seen": 1
+    },
+    {
       "id": "350393",
       "callsign": "TFL79A",
       "type": "carrier",
@@ -347677,7 +350037,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:03.921Z",
-      "last_seen": "2026-06-03T15:23:59.970Z",
+      "last_seen": "2026-05-27T19:20:03.921Z",
       "times_seen": 1
     },
     {
@@ -347717,7 +350077,7 @@
       "departure_country": "United States",
       "arrival_country": "United States",
       "first_seen": "2026-05-27T19:20:02.061Z",
-      "last_seen": "2026-06-03T15:23:57.999Z",
+      "last_seen": "2026-05-27T19:20:02.061Z",
       "times_seen": 1
     },
     {
