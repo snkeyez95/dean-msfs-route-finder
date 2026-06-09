@@ -2695,27 +2695,30 @@ async function populateSimIntegration(){
     if(si)si.value=S.cfg.steamExePath;
     document.getElementById('steam-path-st').textContent='Saved: '+S.cfg.steamExePath;
   }
-  // Auto-detect if neither field has been saved yet
-  if(!S.cfg.communityFolder){
+  // Auto-detect any missing fields
+  if(!S.cfg.communityFolder||!S.cfg.msfsVersion||(S.cfg.msfsVersion==='steam'&&!S.cfg.steamExePath)){
     const det=await window.api.msfsDetect();
-    if(det&&det.communityFolder){
-      S.cfg.communityFolder=det.communityFolder;
-      S.cfg.msfsVersion=det.version;
-      if(det.version==='steam'&&!S.cfg.steamExePath)S.cfg.steamExePath=det.steamExe||'';
-      window.api.saveConfig(S.cfg);
-      if(ci)ci.value=det.communityFolder;
-      const label=det.version==='store'?'Auto-detected (Microsoft Store)':'Auto-detected (Steam)';
-      document.getElementById('community-folder-st').textContent=label+': '+det.communityFolder;
-      if(det.version==='steam'&&det.steamExe){
-        if(si&&!si.value)si.value=det.steamExe;
+    if(det&&det.version){
+      let changed=false;
+      if(!S.cfg.communityFolder&&det.communityFolder){
+        S.cfg.communityFolder=det.communityFolder;
+        if(ci)ci.value=det.communityFolder;
+        const label=det.version==='store'?'Auto-detected (Microsoft Store)':'Auto-detected (Steam)';
+        document.getElementById('community-folder-st').textContent=label+': '+det.communityFolder;
+        changed=true;
+      }
+      if(!S.cfg.msfsVersion){S.cfg.msfsVersion=det.version;changed=true;}
+      if(det.version==='steam'&&!S.cfg.steamExePath&&det.steamExe){
+        S.cfg.steamExePath=det.steamExe;
+        if(si)si.value=det.steamExe;
         document.getElementById('steam-path-st').textContent='Auto-detected: '+det.steamExe;
+        changed=true;
       }
       if(det.version==='store'){
-        // Store version doesn't need Steam path — hide that section
         const steamWrap=document.getElementById('steam-path-wrap');
         if(steamWrap)steamWrap.style.display='none';
       }
-      RLOG('[DETECT] MSFS 2024 '+det.version+' auto-detected: '+det.communityFolder);
+      if(changed){window.api.saveConfig(S.cfg);RLOG('[DETECT] MSFS 2024 '+det.version+' — missing fields filled in');}
     }
   }
 }
