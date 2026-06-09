@@ -309,14 +309,41 @@ ipcMain.handle('deactivate-scenery', (_, {folders, communityFolder}) => {
   return {ok: errors.length === 0, removed, errors};
 });
 
-ipcMain.handle('launch-msfs', (_, steamExePath) => {
-  const steamExe = (steamExePath && steamExePath.trim()) || 'C:\\Program Files (x86)\\Steam\\steam.exe';
+ipcMain.handle('msfs-detect', () => {
+  const home = os.homedir();
+  const steamCommunity = path.join(home, 'AppData', 'Roaming', 'Microsoft Flight Simulator 2024', 'Packages', 'Community');
+  const storeCommunity = path.join(home, 'AppData', 'Local', 'Packages', 'Microsoft.Limitless_8wekyb3d8bbwe', 'LocalCache', 'Packages', 'Community');
+  const defaultSteamExe = 'C:\\Program Files (x86)\\Steam\\steam.exe';
+  if (fs.existsSync(steamCommunity)) {
+    LOG.info('[DETECT] MSFS 2024 Steam detected. Community:', steamCommunity);
+    return {version: 'steam', communityFolder: steamCommunity, steamExe: defaultSteamExe};
+  }
+  if (fs.existsSync(storeCommunity)) {
+    LOG.info('[DETECT] MSFS 2024 Store detected. Community:', storeCommunity);
+    return {version: 'store', communityFolder: storeCommunity};
+  }
+  LOG.info('[DETECT] MSFS 2024 not found at known paths');
+  return {version: null, communityFolder: null};
+});
+
+ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
   try {
-    const child = spawn(steamExe, ['-no-browser', '-applaunch', '2537590'], {
-      detached: true, stdio: 'ignore', windowsHide: false,
-    });
-    child.unref();
-    LOG.info('[LAUNCH] MSFS launch triggered via', steamExe);
+    if (version === 'store') {
+      // Microsoft Store version — launch via Windows shell protocol (no storefront)
+      const child = spawn('explorer.exe', ['shell:AppsFolder\\Microsoft.Limitless_8wekyb3d8bbwe!App'], {
+        detached: true, stdio: 'ignore',
+      });
+      child.unref();
+      LOG.info('[LAUNCH] MSFS 2024 Store launched via shell:AppsFolder');
+    } else {
+      // Steam version — -no-browser suppresses storefront popup
+      const steamExe = (steamExePath && steamExePath.trim()) || 'C:\\Program Files (x86)\\Steam\\steam.exe';
+      const child = spawn(steamExe, ['-no-browser', '-applaunch', '2537590'], {
+        detached: true, stdio: 'ignore', windowsHide: false,
+      });
+      child.unref();
+      LOG.info('[LAUNCH] MSFS 2024 Steam launched via', steamExe);
+    }
     return {ok: true};
   } catch(e) {
     LOG.error('[LAUNCH] Failed to launch MSFS:', e.message);

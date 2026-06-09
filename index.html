@@ -298,7 +298,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.36</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.37</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -630,7 +630,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     </div>
     <div id="community-folder-st" style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--ink3);min-height:16px"></div>
   </div>
-  <div class="api-pan">
+  <div class="api-pan" id="steam-path-wrap">
     <div class="api-t">Quick Launch &mdash; Steam</div>
     <div class="api-s">The <strong>&#9654; Launch MSFS</strong> button in the title bar uses Steam's <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:12px">-no-browser</code> flag to open MSFS 2024 without the Steam storefront popping up. If Steam is not in the default location, set the path below.</div>
     <div class="api-row" style="margin-bottom:7px">
@@ -2652,7 +2652,7 @@ async function doDeactivateScenery(depFolder,arrFolder){
 
 // ── QUICK LAUNCH ─────────────────────────────────────────────────────────────
 async function launchMSFS(){
-  const res=await window.api.launchMsfs(S.cfg.steamExePath||'');
+  const res=await window.api.launchMsfs({version:S.cfg.msfsVersion||'steam',steamExePath:S.cfg.steamExePath||''});
   if(res&&!res.ok)RLOG('[LAUNCH] Failed: '+(res.error||'unknown'));
 }
 
@@ -2683,11 +2683,41 @@ function saveSteamPath(){
   window.api.saveConfig(S.cfg);
   document.getElementById('steam-path-st').textContent=v?'Saved: '+v:'Using default path';
 }
-function populateSimIntegration(){
+async function populateSimIntegration(){
+  // Show saved values if present
   const ci=document.getElementById('community-folder-inp');
-  if(ci&&S.cfg.communityFolder){ci.value=S.cfg.communityFolder;document.getElementById('community-folder-st').textContent='Saved: '+S.cfg.communityFolder;}
   const si=document.getElementById('steam-path-inp');
-  if(si&&S.cfg.steamExePath){si.value=S.cfg.steamExePath;document.getElementById('steam-path-st').textContent='Saved: '+S.cfg.steamExePath;}
+  if(S.cfg.communityFolder){
+    if(ci)ci.value=S.cfg.communityFolder;
+    document.getElementById('community-folder-st').textContent='Saved: '+S.cfg.communityFolder;
+  }
+  if(S.cfg.steamExePath){
+    if(si)si.value=S.cfg.steamExePath;
+    document.getElementById('steam-path-st').textContent='Saved: '+S.cfg.steamExePath;
+  }
+  // Auto-detect if neither field has been saved yet
+  if(!S.cfg.communityFolder){
+    const det=await window.api.msfsDetect();
+    if(det&&det.communityFolder){
+      S.cfg.communityFolder=det.communityFolder;
+      S.cfg.msfsVersion=det.version;
+      if(det.version==='steam'&&!S.cfg.steamExePath)S.cfg.steamExePath=det.steamExe||'';
+      window.api.saveConfig(S.cfg);
+      if(ci)ci.value=det.communityFolder;
+      const label=det.version==='store'?'Auto-detected (Microsoft Store)':'Auto-detected (Steam)';
+      document.getElementById('community-folder-st').textContent=label+': '+det.communityFolder;
+      if(det.version==='steam'&&det.steamExe){
+        if(si&&!si.value)si.value=det.steamExe;
+        document.getElementById('steam-path-st').textContent='Auto-detected: '+det.steamExe;
+      }
+      if(det.version==='store'){
+        // Store version doesn't need Steam path — hide that section
+        const steamWrap=document.getElementById('steam-path-wrap');
+        if(steamWrap)steamWrap.style.display='none';
+      }
+      RLOG('[DETECT] MSFS 2024 '+det.version+' auto-detected: '+det.communityFolder);
+    }
+  }
 }
 
 // ── METAR ────────────────────────────────────────────────────────────────────
@@ -3393,5 +3423,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.36</div>
+  pointer-events:none;">v4.5.37</div>
 </body></html>
