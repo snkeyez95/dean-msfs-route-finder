@@ -628,7 +628,7 @@ html[data-theme="light"] .theme-knob{left:30px}
         <span id="sim-override-icon" style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace">&#9654;</span>
         <span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace">Override paths (non-standard install)</span>
       </div>
-      <div id="sim-override-panel" style="display:none;margin-top:12px;display:flex;flex-direction:column;gap:10px">
+      <div id="sim-override-panel" style="display:none;margin-top:12px;flex-direction:column;gap:10px">
         <div>
           <div style="font-size:11px;color:var(--ink3);margin-bottom:5px;font-family:'JetBrains Mono',monospace">Community Folder</div>
           <div class="api-row">
@@ -637,13 +637,7 @@ html[data-theme="light"] .theme-knob{left:30px}
             <button class="btn bp bsm" onclick="saveCommunityFolder()">Save</button>
           </div>
         </div>
-        <div id="steam-path-wrap">
-          <div style="font-size:11px;color:var(--ink3);margin-bottom:5px;font-family:'JetBrains Mono',monospace">Steam Executable</div>
-          <div class="api-row">
-            <input class="api-inp" type="text" id="steam-path-inp" placeholder="Default: C:\Program Files (x86)\Steam\steam.exe" oninput="onSteamPathInput()" style="color:var(--ink2)">
-            <button class="btn bp bsm" onclick="saveSteamPath()">Save</button>
-          </div>
-        </div>
+
       </div>
     </div>
   </div>
@@ -2674,9 +2668,7 @@ function toggleSimOverride(){
   if(icon)icon.innerHTML=open?'&#9660;':'&#9654;';
   if(open){
     const ci=document.getElementById('community-folder-inp');
-    const si=document.getElementById('steam-path-inp');
     if(ci&&S.cfg.communityFolder)ci.value=S.cfg.communityFolder;
-    if(si&&S.cfg.steamExePath)si.value=S.cfg.steamExePath;
   }
 }
 function onCommunityFolderInput(){}
@@ -2691,13 +2683,6 @@ function saveCommunityFolder(){
   window.api.saveConfig(S.cfg);
   updateSimDetectStatus();
   RLOG('[SCENE] Community folder override: '+v);
-}
-function onSteamPathInput(){}
-function saveSteamPath(){
-  const v=document.getElementById('steam-path-inp').value.trim();
-  S.cfg.steamExePath=v||'';
-  window.api.saveConfig(S.cfg);
-  updateSimDetectStatus();
 }
 function updateSimDetectStatus(){
   const el=document.getElementById('sim-detect-status');
@@ -2724,7 +2709,6 @@ async function populateSimIntegration(){
     if(det.version==='steam'&&!S.cfg.steamExePath&&det.steamExe){S.cfg.steamExePath=det.steamExe;changed=true;}
   }
   if(changed){window.api.saveConfig(S.cfg);RLOG('[DETECT] MSFS 2024 auto-configured: '+((det&&det.version)||'unknown'));}
-  if(det&&det.version==='store'){const w=document.getElementById('steam-path-wrap');if(w)w.style.display='none';}
   updateSimDetectStatus();
 }
 
