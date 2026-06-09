@@ -1,18 +1,13 @@
-$baseUrl = "https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main"
-$files = @("index.html", "main.js", "preload.js")
 $dest = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $dest
 
-foreach ($f in $files) {
-    try {
-        $url = "$baseUrl/$f"
-        $out = Join-Path $dest $f
-        Write-Host "  Updating $f ..." -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing -Headers @{"Cache-Control"="no-cache"; "Pragma"="no-cache"}
-        Write-Host "  OK" -ForegroundColor Green
-    } catch {
-        Write-Host "  FAILED: $f - $($_.Exception.Message)" -ForegroundColor Red
-    }
+Write-Host "  Pulling latest from GitHub..." -ForegroundColor Cyan
+
+try {
+    $result = & git pull origin main 2>&1
+    Write-Host $result -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Update complete!" -ForegroundColor Green
+} catch {
+    Write-Host "  FAILED: $($_.Exception.Message)" -ForegroundColor Red
 }
-
-Write-Host ""
-Write-Host "  Update complete!" -ForegroundColor Green
