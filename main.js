@@ -351,6 +351,26 @@ ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
   }
 });
 
+ipcMain.handle('browse-file', async () => {
+  const res = await dialog.showOpenDialog(win, {
+    properties: ['openFile'],
+    filters: [{name: 'Executables', extensions: ['exe']}],
+  });
+  return res.canceled ? null : {filePath: res.filePaths[0]};
+});
+
+ipcMain.handle('launch-app', (_, {path: appPath}) => {
+  try {
+    const child = spawn(appPath, [], {detached: true, stdio: 'ignore'});
+    child.unref();
+    LOG.info('[LAUNCH] App launched:', appPath);
+    return {ok: true};
+  } catch(e) {
+    LOG.error('[LAUNCH] Failed to launch app:', e.message);
+    return {ok: false, error: e.message};
+  }
+});
+
 ipcMain.handle('get-log-path',()=>LOG_PATH);
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());

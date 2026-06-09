@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -298,7 +298,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.39</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.40</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -600,6 +600,13 @@ html[data-theme="light"] .theme-knob{left:30px}
       <button class="btn bg bsm" onclick="exportSnapshot()">&#11015; Export to community_routes.json</button>
       <button class="btn bg bsm" onclick="restoreFromSnapshot()">&#8635; Restore from Snapshot</button>
     </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Quick Launch Apps</div>
+  <div class="api-pan" style="margin-bottom:24px">
+    <div class="api-t">Companion Apps</div>
+    <div class="api-s">Apps to launch alongside MSFS. Click &#9889; Quick Launch in any route detail to open them.</div>
+    <div id="ql-app-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+    <button class="btn bg bsm" onclick="addQuickLaunchApp()">&#65291; Add App</button>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Manual Import</div>
   <div id="si-drop-zone" class="si-drop"
@@ -1004,6 +1011,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     }catch(e){ console.error('Session restore error:',e); }
   }
   populateSimIntegration();
+  renderQlAppList();
   buildChSB();renderCD(0);updateStats();renderRoutes();
   updateSnapshotInfo();
   fetchMetarBatch();
@@ -1894,6 +1902,7 @@ function renderRoutes(){
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'main',i)}
+        ${qlBtnHtml('main',i)}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -2146,6 +2155,7 @@ function renderFreeRouteResults(){
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'fr',i)}
+        ${qlBtnHtml('fr',i)}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -2534,6 +2544,7 @@ function renderTripCard(){
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(leg.dep,leg.arr,'tp',i)}
+        ${qlBtnHtml('tp',i)}
       </div>
     </div></td></tr>`;
     return[main,det];
@@ -2652,7 +2663,70 @@ async function doDeactivateScenery(depFolder,arrFolder){
   renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();
 }
 
-// ── QUICK LAUNCH ─────────────────────────────────────────────────────────────
+// ── QUICK LAUNCH COMPANION APPS ──────────────────────────────────────────────
+function qlBtnHtml(ns,idx){
+  const apps=S.cfg.quickLaunchApps||[];
+  if(!apps.length)return'';
+  return`<div style="position:relative;display:inline-block">
+    <button class="btn bg bsm" onclick="toggleQlDrop(event,'ql-drop-${ns}-${idx}')">&#9889; Quick Launch</button>
+    <div id="ql-drop-${ns}-${idx}" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--sep);border-radius:6px;z-index:200;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden">
+      ${apps.map((a,ai)=>`<button style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--ink1);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'" onclick="launchQuickApp('${(a.path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','ql-drop-${ns}-${idx}')">${a.name||'App '+(ai+1)}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function toggleQlDrop(e,id){
+  e.stopPropagation();
+  const el=document.getElementById(id);
+  if(!el)return;
+  const visible=el.style.display!=='none';
+  document.querySelectorAll('[id^="ql-drop-"]').forEach(d=>d.style.display='none');
+  if(!visible){
+    el.style.display='block';
+    setTimeout(()=>document.addEventListener('click',function h(){el.style.display='none';document.removeEventListener('click',h);},{once:true}),0);
+  }
+}
+
+async function launchQuickApp(appPath,dropId){
+  const drop=document.getElementById(dropId);
+  if(drop)drop.style.display='none';
+  const res=await window.api.launchApp({path:appPath});
+  if(res&&!res.ok)RLOG('[LAUNCH] App failed: '+(res.error||'unknown'));
+}
+
+function renderQlAppList(){
+  const list=document.getElementById('ql-app-list');
+  if(!list)return;
+  const apps=S.cfg.quickLaunchApps||[];
+  if(!apps.length){list.innerHTML='<div style="font-size:12px;color:var(--ink3);font-family:\'Inter\',sans-serif">No apps configured yet.</div>';return;}
+  list.innerHTML=apps.map((a,i)=>`<div style="display:flex;align-items:center;gap:6px">
+    <span style="flex:0 0 100px;font-size:12px;color:var(--ink1);font-family:'Inter',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.name}">${a.name}</span>
+    <span style="flex:1;font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.path}">${a.path}</span>
+    <button class="btn bg bsm" style="flex-shrink:0;padding:2px 7px;font-size:11px" onclick="removeQuickLaunchApp(${i})">&#10005;</button>
+  </div>`).join('');
+}
+
+async function addQuickLaunchApp(){
+  const res=await window.api.browseFile();
+  if(!res||!res.filePath)return;
+  const p=res.filePath;
+  const name=p.split('\\').pop().replace(/\.exe$/i,'');
+  const apps=S.cfg.quickLaunchApps||[];
+  apps.push({name,path:p});
+  S.cfg.quickLaunchApps=apps;
+  await window.api.saveConfig(S.cfg);
+  renderQlAppList();
+}
+
+async function removeQuickLaunchApp(idx){
+  const apps=S.cfg.quickLaunchApps||[];
+  apps.splice(idx,1);
+  S.cfg.quickLaunchApps=apps;
+  await window.api.saveConfig(S.cfg);
+  renderQlAppList();
+}
+
+// ── QUICK LAUNCH (MSFS) ───────────────────────────────────────────────────────
 async function launchMSFS(){
   const res=await window.api.launchMsfs({version:S.cfg.msfsVersion||'steam',steamExePath:S.cfg.steamExePath||''});
   if(res&&!res.ok)RLOG('[LAUNCH] Failed: '+(res.error||'unknown'));
@@ -3415,5 +3489,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.39</div>
+  pointer-events:none;">v4.5.40</div>
 </body></html>
