@@ -270,6 +270,7 @@ ipcMain.handle('si-write-community-routes', (_, snapshot) => {
 ipcMain.handle('activate-scenery', (_, {dep, arr, depFolder, arrFolder, libraryFolder, communityFolder}) => {
   const created = [], skipped = [], errors = [];
   for (const [icao, folder] of [[dep, depFolder], [arr, arrFolder]]) {
+    if (!folder) continue;
     const src = path.join(libraryFolder, folder);
     const dest = path.join(communityFolder, folder);
     try {

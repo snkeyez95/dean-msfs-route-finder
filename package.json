@@ -1,6 +1,6 @@
 ﻿{
   "name": "dean-msfs-route-finder",
-  "version": "4.5.40",
+  "version": "4.5.41",
   "description": "Dean's MSFS Route Finder",
   "main": "main.js",
   "scripts": {

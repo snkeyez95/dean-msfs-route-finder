@@ -44,7 +44,18 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg0);color:va
 .tab:hover{color:var(--ink2)}.tab.active{color:var(--ink0);border-bottom-color:var(--acc)}
 .tbadge{display:inline-block;background:var(--acc);color:#000;font-size:11px;font-weight:700;
   padding:2px 7px;border-radius:20px;margin-left:7px;font-family:'JetBrains Mono',monospace;vertical-align:1px}
-.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.app-body{display:flex;flex:1;overflow:hidden}
+.sidebar{width:168px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--sep);display:flex;flex-direction:column}
+.sb-brand{padding:16px 14px 12px;border-bottom:1px solid var(--sep);flex-shrink:0}
+.sb-brand-name{font-size:14px;font-weight:700;letter-spacing:-0.03em;color:var(--ink0);line-height:1.1}
+.sb-brand-name .acc{color:var(--acc);font-family:'JetBrains Mono',monospace}
+.sb-ver{font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace;margin-top:3px}
+.sb-nav{padding:6px 0;flex:1;overflow-y:auto}
+.sb-item{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;user-select:none;transition:color .12s,background .12s;white-space:nowrap}
+.sb-item:hover{color:var(--ink2);background:var(--bg2)}
+.sb-item.active{color:var(--acc);background:var(--acc3)}
+.sb-ic{width:16px;text-align:center;flex-shrink:0}
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .pane{display:none;flex:1;overflow:hidden}
 .pane.on{display:flex;flex-direction:column}
 .scroll{flex:1;overflow-y:auto;padding:24px 40px}
@@ -298,7 +309,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.40</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.41</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -314,19 +325,36 @@ html[data-theme="light"] .theme-knob{left:30px}
   <span id="si-banner-msg">SayIntentions cookie expired &mdash; paste new cookie in the Settings tab</span>
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
-<div class="hdr">
-  <div class="brand">Dean's&nbsp;<span class="acc">MSFS</span>&nbsp;Route Finder</div>
-  <div class="bsub">Fenix A319 / A320 / A321 &nbsp;&bull;&nbsp; PMDG 737-800 &nbsp;&bull;&nbsp; Challenging Approaches &nbsp;&bull;&nbsp; Live Routes via SayIntentions.AI</div>
-  <div class="tabs">
-    <div class="tab" data-tab="airports" onclick="sw('airports')">My Airports</div>
-    <div class="tab active" data-tab="routes" onclick="sw('routes')">Plan a Flight <span class="tbadge" id="rbadge">0</span></div>
-    <div class="tab" data-tab="challenges" onclick="sw('challenges')">Challenging Approaches</div>
-    <div class="tab" data-tab="settings" onclick="sw('settings')">&#9881; Settings</div>
+<div class="app-body">
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">Dean's&nbsp;<span class="acc">MSFS</span></div>
+    <div class="sb-ver">Route Finder v4.5.41</div>
+  </div>
+  <div class="sb-nav">
+    <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
+    <div class="sb-item" data-tab="airports" onclick="sw('airports')"><span class="sb-ic">&#9992;</span> Scenery</div>
+    <div class="sb-item" data-tab="routes" onclick="sw('routes')"><span class="sb-ic">&#128506;</span> Plan a Flight&nbsp;<span class="tbadge" id="rbadge">0</span></div>
+    <div class="sb-item" data-tab="challenges" onclick="sw('challenges')"><span class="sb-ic">&#9889;</span> Challenging</div>
+    <div class="sb-item" data-tab="fleet" onclick="sw('fleet')"><span class="sb-ic">&#128747;</span> My Fleet</div>
+    <div class="sb-item" data-tab="companions" onclick="sw('companions')"><span class="sb-ic">&#9654;</span> Companion Apps</div>
+    <div class="sb-item" data-tab="settings" onclick="sw('settings')"><span class="sb-ic">&#9881;</span> Settings</div>
   </div>
 </div>
-<div class="main">
+<div class="content">
 
-<!-- ── TAB 1: MY AIRPORTS ── -->
+<!-- ── DASHBOARD ── -->
+<div class="pane on" id="pane-dashboard"><div class="scroll">
+  <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Dashboard</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Your MSFS library at a glance.</div>
+  <div id="dash-map-wrap" style="background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);overflow:hidden;margin-bottom:16px;position:relative">
+    <svg id="dash-map" viewBox="0 0 720 340" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block"></svg>
+  </div>
+  <div id="dash-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:18px"></div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:12px">Recent Routes</div>
+  <div id="dash-recent" style="display:flex;flex-direction:column;gap:6px"></div>
+</div></div>
+<!-- ── SCENERY ── -->
 <div class="pane" id="pane-airports"><div class="scroll">
   <div class="stats">
     <div class="sc hi"><div class="sc-l">Total Airports</div><div class="sc-v va" id="st-tot">0</div></div>
@@ -368,7 +396,7 @@ html[data-theme="light"] .theme-knob{left:30px}
       <table class="atbl">
         <thead><tr>
           <th style="width:38px"></th><th style="width:80px">ICAO</th><th>Airport</th>
-          <th style="width:52px">Ctry</th><th style="width:125px">Type</th><th style="width:78px">Method</th><th style="width:40px"></th>
+          <th style="width:78px">Method</th><th style="width:40px"></th>
         </tr></thead>
         <tbody id="apt-body"></tbody>
       </table>
@@ -377,7 +405,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </div></div>
 
 <!-- ── TAB 2: PLAN A FLIGHT ── -->
-<div class="pane on" id="pane-routes">
+<div class="pane" id="pane-routes">
   <div style="padding:24px 40px 0;flex-shrink:0">
     <div id="normal-filter-rows">
       <div class="crow" id="acft-chips-row">
@@ -550,17 +578,6 @@ html[data-theme="light"] .theme-knob{left:30px}
 
 <!-- ── TAB 4: SETTINGS ── -->
 <div class="pane" id="pane-settings"><div class="scroll">
-  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">My Fleet</div>
-  <div class="api-pan" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="toggleFleetPanel()">
-      <span class="api-t" style="margin-bottom:0">My Fleet</span>
-      <span id="fleet-toggle-icon" style="font-size:11px;color:var(--ink3);margin-left:auto;font-family:'JetBrains Mono',monospace">&#9660; configure</span>
-    </div>
-    <div id="fleet-panel" style="display:none;margin-top:14px">
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Check the aircraft you own. Route results and filter chips are driven by this list.</div>
-      <div id="fleet-checks" style="display:flex;flex-wrap:wrap;gap:12px 28px"></div>
-    </div>
-  </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Route Data Source</div>
   <div class="api-pan" style="margin-bottom:24px">
     <div class="api-t">Live Route Data &mdash; SayIntentions.AI</div>
@@ -600,13 +617,6 @@ html[data-theme="light"] .theme-knob{left:30px}
       <button class="btn bg bsm" onclick="exportSnapshot()">&#11015; Export to community_routes.json</button>
       <button class="btn bg bsm" onclick="restoreFromSnapshot()">&#8635; Restore from Snapshot</button>
     </div>
-  </div>
-  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Quick Launch Apps</div>
-  <div class="api-pan" style="margin-bottom:24px">
-    <div class="api-t">Companion Apps</div>
-    <div class="api-s">Apps to launch alongside MSFS. Click &#9889; Quick Launch in any route detail to open them.</div>
-    <div id="ql-app-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
-    <button class="btn bg bsm" onclick="addQuickLaunchApp()">&#65291; Add App</button>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Manual Import</div>
   <div id="si-drop-zone" class="si-drop"
@@ -650,7 +660,25 @@ html[data-theme="light"] .theme-knob{left:30px}
   </div>
 </div></div>
 
-</div><script>
+
+<!-- ── MY FLEET ── -->
+<div class="pane" id="pane-fleet"><div class="scroll">
+  <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">My Fleet</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Check the aircraft you own. Route results and filter chips are driven by this list.</div>
+  <div class="card" style="padding:20px">
+    <div id="fleet-checks-fleet" style="display:flex;flex-wrap:wrap;gap:12px 28px"></div>
+  </div>
+</div></div>
+
+<!-- ── COMPANION APPS ── -->
+<div class="pane" id="pane-companions"><div class="scroll">
+  <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Companion Apps</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Apps to launch alongside MSFS. Click &#9889; Quick Launch in any route detail to open them.</div>
+  <div class="card" style="padding:20px;margin-bottom:16px">
+    <div id="ql-app-list-comp" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+    <button class="btn bg bsm" onclick="addQuickLaunchApp()">&#65291; Add App</button>
+  </div>
+</div></div></div></div><script>
 // ── RENDERER LOGGER ──────────────────────────────────────────────────────────
 function RLOG(...args){
   const msg=args.map(a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' ');
@@ -1012,7 +1040,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
   }
   populateSimIntegration();
   renderQlAppList();
+  renderFleetPanel();
   buildChSB();renderCD(0);updateStats();renderRoutes();
+  renderDashboard();
   updateSnapshotInfo();
   fetchMetarBatch();
   setInterval(async()=>{if(S.selICAOs.size){RLOG('[WX] Auto-refresh triggered');await fetchMetarBatch();RLOG('[WX] Auto-refresh complete: '+Object.keys(S.metarCache).length+' cached');}},30*60*1000);
@@ -1062,7 +1092,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
 });
 
 function sw(t){
-  document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));
+  document.querySelectorAll('.sb-item').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));
   document.querySelectorAll('.pane').forEach(e=>e.classList.toggle('on',e.id==='pane-'+t));
   if(t==='routes'){
     (async()=>{
@@ -1072,6 +1102,9 @@ function sw(t){
     })();
   }
   if(t==='challenges')buildChDepSelect();
+  if(t==='dashboard')renderDashboard();
+  if(t==='fleet')renderFleetPane();
+  if(t==='companions')renderCompanionsPane();
 }
 
 // ── AIRPORTS ────────────────────────────────────────────────────────────────
@@ -1223,8 +1256,6 @@ function renderApts(){
         <td></td>
         <td class="icao" style="color:var(--ink4)">${r.icao||'&mdash;'}</td>
         <td><div class="an" style="color:var(--ink3)">${info[0]}</div><div class="af">${r.folder}</div></td>
-        <td style="font-size:13px;color:var(--ink3)">${info[2]||''}</td>
-        <td><span class="bdg bgry">${info[3]||''}</span></td>
         <td><span style="font-size:12px;color:var(--ink4)">${r.method||'&mdash;'}</span></td>
         <td><button class="btn bg bxs" onclick="unignoreFolder('${r.folder}')" title="Restore this airport">Restore</button></td>
       </tr>`;
@@ -1233,8 +1264,6 @@ function renderApts(){
       <td><input type="checkbox" ${sel?'checked':''} ${r.icao?'':'disabled'} onchange="togA('${r.icao}',this.checked)" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;"></td>
       <td class="icao" style="color:${r.icao?'var(--acc)':'var(--ink4)'}">${r.icao||'&mdash;'}</td>
       <td><div class="an">${info[0]}</div><div class="af">${r.folder}</div></td>
-      <td style="font-size:13px;color:var(--ink2)">${info[2]||''}</td>
-      <td><span class="bdg bgry">${info[3]||''}</span></td>
       <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:${mc};flex-shrink:0;display:inline-block"></span>${r.method||'&mdash;'}</span></td>
       <td style="white-space:nowrap">${!r.icao?`<span style="display:inline-flex;align-items:center;gap:4px"><button class="btn bg bxs" onclick="startAddIcao(this,'${r.folder}')" title="Manually assign ICAO code" style="color:var(--acc);font-family:'JetBrains Mono',monospace;font-weight:600">+ ICAO</button><button class="btn bg bxs" onclick="ignoreFolder('${r.folder}')" title="Ignore this airport (hide from list)" style="padding:4px 8px;line-height:1;color:var(--ink3)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>`:''}</td>
     </tr>`;
@@ -1403,8 +1432,10 @@ function toggleFleetPanel(){
   if(ic)ic.innerHTML=open?'&#9650; collapse':'&#9660; configure';
 }
 
+function renderFleetPane(){renderFleetPanel();}
+
 function renderFleetPanel(){
-  const el=document.getElementById('fleet-checks');
+  const el=document.getElementById('fleet-checks-fleet');
   if(!el)return;
   const fleet=S.cfg.myFleet||{};
   const families=[...new Set(FLEET_DEF.map(f=>f.family))];
@@ -2627,33 +2658,43 @@ function sceneryBtnHtml(dep,arr,ns,idx){
   const depRow=S.allRows.find(r=>r.icao===dep&&r.selected!==false);
   const arrRow=S.allRows.find(r=>r.icao===arr&&r.selected!==false);
   if(!depRow&&!arrRow)return'';
-  if(!depRow)return`<span style="font-size:11px;color:var(--ink3);align-self:center;margin-left:4px">${dep} not in library</span>`;
-  if(!arrRow)return`<span style="font-size:11px;color:var(--ink3);align-self:center;margin-left:4px">${arr} not in library</span>`;
   const junctions=S.cfg.activeJunctions||[];
-  const depActive=junctions.includes(depRow.folder);
-  const arrActive=junctions.includes(arrRow.folder);
-  const bothActive=depActive&&arrActive;
-  if(bothActive){
-    return`<button class="btn bg bsm" style="border-color:rgba(50,215,75,.4);color:var(--grn)" onclick="doDeactivateScenery('${depRow.folder}','${arrRow.folder}')">&#10006; Remove Activation</button>`;
+  function statusIcon(row,icao){
+    if(!row)return`<span style="color:var(--ink4);font-size:12px" title="Not in library">—</span>`;
+    if(junctions.includes(row.folder))return`<span style="color:var(--grn);font-size:13px" title="Active in Community folder">✓</span>`;
+    return`<span style="color:var(--acc);font-size:13px" title="In library, not activated">◎</span>`;
   }
-  return`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}','${depRow.folder}','${arrRow.folder}')">&#9654; Activate Scenery</button>`;
+  const depF=depRow?`'${depRow.folder}'`:'null';
+  const arrF=arrRow?`'${arrRow.folder}'`:'null';
+  const depActive=depRow&&junctions.includes(depRow.folder);
+  const arrActive=arrRow&&junctions.includes(arrRow.folder);
+  const anyActive=depActive||arrActive;
+  const allActive=(!depRow||depActive)&&(!arrRow||arrActive);
+  const activateBtn=!allActive?`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}',${depF},${arrF})">&#9654; Activate</button>`:'';
+  const removeBtn=anyActive?`<button class="btn bg bsm" style="border-color:rgba(50,215,75,.3);color:var(--grn)" onclick="doDeactivateScenery(${depF},${arrF})">&#10006; Remove</button>`:'';
+  return`<div style="display:flex;flex-direction:column;gap:4px;margin-left:4px;align-self:center">
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(depRow,dep)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${dep}</span><span style="color:var(--ink3)">${depRow?depRow.folder:'not in library'}</span></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(arrRow,arr)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${arr}</span><span style="color:var(--ink3)">${arrRow?arrRow.folder:'not in library'}</span></div>
+    <div style="display:flex;gap:6px;margin-top:2px">${activateBtn}${removeBtn}</div>
+  </div>`;
 }
 
 async function doActivateScenery(dep,arr,depFolder,arrFolder){
   if(!S.cfg.communityFolder){alert('Set your Community folder in Settings → Sim Integration first.');return;}
-  const res=await window.api.activateScenery({dep,arr,depFolder,arrFolder,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
+  const res=await window.api.activateScenery({dep,arr,depFolder:depFolder||null,arrFolder:arrFolder||null,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
   if(!res||!res.ok){alert('Activation failed: '+(res&&res.error||'unknown error'));return;}
   const junctions=new Set(S.cfg.activeJunctions||[]);
   res.created.forEach(f=>junctions.add(f));
   S.cfg.activeJunctions=Array.from(junctions);
   window.api.saveConfig(S.cfg);
-  RLOG('[SCENE] Activated: '+res.created.join(', ')+(res.skipped.length?' | skipped (already exists): '+res.skipped.join(', '):''));
+  RLOG('[SCENE] Activated: '+res.created.join(', ')+(res.skipped.length?' | skipped: '+res.skipped.join(', '):''));
   renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();
 }
 
 async function doDeactivateScenery(depFolder,arrFolder){
   if(!S.cfg.communityFolder)return;
-  const res=await window.api.deactivateScenery({folders:[depFolder,arrFolder],communityFolder:S.cfg.communityFolder});
+  const folders=[depFolder,arrFolder].filter(Boolean);
+  const res=await window.api.deactivateScenery({folders,communityFolder:S.cfg.communityFolder});
   if(!res||!res.ok){alert('Deactivation failed: '+(res&&res.error||'unknown error'));return;}
   const junctions=new Set(S.cfg.activeJunctions||[]);
   res.removed.forEach(f=>junctions.delete(f));
@@ -2666,11 +2707,12 @@ async function doDeactivateScenery(depFolder,arrFolder){
 // ── QUICK LAUNCH COMPANION APPS ──────────────────────────────────────────────
 function qlBtnHtml(ns,idx){
   const apps=S.cfg.quickLaunchApps||[];
-  if(!apps.length)return'';
+  const msfsItem=`<button style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--acc);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;border-bottom:1px solid var(--sep)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'" onclick="launchMSFS();document.getElementById('ql-drop-${ns}-${idx}').style.display='none'">&#9654; Launch MSFS</button>`;
+  const appItems=apps.map((a,ai)=>`<button style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--ink1);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'" onclick="launchQuickApp('${(a.path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','ql-drop-${ns}-${idx}')">${a.name||'App '+(ai+1)}</button>`).join('');
   return`<div style="position:relative;display:inline-block">
     <button class="btn bg bsm" onclick="toggleQlDrop(event,'ql-drop-${ns}-${idx}')">&#9889; Quick Launch</button>
-    <div id="ql-drop-${ns}-${idx}" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--sep);border-radius:6px;z-index:200;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden">
-      ${apps.map((a,ai)=>`<button style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--ink1);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='none'" onclick="launchQuickApp('${(a.path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','ql-drop-${ns}-${idx}')">${a.name||'App '+(ai+1)}</button>`).join('')}
+    <div id="ql-drop-${ns}-${idx}" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:1px solid var(--sep);border-radius:6px;z-index:200;min-width:170px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden">
+      ${msfsItem}${appItems}
     </div>
   </div>`;
 }
@@ -2694,8 +2736,78 @@ async function launchQuickApp(appPath,dropId){
   if(res&&!res.ok)RLOG('[LAUNCH] App failed: '+(res.error||'unknown'));
 }
 
+function renderCompanionsPane(){renderQlAppList();}
+
+// ── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard(){
+  renderDashMap();
+  renderDashStats();
+  renderDashRecent();
+}
+
+function renderDashMap(){
+  const svg=document.getElementById('dash-map');
+  if(!svg)return;
+  const W=720,H=340;
+  const px=lon=>((lon+180)/360*W);
+  const py=lat=>((90-lat)/180*H);
+  // Convert lat/lon array to SVG polygon points string
+  function poly(pts){return pts.map(([lo,la])=>px(lo).toFixed(1)+','+py(la).toFixed(1)).join(' ');}
+  // Simplified continent polygons (equirectangular, key outline points)
+  const continents=[
+    [[-170,72],[-130,80],[-60,80],[-55,65],[-52,48],[-65,44],[-75,35],[-80,25],[-90,18],[-80,8],[-77,18],[-85,22],[-95,28],[-110,22],[-120,26],[-126,38],[-132,54],[-140,60],[-165,62]],// N America
+    [[-45,83],[-20,83],[-18,76],[-24,70],[-42,65],[-55,68],[-60,76]],// Greenland
+    [[-80,12],[-72,12],[-70,-2],[-78,-5],[-80,-15],[-74,-20],[-68,-28],[-55,-38],[-52,-34],[-45,-24],[-35,-8],[-42,0],[-50,5],[-62,8],[-75,12]],// S America
+    [[-10,36],[0,46],[5,46],[8,48],[15,48],[20,55],[28,60],[30,62],[25,68],[15,70],[8,58],[8,55],[12,50],[18,48],[20,46],[22,44],[20,40],[16,38],[10,38],[5,36],[-2,36]],// Europe
+    [[-18,16],[-16,24],[-10,28],[0,32],[8,38],[14,36],[20,30],[26,32],[32,30],[38,28],[44,12],[48,4],[40,-12],[36,-20],[28,-28],[20,-34],[12,-24],[4,-16],[0,-8],[-4,4],[-10,4],[-14,8],[-18,12]],// Africa
+    [[28,42],[36,46],[44,40],[50,30],[60,22],[72,20],[76,8],[80,12],[88,22],[96,18],[100,4],[104,2],[110,8],[118,26],[126,34],[132,44],[142,52],[132,56],[110,52],[100,50],[88,48],[76,50],[68,54],[56,58],[52,52],[46,48],[40,46],[34,48],[28,46]],// Asia
+    [[114,-22],[120,-18],[128,-14],[136,-12],[140,-18],[142,-10],[150,-22],[152,-28],[148,-38],[140,-36],[130,-32],[124,-34],[118,-30]],// Australia
+    [[-180,-70],[-90,-68],[0,-70],[90,-68],[180,-70],[180,-90],[-180,-90]],// Antarctica
+  ];
+  // Build airport dots
+  const rows=S.allRows||[];
+  const dots=rows.filter(r=>r.icao&&r.method!=='noise').map(r=>{
+    const info=AI[r.icao]||(S.cfg.resolvedAirports&&S.cfg.resolvedAirports[r.icao]);
+    const lat=Array.isArray(info)?info[4]:info&&info.lat;
+    const lon=Array.isArray(info)?info[5]:info&&info.lon;
+    if(!lat&&!lon)return'';
+    const x=px(lon),y=py(lat);
+    const col=r.selected!==false?'var(--acc)':'var(--ink4)';
+    const name=(Array.isArray(info)?info[0]:info&&info.name)||r.icao;
+    return`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" opacity="0.85" style="cursor:default"><title>${r.icao} — ${name}</title></circle>`;
+  }).join('');
+  svg.innerHTML=`<rect width="${W}" height="${H}" fill="var(--bg2)"/>
+    <line x1="0" y1="${py(0).toFixed(1)}" x2="${W}" y2="${py(0).toFixed(1)}" stroke="var(--sep2)" stroke-width="0.5"/>
+    ${continents.map(pts=>`<polygon points="${poly(pts)}" fill="var(--bg4)" stroke="var(--sep2)" stroke-width="0.5"/>`).join('')}
+    ${dots}`;
+}
+
+function renderDashStats(){
+  const el=document.getElementById('dash-stats');
+  if(!el)return;
+  const airports=(S.allRows||[]).filter(r=>r.selected!==false&&r.icao&&r.method!=='noise').length;
+  const routes=Object.keys(S.routeRegistry||{}).length;
+  const fleet=Object.values(S.cfg.myFleet||{}).filter(v=>v).length;
+  const apps=(S.cfg.quickLaunchApps||[]).length;
+  const card=(label,val,cls)=>`<div class="sc"><div class="sc-l">${label}</div><div class="sc-v ${cls}">${val}</div></div>`;
+  el.innerHTML=card('Airports in Library',airports,'va')+card('Routes in Registry',routes,'vg')+card('Fleet Aircraft',fleet,'vb')+card('Companion Apps',apps,'vw');
+}
+
+function renderDashRecent(){
+  const el=document.getElementById('dash-recent');
+  if(!el)return;
+  const reg=S.routeRegistry||{};
+  const sorted=Object.values(reg).sort((a,b)=>(b.last_seen||'').localeCompare(a.last_seen||'')).slice(0,6);
+  if(!sorted.length){el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No routes in registry yet. Refresh routes in Settings to get started.</div>';return;}
+  el.innerHTML=sorted.map(r=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
+    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--acc);min-width:100px">${r.departure_airport} → ${r.arrival_airport}</span>
+    <span style="font-size:12px;color:var(--ink2);flex:1">${r.airline||'—'}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3)">${r.aircraft_type||'—'}</span>
+  </div>`).join('');
+}
+
 function renderQlAppList(){
-  const list=document.getElementById('ql-app-list');
+  const list=document.getElementById('ql-app-list-comp');
   if(!list)return;
   const apps=S.cfg.quickLaunchApps||[];
   if(!apps.length){list.innerHTML='<div style="font-size:12px;color:var(--ink3);font-family:\'Inter\',sans-serif">No apps configured yet.</div>';return;}
@@ -3489,5 +3601,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.40</div>
+  pointer-events:none;">v4.5.41</div>
 </body></html>
