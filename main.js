@@ -267,6 +267,63 @@ ipcMain.handle('si-write-community-routes', (_, snapshot) => {
   }
 });
 
+ipcMain.handle('activate-scenery', (_, {dep, arr, depFolder, arrFolder, libraryFolder, communityFolder}) => {
+  const created = [], skipped = [], errors = [];
+  for (const [icao, folder] of [[dep, depFolder], [arr, arrFolder]]) {
+    const src = path.join(libraryFolder, folder);
+    const dest = path.join(communityFolder, folder);
+    try {
+      if (fs.existsSync(dest)) {
+        skipped.push(folder);
+        LOG.info(`[SCENE] ${icao}: junction already exists at ${dest}`);
+      } else {
+        fs.symlinkSync(src, dest, 'junction');
+        created.push(folder);
+        LOG.info(`[SCENE] ${icao}: junction created ${dest} -> ${src}`);
+      }
+    } catch(e) {
+      errors.push(folder + ': ' + e.message);
+      LOG.error(`[SCENE] ${icao}: junction failed:`, e.message);
+    }
+  }
+  return {ok: errors.length === 0, created, skipped, errors};
+});
+
+ipcMain.handle('deactivate-scenery', (_, {folders, communityFolder}) => {
+  const removed = [], errors = [];
+  for (const folder of folders) {
+    const dest = path.join(communityFolder, folder);
+    try {
+      if (fs.existsSync(dest)) {
+        fs.unlinkSync(dest);
+        removed.push(folder);
+        LOG.info(`[SCENE] Junction removed: ${dest}`);
+      } else {
+        removed.push(folder);
+      }
+    } catch(e) {
+      errors.push(folder + ': ' + e.message);
+      LOG.error(`[SCENE] Junction removal failed:`, e.message);
+    }
+  }
+  return {ok: errors.length === 0, removed, errors};
+});
+
+ipcMain.handle('launch-msfs', (_, steamExePath) => {
+  const steamExe = (steamExePath && steamExePath.trim()) || 'C:\\Program Files (x86)\\Steam\\steam.exe';
+  try {
+    const child = spawn(steamExe, ['-no-browser', '-applaunch', '2537590'], {
+      detached: true, stdio: 'ignore', windowsHide: false,
+    });
+    child.unref();
+    LOG.info('[LAUNCH] MSFS launch triggered via', steamExe);
+    return {ok: true};
+  } catch(e) {
+    LOG.error('[LAUNCH] Failed to launch MSFS:', e.message);
+    return {ok: false, error: e.message};
+  }
+});
+
 ipcMain.handle('get-log-path',()=>LOG_PATH);
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());

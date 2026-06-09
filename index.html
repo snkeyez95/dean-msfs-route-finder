@@ -256,8 +256,13 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 .sir-grn{background:var(--grn2);color:var(--grn);border:1px solid rgba(50,215,75,.25)}
 .sir-amb{background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)}
 .sir-red{background:var(--red2);color:var(--red);border:1px solid rgba(255,69,58,.25)}
+/* LAUNCH BUTTON */
+.launch-btn{-webkit-app-region:no-drag;margin-left:auto;background:var(--grn);color:#000;border:none;
+  border-radius:var(--r2);padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;
+  letter-spacing:.02em;font-family:'JetBrains Mono',monospace;transition:background .15s;white-space:nowrap}
+.launch-btn:hover{background:#45e85a}
 /* THEME TOGGLE */
-.theme-pill{-webkit-app-region:no-drag;margin-left:auto;display:flex;align-items:center;
+.theme-pill{-webkit-app-region:no-drag;display:flex;align-items:center;
   width:52px;height:26px;border-radius:13px;background:var(--bg4);border:1px solid var(--sep2);
   cursor:pointer;padding:0 6px;justify-content:space-between;flex-shrink:0;
   position:relative;user-select:none;transition:background .2s}
@@ -293,7 +298,8 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.35</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.36</div>
+  <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -612,6 +618,26 @@ html[data-theme="light"] .theme-knob{left:30px}
       <button class="btn bg bsm" id="cr-btn" onclick="downloadCommunityRoutes()">&#11015; Download Community Routes</button>
       <div id="cr-status" style="margin-top:8px;font-size:12px;color:var(--ink3);font-family:'JetBrains Mono',monospace;min-height:16px"></div>
     </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Sim Integration</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">Scenery Activation</div>
+    <div class="api-s">Set your MSFS Community folder. When you expand a route, the app can create junction points (symlinks) for the DEP and ARR scenery add-ons — keeping your Community folder lean.</div>
+    <div class="api-row" style="margin-bottom:7px">
+      <input class="api-inp" type="text" id="community-folder-inp" placeholder="e.g. C:\Users\You\AppData\Roaming\...\Community" oninput="onCommunityFolderInput()" style="color:var(--ink2)">
+      <button class="btn bg bsm" onclick="browseCommunityFolder()">Browse&hellip;</button>
+      <button class="btn bp bsm" onclick="saveCommunityFolder()">Save</button>
+    </div>
+    <div id="community-folder-st" style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--ink3);min-height:16px"></div>
+  </div>
+  <div class="api-pan">
+    <div class="api-t">Quick Launch &mdash; Steam</div>
+    <div class="api-s">The <strong>&#9654; Launch MSFS</strong> button in the title bar uses Steam's <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:12px">-no-browser</code> flag to open MSFS 2024 without the Steam storefront popping up. If Steam is not in the default location, set the path below.</div>
+    <div class="api-row" style="margin-bottom:7px">
+      <input class="api-inp" type="text" id="steam-path-inp" placeholder="Default: C:\Program Files (x86)\Steam\steam.exe" oninput="onSteamPathInput()" style="color:var(--ink2)">
+      <button class="btn bp bsm" onclick="saveSteamPath()">Save</button>
+    </div>
+    <div id="steam-path-st" style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--ink3);min-height:16px"></div>
   </div>
 </div></div>
 
@@ -975,6 +1001,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
       setScanNote('Loaded '+S.allRows.length+' airports from last session. Click Scan Now if your library has changed.');
     }catch(e){ console.error('Session restore error:',e); }
   }
+  populateSimIntegration();
   buildChSB();renderCD(0);updateStats();renderRoutes();
   updateSnapshotInfo();
   fetchMetarBatch();
@@ -1864,6 +1891,7 @@ function renderRoutes(){
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
+        ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'main',i)}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -2115,6 +2143,7 @@ function renderFreeRouteResults(){
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
+        ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'fr',i)}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -2502,6 +2531,7 @@ function renderTripCard(){
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; FlightAware</button>
         <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
+        ${sceneryBtnHtml(leg.dep,leg.arr,'tp',i)}
       </div>
     </div></td></tr>`;
     return[main,det];
@@ -2576,6 +2606,88 @@ function restoreTripPlan(){
   // Panel stays collapsed (toggled by user) — prepare card state for when they open it
   document.getElementById('tp-input-state').style.display='none';
   document.getElementById('tp-card').style.display='block';
+}
+
+// ── SCENERY ACTIVATION ───────────────────────────────────────────────────────
+function sceneryBtnHtml(dep,arr,ns,idx){
+  if(!S.cfg.communityFolder)return'';
+  const depRow=S.allRows.find(r=>r.icao===dep&&r.selected!==false);
+  const arrRow=S.allRows.find(r=>r.icao===arr&&r.selected!==false);
+  if(!depRow&&!arrRow)return'';
+  if(!depRow)return`<span style="font-size:11px;color:var(--ink3);align-self:center;margin-left:4px">${dep} not in library</span>`;
+  if(!arrRow)return`<span style="font-size:11px;color:var(--ink3);align-self:center;margin-left:4px">${arr} not in library</span>`;
+  const junctions=S.cfg.activeJunctions||[];
+  const depActive=junctions.includes(depRow.folder);
+  const arrActive=junctions.includes(arrRow.folder);
+  const bothActive=depActive&&arrActive;
+  if(bothActive){
+    return`<button class="btn bg bsm" style="border-color:rgba(50,215,75,.4);color:var(--grn)" onclick="doDeactivateScenery('${depRow.folder}','${arrRow.folder}')">&#10006; Remove Activation</button>`;
+  }
+  return`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}','${depRow.folder}','${arrRow.folder}')">&#9654; Activate Scenery</button>`;
+}
+
+async function doActivateScenery(dep,arr,depFolder,arrFolder){
+  if(!S.cfg.communityFolder){alert('Set your Community folder in Settings → Sim Integration first.');return;}
+  const res=await window.api.activateScenery({dep,arr,depFolder,arrFolder,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
+  if(!res||!res.ok){alert('Activation failed: '+(res&&res.error||'unknown error'));return;}
+  const junctions=new Set(S.cfg.activeJunctions||[]);
+  res.created.forEach(f=>junctions.add(f));
+  S.cfg.activeJunctions=Array.from(junctions);
+  window.api.saveConfig(S.cfg);
+  RLOG('[SCENE] Activated: '+res.created.join(', ')+(res.skipped.length?' | skipped (already exists): '+res.skipped.join(', '):''));
+  renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();
+}
+
+async function doDeactivateScenery(depFolder,arrFolder){
+  if(!S.cfg.communityFolder)return;
+  const res=await window.api.deactivateScenery({folders:[depFolder,arrFolder],communityFolder:S.cfg.communityFolder});
+  if(!res||!res.ok){alert('Deactivation failed: '+(res&&res.error||'unknown error'));return;}
+  const junctions=new Set(S.cfg.activeJunctions||[]);
+  res.removed.forEach(f=>junctions.delete(f));
+  S.cfg.activeJunctions=Array.from(junctions);
+  window.api.saveConfig(S.cfg);
+  RLOG('[SCENE] Deactivated: '+res.removed.join(', '));
+  renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();
+}
+
+// ── QUICK LAUNCH ─────────────────────────────────────────────────────────────
+async function launchMSFS(){
+  const res=await window.api.launchMsfs(S.cfg.steamExePath||'');
+  if(res&&!res.ok)RLOG('[LAUNCH] Failed: '+(res.error||'unknown'));
+}
+
+// ── SIM INTEGRATION SETTINGS ─────────────────────────────────────────────────
+function onCommunityFolderInput(){
+  const v=document.getElementById('community-folder-inp').value.trim();
+  document.getElementById('community-folder-st').textContent=v?'Unsaved changes — click Save':'';
+}
+async function browseCommunityFolder(){
+  const p=await window.api.browseFolder();
+  if(!p)return;
+  document.getElementById('community-folder-inp').value=p;
+  document.getElementById('community-folder-st').textContent='Unsaved changes — click Save';
+}
+function saveCommunityFolder(){
+  const v=document.getElementById('community-folder-inp').value.trim();
+  S.cfg.communityFolder=v||'';
+  window.api.saveConfig(S.cfg);
+  document.getElementById('community-folder-st').textContent=v?'Saved: '+v:'Cleared';
+  RLOG('[SCENE] Community folder set: '+v);
+}
+function onSteamPathInput(){
+  document.getElementById('steam-path-st').textContent='Unsaved changes — click Save';
+}
+function saveSteamPath(){
+  const v=document.getElementById('steam-path-inp').value.trim();
+  S.cfg.steamExePath=v||'';
+  window.api.saveConfig(S.cfg);
+  document.getElementById('steam-path-st').textContent=v?'Saved: '+v:'Using default path';
+}
+function populateSimIntegration(){
+  const ci=document.getElementById('community-folder-inp');
+  if(ci&&S.cfg.communityFolder){ci.value=S.cfg.communityFolder;document.getElementById('community-folder-st').textContent='Saved: '+S.cfg.communityFolder;}
+  const si=document.getElementById('steam-path-inp');
+  if(si&&S.cfg.steamExePath){si.value=S.cfg.steamExePath;document.getElementById('steam-path-st').textContent='Saved: '+S.cfg.steamExePath;}
 }
 
 // ── METAR ────────────────────────────────────────────────────────────────────
@@ -3281,5 +3393,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.35</div>
+  pointer-events:none;">v4.5.36</div>
 </body></html>
