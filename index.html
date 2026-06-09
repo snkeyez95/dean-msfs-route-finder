@@ -298,7 +298,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.39</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v4.5.38</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -628,13 +628,20 @@ html[data-theme="light"] .theme-knob{left:30px}
         <span id="sim-override-icon" style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace">&#9654;</span>
         <span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace">Override paths (non-standard install)</span>
       </div>
-      <div id="sim-override-panel" style="display:none;margin-top:12px;flex-direction:column;gap:10px">
+      <div id="sim-override-panel" style="display:none;margin-top:12px;display:flex;flex-direction:column;gap:10px">
         <div>
           <div style="font-size:11px;color:var(--ink3);margin-bottom:5px;font-family:'JetBrains Mono',monospace">Community Folder</div>
           <div class="api-row">
-            <input class="api-inp" type="text" id="community-folder-inp" placeholder="e.g. C:\...\Community" style="color:var(--ink2)">
+            <input class="api-inp" type="text" id="community-folder-inp" placeholder="e.g. C:\...\Community" oninput="onCommunityFolderInput()" style="color:var(--ink2)">
             <button class="btn bg bsm" onclick="browseCommunityFolder()">Browse&hellip;</button>
             <button class="btn bp bsm" onclick="saveCommunityFolder()">Save</button>
+          </div>
+        </div>
+        <div id="steam-path-wrap">
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:5px;font-family:'JetBrains Mono',monospace">Steam Executable</div>
+          <div class="api-row">
+            <input class="api-inp" type="text" id="steam-path-inp" placeholder="Default: C:\Program Files (x86)\Steam\steam.exe" oninput="onSteamPathInput()" style="color:var(--ink2)">
+            <button class="btn bp bsm" onclick="saveSteamPath()">Save</button>
           </div>
         </div>
       </div>
@@ -2667,9 +2674,12 @@ function toggleSimOverride(){
   if(icon)icon.innerHTML=open?'&#9660;':'&#9654;';
   if(open){
     const ci=document.getElementById('community-folder-inp');
+    const si=document.getElementById('steam-path-inp');
     if(ci&&S.cfg.communityFolder)ci.value=S.cfg.communityFolder;
+    if(si&&S.cfg.steamExePath)si.value=S.cfg.steamExePath;
   }
 }
+function onCommunityFolderInput(){}
 async function browseCommunityFolder(){
   const p=await window.api.browseFolder();
   if(!p)return;
@@ -2682,28 +2692,39 @@ function saveCommunityFolder(){
   updateSimDetectStatus();
   RLOG('[SCENE] Community folder override: '+v);
 }
+function onSteamPathInput(){}
+function saveSteamPath(){
+  const v=document.getElementById('steam-path-inp').value.trim();
+  S.cfg.steamExePath=v||'';
+  window.api.saveConfig(S.cfg);
+  updateSimDetectStatus();
+}
 function updateSimDetectStatus(){
   const el=document.getElementById('sim-detect-status');
   if(!el)return;
   const ver=S.cfg.msfsVersion;
   const cf=S.cfg.communityFolder;
+  const se=S.cfg.steamExePath;
   if(!ver&&!cf){
     el.innerHTML='<span style="color:var(--acc)">&#9888; MSFS 2024 not found at standard paths &mdash; expand Override below to set manually</span>';
     return;
   }
   const verLabel=ver==='store'?'Microsoft Store':'Steam';
   const cfLine=cf?`<div>&#10003; Community: <span style="color:var(--ink2)">${cf}</span></div>`:'<div style="color:var(--acc)">&#9888; Community folder not set</div>';
-  const launchLine=ver==='store'?'Microsoft Store (shell launch)':'Steam (-no-browser)';
-  el.innerHTML=`<div style="color:var(--grn);margin-bottom:4px">&#10003; MSFS 2024 &mdash; ${verLabel}</div>${cfLine}<div>&#10003; Launch: <span style="color:var(--ink2)">${launchLine}</span></div>`;
+  const seLine=ver==='steam'?`<div>&#10003; Launch: <span style="color:var(--ink2)">${se||'C:\\Program Files (x86)\\Steam\\steam.exe (default)'}</span></div>`:'<div>&#10003; Launch: <span style="color:var(--ink2)">Microsoft Store (shell launch)</span></div>';
+  el.innerHTML=`<div style="color:var(--grn);margin-bottom:4px">&#10003; MSFS 2024 &mdash; ${verLabel}</div>${cfLine}${seLine}`;
 }
 async function populateSimIntegration(){
+  // Always detect — silently fill in anything missing, then show status
   const det=await window.api.msfsDetect();
   let changed=false;
   if(det&&det.version){
     if(!S.cfg.msfsVersion){S.cfg.msfsVersion=det.version;changed=true;}
     if(!S.cfg.communityFolder&&det.communityFolder){S.cfg.communityFolder=det.communityFolder;changed=true;}
+    if(det.version==='steam'&&!S.cfg.steamExePath&&det.steamExe){S.cfg.steamExePath=det.steamExe;changed=true;}
   }
-  if(changed){window.api.saveConfig(S.cfg);RLOG('[DETECT] MSFS 2024 auto-configured: '+(det.version||'unknown'));}
+  if(changed){window.api.saveConfig(S.cfg);RLOG('[DETECT] MSFS 2024 auto-configured: '+((det&&det.version)||'unknown'));}
+  if(det&&det.version==='store'){const w=document.getElementById('steam-path-wrap');if(w)w.style.display='none';}
   updateSimDetectStatus();
 }
 
@@ -3410,5 +3431,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v4.5.39</div>
+  pointer-events:none;">v4.5.38</div>
 </body></html>
