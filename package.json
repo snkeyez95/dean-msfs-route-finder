@@ -11,10 +11,9 @@
   "build": {
     "appId": "com.dean.msfs-route-finder",
     "productName": "A Better Route Planner",
-    "directories": { "output": "dist" },
+    "directories": { "output": "C:\\Temp\\abrp-build" },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "icon.ico"
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
     "nsis": {
       "oneClick": false,
