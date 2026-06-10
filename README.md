@@ -1,4 +1,4 @@
-﻿# Dean's MSFS Route Finder — v4.5.41
+﻿# Dean's MSFS Route Finder — v5.0.0
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -199,10 +199,10 @@ Key log prefixes:
 ## Changelog
 
 ```
-v4.5.41  Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist
-v4.5.41  Quick Launch companion apps — configure + launch from route detail
-v4.5.41  Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist
-v4.5.41  Fix override panel collapsed by default, remove unused Steam exe field
+v5.0.0  Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist
+v5.0.0  Quick Launch companion apps — configure + launch from route detail
+v5.0.0  Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist
+v5.0.0  Fix override panel collapsed by default, remove unused Steam exe field
 v4.5.38  Sim Integration redesign: silent auto-detect on launch, status display, no input fields
 v4.5.37  Auto-detect MSFS install (Steam/Store), pre-fill Community folder + launch method
 v4.5.36  Scenery activation (junction points) + Quick Launch Steam bypass
