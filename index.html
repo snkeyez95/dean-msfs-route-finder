@@ -307,7 +307,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 #map-popup .mp2{font-size:11px;color:#29b6f6;font-family:'JetBrains Mono',monospace;margin-top:2px}
 </style></head><body>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.2.1</div>
+  <div class="tname">A Better Route Planner &mdash; v5.3.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -333,7 +333,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.2.1</div>
+    <div class="sb-ver">v5.3.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -352,7 +352,7 @@ html[data-theme="light"] .theme-knob{left:30px}
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Dashboard</div>
   <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Your MSFS library at a glance.</div>
   <div id="dash-map-wrap" style="background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);overflow:hidden;margin-bottom:16px;position:relative">
-    <svg id="dash-map" viewBox="0 0 720 340" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block"></svg>
+    <svg id="dash-map" viewBox="0 0 720 220" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block"></svg>
     <div id="map-popup"><div class="mp1" id="mp-line1"></div><div class="mp2" id="mp-line2"></div></div>
   </div>
   <div id="dash-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:18px"></div>
@@ -1983,6 +1983,10 @@ function togR(i){
       fetchMetar(r.departure_airport,S.openRoute,'dep');
       fetchMetar(r.arrival_airport,S.openRoute,'arr');
     }
+    setTimeout(()=>{
+      const row=document.querySelector('tr.dr.open');
+      if(row) row.scrollIntoView({behavior:'smooth',block:'start'});
+    },0);
   }
 }
 
@@ -2799,7 +2803,7 @@ let _worldPaths = null;
 function renderDashMap(){
   const svg=document.getElementById('dash-map');
   if(!svg)return;
-  const W=720,H=340;
+  const W=720,H=220;
   const px=lon=>((lon+180)/360*W);
   const py=lat=>((90-lat)/180*H);
   if(!_worldPaths){
@@ -2819,7 +2823,7 @@ function renderDashMap(){
     const dev=folderToDev(r.folder);
     const l1=city.replace(/'/g,'&#39;');
     const l2=(r.icao+(dev?' — '+dev:'')).replace(/'/g,'&#39;');
-    return`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="#29b6f6" opacity="0.9" stroke="#ffffff" stroke-width="0.8" style="cursor:pointer" onclick="showMapPopup(event,'${r.icao}','${l1}','${l2}',${x.toFixed(1)},${y.toFixed(1)})"></circle>`;
+    return`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="#29b6f6" opacity="0.9" stroke="#ffffff" stroke-width="0.6" style="cursor:pointer" onclick="showMapPopup(event,'${r.icao}','${l1}','${l2}',${x.toFixed(1)},${y.toFixed(1)})"></circle>`;
   }).join('');
   const pathsHTML=_worldPaths.map(d=>`<path d="${d}" fill="#0a1628" stroke="#29b6f6" stroke-width="1.2" filter="url(#cglow)"/>`).join('');
   svg.innerHTML=`<defs>
@@ -3670,5 +3674,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.2.1</div>
+  pointer-events:none;">v5.3.0</div>
 </body></html>
