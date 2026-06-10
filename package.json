@@ -1,7 +1,7 @@
-﻿{
+{
   "name": "dean-msfs-route-finder",
-  "version": "5.0.4",
-  "description": "Dean's MSFS Route Finder",
+  "version": "5.0.5",
+  "description": "A Better Route Planner",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,7 +10,7 @@
   },
   "build": {
     "appId": "com.dean.msfs-route-finder",
-    "productName": "Dean's MSFS Route Finder",
+    "productName": "A Better Route Planner",
     "directories": { "output": "dist" },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
@@ -21,7 +21,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Dean's MSFS Route Finder"
+      "shortcutName": "A Better Route Planner"
     }
   },
   "dependencies": {

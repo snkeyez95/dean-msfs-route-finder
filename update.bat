@@ -1,9 +1,9 @@
-@echo off
-title Dean's MSFS Route Finder - Updater
+﻿@echo off
+title A Better Route Planner - Updater
 color 0A
 echo.
 echo  ================================================
-echo   Dean's MSFS Route Finder - Auto Updater
+echo   A Better Route Planner - Auto Updater
 echo  ================================================
 echo.
 

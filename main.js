@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const os     = require('os');
@@ -29,7 +29,7 @@ const LOG = {
 // Clear log on fresh start, write header
 try {
   fs.writeFileSync(LOG_PATH,
-    `Dean's MSFS Route Finder — Session started ${new Date().toISOString()}\n` +
+    `A Better Route Planner — Session started ${new Date().toISOString()}\n` +
     `Platform: ${process.platform} | Node: ${process.version} | Electron: ${process.versions.electron}\n` +
     '='.repeat(80) + '\n'
   );
@@ -63,14 +63,14 @@ function isNewer(remote, local) {
 function checkForUpdate() {
   try {
     const localHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-    const localMatch = localHtml.match(/Dean's MSFS Route Finder[^v]*v(\d+\.\d+\.\d+)/);
+    const localMatch = localHtml.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);
     if (!localMatch) return;
     const localVer = localMatch[1];
     https.get('https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main/index.html', res => {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
-        const remoteMatch = data.match(/Dean's MSFS Route Finder[^v]*v(\d+\.\d+\.\d+)/);
+        const remoteMatch = data.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);
         if (!remoteMatch) return;
         const remoteVer = remoteMatch[1];
         LOG.info(`Version check: local=v${localVer} remote=v${remoteVer}`);

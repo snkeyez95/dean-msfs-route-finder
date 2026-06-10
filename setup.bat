@@ -1,9 +1,9 @@
-@echo off
-title Dean's MSFS Route Finder - First Time Setup
+﻿@echo off
+title A Better Route Planner - First Time Setup
 color 0A
 echo.
 echo  ================================================
-echo   Dean's MSFS Route Finder - First Time Setup
+echo   A Better Route Planner - First Time Setup
 echo  ================================================
 echo.
 echo  This will download the latest app files from GitHub.

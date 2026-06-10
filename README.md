@@ -1,4 +1,4 @@
-﻿# Dean's MSFS Route Finder — v5.0.4
+# A Better Route Planner — v5.0.5
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -80,7 +80,7 @@ The app maintains a local database of routes saved to `%USERPROFILE%\.dean_msfs_
 
 ## Community Routes
 
-Dean's MSFS Route Finder includes a community route database that allows users without a SayIntentions.AI cookie to get a full route database instantly.
+A Better Route Planner includes a community route database that allows users without a SayIntentions.AI cookie to get a full route database instantly.
 
 **For users without an SI cookie:**
 1. Go to **Settings → Manual Import**
@@ -199,7 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
-v5.0.4   Clickable airport dots on dashboard map — popup shows city and scenery developer
+v5.0.5   Rename to A Better Route Planner, sidebar brand updated`nv5.0.4   Clickable airport dots on dashboard map — popup shows city and scenery developer
 v5.0.3   World map upgraded to 50m resolution, thicker neon glow, richer gradient background
 v5.0.2   Real world map using Natural Earth 110m data (world-atlas + topojson-client)
 v5.0.1   Neon glow world map, Both-airports mode default, scenery checkboxes as junction activators, SimBrief route tracking on dashboard
