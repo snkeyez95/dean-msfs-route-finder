@@ -337,13 +337,14 @@ ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
       child.unref();
       LOG.info('[LAUNCH] MSFS 2024 Store launched via shell:AppsFolder');
     } else {
-      // Steam version — -no-browser suppresses storefront popup
-      const steamExe = (steamExePath && steamExePath.trim()) || 'C:\\Program Files (x86)\\Steam\\steam.exe';
-      const child = spawn(steamExe, ['-no-browser', '-applaunch', '2537590'], {
+      // Steam version — launch exe directly so Steam client never pops up
+      const msfsExe = (steamExePath && steamExePath.trim()) ||
+        'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Microsoft Flight Simulator 2024\\FlightSimulator.exe';
+      const child = spawn(msfsExe, [], {
         detached: true, stdio: 'ignore', windowsHide: false,
       });
       child.unref();
-      LOG.info('[LAUNCH] MSFS 2024 Steam launched via', steamExe);
+      LOG.info('[LAUNCH] MSFS 2024 launched directly via', msfsExe);
     }
     return {ok: true};
   } catch(e) {

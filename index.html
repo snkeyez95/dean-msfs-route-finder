@@ -312,7 +312,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">A Better Route Planner &mdash; v5.0.5</div>
+  <div class="tname">A Better Route Planner &mdash; v5.0.6</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -332,7 +332,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.0.5</div>
+    <div class="sb-ver">v5.0.6</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -675,7 +675,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <!-- ── COMPANION APPS ── -->
 <div class="pane" id="pane-companions"><div class="scroll">
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Companion Apps</div>
-  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Apps to launch alongside MSFS. Click &#9889; Quick Launch in any route detail to open them.</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Apps to launch alongside MSFS. Click &#9889; Quick Launch on any route to open MSFS and all apps at once.</div>
   <div class="card" style="padding:20px;margin-bottom:16px">
     <div id="ql-app-list-comp" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
     <button class="btn bg bsm" onclick="addQuickLaunchApp()">&#65291; Add App</button>
@@ -1948,7 +1948,7 @@ function renderRoutes(){
         <button class="btn bp bsm" onclick="openSimBrief('${r.departure_airport}','${r.arrival_airport}','${r.aircraft_type}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'main',i)}
-        ${qlBtnHtml('main',i)}
+        ${qlBtnHtml()}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -2201,7 +2201,7 @@ function renderFreeRouteResults(){
         <button class="btn bp bsm" onclick="openSimBrief('${dep}','${arr}','${r.aircraft_type}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'fr',i)}
-        ${qlBtnHtml('fr',i)}
+        ${qlBtnHtml()}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -2590,7 +2590,7 @@ function renderTripCard(){
         <button class="btn bp bsm" onclick="openSimBrief('${leg.dep}','${leg.arr}','${sbType}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(leg.dep,leg.arr,'tp',i)}
-        ${qlBtnHtml('tp',i)}
+        ${qlBtnHtml()}
       </div>
     </div></td></tr>`;
     return[main,det];
@@ -3664,5 +3664,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.0.5</div>
+  pointer-events:none;">v5.0.6</div>
 </body></html>
