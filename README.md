@@ -1,4 +1,4 @@
-﻿# Dean's MSFS Route Finder — v5.0.2
+﻿# Dean's MSFS Route Finder — v5.0.3
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.0.3   World map upgraded to 50m resolution, thicker neon glow, richer gradient background
 v5.0.2   Real world map using Natural Earth 110m data (world-atlas + topojson-client)
 v5.0.1   Neon glow world map, Both-airports mode default, scenery checkboxes as junction activators, SimBrief route tracking on dashboard
 v5.0.0   Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist, partial activation

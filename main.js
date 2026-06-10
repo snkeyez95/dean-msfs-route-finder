@@ -355,7 +355,7 @@ ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
 ipcMain.handle('get-world-map', () => {
   try {
     const topojson = require('topojson-client');
-    const world = require('world-atlas/land-110m.json');
+    const world = require('world-atlas/land-50m.json');
     const W = 720, H = 340;
     const px = lon => (lon + 180) / 360 * W;
     const py = lat => (90 - lat) / 180 * H;
