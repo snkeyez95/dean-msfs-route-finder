@@ -1,5 +1,4 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const path   = require('path');
 const fs     = require('fs');
 const os     = require('os');
@@ -64,6 +63,7 @@ function isNewer(remote, local) {
 function checkForUpdate() {
   if (app.isPackaged) {
     // Installed .exe — use electron-updater to download and apply updates
+    const { autoUpdater } = require('electron-updater');
     autoUpdater.logger = { info: m => LOG.info('[AU]', m), warn: m => LOG.warn('[AU]', m), error: m => LOG.error('[AU]', m) };
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
@@ -420,7 +420,7 @@ ipcMain.handle('launch-app', (_, {path: appPath}) => {
 });
 
 ipcMain.handle('get-log-path',()=>LOG_PATH);
-ipcMain.on('install-update', () => { autoUpdater.quitAndInstall(); });
+ipcMain.on('install-update', () => { require('electron-updater').autoUpdater.quitAndInstall(); });
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
 ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());
