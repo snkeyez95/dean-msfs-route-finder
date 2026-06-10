@@ -5,8 +5,13 @@ const os     = require('os');
 const https  = require('https');
 const { spawn } = require('child_process');
 
+// ── USER DATA DIR ─────────────────────────────────────────────────────────────
+// All writable files live under %APPDATA%\A Better Route Planner\
+const USER_DATA = app.getPath('userData');
+if (!fs.existsSync(USER_DATA)) fs.mkdirSync(USER_DATA, { recursive: true });
+
 // ── FILE LOGGER ──────────────────────────────────────────────────────────────
-const LOG_PATH = path.join(__dirname, 'dean_msfs_debug.log');
+const LOG_PATH = path.join(USER_DATA, 'dean_msfs_debug.log');
 function redact(str) {
   // Redact long hex strings (API keys) and anything labelled cookie=
   return String(str)
@@ -36,9 +41,7 @@ try {
 } catch(e) {}
 LOG.info('App starting');
 
-// Fix GPU cache errors when running as Administrator on Windows
-app.setPath('userData',    path.join(os.homedir(), '.dean-msfs-cache'));
-app.setPath('sessionData', path.join(os.homedir(), '.dean-msfs-session'));
+// GPU flags to suppress errors when running as Administrator on Windows
 
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -142,7 +145,15 @@ ipcMain.handle('scan-folder', async (_,p)=>{
   }
 });
 
-const CFG=path.join(os.homedir(),'.dean_msfs_v4.json');
+const CFG = path.join(USER_DATA, 'config.json');
+// One-time migration: copy old home-root config to new userData location
+(()=>{
+  const OLD_CFG = path.join(os.homedir(), '.dean_msfs_v4.json');
+  if (!fs.existsSync(CFG) && fs.existsSync(OLD_CFG)) {
+    try { fs.copyFileSync(OLD_CFG, CFG); LOG.info('Config migrated from', OLD_CFG); }
+    catch(e) { LOG.warn('Config migration failed:', e.message); }
+  }
+})();
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' registry='+(Object.keys(c.routeRegistry||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
 ipcMain.handle('save-config',(_,cfg)=>{
   try{
@@ -248,13 +259,17 @@ ipcMain.handle('si-save-snapshot', (_, snapshot) => {
   }
 });
 
+// community_routes.json: dev = project folder (git can commit it), installed = userData
+const COMMUNITY_ROUTES = app.isPackaged
+  ? path.join(USER_DATA, 'community_routes.json')
+  : path.join(__dirname, 'community_routes.json');
+
 ipcMain.handle('si-export-snapshot', (_, snapshot) => {
   try {
-    const outPath = path.join(__dirname, 'community_routes.json');
     const routes = Object.values(snapshot);
-    fs.writeFileSync(outPath, JSON.stringify({routes}, null, 2));
-    LOG.info('[SI] community_routes.json exported: ' + routes.length + ' routes written to app folder');
-    return {ok: true, path: outPath};
+    fs.writeFileSync(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
+    LOG.info('[SI] community_routes.json exported: ' + routes.length + ' routes to ' + COMMUNITY_ROUTES);
+    return {ok: true, path: COMMUNITY_ROUTES};
   } catch(e) {
     LOG.error('si-export-snapshot failed:', e.message);
     return {ok: false, error: e.message};
@@ -263,22 +278,20 @@ ipcMain.handle('si-export-snapshot', (_, snapshot) => {
 
 ipcMain.handle('si-write-community-routes', (_, snapshot) => {
   try {
-    const outPath = path.join(__dirname, 'community_routes.json');
     const routes = Object.values(snapshot);
-    fs.writeFileSync(outPath, JSON.stringify({routes}, null, 2));
-    LOG.info('[SI] community_routes.json updated: ' + routes.length + ' routes written to app folder');
-    // Silent auto-publish — no visible window, no UI notification
-    const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat')], {
-      windowsHide: true,
-      shell: false,
-      cwd: __dirname,
-      stdio: 'ignore',
-    });
-    pub.on('close', code => {
-      if (code === 0) LOG.info('[SI] Community routes published to GitHub successfully');
-      else LOG.warn('[SI] Community routes publish failed — will retry next refresh');
-    });
-    pub.on('error', e => LOG.error('[SI] Community routes publish error:', e.message));
+    fs.writeFileSync(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
+    LOG.info('[SI] community_routes.json updated: ' + routes.length + ' routes to ' + COMMUNITY_ROUTES);
+    // Auto-publish only makes sense in dev where git is set up
+    if (!app.isPackaged) {
+      const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat')], {
+        windowsHide: true, shell: false, cwd: __dirname, stdio: 'ignore',
+      });
+      pub.on('close', code => {
+        if (code === 0) LOG.info('[SI] Community routes published to GitHub successfully');
+        else LOG.warn('[SI] Community routes publish failed — will retry next refresh');
+      });
+      pub.on('error', e => LOG.error('[SI] Community routes publish error:', e.message));
+    }
     return {ok: true, count: routes.length};
   } catch(e) {
     LOG.error('[SI] si-write-community-routes failed:', e.message);
