@@ -199,10 +199,9 @@ Key log prefixes:
 ## Changelog
 
 ```
-v5.0.0  Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist
-v5.0.0  Quick Launch companion apps — configure + launch from route detail
-v5.0.0  Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist
-v5.0.0  Fix override panel collapsed by default, remove unused Steam exe field
+v5.0.0   Full redesign: sidebar nav, dashboard map, fleet+companion panes, scenery checklist, partial activation
+v4.5.40  Last v4 release — Quick Launch companion apps, git-pull updater (tagged v4.5.40-stable)
+v4.5.39  Fix override panel collapsed by default, remove unused Steam exe field
 v4.5.38  Sim Integration redesign: silent auto-detect on launch, status display, no input fields
 v4.5.37  Auto-detect MSFS install (Steam/Store), pre-fill Community folder + launch method
 v4.5.36  Scenery activation (junction points) + Quick Launch Steam bypass
