@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('api', {
   winClose:           ()    => ipcRenderer.send('win-close'),
   rendererLog:        (msg) => ipcRenderer.send('renderer-log', msg),
   getLogPath:         ()    => ipcRenderer.invoke('get-log-path'),
+  isPackaged:         __dirname.includes('app.asar'),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available',   (_, ver) => cb(ver)),
+  onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded',  (_, ver) => cb(ver)),
+  installUpdate:      ()    => ipcRenderer.send('install-update'),
   onSiCookieExpired:  (cb)  => ipcRenderer.on('si-cookie-expired',  ()       => cb()),
 });

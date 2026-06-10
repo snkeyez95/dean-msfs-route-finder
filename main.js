@@ -1,4 +1,5 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path   = require('path');
 const fs     = require('fs');
 const os     = require('os');
@@ -61,27 +62,45 @@ function isNewer(remote, local) {
 }
 
 function checkForUpdate() {
-  try {
-    const localHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-    const localMatch = localHtml.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);
-    if (!localMatch) return;
-    const localVer = localMatch[1];
-    https.get('https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main/index.html', res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => {
-        const remoteMatch = data.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);
-        if (!remoteMatch) return;
-        const remoteVer = remoteMatch[1];
-        LOG.info(`Version check: local=v${localVer} remote=v${remoteVer}`);
-        if (isNewer(remoteVer, localVer) && win && !win.isDestroyed()) {
-          LOG.info(`Update available: remote=v${remoteVer} local=v${localVer}`);
-          win.webContents.send('update-available', remoteVer);
-        }
-      });
-    }).on('error', e => LOG.warn('Version check failed:', e.message));
-  } catch(e) {
-    LOG.warn('Version check error:', e.message);
+  if (app.isPackaged) {
+    // Installed .exe — use electron-updater to download and apply updates
+    autoUpdater.logger = { info: m => LOG.info('[AU]', m), warn: m => LOG.warn('[AU]', m), error: m => LOG.error('[AU]', m) };
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-available', info => {
+      LOG.info('[AU] Update available: v' + info.version);
+      if (win && !win.isDestroyed()) win.webContents.send('update-available', info.version);
+    });
+    autoUpdater.on('update-downloaded', info => {
+      LOG.info('[AU] Update downloaded: v' + info.version);
+      if (win && !win.isDestroyed()) win.webContents.send('update-downloaded', info.version);
+    });
+    autoUpdater.on('error', e => LOG.error('[AU] Error:', e.message));
+    autoUpdater.checkForUpdates().catch(e => LOG.warn('[AU] Check failed:', e.message));
+  } else {
+    // Dev mode — compare raw GitHub index.html version string, prompt to run update.bat
+    try {
+      const localHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+      const localMatch = localHtml.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);
+      if (!localMatch) return;
+      const localVer = localMatch[1];
+      https.get('https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main/index.html', res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          const remoteMatch = data.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);
+          if (!remoteMatch) return;
+          const remoteVer = remoteMatch[1];
+          LOG.info(`Version check: local=v${localVer} remote=v${remoteVer}`);
+          if (isNewer(remoteVer, localVer) && win && !win.isDestroyed()) {
+            LOG.info(`Update available: remote=v${remoteVer} local=v${localVer}`);
+            win.webContents.send('update-available', remoteVer);
+          }
+        });
+      }).on('error', e => LOG.warn('Version check failed:', e.message));
+    } catch(e) {
+      LOG.warn('Version check error:', e.message);
+    }
   }
 }
 
@@ -401,6 +420,7 @@ ipcMain.handle('launch-app', (_, {path: appPath}) => {
 });
 
 ipcMain.handle('get-log-path',()=>LOG_PATH);
+ipcMain.on('install-update', () => { autoUpdater.quitAndInstall(); });
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
 ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());

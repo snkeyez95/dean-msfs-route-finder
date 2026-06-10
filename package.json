@@ -1,19 +1,29 @@
 {
   "name": "dean-msfs-route-finder",
-  "version": "5.0.6",
+  "version": "5.0.7",
   "description": "A Better Route Planner",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win --x64",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "release": "electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "com.dean.msfs-route-finder",
     "productName": "A Better Route Planner",
-    "directories": { "output": "C:\\Temp\\abrp-build" },
+    "directories": {
+      "output": "C:\\Temp\\abrp-build"
+    },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -21,9 +31,15 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "A Better Route Planner"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "snkeyez95",
+      "repo": "dean-msfs-route-finder"
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
