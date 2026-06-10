@@ -687,6 +687,8 @@ function RLOG(...args){
   const msg=args.map(a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' ');
   try{window.api.rendererLog(msg);}catch(e){}
 }
+window.onerror=(msg,src,line,col,err)=>{RLOG('[CRASH] '+msg+' @ '+src+':'+line);};
+window.addEventListener('unhandledrejection',e=>{RLOG('[CRASH] Unhandled promise rejection: '+(e.reason&&e.reason.message||e.reason));});
 
 // ── AIRPORT DB ──────────────────────────────────────────────────────────────
 const AI={
@@ -1086,7 +1088,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     const b=document.getElementById('upd-banner');
     const m=document.getElementById('upd-msg');
     if(b&&m){
-      if(window.api.isPackaged){
+      if(window.api.isPackaged()){
         m.textContent='⟳ Update v'+ver+' downloading in the background…';
       } else {
         m.textContent='⟳ Update available — v'+ver+' is ready. Run update.bat to update.';
