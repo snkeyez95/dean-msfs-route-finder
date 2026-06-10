@@ -6,8 +6,6 @@ echo  ================================================
 echo   Dean's MSFS Route Finder - Auto Updater
 echo  ================================================
 echo.
-echo  Downloading latest files from GitHub...
-echo.
 
 cd /d "%~dp0"
 
