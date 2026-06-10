@@ -309,7 +309,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <button class="wb mn" onclick="window.api.winMinimize()"></button>
     <button class="wb mx" onclick="window.api.winMaximize()"></button>
   </div>
-  <div class="tname">Dean's MSFS Route Finder &mdash; v5.0.0</div>
+  <div class="tname">Dean's MSFS Route Finder &mdash; v5.0.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -329,7 +329,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">Dean's&nbsp;<span class="acc">MSFS</span></div>
-    <div class="sb-ver">Route Finder v5.0.0</div>
+    <div class="sb-ver">Route Finder v5.0.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -388,8 +388,6 @@ html[data-theme="light"] .theme-knob{left:30px}
         <option value="missing">Missing</option>
       </select>
       <a id="ignored-link" href="#" onclick="S.showIgnored=!S.showIgnored;renderApts();return false;" style="display:none;font-size:13px;color:var(--ink3);text-decoration:none;align-self:center;white-space:nowrap"></a>
-      <button class="btn bg bsm" onclick="selAll()">Select All</button>
-      <button class="btn bg bsm" onclick="clrAll()">Clear</button>
       <button class="btn bg bsm" onclick="addManual()" style="margin-left:auto">+ Add ICAO</button>
     </div>
     <div class="awrap">
@@ -413,8 +411,8 @@ html[data-theme="light"] .theme-knob{left:30px}
       </div>
       <div class="crow">
         <span class="clbl">Mode</span>
-        <div class="chip sq on" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
-        <div class="chip sq" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+        <div class="chip sq on" data-mode="2" onclick="setMode('2')">Both airports in library</div>
+        <div class="chip sq" data-mode="1" onclick="setMode('1')">At least 1 airport in library</div>
       </div>
       <div class="crow">
         <span class="clbl">Direction</span>
@@ -960,7 +958,7 @@ const CH=[
 // State
 const S={
   folderPath:'',allRows:[],selICAOs:new Set(),
-  acft:'all',mode:'1',openRoute:null,
+  acft:'all',mode:'2',openRoute:null,
   selChall:0,cfg:{},siCookie:'',
   routeRegistry:{},
   routeRegistrySnapshot:{},
@@ -1249,7 +1247,8 @@ function renderApts(){
   }).map(r=>{
     const isIgnored=ignored.has(r.folder);
     const info=AI[r.icao]||['Unknown Airport','','',''];
-    const sel=r.icao?S.selICAOs.has(r.icao):false;
+    const junctions=S.cfg.activeJunctions||[];
+    const sel=r.icao?junctions.includes(r.folder):false;
     const mc=r.method==='auto'?'var(--acc)':r.method==='fuzzy'?'#d4a017':r.method==='manual'?'var(--blu)':'var(--bg4)';
     if(isIgnored){
       return`<tr style="opacity:0.35">
@@ -1270,14 +1269,24 @@ function renderApts(){
   }).join('');
 }
 
-function togA(icao,c){
-  if(c)S.selICAOs.add(icao);else S.selICAOs.delete(icao);
-  S.allRows.forEach(r=>{if(r.icao===icao)r.selected=c;});
-  S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);
-  updateStats();renderRoutes();
+async function togA(icao,checked){
+  if(!S.cfg.communityFolder){alert('Set your Community folder in Settings → Sim Integration first.');renderApts();return;}
+  const row=S.allRows.find(r=>r.icao===icao);
+  if(!row)return;
+  if(checked){
+    const res=await window.api.activateScenery({dep:icao,arr:null,depFolder:row.folder,arrFolder:null,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
+    if(!res||!res.ok){alert('Activation failed: '+(res&&res.error||'unknown error'));renderApts();return;}
+    const j=new Set(S.cfg.activeJunctions||[]);
+    res.created.forEach(f=>j.add(f));
+    S.cfg.activeJunctions=Array.from(j);
+  }else{
+    const res=await window.api.deactivateScenery({folders:[row.folder],communityFolder:S.cfg.communityFolder});
+    if(!res||!res.ok){alert('Deactivation failed: '+(res&&res.error||'unknown error'));renderApts();return;}
+    S.cfg.activeJunctions=(S.cfg.activeJunctions||[]).filter(f=>f!==row.folder);
+  }
+  window.api.saveConfig(S.cfg);
+  renderApts();
 }
-function selAll(){S.allRows.forEach(r=>{if(r.icao){S.selICAOs.add(r.icao);r.selected=true;}});S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);renderApts();updateStats();}
-function clrAll(){S.selICAOs.clear();S.allRows.forEach(r=>r.selected=false);S.cfg.savedRows=S.allRows;window.api.saveConfig(S.cfg);renderApts();updateStats();}
 
 async function addManual(){
   const icao=prompt('Enter 4-letter ICAO code:');if(!icao)return;
@@ -1481,12 +1490,13 @@ function renderFleetChips(){
 
 function processPage(routes){
   const now=new Date().toISOString();
+  const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
   for(const r of routes){
     if(r.type!=='carrier')continue;
     if(!SI_ACFT_MAP[r.aircraft_type])continue;
     const dep=(r.departure_airport||'').toUpperCase();
     const arr=(r.arrival_airport||'').toUpperCase();
-    if(!S.selICAOs.has(dep)&&!S.selICAOs.has(arr))continue;
+    if(!allLib.has(dep)&&!allLib.has(arr))continue;
     const id=String(r.id);
     if(S.routeRegistry[id]){
       S.routeRegistry[id].last_seen=now;
@@ -1662,7 +1672,7 @@ async function fetchSIRoutes({autoMode=false}={}){
     else setSt('No cookie — save your SayIntentions cookie first.','var(--acc)');
     return;
   }
-  if(!autoMode&&!S.selICAOs.size){setSt('No airports selected. Scan your scenery folder first.','var(--acc)');return;}
+  if(!autoMode&&!S.allRows.filter(r=>r.icao&&r.method!=='noise').length){setSt('No airports found. Scan your scenery folder first.','var(--acc)');return;}
   const btn=document.getElementById('fetch-btn');
   if(btn)btn.disabled=true;
   siShowFetchPanel(true);
@@ -1806,10 +1816,11 @@ function getRoutes(){
   const durMaxHrs=parseFloat((document.getElementById('dur-f')||{value:''}).value)||0;
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
   const activeFleet=getActiveFleet();
+  const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
   let rs=Object.values(S.routeRegistry).filter(r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
     const dep=r.departure_airport,arr=r.arrival_airport;
-    const di=S.selICAOs.has(dep),ai=S.selICAOs.has(arr);
+    const di=allLib.has(dep),ai=allLib.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
     if(S.mode==='1'&&!(di||ai))return false;
     if(S.dirFilter==='dep'&&!di)return false;
@@ -1930,7 +1941,7 @@ function renderRoutes(){
       </div>
       <div class="dp-acts">
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
-        <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bp bsm" onclick="openSimBrief('${r.departure_airport}','${r.arrival_airport}','${r.aircraft_type}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'main',i)}
         ${qlBtnHtml('main',i)}
@@ -2024,7 +2035,7 @@ function onFrInput(field){
   if(hint){
     if(icao.length===4){
       const name=frAptName(icao);
-      const inLib=S.selICAOs.has(icao);
+      const inLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao)).has(icao);
       hint.innerHTML=(name?`<span style="color:var(--ink2)">${name}</span>`:'')
         +(inLib?`<br><span class="fr-lib">&#10003; In your library</span>`:'');
     }else{
@@ -2107,7 +2118,7 @@ function renderFreeRouteResults(){
       <div class="ei">&#9992;</div>
       <div class="et">No registry match</div>
       <div class="es">No routes found for ${S.frDep} &rarr; ${S.frArr} with your active fleet.<br>You can still open SimBrief and plan this route manually.</div>
-      <div style="margin-top:14px"><button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button></div>
+      <div style="margin-top:14px"><button class="btn bp bsm" onclick="openSimBrief('${S.frDep}','${S.frArr}','','${sbU}')">&#9992; Open in SimBrief</button></div>
     </div></td></tr>`;
     return;
   }
@@ -2183,7 +2194,7 @@ function renderFreeRouteResults(){
       </div>
       <div class="dp-acts">
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
-        <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bp bsm" onclick="openSimBrief('${dep}','${arr}','${r.aircraft_type}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'fr',i)}
         ${qlBtnHtml('fr',i)}
@@ -2572,7 +2583,7 @@ function renderTripCard(){
       ${detContent}
       <div class="dp-acts">
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; FlightAware</button>
-        <button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bp bsm" onclick="openSimBrief('${leg.dep}','${leg.arr}','${sbType}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(leg.dep,leg.arr,'tp',i)}
         ${qlBtnHtml('tp',i)}
@@ -2688,7 +2699,7 @@ async function doActivateScenery(dep,arr,depFolder,arrFolder){
   S.cfg.activeJunctions=Array.from(junctions);
   window.api.saveConfig(S.cfg);
   RLOG('[SCENE] Activated: '+res.created.join(', ')+(res.skipped.length?' | skipped: '+res.skipped.join(', '):''));
-  renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();
+  renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();renderApts();
 }
 
 async function doDeactivateScenery(depFolder,arrFolder){
@@ -2701,7 +2712,7 @@ async function doDeactivateScenery(depFolder,arrFolder){
   S.cfg.activeJunctions=Array.from(junctions);
   window.api.saveConfig(S.cfg);
   RLOG('[SCENE] Deactivated: '+res.removed.join(', '));
-  renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();
+  renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();renderApts();
 }
 
 // ── QUICK LAUNCH COMPANION APPS ──────────────────────────────────────────────
@@ -2751,20 +2762,29 @@ function renderDashMap(){
   const W=720,H=340;
   const px=lon=>((lon+180)/360*W);
   const py=lat=>((90-lat)/180*H);
-  // Convert lat/lon array to SVG polygon points string
-  function poly(pts){return pts.map(([lo,la])=>px(lo).toFixed(1)+','+py(la).toFixed(1)).join(' ');}
-  // Simplified continent polygons (equirectangular, key outline points)
-  const continents=[
-    [[-170,72],[-130,80],[-60,80],[-55,65],[-52,48],[-65,44],[-75,35],[-80,25],[-90,18],[-80,8],[-77,18],[-85,22],[-95,28],[-110,22],[-120,26],[-126,38],[-132,54],[-140,60],[-165,62]],// N America
-    [[-45,83],[-20,83],[-18,76],[-24,70],[-42,65],[-55,68],[-60,76]],// Greenland
-    [[-80,12],[-72,12],[-70,-2],[-78,-5],[-80,-15],[-74,-20],[-68,-28],[-55,-38],[-52,-34],[-45,-24],[-35,-8],[-42,0],[-50,5],[-62,8],[-75,12]],// S America
-    [[-10,36],[0,46],[5,46],[8,48],[15,48],[20,55],[28,60],[30,62],[25,68],[15,70],[8,58],[8,55],[12,50],[18,48],[20,46],[22,44],[20,40],[16,38],[10,38],[5,36],[-2,36]],// Europe
-    [[-18,16],[-16,24],[-10,28],[0,32],[8,38],[14,36],[20,30],[26,32],[32,30],[38,28],[44,12],[48,4],[40,-12],[36,-20],[28,-28],[20,-34],[12,-24],[4,-16],[0,-8],[-4,4],[-10,4],[-14,8],[-18,12]],// Africa
-    [[28,42],[36,46],[44,40],[50,30],[60,22],[72,20],[76,8],[80,12],[88,22],[96,18],[100,4],[104,2],[110,8],[118,26],[126,34],[132,44],[142,52],[132,56],[110,52],[100,50],[88,48],[76,50],[68,54],[56,58],[52,52],[46,48],[40,46],[34,48],[28,46]],// Asia
-    [[114,-22],[120,-18],[128,-14],[136,-12],[140,-18],[142,-10],[150,-22],[152,-28],[148,-38],[140,-36],[130,-32],[124,-34],[118,-30]],// Australia
-    [[-180,-70],[-90,-68],[0,-70],[90,-68],[180,-70],[180,-90],[-180,-90]],// Antarctica
+  function pts(arr){return arr.map(([lo,la])=>px(lo).toFixed(1)+','+py(la).toFixed(1)).join(' ');}
+  const shapes=[
+    [[-168,72],[-164,60],[-166,58],[-162,56],[-152,58],[-148,60],[-145,60],[-140,58],[-136,56],[-134,54],[-130,54],[-126,50],[-124,46],[-124,38],[-120,34],[-118,32],[-114,30],[-110,24],[-106,20],[-100,18],[-96,16],[-90,16],[-88,14],[-84,10],[-80,8],[-77,8],[-77,14],[-80,20],[-82,22],[-84,22],[-88,22],[-92,28],[-96,26],[-100,22],[-106,20],[-116,28],[-122,36],[-124,46],[-126,50],[-130,54],[-136,58],[-142,60],[-150,60],[-156,58],[-162,56],[-168,64],[-168,72]],
+    [[-44,84],[-22,83],[-18,76],[-24,70],[-44,65],[-52,66],[-58,68],[-60,76],[-48,83]],
+    [[-24,66],[-14,64],[-12,64],[-14,66],[-20,66],[-22,66]],
+    [[-6,50],[-4,50],[-2,52],[-2,54],[-4,58],[-6,58],[-4,56],[-2,56],[-2,52],[-4,50],[-6,50]],
+    [[-80,12],[-78,10],[-75,10],[-70,2],[-70,-2],[-78,-6],[-80,-10],[-80,-16],[-74,-20],[-68,-28],[-56,-38],[-52,-34],[-48,-28],[-44,-20],[-40,-12],[-40,-6],[-36,-2],[-36,0],[-40,4],[-50,6],[-62,8],[-72,10],[-76,10],[-80,12]],
+    [[-10,36],[-10,44],[-4,44],[-2,44],[-2,46],[0,46],[2,48],[4,50],[6,50],[8,48],[12,48],[16,48],[20,46],[22,42],[22,38],[26,38],[28,40],[30,46],[26,54],[22,56],[20,58],[18,58],[16,58],[14,56],[10,56],[8,56],[8,54],[8,52],[4,52],[2,52],[0,50],[-4,48],[-2,46],[-6,44],[-8,40],[-10,36]],
+    [[10,56],[12,56],[14,56],[18,58],[20,60],[24,62],[26,62],[28,64],[28,68],[24,70],[18,70],[14,68],[12,66],[8,64],[6,62],[6,60],[8,58],[10,58],[10,56]],
+    [[-18,16],[-16,20],[-16,24],[-12,28],[-4,32],[0,32],[4,34],[10,36],[12,36],[14,32],[18,28],[22,30],[28,32],[32,30],[36,28],[38,22],[42,14],[46,8],[48,4],[44,0],[40,-4],[36,-18],[30,-26],[26,-34],[24,-36],[20,-36],[18,-34],[16,-26],[14,-18],[10,-10],[6,-2],[4,4],[0,4],[-4,4],[-8,4],[-10,2],[-10,8],[-14,10],[-16,14],[-18,16]],
+    [[28,42],[32,46],[36,50],[40,42],[44,38],[48,42],[52,50],[56,54],[60,58],[66,64],[72,68],[80,72],[90,72],[100,70],[110,68],[120,66],[132,64],[140,62],[144,66],[148,70],[158,68],[164,60],[168,54],[164,48],[160,52],[156,52],[152,56],[148,58],[144,62],[140,62],[132,56],[126,48],[122,42],[120,36],[116,28],[112,22],[108,18],[104,12],[100,6],[96,2],[92,-2],[88,6],[82,8],[78,8],[76,10],[78,22],[78,28],[80,12],[72,20],[68,22],[64,22],[60,22],[52,30],[48,32],[44,40],[40,42],[36,48],[32,48],[28,46],[28,42]],
+    [[66,22],[68,24],[72,22],[74,20],[76,12],[78,10],[80,10],[82,14],[80,16],[78,20],[78,24],[80,28],[84,26],[86,22],[90,22],[92,22],[94,18],[90,10],[86,8],[82,8],[80,10],[78,8],[76,8],[72,20],[70,22],[66,22]],
+    [[32,30],[36,28],[40,28],[44,24],[50,20],[56,16],[58,16],[60,20],[58,24],[54,26],[50,28],[44,28],[40,30],[36,30],[32,30]],
+    [[114,-22],[118,-18],[120,-18],[124,-16],[126,-14],[128,-14],[132,-12],[136,-12],[138,-14],[140,-16],[140,-18],[142,-12],[146,-14],[148,-18],[150,-22],[152,-26],[152,-30],[150,-32],[148,-36],[144,-38],[140,-38],[136,-34],[132,-32],[128,-34],[124,-30],[120,-26],[116,-24],[114,-22]],
+    [[130,32],[132,34],[132,36],[134,38],[136,36],[138,36],[140,38],[142,40],[142,44],[140,42],[138,40],[136,34],[134,34],[132,34],[130,32]],
+    [[140,44],[142,44],[144,44],[144,46],[140,46],[140,44]],
+    [[166,-44],[168,-44],[170,-44],[172,-46],[170,-48],[168,-46],[166,-44]],
+    [[108,0],[110,2],[114,4],[116,6],[118,4],[118,0],[116,-2],[114,-4],[112,-2],[108,0]],
+    [[96,4],[100,2],[102,2],[104,-2],[106,-4],[104,-4],[102,-2],[100,-2],[96,4]],
+    [[120,18],[122,14],[122,10],[120,10],[118,12],[118,16],[120,18]],
+    [[44,-12],[48,-14],[50,-16],[50,-22],[46,-24],[44,-20],[44,-14],[44,-12]],
+    [[-180,-74],[-120,-70],[-60,-72],[0,-74],[60,-72],[120,-68],[180,-74],[180,-90],[-180,-90]]
   ];
-  // Build airport dots
   const rows=S.allRows||[];
   const dots=rows.filter(r=>r.icao&&r.method!=='noise').map(r=>{
     const info=AI[r.icao]||(S.cfg.resolvedAirports&&S.cfg.resolvedAirports[r.icao]);
@@ -2772,14 +2792,26 @@ function renderDashMap(){
     const lon=Array.isArray(info)?info[5]:info&&info.lon;
     if(!lat&&!lon)return'';
     const x=px(lon),y=py(lat);
-    const col=r.selected!==false?'var(--acc)':'var(--ink4)';
     const name=(Array.isArray(info)?info[0]:info&&info.name)||r.icao;
-    return`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" opacity="0.85" style="cursor:default"><title>${r.icao} — ${name}</title></circle>`;
+    return`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#29b6f6" opacity="0.9" stroke="#ffffff" stroke-width="0.8"><title>${r.icao} — ${name}</title></circle>`;
   }).join('');
-  svg.innerHTML=`<rect width="${W}" height="${H}" fill="var(--bg2)"/>
-    <line x1="0" y1="${py(0).toFixed(1)}" x2="${W}" y2="${py(0).toFixed(1)}" stroke="var(--sep2)" stroke-width="0.5"/>
-    ${continents.map(pts=>`<polygon points="${poly(pts)}" fill="var(--bg4)" stroke="var(--sep2)" stroke-width="0.5"/>`).join('')}
-    ${dots}`;
+  svg.innerHTML=\<defs>
+    <filter id="cglow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="cvig" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0a1628" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#010408" stop-opacity="0.7"/>
+    </radialGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="#050a12"/>
+  <line x1="0" y1="${py(0).toFixed(1)}" x2="${W}" y2="${py(0).toFixed(1)}" stroke="#1a2a40" stroke-width="0.5" opacity="0.6"/>
+  <line x1="0" y1="${py(30).toFixed(1)}" x2="${W}" y2="${py(30).toFixed(1)}" stroke="#0e1a2a" stroke-width="0.4" opacity="0.5"/>
+  <line x1="0" y1="${py(-30).toFixed(1)}" x2="${W}" y2="${py(-30).toFixed(1)}" stroke="#0e1a2a" stroke-width="0.4" opacity="0.5"/>
+  ${shapes.map(s=>`<polygon points="${pts(s)}" fill="#0d1520" stroke="#29b6f6" stroke-width="0.7" filter="url(#cglow)"/>`).join('')}
+  <rect width="${W}" height="${H}" fill="url(#cvig)" pointer-events="none"/>
+  \\;
 }
 
 function renderDashStats(){
@@ -2793,16 +2825,26 @@ function renderDashStats(){
   el.innerHTML=card('Airports in Library',airports,'va')+card('Routes in Registry',routes,'vg')+card('Fleet Aircraft',fleet,'vb')+card('Companion Apps',apps,'vw');
 }
 
+function openSimBrief(dep,arr,type,url){
+  const entry={dep,arr,type,ts:Date.now()};
+  const recent=S.cfg.recentSimBriefRoutes||[];
+  const filtered=recent.filter(e=>!(e.dep===dep&&e.arr===arr));
+  S.cfg.recentSimBriefRoutes=[entry,...filtered].slice(0,6);
+  window.api.saveConfig(S.cfg);
+  window.api.openExternal(url);
+  renderDashRecent();
+}
+
 function renderDashRecent(){
   const el=document.getElementById('dash-recent');
   if(!el)return;
-  const reg=S.routeRegistry||{};
-  const sorted=Object.values(reg).sort((a,b)=>(b.last_seen||'').localeCompare(a.last_seen||'')).slice(0,6);
-  if(!sorted.length){el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No routes in registry yet. Refresh routes in Settings to get started.</div>';return;}
-  el.innerHTML=sorted.map(r=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
-    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--acc);min-width:100px">${r.departure_airport} → ${r.arrival_airport}</span>
-    <span style="font-size:12px;color:var(--ink2);flex:1">${r.airline||'—'}</span>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3)">${r.aircraft_type||'—'}</span>
+  const recent=S.cfg.recentSimBriefRoutes||[];
+  if(!recent.length){el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No SimBrief flights yet — open a route in SimBrief to track it here.</div>';return;}
+  const ago=ts=>{const m=Math.floor((Date.now()-ts)/60000);if(m<60)return m+'m ago';if(m<1440)return Math.floor(m/60)+'h ago';return Math.floor(m/1440)+'d ago';};
+  el.innerHTML=recent.map(e=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
+    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--acc);min-width:100px">${e.dep} &#x2192; ${e.arr}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);min-width:40px">${e.type||'—'}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);margin-left:auto">${ago(e.ts)}</span>
   </div>`).join('');
 }
 
@@ -3271,7 +3313,7 @@ function chRoutesHTML(ch){
       <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.airline||r.callsign||'&mdash;'}</span>
       <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${r.aircraft_type}</span>
       <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${dist}</span>
-      <button class="btn bg bxs" onclick="window.api.openExternal('${sbU}')" style="flex-shrink:0">&rarr; SimBrief</button>
+      <button class="btn bg bxs" onclick="openSimBrief('${r.departure_airport}','${r.arrival_airport}','${r.aircraft_type}','${sbU}')" style="flex-shrink:0">&rarr; SimBrief</button>
     </div>`;
   }).join('');
   return`<div style="border:1px solid var(--sep);border-radius:var(--r2);margin-bottom:12px;overflow:hidden">
@@ -3370,7 +3412,7 @@ function renderCD(idx){
       <div id="chadv-${ch.icao}"></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${S.chDep?`<button class="btn bp bsm" onclick="window.api.openExternal('${sbU}')">&#9992; Open in SimBrief</button>`:''}
+      ${S.chDep?`<button class="btn bp bsm" onclick="openSimBrief('${sbDep}','${ch.icao}','${sbType}','${sbU}')">&#9992; Open in SimBrief</button>`:''}
       <button class="btn bg bsm" onclick="window.api.openExternal('${ch.yt}')">&#9654; Watch Approach on YouTube</button>
       <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector Chart</button>
     </div>`;
@@ -3601,5 +3643,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.0.0</div>
+  pointer-events:none;">v5.0.1</div>
 </body></html>
