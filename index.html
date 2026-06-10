@@ -2720,33 +2720,21 @@ async function doDeactivateScenery(depFolder,arrFolder){
 }
 
 // ── QUICK LAUNCH COMPANION APPS ──────────────────────────────────────────────
-function qlBtnHtml(ns,idx){
-  const apps=S.cfg.quickLaunchApps||[];
-  const msfsItem=`<button style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--acc);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;border-bottom:1px solid var(--sep)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'" onclick="launchMSFS();document.getElementById('ql-drop-${ns}-${idx}').style.display='none'">&#9654; Launch MSFS</button>`;
-  const appItems=apps.map((a,ai)=>`<button style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--ink1);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'" onclick="launchQuickApp('${(a.path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','ql-drop-${ns}-${idx}')">${a.name||'App '+(ai+1)}</button>`).join('');
-  return`<div style="position:relative;display:inline-block">
-    <button class="btn bg bsm" onclick="toggleQlDrop(event,'ql-drop-${ns}-${idx}')">&#9889; Quick Launch</button>
-    <div id="ql-drop-${ns}-${idx}" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:1px solid var(--sep);border-radius:6px;z-index:200;min-width:170px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden">
-      ${msfsItem}${appItems}
-    </div>
-  </div>`;
+function qlBtnHtml(){
+  return`<button class="btn bg bsm" onclick="quickLaunchAll()">&#9889; Quick Launch</button>`;
 }
 
-function toggleQlDrop(e,id){
-  e.stopPropagation();
-  const el=document.getElementById(id);
-  if(!el)return;
-  const visible=el.style.display!=='none';
-  document.querySelectorAll('[id^="ql-drop-"]').forEach(d=>d.style.display='none');
-  if(!visible){
-    el.style.display='block';
-    setTimeout(()=>document.addEventListener('click',function h(){el.style.display='none';document.removeEventListener('click',h);},{once:true}),0);
+async function quickLaunchAll(){
+  launchMSFS();
+  const apps=S.cfg.quickLaunchApps||[];
+  for(const a of apps){
+    if(!a.path)continue;
+    const res=await window.api.launchApp({path:a.path});
+    if(res&&!res.ok)RLOG('[LAUNCH] App failed: '+a.name+': '+(res.error||'unknown'));
   }
 }
 
-async function launchQuickApp(appPath,dropId){
-  const drop=document.getElementById(dropId);
-  if(drop)drop.style.display='none';
+async function launchQuickApp(appPath){
   const res=await window.api.launchApp({path:appPath});
   if(res&&!res.ok)RLOG('[LAUNCH] App failed: '+(res.error||'unknown'));
 }
