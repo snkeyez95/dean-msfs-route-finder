@@ -6,9 +6,13 @@ const https  = require('https');
 const { spawn } = require('child_process');
 
 // ── USER DATA DIR ─────────────────────────────────────────────────────────────
-// All writable files live under %APPDATA%\A Better Route Planner\
+// Name the runtime data folder to match the product. MUST run before any
+// app.getPath('userData') call. Folder becomes %APPDATA%\A Better Route Planner\
+app.setName('A Better Route Planner');
 const USER_DATA = app.getPath('userData');
 if (!fs.existsSync(USER_DATA)) fs.mkdirSync(USER_DATA, { recursive: true });
+// Old folder name (from package.json "name") — used once to migrate existing data.
+const LEGACY_USER_DATA = path.join(app.getPath('appData'), 'dean-msfs-route-finder');
 
 // ── FILE LOGGER ──────────────────────────────────────────────────────────────
 const LOG_PATH = path.join(USER_DATA, 'dean_msfs_debug.log');
@@ -146,13 +150,26 @@ ipcMain.handle('scan-folder', async (_,p)=>{
 });
 
 const CFG = path.join(USER_DATA, 'config.json');
-// One-time migration: copy old home-root config to new userData location
+// One-time migration into the renamed userData folder. Copy-only — the source
+// files are left untouched as a backup. Prefer the legacy userData folder
+// (dean-msfs-route-finder), then fall back to the original home-root dot-file.
 (()=>{
-  const OLD_CFG = path.join(os.homedir(), '.dean_msfs_v4.json');
-  if (!fs.existsSync(CFG) && fs.existsSync(OLD_CFG)) {
-    try { fs.copyFileSync(OLD_CFG, CFG); LOG.info('Config migrated from', OLD_CFG); }
-    catch(e) { LOG.warn('Config migration failed:', e.message); }
-  }
+  if (fs.existsSync(CFG)) return;
+  const legacyCfg = path.join(LEGACY_USER_DATA, 'config.json');
+  const homeCfg   = path.join(os.homedir(), '.dean_msfs_v4.json');
+  const src = fs.existsSync(legacyCfg) ? legacyCfg : (fs.existsSync(homeCfg) ? homeCfg : null);
+  if (!src) return;
+  try { fs.copyFileSync(src, CFG); LOG.info('Config migrated from', src); }
+  catch(e) { LOG.warn('Config migration failed:', e.message); }
+  // Carry over the community routes backup too, if present in the legacy folder.
+  try {
+    const legacyCR = path.join(LEGACY_USER_DATA, 'community_routes.json');
+    const newCR    = path.join(USER_DATA, 'community_routes.json');
+    if (fs.existsSync(legacyCR) && !fs.existsSync(newCR)) {
+      fs.copyFileSync(legacyCR, newCR);
+      LOG.info('Community routes migrated from', legacyCR);
+    }
+  } catch(e) { LOG.warn('Community routes migration failed:', e.message); }
 })();
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' registry='+(Object.keys(c.routeRegistry||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
 ipcMain.handle('save-config',(_,cfg)=>{
