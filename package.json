@@ -35,7 +35,8 @@
     "publish": {
       "provider": "github",
       "owner": "snkeyez95",
-      "repo": "dean-msfs-route-finder"
+      "repo": "dean-msfs-route-finder",
+      "releaseType": "release"
     }
   },
   "dependencies": {
