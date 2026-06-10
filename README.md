@@ -199,6 +199,9 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.2.0   Route fetch now retries on 502/504 gateway errors (was stopping mid-refresh)
+v5.1.0   All user data consolidated under AppData, build-path file-lock fix
+v5.0.9   Version display consistency across title bar, sidebar, footer
 v5.0.8   Windows-style title bar buttons on right
 v5.0.7   Auto-updater for installed .exe, release.bat for publishing new versions
 v5.0.6   Quick Launch fires MSFS + all companion apps instantly, silent direct MSFS exe launch

@@ -307,7 +307,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 #map-popup .mp2{font-size:11px;color:#29b6f6;font-family:'JetBrains Mono',monospace;margin-top:2px}
 </style></head><body>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.1.0</div>
+  <div class="tname">A Better Route Planner &mdash; v5.2.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -333,7 +333,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.1.0</div>
+    <div class="sb-ver">v5.2.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1627,7 +1627,7 @@ async function _rlWait(ms,stopFn){
   return true;
 }
 
-// Smart page fetch: 503 → retry 3×30s → 65s rate-limit wait → repeat; 429 → 65s wait up to 3×; network error → retry 3×30s → 65s → stop
+// Smart page fetch: 503/502/504 → retry 3×30s → 65s rate-limit wait → repeat; 429 → 65s wait up to 3×; network error → retry 3×30s → 65s → stop
 async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResume,onNetworkError,onNetworkWait,onNetworkResume}={}){
   let attempts503=0,attempts429=0,attemptsNet=0;
   while(true){
@@ -1661,14 +1661,14 @@ async function siFetchPageSmart(page,cookie,{stopFn,onRetry503,onRateWait,onResu
       RLOG('[SI] Page '+page+' failed after 4 attempts — stopping');
       return{ok:false,networkFailed:true,error:errCode,fatal:true};
     }
-    if(res.status===503){
+    if(res.status===503||res.status===502||res.status===504){
       attempts503++;
       if(attempts503<=3){
-        if(onRetry503)onRetry503(page,attempts503);
+        if(onRetry503)onRetry503(page,attempts503,res.status);
         if(!await _rlWait(30000,stopFn))return{ok:false,stopped:true};
         continue;
       }
-      if(onRateWait)onRateWait(page,503);
+      if(onRateWait)onRateWait(page,res.status);
       if(!await _rlWait(65000,stopFn))return{ok:false,stopped:true};
       attempts503=0;
       if(onResume)onResume(page);
@@ -1702,14 +1702,15 @@ async function fetchSIRoutes({autoMode=false}={}){
   siSetFetchProgress('Refreshing... fetching page 1',0);siSetFetchAdded(0);
   const mkH=(tot)=>({
     stopFn:()=>false,
-    onRetry503:(p,n)=>{
-      siSetFetchProgress('Page '+p+(tot?'/'+tot:'')+' — 503 retry '+n+'/3',tot?Math.round(p/tot*100):0);
-      RLOG('[SI] 503 on page '+p+' — retry '+n+'/3 in 30s');
+    onRetry503:(p,n,status)=>{
+      const sc=status||503;
+      siSetFetchProgress('Page '+p+(tot?'/'+tot:'')+' — '+sc+' retry '+n+'/3',tot?Math.round(p/tot*100):0);
+      RLOG('[SI] '+sc+' on page '+p+' — retry '+n+'/3 in 30s');
     },
     onRateWait:(p,status)=>{
       rateLimitWaits++;
       startRlCountdown(65);
-      RLOG('[SI] '+(status===503?'Repeated 503 on page '+p+' — treating as rate limit, waiting 65s before continuing':'429 rate limit on page '+p+' — waiting 65s before retry'));
+      RLOG('[SI] '+(status===429?'429 rate limit on page '+p+' — waiting 65s before retry':'Repeated '+status+' on page '+p+' — treating as rate limit, waiting 65s before continuing'));
     },
     onResume:(p)=>{
       stopRlCountdown();
@@ -3669,5 +3670,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.1.0</div>
+  pointer-events:none;">v5.2.0</div>
 </body></html>
