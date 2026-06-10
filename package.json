@@ -13,7 +13,7 @@
     "appId": "com.dean.msfs-route-finder",
     "productName": "A Better Route Planner",
     "directories": {
-      "output": "dist"
+      "output": "C:\\Temp\\abrp-build"
     },
     "win": {
       "target": [

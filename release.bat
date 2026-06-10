@@ -12,6 +12,11 @@ echo.
 pause
 
 echo.
+echo Clearing previous build output...
+if exist "C:\Temp\abrp-build\win-unpacked" rd /s /q "C:\Temp\abrp-build\win-unpacked"
+if exist "C:\Temp\abrp-build\*.exe" del /f /q "C:\Temp\abrp-build\*.exe"
+
+echo.
 echo Building and publishing release...
 echo.
 set CSC_IDENTITY_AUTO_DISCOVERY=false
