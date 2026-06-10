@@ -352,6 +352,34 @@ ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
   }
 });
 
+ipcMain.handle('get-world-map', () => {
+  try {
+    const topojson = require('topojson-client');
+    const world = require('world-atlas/land-110m.json');
+    const W = 720, H = 340;
+    const px = lon => (lon + 180) / 360 * W;
+    const py = lat => (90 - lat) / 180 * H;
+    const ringsToPath = rings =>
+      rings.map(ring =>
+        'M' + ring.map(([lon, lat]) => px(lon).toFixed(1) + ',' + py(lat).toFixed(1)).join('L') + 'Z'
+      ).join('');
+    const land = topojson.feature(world, world.objects.land);
+    const paths = [];
+    const processGeom = g => {
+      if (!g) return;
+      if (g.type === 'Polygon') paths.push(ringsToPath(g.coordinates));
+      else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => paths.push(ringsToPath(poly)));
+    };
+    if (land.type === 'FeatureCollection') land.features.forEach(f => processGeom(f.geometry));
+    else if (land.type === 'Feature') processGeom(land.geometry);
+    LOG.info('get-world-map: generated ' + paths.length + ' path(s)');
+    return paths;
+  } catch (e) {
+    LOG.error('get-world-map failed: ' + e.message);
+    return null;
+  }
+});
+
 ipcMain.handle('browse-file', async () => {
   const res = await dialog.showOpenDialog(win, {
     properties: ['openFile'],

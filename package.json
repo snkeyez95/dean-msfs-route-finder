@@ -1,6 +1,6 @@
 ﻿{
   "name": "dean-msfs-route-finder",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Dean's MSFS Route Finder",
   "main": "main.js",
   "scripts": {
@@ -23,6 +23,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Dean's MSFS Route Finder"
     }
+  },
+  "dependencies": {
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "electron": "^28.0.0",

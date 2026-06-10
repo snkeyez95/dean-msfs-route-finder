@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   siSaveSnapshot:     (s)   => ipcRenderer.invoke('si-save-snapshot', s),
   siExportSnapshot:       (s)   => ipcRenderer.invoke('si-export-snapshot', s),
   siWriteCommunityRoutes: (s)   => ipcRenderer.invoke('si-write-community-routes', s),
+  getWorldMap:            ()    => ipcRenderer.invoke('get-world-map'),
   browseFile:             ()    => ipcRenderer.invoke('browse-file'),
   launchApp:              (o)   => ipcRenderer.invoke('launch-app', o),
   msfsDetect:             ()    => ipcRenderer.invoke('msfs-detect'),
