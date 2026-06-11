@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.3.1   Fix map dot alignment (correct projection), republish with working map
 v5.3.0   Dashboard map shorter, airport dots halved, expand-route scrolls header to top
 v5.2.1   Data folder renamed to "A Better Route Planner" (auto-migrates existing data)
 v5.2.0   Route fetch now retries on 502/504 gateway errors (was stopping mid-refresh)
