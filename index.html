@@ -307,7 +307,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 #map-popup .mp2{font-size:11px;color:#29b6f6;font-family:'JetBrains Mono',monospace;margin-top:2px}
 </style></head><body>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.4.1</div>
+  <div class="tname">A Better Route Planner &mdash; v5.4.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -333,7 +333,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.4.1</div>
+    <div class="sb-ver">v5.4.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1977,7 +1977,6 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
-          <div id="rwy-vis-dep-${i}"></div>
           ${wxBlock(depM)}
         </div>
         <div class="dp-sec">
@@ -1987,7 +1986,6 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
-          <div id="rwy-vis-arr-${i}"></div>
           ${wxBlock(arrM)}
         </div>
       </div>
@@ -3006,7 +3004,6 @@ async function fetchMetar(icao,idx,side){
   const rawEl=document.getElementById('metar-'+side+'-'+idx);
   const rwyEl=document.getElementById('rwy-'+side+'-'+idx);
   const windEl=document.getElementById('wind-'+side+'-'+idx);
-  const visEl=document.getElementById('rwy-vis-'+side+'-'+idx);
   if(!rawEl)return;
   const cached=S.metarCache[(icao||'').toUpperCase()];
   let rawText=cached?cached.rawOb:null;
@@ -3029,7 +3026,6 @@ async function fetchMetar(icao,idx,side){
     const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
     windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` — ${xw}kt crosswind`:''}</div>`;
   }
-  renderRwyVis(visEl,w,getRunways(icao),best);
 }
 
 // ── WEATHER SCORING ──────────────────────────────────────────────────────────
@@ -3296,78 +3292,6 @@ async function fetchRwyData(icao){
     }
     if(parsed.length)S.rwyCache[icao]=parsed;
   }catch(e){}
-}
-
-function renderRwyVis(el,w,rwys,bestId){
-  if(!el)return;
-  const cx=70,cy=70,R=62,L=44;
-  const rad=d=>d*Math.PI/180;
-  const pt=(h,r)=>[cx+r*Math.sin(rad(h)),cy-r*Math.cos(rad(h))];
-  // fixed dark palette — looks like an aviation instrument in any theme
-  const BG='#0a1520',RING='#1e3a52',CARD='#4a8ab0',TICK='#1e3a52';
-  const RWY_ACT='#f5a623',RWY_OFF='#2a4a6a',NUM_ACT='#f5a623',NUM_OFF='#4a7a9a';
-  const WIND_COL='#32d74b';
-  let s='';
-  // compass disc
-  s+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${BG}" stroke="${RING}" stroke-width="2"/>`;
-  // 10° tick marks
-  for(let h=0;h<360;h+=10){
-    const len=h%90===0?8:h%30===0?5:3;
-    const[ox,oy]=pt(h,R),[ix,iy]=pt(h,R-len);
-    s+=`<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${ix.toFixed(1)}" y2="${iy.toFixed(1)}" stroke="${h%90===0?CARD:TICK}" stroke-width="${h%90===0?1.5:0.8}"/>`;
-  }
-  // cardinal labels
-  [['N',0],['E',90],['S',180],['W',270]].forEach(([lbl,h])=>{
-    const[lx,ly]=pt(h,R-14);
-    s+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="bold" fill="${CARD}" font-family="JetBrains Mono,monospace">${lbl}</text>`;
-  });
-  // runway lines
-  if(rwys&&rwys.length){
-    const bestData=rwys.find(r=>r.r===bestId);
-    const bestH=bestData?bestData.h%180:-1;
-    const drawn=new Set();
-    for(const rwy of rwys){
-      const normH=rwy.h%180;
-      if(drawn.has(normH))continue;
-      drawn.add(normH);
-      const isBest=normH===bestH;
-      const col=isBest?RWY_ACT:RWY_OFF;
-      const sw=isBest?5:2.5;
-      const[x1,y1]=pt(rwy.h,L),[x2,y2]=pt((rwy.h+180)%360,L);
-      s+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
-      const rn1=String(Math.round(rwy.h/10)||36).padStart(2,'0');
-      const rn2=String(((Math.round(rwy.h/10)+18-1)%36)+1).padStart(2,'0');
-      const[tx1,ty1]=pt(rwy.h,L+13),[tx2,ty2]=pt((rwy.h+180)%360,L+13);
-      const nc=isBest?NUM_ACT:NUM_OFF;
-      s+=`<text x="${tx1.toFixed(1)}" y="${ty1.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="bold" fill="${nc}" font-family="JetBrains Mono,monospace">${rn1}</text>`;
-      s+=`<text x="${tx2.toFixed(1)}" y="${ty2.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="bold" fill="${nc}" font-family="JetBrains Mono,monospace">${rn2}</text>`;
-    }
-  }
-  // wind indicator
-  let windLabel='No wind data';
-  if(w){
-    if(w.dir==='VRB'){
-      windLabel=`Variable ${w.spd}kt`;
-      s+=`<circle cx="${cx}" cy="${cy}" r="8" fill="none" stroke="${WIND_COL}" stroke-width="2" stroke-dasharray="4,3"/>`;
-    }else if(w.spd<3){
-      windLabel='Calm';
-      s+=`<circle cx="${cx}" cy="${cy}" r="5" fill="${WIND_COL}" opacity="0.7"/>`;
-    }else{
-      const wd=parseInt(w.dir);
-      windLabel=`${w.dir}° ${w.spd}kt${w.gust>w.spd?' G'+w.gust+'kt':''}`;
-      const[ex,ey]=pt(wd,R-10),[sx,sy]=pt((wd+180)%360,12);
-      s+=`<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${WIND_COL}" stroke-width="2.5" stroke-linecap="round"/>`;
-      const hLen=10,hAng=25;
-      const ax1=ex+hLen*Math.sin(rad(wd+180+hAng)),ay1=ey-hLen*Math.cos(rad(wd+180+hAng));
-      const ax2=ex+hLen*Math.sin(rad(wd+180-hAng)),ay2=ey-hLen*Math.cos(rad(wd+180-hAng));
-      s+=`<polygon points="${ex.toFixed(1)},${ey.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}" fill="${WIND_COL}"/>`;
-    }
-  }
-  el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;margin-top:8px">
-    <svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">${s}</svg>
-    <div style="font-size:11px;color:#32d74b;margin-top:4px;font-family:JetBrains Mono,monospace;font-weight:600">${windLabel}</div>
-    <div style="font-size:9px;color:#4a7a9a;margin-top:2px;font-family:JetBrains Mono,monospace">Wind-based estimate only</div>
-  </div>`;
 }
 
 // ── CHALLENGES ───────────────────────────────────────────────────────────────
@@ -3802,5 +3726,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.4.1</div>
+  pointer-events:none;">v5.4.2</div>
 </body></html>

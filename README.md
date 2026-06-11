@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.4.2   Remove runway compass SVG — text-only wind and active runway display
 v5.4.1   Runway compass redesigned — dark instrument panel style, high contrast in all themes
 v5.4.0   Wind & runway compass visual in route expansion panel, dynamic runway data fetch
 v5.3.1   Fix map dot alignment (correct projection), republish with working map
