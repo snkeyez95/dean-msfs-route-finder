@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.4.0   Wind & runway compass visual in route expansion panel, dynamic runway data fetch
 v5.3.1   Fix map dot alignment (correct projection), republish with working map
 v5.3.0   Dashboard map shorter, airport dots halved, expand-route scrolls header to top
 v5.2.1   Data folder renamed to "A Better Route Planner" (auto-migrates existing data)

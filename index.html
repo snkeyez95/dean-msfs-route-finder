@@ -307,7 +307,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 #map-popup .mp2{font-size:11px;color:#29b6f6;font-family:'JetBrains Mono',monospace;margin-top:2px}
 </style></head><body>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.3.1</div>
+  <div class="tname">A Better Route Planner &mdash; v5.4.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -333,7 +333,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.3.1</div>
+    <div class="sb-ver">v5.4.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -936,6 +936,34 @@ const RWY_HDGS={
   "CYYZ":[{r:"23",h:230},{r:"05",h:50},{r:"33L",h:330},{r:"15R",h:150},{r:"06L",h:60},{r:"24R",h:240}],
   "CYYC":[{r:"35L",h:350},{r:"35R",h:350},{r:"17L",h:170},{r:"17R",h:170},{r:"28",h:280},{r:"10",h:100}],
   "CYVR":[{r:"26L",h:260},{r:"26R",h:260},{r:"08L",h:80},{r:"08R",h:80}],
+  "KDFW":[{r:"17C",h:175},{r:"35C",h:355},{r:"17L",h:175},{r:"35R",h:355},{r:"17R",h:178},{r:"35L",h:358},{r:"13L",h:131},{r:"31R",h:311},{r:"13R",h:134},{r:"31L",h:314},{r:"18L",h:179},{r:"36R",h:359},{r:"18R",h:182},{r:"36L",h:2}],
+  "KPHX":[{r:"07L",h:75},{r:"07R",h:75},{r:"25L",h:255},{r:"25R",h:255},{r:"08",h:80},{r:"26",h:260}],
+  "KORD":[{r:"04L",h:40},{r:"04R",h:40},{r:"22L",h:220},{r:"22R",h:220},{r:"09L",h:90},{r:"09C",h:90},{r:"09R",h:90},{r:"27L",h:270},{r:"27C",h:270},{r:"27R",h:270},{r:"10C",h:100},{r:"10L",h:100},{r:"10R",h:100},{r:"28C",h:280},{r:"28L",h:280},{r:"28R",h:280}],
+  "KABQ":[{r:"03",h:30},{r:"21",h:210},{r:"08",h:80},{r:"26",h:260}],
+  "KOKC":[{r:"13",h:130},{r:"31",h:310},{r:"17L",h:170},{r:"17R",h:173},{r:"35L",h:350},{r:"35R",h:353}],
+  "KBOI":[{r:"10L",h:100},{r:"10R",h:100},{r:"28L",h:280},{r:"28R",h:280}],
+  "KCOS":[{r:"17L",h:175},{r:"17R",h:175},{r:"35L",h:355},{r:"35R",h:355}],
+  "KIND":[{r:"05L",h:50},{r:"05R",h:50},{r:"23L",h:230},{r:"23R",h:230},{r:"14",h:140},{r:"32",h:320}],
+  "KMFE":[{r:"13",h:130},{r:"31",h:310},{r:"18",h:180},{r:"36",h:360}],
+  "KSTL":[{r:"11",h:112},{r:"29",h:292},{r:"12L",h:122},{r:"30R",h:302},{r:"12R",h:122},{r:"30L",h:302}],
+  "KMCI":[{r:"01L",h:10},{r:"01R",h:10},{r:"19L",h:190},{r:"19R",h:190}],
+  "KLAS":[{r:"07L",h:75},{r:"07R",h:75},{r:"25L",h:255},{r:"25R",h:255},{r:"01L",h:10},{r:"01R",h:10},{r:"19L",h:190},{r:"19R",h:190}],
+  "KSLC":[{r:"16L",h:160},{r:"16R",h:160},{r:"34L",h:340},{r:"34R",h:340},{r:"17",h:170},{r:"35",h:350}],
+  "KATL":[{r:"08L",h:80},{r:"08R",h:80},{r:"26L",h:260},{r:"26R",h:260},{r:"09L",h:90},{r:"09R",h:90},{r:"27L",h:270},{r:"27R",h:270},{r:"10",h:100},{r:"28",h:280}],
+  "KDAL":[{r:"13L",h:130},{r:"13R",h:130},{r:"31L",h:310},{r:"31R",h:310}],
+  "KHOU":[{r:"04",h:40},{r:"22",h:220},{r:"12L",h:120},{r:"12R",h:120},{r:"30L",h:300},{r:"30R",h:300}],
+  "KIAH":[{r:"08L",h:80},{r:"08R",h:80},{r:"26L",h:260},{r:"26R",h:260},{r:"09",h:90},{r:"27",h:270},{r:"15L",h:150},{r:"15R",h:150},{r:"33L",h:330},{r:"33R",h:330}],
+  "KSAT":[{r:"04",h:40},{r:"22",h:220},{r:"12L",h:120},{r:"12R",h:120},{r:"30L",h:300},{r:"30R",h:300}],
+  "KMEM":[{r:"18C",h:180},{r:"18L",h:180},{r:"18R",h:180},{r:"36C",h:360},{r:"36L",h:360},{r:"36R",h:360}],
+  "KORD":[{r:"04L",h:40},{r:"04R",h:40},{r:"22L",h:220},{r:"22R",h:220},{r:"09L",h:90},{r:"09C",h:90},{r:"09R",h:90},{r:"27L",h:270},{r:"27C",h:270},{r:"27R",h:270},{r:"10C",h:100},{r:"10L",h:100},{r:"10R",h:100},{r:"28C",h:280},{r:"28L",h:280},{r:"28R",h:280}],
+  "CYEG":[{r:"02",h:20},{r:"20",h:200},{r:"12",h:120},{r:"30",h:300}],
+  "CYQR":[{r:"13",h:130},{r:"31",h:310}],
+  "CYXE":[{r:"08",h:80},{r:"26",h:260},{r:"33",h:330},{r:"15",h:150}],
+  "CYWG":[{r:"13",h:130},{r:"31",h:310},{r:"18",h:180},{r:"36",h:360}],
+  "CYXS":[{r:"15",h:150},{r:"33",h:330}],
+  "CYQL":[{r:"26",h:260},{r:"08",h:80},{r:"35",h:350},{r:"17",h:170}],
+  "KSAN":[{r:"09",h:90},{r:"27",h:270}],
+  "KFAT":[{r:"11L",h:110},{r:"11R",h:110},{r:"29L",h:290},{r:"29R",h:290}],
 };
 
 // Challenging approaches — lat/lon for distance calc, all details
@@ -974,7 +1002,7 @@ const S={
   regionFilter:'all',
   dirFilter:'either',
   acFilter:'',
-  metarCache:{},
+  metarCache:{},rwyCache:{},
   metarLastFetch:0,
   wxFetching:false,
   freeRouteMode:false,
@@ -1949,6 +1977,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
+          <div id="rwy-vis-dep-${i}"></div>
           ${wxBlock(depM)}
         </div>
         <div class="dp-sec">
@@ -1958,6 +1987,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
+          <div id="rwy-vis-arr-${i}"></div>
           ${wxBlock(arrM)}
         </div>
       </div>
@@ -2976,6 +3006,7 @@ async function fetchMetar(icao,idx,side){
   const rawEl=document.getElementById('metar-'+side+'-'+idx);
   const rwyEl=document.getElementById('rwy-'+side+'-'+idx);
   const windEl=document.getElementById('wind-'+side+'-'+idx);
+  const visEl=document.getElementById('rwy-vis-'+side+'-'+idx);
   if(!rawEl)return;
   const cached=S.metarCache[(icao||'').toUpperCase()];
   let rawText=cached?cached.rawOb:null;
@@ -2989,6 +3020,7 @@ async function fetchMetar(icao,idx,side){
   rawEl.textContent=rawText;
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  await fetchRwyData(icao);
   const best=bestRwy(icao,w.dir,w.spd);
   if(rwyEl)rwyEl.textContent=best;
   if(windEl){
@@ -2997,6 +3029,7 @@ async function fetchMetar(icao,idx,side){
     const ga=w.gust>w.spd?`, gusting ${w.gust}kt`:'';
     windEl.innerHTML=`<div class="adv ${cls}" style="margin-top:4px">Wind ${w.dir==='VRB'?'variable':w.dir+'°'} at ${w.spd}kt${ga}${xw?` — ${xw}kt crosswind`:''}</div>`;
   }
+  renderRwyVis(visEl,w,getRunways(icao),best);
 }
 
 // ── WEATHER SCORING ──────────────────────────────────────────────────────────
@@ -3223,8 +3256,10 @@ function parseWind(m){
   return{dir:w[1],spd:parseInt(w[2]),gust:w[3]?parseInt(w[3]):parseInt(w[2])};
 }
 
+function getRunways(icao){return RWY_HDGS[icao]||S.rwyCache[icao]||null;}
+
 function bestRwy(icao,dir,spd){
-  const rwys=RWY_HDGS[icao];
+  const rwys=getRunways(icao);
   if(!rwys||dir==='VRB'||spd<3)return'Check ATIS';
   const wd=parseInt(dir);let best=null,bestHW=-999;
   for(const r of rwys){
@@ -3236,10 +3271,92 @@ function bestRwy(icao,dir,spd){
 }
 
 function xwind(icao,rwyId,dir,spd){
-  const rwys=RWY_HDGS[icao];if(!rwys||dir==='VRB')return 0;
+  const rwys=getRunways(icao);if(!rwys||dir==='VRB')return 0;
   const r=rwys.find(x=>x.r===rwyId);if(!r)return 0;
   const diff=((parseInt(dir)-r.h+360)%360),angle=diff>180?360-diff:diff;
   return Math.round(spd*Math.sin(angle*Math.PI/180));
+}
+
+async function fetchRwyData(icao){
+  if(getRunways(icao))return;
+  try{
+    const res=await fetch('https://aviationweather.gov/api/data/airport?ids='+icao+'&format=json');
+    const data=await res.json();
+    const apt=Array.isArray(data)?data[0]:data;
+    const rawRwys=apt&&apt.runways;
+    if(!Array.isArray(rawRwys)||!rawRwys.length)return;
+    const parsed=[];
+    for(const rwy of rawRwys){
+      const h=rwy.alignment??rwy.heading??rwy.magneticCourse??rwy.trueCourse;
+      if(h==null)continue;
+      const id=(rwy.id||rwy.ident||rwy.name||'').trim();
+      const parts=id.split('/');
+      if(parts[0])parsed.push({r:parts[0].trim(),h:Math.round(+h)%360});
+      if(parts[1])parsed.push({r:parts[1].trim(),h:(Math.round(+h)+180)%360});
+    }
+    if(parsed.length)S.rwyCache[icao]=parsed;
+  }catch(e){}
+}
+
+function renderRwyVis(el,w,rwys,bestId){
+  if(!el)return;
+  const cx=65,cy=65,R=55,L=36;
+  const rad=d=>d*Math.PI/180;
+  const pt=(h,r)=>[cx+r*Math.sin(rad(h)),cy-r*Math.cos(rad(h))];
+  let s='';
+  s+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="var(--bg2)" stroke="var(--sep)" stroke-width="1.5"/>`;
+  [['N',0],['E',90],['S',180],['W',270]].forEach(([lbl,h])=>{
+    const[lx,ly]=pt(h,R-10);
+    s+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" fill="var(--ink3)" font-family="JetBrains Mono,monospace">${lbl}</text>`;
+  });
+  [45,135,225,315].forEach(h=>{
+    const[ox,oy]=pt(h,R),[ix,iy]=pt(h,R-5);
+    s+=`<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${ix.toFixed(1)}" y2="${iy.toFixed(1)}" stroke="var(--sep)" stroke-width="1"/>`;
+  });
+  if(rwys&&rwys.length){
+    const bestData=rwys.find(r=>r.r===bestId);
+    const bestH=bestData?bestData.h%180:-1;
+    const drawn=new Set();
+    for(const rwy of rwys){
+      const normH=rwy.h%180;
+      if(drawn.has(normH))continue;
+      drawn.add(normH);
+      const isBest=normH===bestH;
+      const col=isBest?'var(--acc)':'var(--ink3)';
+      const sw=isBest?3:1.5;
+      const[x1,y1]=pt(rwy.h,L),[x2,y2]=pt((rwy.h+180)%360,L);
+      s+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
+      const rn1=String(Math.round(rwy.h/10)||36).padStart(2,'0');
+      const rn2=String(((Math.round(rwy.h/10)+18-1)%36)+1).padStart(2,'0');
+      const[tx1,ty1]=pt(rwy.h,L+10),[tx2,ty2]=pt((rwy.h+180)%360,L+10);
+      s+=`<text x="${tx1.toFixed(1)}" y="${ty1.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="8" fill="${col}" font-family="JetBrains Mono,monospace">${rn1}</text>`;
+      s+=`<text x="${tx2.toFixed(1)}" y="${ty2.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="8" fill="${col}" font-family="JetBrains Mono,monospace">${rn2}</text>`;
+    }
+  }
+  let windLabel='No wind data';
+  if(w){
+    if(w.dir==='VRB'){
+      windLabel=`Variable ${w.spd}kt`;
+      s+=`<circle cx="${cx}" cy="${cy}" r="7" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+    }else if(w.spd<3){
+      windLabel='Calm';
+      s+=`<circle cx="${cx}" cy="${cy}" r="4" fill="var(--ink3)" opacity="0.5"/>`;
+    }else{
+      const wd=parseInt(w.dir);
+      windLabel=`${w.dir}° ${w.spd}kt${w.gust>w.spd?' G'+w.gust+'kt':''}`;
+      const[ex,ey]=pt(wd,R-8),[sx,sy]=pt((wd+180)%360,10);
+      s+=`<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="var(--grn)" stroke-width="2" stroke-linecap="round"/>`;
+      const hLen=8,hAng=25;
+      const ax1=ex+hLen*Math.sin(rad(wd+180+hAng)),ay1=ey-hLen*Math.cos(rad(wd+180+hAng));
+      const ax2=ex+hLen*Math.sin(rad(wd+180-hAng)),ay2=ey-hLen*Math.cos(rad(wd+180-hAng));
+      s+=`<polygon points="${ex.toFixed(1)},${ey.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}" fill="var(--grn)"/>`;
+    }
+  }
+  el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;margin-top:6px">
+    <svg width="130" height="130" viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg">${s}</svg>
+    <div style="font-size:10px;color:var(--grn);margin-top:2px;font-family:JetBrains Mono,monospace">${windLabel}</div>
+    <div style="font-size:9px;color:var(--ink3);margin-top:1px">Wind-based estimate only</div>
+  </div>`;
 }
 
 // ── CHALLENGES ───────────────────────────────────────────────────────────────
@@ -3674,5 +3791,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.3.1</div>
+  pointer-events:none;">v5.4.0</div>
 </body></html>
