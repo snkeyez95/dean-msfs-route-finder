@@ -2803,7 +2803,7 @@ let _worldPaths = null;
 function renderDashMap(){
   const svg=document.getElementById('dash-map');
   if(!svg)return;
-  const W=720,H=220;
+  const W=720,H=340;
   const px=lon=>((lon+180)/360*W);
   const py=lat=>((90-lat)/180*H);
   if(!_worldPaths){
