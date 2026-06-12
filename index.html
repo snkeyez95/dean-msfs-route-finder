@@ -322,7 +322,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.5.1</div>
+  <div class="tname">A Better Route Planner &mdash; v5.5.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -348,7 +348,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.5.1</div>
+    <div class="sb-ver">v5.5.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -688,6 +688,10 @@ html[data-theme="light"] .theme-knob{left:30px}
     <div style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer;user-select:none" onclick="toggleGsxAutoInstall()">
       <span id="gsx-auto-box" style="font-size:14px;color:var(--acc);font-family:'JetBrains Mono',monospace">&#9745;</span>
       <span style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace">Auto-install bundled GSX profiles found in scenery folders</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+      <button class="btn bg bsm" onclick="gsxRecheck()">&#8635; Recheck GSX profiles</button>
+      <span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace">Forgets the cache and re-scans every scenery folder</span>
     </div>
     <div id="gsx-drop-zone" class="si-drop" style="margin-top:16px"
       ondragover="onGsxDragOver(event)" ondragleave="onGsxDragLeave(event)" ondrop="onGsxDrop(event)">
@@ -3151,6 +3155,13 @@ async function saveGsxFolder(){
   await gsxRefresh();await gsxEvaluate();
   gsxToast('GSX folder saved — rechecking profiles');
 }
+async function gsxRecheck(){
+  S.cfg.gsxScanCache={};   // wipe remembered results — force a full re-scan
+  gsxToast('Rechecking all GSX profiles…');
+  await gsxRefresh();
+  await gsxEvaluate();
+  gsxToast('GSX recheck complete');
+}
 function toggleGsxAutoInstall(){
   S.cfg.gsxAutoInstall=(S.cfg.gsxAutoInstall===false)?true:false;
   window.api.saveConfig(S.cfg);
@@ -3944,5 +3955,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.5.1</div>
+  pointer-events:none;">v5.5.2</div>
 </body></html>
