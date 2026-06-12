@@ -322,7 +322,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.5.3</div>
+  <div class="tname">A Better Route Planner &mdash; v5.5.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -348,7 +348,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.5.3</div>
+    <div class="sb-ver">v5.5.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1110,6 +1110,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
       renderApts();
       setScanNote('Loaded '+S.allRows.length+' airports from last session. Click Scan Now if your library has changed.');
       gsxRefresh().then(()=>{renderApts();gsxEvaluate();});
+      resolveUnknownAirports().then(()=>renderApts());  // backfill names / promote guesses for saved rows
     }catch(e){ console.error('Session restore error:',e); }
   }
   populateSimIntegration();
@@ -1271,13 +1272,16 @@ function exICAO(name){
   for(const p of pts)if(p.length===4&&/^[A-Z]+$/.test(p)&&IS.has(p))return[p,'auto'];
   // Tier 2: a known ICAO appearing as a substring
   for(let i=0;i<up.length-3;i++){const c=up.slice(i,i+4);if(/^[A-Z]+$/.test(c)&&IS.has(c))return[c,'auto'];}
-  // Tier 3: structured guess — the token right after an "airport"/"airfield" keyword
-  // (e.g. "drzewieckidesign-airport-eetn-tallinn" -> EETN). Validated against
-  // aviationweather.gov later in resolveUnknownAirports(); reverted if not real.
+  // Tier 3: high-confidence — the token right after an "airport"/"airfield" keyword
+  // (e.g. "drzewieckidesign-airport-eetn-tallinn" -> EETN). This position is
+  // unambiguous, so treat it as auto; the name is filled in later from
+  // aviationweather.gov in resolveUnknownAirports().
   for(let i=0;i<pts.length-1;i++){
-    if(AIRPORT_KW.has(pts[i])&&isPlausibleICAO(pts[i+1]))return[pts[i+1],'guess'];
+    if(AIRPORT_KW.has(pts[i])&&isPlausibleICAO(pts[i+1]))return[pts[i+1],'auto'];
   }
-  // Tier 4: exactly one ICAO-looking 4-letter token (e.g. "dev-eetn-tallinn")
+  // Tier 4: exactly one ICAO-looking 4-letter token, no keyword (e.g.
+  // "dev-eetn-tallinn"). Weaker signal — mark 'guess' and validate against
+  // aviationweather.gov, reverting to manual entry if it isn't a real airport.
   const cand=pts.filter(p=>isPlausibleICAO(p));
   if(cand.length===1)return[cand[0],'guess'];
   // Tier 5: fuzzy city-name map (last resort)
@@ -1313,8 +1317,12 @@ async function procFolders(folders){
   await resolveUnknownAirports();
 }
 
+function titleCaseName(s){return (s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
+
 async function resolveUnknownAirports(){
-  const unknown=S.allRows.filter(r=>r.icao&&!AI[r.icao]);
+  // Rows needing resolution: no AI entry yet, OR an entry whose name is just the
+  // ICAO (the signature of an earlier bad resolve — re-fetch to get a real name).
+  const unknown=S.allRows.filter(r=>r.icao&&(!AI[r.icao]||AI[r.icao][0]===r.icao));
   if(!unknown.length)return;
   setScanNote('Resolving '+unknown.length+' unknown airport'+(unknown.length>1?'s':'')+'...');
   if(!S.cfg.resolvedAirports)S.cfg.resolvedAirports={};
@@ -1325,7 +1333,8 @@ async function resolveUnknownAirports(){
       const data=await resp.json();
       if(data&&data.length){
         const a=data[0];
-        const entry=[a.site||row.icao,a.city||'',a.country||'','Medium Airport',a.lat||0,a.lon||0];
+        const nm=titleCaseName(a.name)||row.icao;
+        const entry=[nm,'',a.country||'','Medium Airport',a.lat||0,a.lon||0];
         AI[row.icao]=entry;
         COMMERCIAL_EXTRA.add(row.icao);
         S.cfg.resolvedAirports[row.icao]=entry;
@@ -3982,5 +3991,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.5.3</div>
+  pointer-events:none;">v5.5.4</div>
 </body></html>

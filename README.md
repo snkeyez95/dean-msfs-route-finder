@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.5.4   ICAO names now resolve correctly (aviationweather "name" field); code after "airport" keyword is auto (not guess); saved rows backfill names on launch
 v5.5.3   Better ICAO detection (reads code after "airport" keyword, validates against aviationweather.gov); correct flightsim.to GSX link format
 v5.5.2   Settings → GSX Pro: "Recheck GSX profiles" button — clears the cache and forces a full re-scan
 v5.5.1   GSX status cached per scenery folder — no re-scan every launch; only new scenery is deep-scanned, removed scenery pruned, manual Scan Now forces a full recheck
