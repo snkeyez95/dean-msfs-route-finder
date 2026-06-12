@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.5.7   Settings reordered — GSX Pro moved above Route Backup / Manual Import
 v5.5.6   GSX drag-and-drop now accepts .rar / .7z archives (via 7-Zip or WinRAR); clear message if no extractor is installed
 v5.5.5   GSX column filter dropdown (All / Installed / Missing); existing Show dropdown relabeled to "ICAO Matched / Unmatched" for clarity
 v5.5.4   ICAO names now resolve correctly (aviationweather "name" field); code after "airport" keyword is auto (not guess); saved rows backfill names on launch
