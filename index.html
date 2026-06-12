@@ -322,7 +322,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.5.4</div>
+  <div class="tname">A Better Route Planner &mdash; v5.5.5</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -348,7 +348,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.5.4</div>
+    <div class="sb-ver">v5.5.5</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -404,8 +404,13 @@ html[data-theme="light"] .theme-knob{left:30px}
       <div class="srch"><span class="si">&#128269;</span><input type="text" id="apt-srch" placeholder="Search ICAO, name, city..." oninput="renderApts()"></div>
       <select id="apt-show" onchange="renderApts()">
         <option value="all">Show: All</option>
-        <option value="matched">Matched</option>
-        <option value="missing">Missing</option>
+        <option value="matched">ICAO Matched</option>
+        <option value="missing">ICAO Unmatched</option>
+      </select>
+      <select id="gsx-show" onchange="renderApts()">
+        <option value="all">GSX: All</option>
+        <option value="installed">GSX Installed</option>
+        <option value="missing">GSX Missing</option>
       </select>
       <a id="ignored-link" href="#" onclick="S.showIgnored=!S.showIgnored;renderApts();return false;" style="display:none;font-size:13px;color:var(--ink3);text-decoration:none;align-self:center;white-space:nowrap"></a>
       <button class="btn bg bsm" onclick="addManual()" style="margin-left:auto">+ Add ICAO</button>
@@ -1358,6 +1363,7 @@ async function resolveUnknownAirports(){
 function renderApts(){
   const q=(document.getElementById('apt-srch').value||'').toLowerCase();
   const show=(document.getElementById('apt-show')||{value:'all'}).value||'all';
+  const gsxShow=(document.getElementById('gsx-show')||{value:'all'}).value||'all';
   const ignored=new Set(S.cfg.ignoredFolders||[]);
   const ignCount=S.allRows.filter(r=>r.method!=='noise'&&ignored.has(r.folder)).length;
   const ignLink=document.getElementById('ignored-link');
@@ -1370,6 +1376,8 @@ function renderApts(){
     if(ignored.has(r.folder))return S.showIgnored;
     if(show==='matched'&&!r.icao)return false;
     if(show==='missing'&&r.icao)return false;
+    if(gsxShow==='installed'&&!gsxInstalled(r.icao))return false;
+    if(gsxShow==='missing'&&(!r.icao||gsxInstalled(r.icao)))return false;
     const info=AI[r.icao]||['','','',''];
     if(q&&!(r.icao||'').toLowerCase().includes(q)&&!info[0].toLowerCase().includes(q)&&!r.folder.toLowerCase().includes(q))return false;
     return true;
@@ -3991,5 +3999,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.5.4</div>
+  pointer-events:none;">v5.5.5</div>
 </body></html>
