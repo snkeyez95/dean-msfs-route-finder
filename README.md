@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.5.3   Better ICAO detection (reads code after "airport" keyword, validates against aviationweather.gov); correct flightsim.to GSX link format
 v5.5.2   Settings → GSX Pro: "Recheck GSX profiles" button — clears the cache and forces a full re-scan
 v5.5.1   GSX status cached per scenery folder — no re-scan every launch; only new scenery is deep-scanned, removed scenery pruned, manual Scan Now forces a full recheck
 v5.5.0   GSX Pro profile status in My Airports — installed badge, flightsim.to search link, auto-install of scenery-bundled profiles, drag-and-drop install

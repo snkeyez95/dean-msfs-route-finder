@@ -322,7 +322,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.5.2</div>
+  <div class="tname">A Better Route Planner &mdash; v5.5.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -348,7 +348,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.5.2</div>
+    <div class="sb-ver">v5.5.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1257,11 +1257,30 @@ function isNoise(name){
   } catch(e){ return false; }
 }
 
+// First letter must be a real ICAO region prefix (excludes I, J, Q, X starts).
+const ICAO_RE=/^[ABCDEFGHKLMNOPRSTUVWYZ][A-Z]{3}$/;
+// 4-letter tokens that show up in scenery folder names but are NOT ICAO codes.
+const COMMON4=new Set(['CITY','INTL','MESH','TREE','PARK','LAKE','EAST','WEST','DEMO','BETA','FULL','LITE','FREE','SOFT','LAND','MAIN','PACK','TEST','REAL','OPEN','ZONE','AREA','BASE','GATE','HALL','HILL','HOME','VIEW','WOOD','FARM','PORT','TOWN','PART','SCEN','DATA','CORE','EURO','HARD','PROP','MODS','ADDS']);
+const AIRPORT_KW=new Set(['AIRPORT','AIRFIELD','AERODROME','APT']);
+function isPlausibleICAO(s){return ICAO_RE.test(s)&&!COMMON4.has(s);}
+
 function exICAO(name){
   if(isNoise(name)) return[null,'noise'];
   const up=name.toUpperCase(),pts=up.split(/[-_\s]/);
+  // Tier 1: a clean 4-letter token that's a known ICAO
   for(const p of pts)if(p.length===4&&/^[A-Z]+$/.test(p)&&IS.has(p))return[p,'auto'];
+  // Tier 2: a known ICAO appearing as a substring
   for(let i=0;i<up.length-3;i++){const c=up.slice(i,i+4);if(/^[A-Z]+$/.test(c)&&IS.has(c))return[c,'auto'];}
+  // Tier 3: structured guess — the token right after an "airport"/"airfield" keyword
+  // (e.g. "drzewieckidesign-airport-eetn-tallinn" -> EETN). Validated against
+  // aviationweather.gov later in resolveUnknownAirports(); reverted if not real.
+  for(let i=0;i<pts.length-1;i++){
+    if(AIRPORT_KW.has(pts[i])&&isPlausibleICAO(pts[i+1]))return[pts[i+1],'guess'];
+  }
+  // Tier 4: exactly one ICAO-looking 4-letter token (e.g. "dev-eetn-tallinn")
+  const cand=pts.filter(p=>isPlausibleICAO(p));
+  if(cand.length===1)return[cand[0],'guess'];
+  // Tier 5: fuzzy city-name map (last resort)
   const low=name.toLowerCase().replace(/[^a-z]/g,'');
   for(const[k,v]of Object.entries(CM))if(low.includes(k))return[v,'fuzzy'];
   return[null,null];
@@ -1302,16 +1321,24 @@ async function resolveUnknownAirports(){
   for(const row of unknown){
     try{
       const resp=await fetch('https://aviationweather.gov/api/data/airport?ids='+row.icao+'&format=json');
-      if(!resp.ok)continue;
+      if(!resp.ok)continue;  // inconclusive (server/network) — leave the row as-is
       const data=await resp.json();
-      if(!data||!data.length)continue;
-      const a=data[0];
-      const entry=[a.site||row.icao,a.city||'',a.country||'','Medium Airport',a.lat||0,a.lon||0];
-      AI[row.icao]=entry;
-      COMMERCIAL_EXTRA.add(row.icao);
-      S.cfg.resolvedAirports[row.icao]=entry;
+      if(data&&data.length){
+        const a=data[0];
+        const entry=[a.site||row.icao,a.city||'',a.country||'','Medium Airport',a.lat||0,a.lon||0];
+        AI[row.icao]=entry;
+        COMMERCIAL_EXTRA.add(row.icao);
+        S.cfg.resolvedAirports[row.icao]=entry;
+        if(row.method==='guess')row.method='auto';  // validated — promote
+      }else if(row.method==='guess'){
+        // Definitive "no such airport" — our guess was wrong. Revert to manual entry.
+        RLOG('[ICAO] guess '+row.icao+' for "'+row.folder+'" not a real airport — reverting');
+        S.selICAOs.delete(row.icao);
+        row.icao=null;row.method=null;
+      }
     }catch(e){RLOG('resolveUnknownAirports error '+row.icao+': '+e.message);}
   }
+  S.cfg.savedRows=S.allRows;
   await window.api.saveConfig(S.cfg);
   renderApts();updateStats();
   buildChSB();buildChDepSelect();
@@ -1379,7 +1406,7 @@ function gsxCell(r){
     return `<td><button class="gsx-pill gsx-install" onclick="gsxInstallProfile('${r.icao}')" title="Install the GSX profile bundled with this scenery">Install</button></td>`;
   if(S.gsxScanning)
     return `<td><span class="gsx-pill gsx-wait" title="Checking scenery folder for a bundled GSX profile">checking&hellip;</span></td>`;
-  const url='https://flightsim.to/others/gsx-pro?search='+encodeURIComponent(r.icao);
+  const url='https://flightsim.to/miscellaneous/gsx-pro?q='+encodeURIComponent(r.icao.toLowerCase());
   return `<td><span class="gsx-pill gsx-miss" onclick="window.api.openExternal('${url}')" title="No GSX profile found — search flightsim.to GSX section for ${r.icao}">flightsim.to &#8599;</span></td>`;
 }
 
@@ -3955,5 +3982,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.5.2</div>
+  pointer-events:none;">v5.5.3</div>
 </body></html>
