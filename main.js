@@ -225,11 +225,49 @@ ipcMain.handle('gsx-install-bundled', (_, {files, gsxFolder})=>{
   return {ok:errors.length===0, copied, errors};
 });
 
-// Manual drag-and-drop install: accepts loose .py/.ini files, a folder, or a .zip.
-// Zips are extracted with Windows' built-in Expand-Archive (no new dependency).
+const GSX_ARCHIVE_RE=/\.(zip|rar|7z)$/i;
+// Windows has no built-in .rar/.7z extractor — locate 7-Zip or WinRAR if installed.
+function gsxFindExtractor(){
+  const cands=[
+    {exe:'C:\\Program Files\\7-Zip\\7z.exe', kind:'7z'},
+    {exe:'C:\\Program Files (x86)\\7-Zip\\7z.exe', kind:'7z'},
+    {exe:'C:\\Program Files\\WinRAR\\UnRAR.exe', kind:'unrar'},
+    {exe:'C:\\Program Files (x86)\\WinRAR\\UnRAR.exe', kind:'unrar'},
+    {exe:'C:\\Program Files\\WinRAR\\WinRAR.exe', kind:'winrar'},
+    {exe:'C:\\Program Files (x86)\\WinRAR\\WinRAR.exe', kind:'winrar'},
+  ];
+  for(const c of cands){ try{ if(fs.existsSync(c.exe)) return c; }catch(e){} }
+  return null;
+}
+// Extract .zip/.rar/.7z into tmp. .zip uses Expand-Archive (built-in); .rar/.7z
+// shell out to 7-Zip or WinRAR. Returns {ok, needTool}.
+function gsxExtractArchive(archivePath, tmp){
+  const cp=require('child_process');
+  const ext=path.extname(archivePath).toLowerCase();
+  if(ext==='.zip'){
+    const r=cp.spawnSync('powershell',
+      ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${tmp}" -Force`],
+      {windowsHide:true});
+    if(r.status===0) return {ok:true};
+    // some zips trip Expand-Archive — fall through to a real archiver if present
+  }
+  const tool=gsxFindExtractor();
+  if(!tool) return {ok:false, needTool:true};
+  let args;
+  if(tool.kind==='7z') args=['x', archivePath, '-o'+tmp, '-y'];
+  else if(tool.kind==='unrar') args=['x','-y', archivePath, tmp+'\\'];
+  else args=['x','-ibck','-y', archivePath, tmp+'\\'];  // WinRAR.exe
+  const r=cp.spawnSync(tool.exe, args, {windowsHide:true});
+  if(r.status!==0) LOG.error('[GSX] extractor exit', r.status, tool.exe);
+  return {ok:r.status===0};
+}
+
+// Manual drag-and-drop install: accepts loose .py/.ini files, a folder, or a
+// .zip/.rar/.7z archive (downloaded straight from flightsim.to).
 ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
   const dir=gsxResolveDir(gsxFolder);
   const copied=[], skipped=[], errors=[], tmpDirs=[];
+  let needTool=false;
   try{ fs.mkdirSync(dir,{recursive:true}); }catch(e){}
   const collect=[];
   for(const p of (paths||[])){
@@ -237,13 +275,16 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
       const st=fs.statSync(p);
       if(st.isDirectory()){
         gsxWalkFiles(p, 8, GSX_SKIP_DIRS).forEach(f=>{ if(gsxIsProfileFile(f.base)) collect.push(f.abs); });
-      } else if(p.toLowerCase().endsWith('.zip')){
-        const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gsxzip-'));
+      } else if(GSX_ARCHIVE_RE.test(p)){
+        const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gsxarc-'));
         tmpDirs.push(tmp);
-        const r=require('child_process').spawnSync('powershell',
-          ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath "${p}" -DestinationPath "${tmp}" -Force`],
-          {windowsHide:true});
-        if(r.status!==0){ errors.push(path.basename(p)+': unzip failed'); LOG.error('[GSX] unzip failed:', p); continue; }
+        const ex=gsxExtractArchive(p, tmp);
+        if(!ex.ok){
+          if(ex.needTool) needTool=true;
+          errors.push(path.basename(p)+(ex.needTool?': no .rar/.7z extractor installed':': extract failed'));
+          LOG.error('[GSX] extract failed:', p, ex.needTool?'(no tool)':'');
+          continue;
+        }
         gsxWalkFiles(tmp, 8, GSX_SKIP_DIRS).forEach(f=>{ if(gsxIsProfileFile(f.base)) collect.push(f.abs); });
       } else if(gsxIsProfileFile(path.basename(p))){
         collect.push(p);
@@ -261,7 +302,7 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
     }catch(e){ errors.push(path.basename(src)+': '+e.message); LOG.error('[GSX] dropped copy failed:', e.message); }
   }
   for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
-  return {ok:errors.length===0, copied, skipped, errors};
+  return {ok:errors.length===0, copied, skipped, errors, needTool};
 });
 
 const CFG = path.join(USER_DATA, 'config.json');
