@@ -305,9 +305,24 @@ html[data-theme="light"] .theme-knob{left:30px}
 #map-popup{display:none;position:absolute;z-index:10;background:#0d1828;border:1px solid rgba(41,182,246,.4);border-radius:6px;padding:8px 12px;pointer-events:none;transform:translate(-50%,calc(-100% - 10px));white-space:nowrap;box-shadow:0 0 12px rgba(41,182,246,.25)}
 #map-popup .mp1{font-size:12px;font-weight:600;color:#e8f4fb;font-family:'Inter',sans-serif}
 #map-popup .mp2{font-size:11px;color:#29b6f6;font-family:'JetBrains Mono',monospace;margin-top:2px}
+.gsx-pill{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;
+  font-size:11px;font-weight:600;padding:3px 8px;border-radius:10px;white-space:nowrap;line-height:1.4;border:1px solid transparent}
+.gsx-ok{background:var(--grn2);color:var(--grn);border-color:rgba(50,215,75,.35)}
+.gsx-miss{background:var(--acc2);color:var(--acc);border-color:rgba(245,166,35,.35);cursor:pointer}
+.gsx-miss:hover{background:rgba(245,166,35,.22)}
+.gsx-install{background:var(--blu2);color:var(--blu);border-color:rgba(10,132,255,.4);cursor:pointer}
+.gsx-install:hover{filter:brightness(1.15)}
+.gsx-wait{background:var(--bg4);color:var(--ink3)}
+#gsx-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--acc2);border:1px solid rgba(245,166,35,.45);color:var(--acc);
+  font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.02em;
+  padding:9px 18px;border-radius:22px;z-index:10000;opacity:0;pointer-events:none;
+  transition:opacity .25s ease,transform .25s ease;box-shadow:0 4px 18px rgba(0,0,0,.3)}
+#gsx-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style></head><body>
+<div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.4.2</div>
+  <div class="tname">A Better Route Planner &mdash; v5.5.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -333,7 +348,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.4.2</div>
+    <div class="sb-ver">v5.5.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -399,7 +414,7 @@ html[data-theme="light"] .theme-knob{left:30px}
       <table class="atbl">
         <thead><tr>
           <th style="width:38px"></th><th style="width:80px">ICAO</th><th>Airport</th>
-          <th style="width:78px">Method</th><th style="width:40px"></th>
+          <th style="width:78px">Method</th><th style="width:120px">GSX</th><th style="width:40px"></th>
         </tr></thead>
         <tbody id="apt-body"></tbody>
       </table>
@@ -660,6 +675,26 @@ html[data-theme="light"] .theme-knob{left:30px}
 
       </div>
     </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">GSX Pro</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">GSX Profile Folder</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Where GSX Pro stores its airport profiles. Leave blank to use the default.</div>
+    <div class="api-row">
+      <input class="api-inp" type="text" id="gsx-folder-inp" placeholder="%APPDATA%\Virtuali\GSX\MSFS" oninput="onGsxFolderInput()" style="color:var(--ink2)">
+      <button class="btn bg bsm" onclick="browseGsxFolder()">Browse&hellip;</button>
+      <button class="btn bp bsm" onclick="saveGsxFolder()">Save</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer;user-select:none" onclick="toggleGsxAutoInstall()">
+      <span id="gsx-auto-box" style="font-size:14px;color:var(--acc);font-family:'JetBrains Mono',monospace">&#9745;</span>
+      <span style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace">Auto-install bundled GSX profiles found in scenery folders</span>
+    </div>
+    <div id="gsx-drop-zone" class="si-drop" style="margin-top:16px"
+      ondragover="onGsxDragOver(event)" ondragleave="onGsxDragLeave(event)" ondrop="onGsxDrop(event)">
+      <div class="si-drop-icon">&#9992;</div>
+      <div class="si-drop-txt"><strong>Drop a GSX profile here to install</strong><br>Accepts profile files (.py / .ini), a folder, or a downloaded .zip</div>
+    </div>
+    <div id="gsx-drop-result" style="display:none;margin-top:10px;font-size:12px;font-family:'JetBrains Mono',monospace"></div>
   </div>
 </div></div>
 
@@ -1003,6 +1038,7 @@ const S={
   dirFilter:'either',
   acFilter:'',
   metarCache:{},rwyCache:{},
+  gsxFiles:[],gsxBundled:{},gsxScanning:false,
   metarLastFetch:0,
   wxFetching:false,
   freeRouteMode:false,
@@ -1069,9 +1105,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
       document.getElementById('apt-sec').style.display='block';
       renderApts();
       setScanNote('Loaded '+S.allRows.length+' airports from last session. Click Scan Now if your library has changed.');
+      gsxRefresh().then(()=>{renderApts();gsxScanMissing();});
     }catch(e){ console.error('Session restore error:',e); }
   }
   populateSimIntegration();
+  populateGsxSettings();
   renderQlAppList();
   renderFleetPanel();
   buildChSB();renderCD(0);updateStats();renderRoutes();
@@ -1247,6 +1285,7 @@ async function procFolders(folders){
   S.cfg.savedRows=S.allRows;
   await window.api.saveConfig(S.cfg);
   setScanNote('Scan complete — '+S.allRows.length+' folders read. Results saved for next session.');
+  await gsxRefresh();renderApts();gsxScanMissing();
   await resolveUnknownAirports();
 }
 
@@ -1305,6 +1344,7 @@ function renderApts(){
         <td class="icao" style="color:var(--ink4)">${r.icao||'&mdash;'}</td>
         <td><div class="an" style="color:var(--ink3)">${info[0]}</div><div class="af">${r.folder}</div></td>
         <td><span style="font-size:12px;color:var(--ink4)">${r.method||'&mdash;'}</span></td>
+        <td></td>
         <td><button class="btn bg bxs" onclick="unignoreFolder('${r.folder}')" title="Restore this airport">Restore</button></td>
       </tr>`;
     }
@@ -1313,9 +1353,97 @@ function renderApts(){
       <td class="icao" style="color:${r.icao?'var(--acc)':'var(--ink4)'}">${r.icao||'&mdash;'}</td>
       <td><div class="an">${info[0]}</div><div class="af">${r.folder}</div></td>
       <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:${mc};flex-shrink:0;display:inline-block"></span>${r.method||'&mdash;'}</span></td>
+      ${gsxCell(r)}
       <td style="white-space:nowrap">${!r.icao?`<span style="display:inline-flex;align-items:center;gap:4px"><button class="btn bg bxs" onclick="startAddIcao(this,'${r.folder}')" title="Manually assign ICAO code" style="color:var(--acc);font-family:'JetBrains Mono',monospace;font-weight:600">+ ICAO</button><button class="btn bg bxs" onclick="ignoreFolder('${r.folder}')" title="Ignore this airport (hide from list)" style="padding:4px 8px;line-height:1;color:var(--ink3)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>`:''}</td>
     </tr>`;
   }).join('');
+}
+
+// ── GSX PRO PROFILES ──────────────────────────────────────────────────────────
+function gsxInstalled(icao){
+  return !!(icao && S.gsxFiles.some(f=>f.startsWith(icao.toLowerCase())));
+}
+// Cell content for the GSX column, driven by the cascade: installed → bundled →
+// flightsim.to link. Returns a full <td>.
+function gsxCell(r){
+  if(!r.icao) return '<td></td>';
+  if(gsxInstalled(r.icao))
+    return `<td><span class="gsx-pill gsx-ok" title="GSX profile installed">GSX &#10003;</span></td>`;
+  const bundled=S.gsxBundled[r.icao];
+  if(bundled&&bundled.length)
+    return `<td><button class="gsx-pill gsx-install" onclick="gsxInstallProfile('${r.icao}')" title="Install the GSX profile bundled with this scenery">Install</button></td>`;
+  if(S.gsxScanning)
+    return `<td><span class="gsx-pill gsx-wait" title="Checking scenery folder for a bundled GSX profile">checking&hellip;</span></td>`;
+  const url='https://flightsim.to/others/gsx-pro?search='+encodeURIComponent(r.icao);
+  return `<td><span class="gsx-pill gsx-miss" onclick="window.api.openExternal('${url}')" title="No GSX profile found — search flightsim.to GSX section for ${r.icao}">flightsim.to &#8599;</span></td>`;
+}
+
+let gsxToastTimer=null;
+function gsxToast(msg){
+  const el=document.getElementById('gsx-toast');
+  if(!el)return;
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(gsxToastTimer);
+  gsxToastTimer=setTimeout(()=>el.classList.remove('show'),4000);
+}
+
+// Step 1 of the cascade: read the GSX profile folder so installed airports show green.
+async function gsxRefresh(){
+  try{
+    const res=await window.api.gsxListProfiles(S.cfg.gsxFolder||'');
+    S.gsxFiles=(res&&res.files)||[];
+    RLOG('[GSX] '+S.gsxFiles.length+' profile file(s) found');
+  }catch(e){S.gsxFiles=[];RLOG('[GSX] refresh error: '+e.message);}
+}
+
+// Step 2: for each airport missing a profile, look inside its scenery folder for a
+// bundled profile. Auto-install (default) or surface a manual Install button.
+async function gsxScanMissing(){
+  const root=S.folderPath||S.cfg.folder;
+  if(!root){return;}
+  const missing=S.allRows.filter(r=>r.icao && !gsxInstalled(r.icao) && !S.gsxBundled[r.icao]);
+  if(!missing.length){return;}
+  const auto=S.cfg.gsxAutoInstall!==false;
+  S.gsxScanning=true;renderApts();
+  for(const r of missing){
+    try{
+      const sceneryFolder=root.replace(/[\\/]+$/,'')+'\\'+r.folder;
+      const res=await window.api.gsxScanBundled({sceneryFolder,icao:r.icao});
+      const files=(res&&res.files)||[];
+      if(!files.length)continue;
+      if(auto){
+        const inst=await window.api.gsxInstallBundled({files:files.map(f=>f.abs),gsxFolder:S.cfg.gsxFolder||''});
+        if(inst&&inst.copied&&inst.copied.length){
+          inst.copied.forEach(n=>S.gsxFiles.push(n.toLowerCase()));
+          gsxToast('GSX profile for '+r.icao+' installed from scenery folder');
+          renderApts();
+        }
+      }else{
+        S.gsxBundled[r.icao]=files;
+        renderApts();
+      }
+    }catch(e){RLOG('[GSX] scan '+r.icao+' error: '+e.message);}
+  }
+  S.gsxScanning=false;renderApts();
+}
+
+// Manual install (auto-install toggle off) — copies the bundled profile after confirm.
+async function gsxInstallProfile(icao){
+  const files=S.gsxBundled[icao];
+  if(!files||!files.length)return;
+  if(!confirm('Install the GSX profile for '+icao+' into your GSX folder?\n\n'+files.length+' file(s) will be copied from the scenery folder.'))return;
+  try{
+    const inst=await window.api.gsxInstallBundled({files:files.map(f=>f.abs),gsxFolder:S.cfg.gsxFolder||''});
+    if(inst&&inst.copied&&inst.copied.length){
+      inst.copied.forEach(n=>S.gsxFiles.push(n.toLowerCase()));
+      delete S.gsxBundled[icao];
+      gsxToast('GSX profile for '+icao+' installed ('+inst.copied.length+' file(s))');
+      renderApts();
+    }else{
+      gsxToast('GSX install failed for '+icao);
+    }
+  }catch(e){gsxToast('GSX install error: '+e.message);}
 }
 
 async function togA(icao,checked){
@@ -2971,6 +3099,66 @@ function saveCommunityFolder(){
   updateSimDetectStatus();
   RLOG('[SCENE] Community folder override: '+v);
 }
+
+// ── GSX SETTINGS ──────────────────────────────────────────────────────────────
+function populateGsxSettings(){
+  const fi=document.getElementById('gsx-folder-inp');
+  if(fi&&S.cfg.gsxFolder)fi.value=S.cfg.gsxFolder;
+  const box=document.getElementById('gsx-auto-box');
+  if(box)box.innerHTML=(S.cfg.gsxAutoInstall!==false)?'&#9745;':'&#9744;';
+}
+function onGsxFolderInput(){}
+async function browseGsxFolder(){
+  const p=await window.api.browseFolder();
+  if(!p)return;
+  document.getElementById('gsx-folder-inp').value=p;
+}
+async function saveGsxFolder(){
+  const v=document.getElementById('gsx-folder-inp').value.trim();
+  S.cfg.gsxFolder=v||'';
+  await window.api.saveConfig(S.cfg);
+  RLOG('[GSX] profile folder set: '+(v||'(default)'));
+  await gsxRefresh();renderApts();gsxScanMissing();
+  gsxToast('GSX folder saved — rechecking profiles');
+}
+function toggleGsxAutoInstall(){
+  S.cfg.gsxAutoInstall=(S.cfg.gsxAutoInstall===false)?true:false;
+  window.api.saveConfig(S.cfg);
+  populateGsxSettings();
+  RLOG('[GSX] auto-install '+(S.cfg.gsxAutoInstall!==false?'on':'off'));
+  if(S.cfg.gsxAutoInstall!==false)gsxScanMissing();
+}
+function onGsxDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='copy';
+  document.getElementById('gsx-drop-zone').classList.add('drag-over');
+}
+function onGsxDragLeave(e){
+  e.preventDefault();
+  document.getElementById('gsx-drop-zone').classList.remove('drag-over');
+}
+async function onGsxDrop(e){
+  e.preventDefault();
+  document.getElementById('gsx-drop-zone').classList.remove('drag-over');
+  const paths=[...(e.dataTransfer.files||[])].map(f=>f.path).filter(Boolean);
+  const rd=document.getElementById('gsx-drop-result');
+  if(!paths.length){if(rd){rd.style.display='block';rd.style.color='var(--acc)';rd.textContent='Nothing detected in that drop — try the files, folder, or .zip again.';}return;}
+  if(rd){rd.style.display='block';rd.style.color='var(--ink3)';rd.textContent='Installing GSX profile…';}
+  try{
+    const res=await window.api.gsxInstallDropped({paths,gsxFolder:S.cfg.gsxFolder||''});
+    const n=(res&&res.copied&&res.copied.length)||0;
+    if(n){
+      await gsxRefresh();renderApts();
+      if(rd){rd.style.color='var(--grn)';rd.textContent='Installed '+n+' GSX file(s) into your GSX folder.';}
+      gsxToast('Installed '+n+' GSX file(s)');
+    }else{
+      if(rd){rd.style.color='var(--acc)';rd.textContent='No GSX profile files (.py / .ini) were found in that drop.';}
+    }
+    if(res&&res.errors&&res.errors.length)RLOG('[GSX] drop errors: '+res.errors.join('; '));
+  }catch(err){
+    if(rd){rd.style.color='var(--acc)';rd.textContent='Install failed: '+err.message;}
+  }
+}
 function updateSimDetectStatus(){
   const el=document.getElementById('sim-detect-status');
   if(!el)return;
@@ -3726,5 +3914,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.4.2</div>
+  pointer-events:none;">v5.5.0</div>
 </body></html>

@@ -149,6 +149,121 @@ ipcMain.handle('scan-folder', async (_,p)=>{
   }
 });
 
+// ── GSX PRO PROFILES ──────────────────────────────────────────────────────────
+// GSX profiles live (flat, sometimes in subfolders) in %APPDATA%\Virtuali\GSX\MSFS.
+// A profile for an airport is a set of files whose base name starts with the
+// lowercase ICAO, e.g. lppr-mkstudios-...-gsx-vdgs.ini / .py / _handler.py
+function gsxDefaultDir(){
+  const appData = process.env.APPDATA || path.join(os.homedir(),'AppData','Roaming');
+  return path.join(appData,'Virtuali','GSX','MSFS');
+}
+function gsxResolveDir(gsxFolder){
+  return (gsxFolder && gsxFolder.trim()) ? gsxFolder.trim() : gsxDefaultDir();
+}
+// Recursively collect files under dir up to maxDepth. skipRe (optional) matches
+// directory names to skip (e.g. bulky texture folders).
+function gsxWalkFiles(dir, maxDepth, skipRe){
+  const out=[];
+  (function rec(d, depth){
+    if(depth>maxDepth) return;
+    let ents;
+    try{ ents=fs.readdirSync(d,{withFileTypes:true}); }catch(e){ return; }
+    for(const e of ents){
+      const full=path.join(d,e.name);
+      if(e.isDirectory()){
+        if(skipRe && skipRe.test(e.name)) continue;
+        rec(full, depth+1);
+      } else {
+        out.push({abs:full, base:e.name});
+      }
+    }
+  })(dir, 0);
+  return out;
+}
+const GSX_SKIP_DIRS = /^texture$/i;
+const gsxIsProfileFile = b => { b=(b||'').toLowerCase(); return b.endsWith('.py')||b.endsWith('.ini'); };
+// Conservative match for scanning whole scenery packages: a .py/.ini that either
+// starts with the ICAO or has "gsx" in the name.
+function gsxLooksBundled(base, icao){
+  const b=(base||'').toLowerCase();
+  if(!gsxIsProfileFile(b)) return false;
+  if(icao && b.startsWith(icao.toLowerCase())) return true;
+  return b.includes('gsx');
+}
+
+ipcMain.handle('gsx-list-profiles', (_, gsxFolder)=>{
+  const dir=gsxResolveDir(gsxFolder);
+  try{
+    if(!fs.existsSync(dir)){ LOG.info('[GSX] profile dir not found:', dir); return {ok:true, dir, files:[]}; }
+    const files=gsxWalkFiles(dir, 4, null).map(f=>f.base.toLowerCase());
+    LOG.info('[GSX] list-profiles:', files.length, 'files in', dir);
+    return {ok:true, dir, files};
+  }catch(e){ LOG.error('[GSX] list-profiles failed:', e.message); return {ok:false, error:e.message, files:[]}; }
+});
+
+ipcMain.handle('gsx-scan-bundled', (_, {sceneryFolder, icao})=>{
+  try{
+    if(!sceneryFolder || !fs.existsSync(sceneryFolder)) return {ok:true, files:[]};
+    const files=gsxWalkFiles(sceneryFolder, 6, GSX_SKIP_DIRS).filter(f=>gsxLooksBundled(f.base, icao));
+    if(files.length) LOG.info('[GSX] scan-bundled', icao, '→', files.length, 'file(s)');
+    return {ok:true, files};
+  }catch(e){ LOG.error('[GSX] scan-bundled failed:', e.message); return {ok:false, error:e.message, files:[]}; }
+});
+
+ipcMain.handle('gsx-install-bundled', (_, {files, gsxFolder})=>{
+  const dir=gsxResolveDir(gsxFolder);
+  const copied=[], errors=[];
+  try{ fs.mkdirSync(dir,{recursive:true}); }catch(e){}
+  for(const src of (files||[])){
+    try{
+      const dest=path.join(dir, path.basename(src));
+      fs.copyFileSync(src, dest);
+      copied.push(path.basename(src));
+      LOG.info('[GSX] installed', path.basename(src), '->', dir);
+    }catch(e){ errors.push(path.basename(src)+': '+e.message); LOG.error('[GSX] install failed:', e.message); }
+  }
+  return {ok:errors.length===0, copied, errors};
+});
+
+// Manual drag-and-drop install: accepts loose .py/.ini files, a folder, or a .zip.
+// Zips are extracted with Windows' built-in Expand-Archive (no new dependency).
+ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
+  const dir=gsxResolveDir(gsxFolder);
+  const copied=[], skipped=[], errors=[], tmpDirs=[];
+  try{ fs.mkdirSync(dir,{recursive:true}); }catch(e){}
+  const collect=[];
+  for(const p of (paths||[])){
+    try{
+      const st=fs.statSync(p);
+      if(st.isDirectory()){
+        gsxWalkFiles(p, 8, GSX_SKIP_DIRS).forEach(f=>{ if(gsxIsProfileFile(f.base)) collect.push(f.abs); });
+      } else if(p.toLowerCase().endsWith('.zip')){
+        const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gsxzip-'));
+        tmpDirs.push(tmp);
+        const r=require('child_process').spawnSync('powershell',
+          ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath "${p}" -DestinationPath "${tmp}" -Force`],
+          {windowsHide:true});
+        if(r.status!==0){ errors.push(path.basename(p)+': unzip failed'); LOG.error('[GSX] unzip failed:', p); continue; }
+        gsxWalkFiles(tmp, 8, GSX_SKIP_DIRS).forEach(f=>{ if(gsxIsProfileFile(f.base)) collect.push(f.abs); });
+      } else if(gsxIsProfileFile(path.basename(p))){
+        collect.push(p);
+      } else {
+        skipped.push(path.basename(p));
+      }
+    }catch(e){ errors.push(path.basename(p)+': '+e.message); LOG.error('[GSX] dropped item failed:', e.message); }
+  }
+  for(const src of collect){
+    try{
+      const dest=path.join(dir, path.basename(src));
+      fs.copyFileSync(src, dest);
+      copied.push(path.basename(src));
+      LOG.info('[GSX] dropped install', path.basename(src), '->', dir);
+    }catch(e){ errors.push(path.basename(src)+': '+e.message); LOG.error('[GSX] dropped copy failed:', e.message); }
+  }
+  for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
+  return {ok:errors.length===0, copied, skipped, errors};
+});
+
 const CFG = path.join(USER_DATA, 'config.json');
 // One-time migration into the renamed userData folder. Copy-only — the source
 // files are left untouched as a backup. Prefer the legacy userData folder

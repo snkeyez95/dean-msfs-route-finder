@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.5.0   GSX Pro profile status in My Airports — installed badge, flightsim.to search link, auto-install of scenery-bundled profiles, drag-and-drop install
 v5.4.2   Remove runway compass SVG — text-only wind and active runway display
 v5.4.1   Runway compass redesigned — dark instrument panel style, high contrast in all themes
 v5.4.0   Wind & runway compass visual in route expansion panel, dynamic runway data fetch

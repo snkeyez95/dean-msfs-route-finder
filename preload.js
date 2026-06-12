@@ -2,6 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   browseFolder:       ()    => ipcRenderer.invoke('browse-folder'),
   scanFolder:         (p)   => ipcRenderer.invoke('scan-folder', p),
+  gsxListProfiles:    (f)   => ipcRenderer.invoke('gsx-list-profiles', f),
+  gsxScanBundled:     (o)   => ipcRenderer.invoke('gsx-scan-bundled', o),
+  gsxInstallBundled:  (o)   => ipcRenderer.invoke('gsx-install-bundled', o),
+  gsxInstallDropped:  (o)   => ipcRenderer.invoke('gsx-install-dropped', o),
   loadConfig:         ()    => ipcRenderer.invoke('load-config'),
   saveConfig:         (c)   => ipcRenderer.invoke('save-config', c),
   siFetchPage:        (o)   => ipcRenderer.invoke('si-fetch-page', o),
