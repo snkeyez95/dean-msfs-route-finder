@@ -588,6 +588,43 @@ ipcMain.handle('unlink-packages', (_, {names, communityFolder}) => {
   return {ok:errors.length===0, removed, skipped, errors};
 });
 
+// Manually add a utility into the Util library folder: copy a dropped/browsed
+// package folder, or extract a downloaded .zip/.rar/.7z, into the Util root. The
+// normal scan then picks it up. Reuses the GSX archive extractor.
+ipcMain.handle('util-add', (_, {paths, utilFolder}) => {
+  const root = pkgResolveRoot(utilFolder, 'util');
+  const added = [], skipped = [], errors = [], tmpDirs = [];
+  let needTool = false;
+  try{ fs.mkdirSync(root, {recursive:true}); }catch(e){}
+  for(const p of (paths||[])){
+    try{
+      const st = fs.statSync(p);
+      if(st.isDirectory()){
+        const dest = path.join(root, path.basename(p));
+        if(fs.existsSync(dest)){ skipped.push(path.basename(p)); continue; }
+        fs.cpSync(p, dest, {recursive:true});
+        added.push(path.basename(p));
+        LOG.info('[PKG] util added (folder):', dest);
+      } else if(GSX_ARCHIVE_RE.test(p)){
+        const baseName = path.basename(p).replace(/\.(zip|rar|7z)$/i, '');
+        const dest = path.join(root, baseName);
+        if(fs.existsSync(dest)){ skipped.push(baseName); continue; }
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'utiladd-'));
+        tmpDirs.push(tmp);
+        const ex = gsxExtractArchive(p, tmp);
+        if(!ex.ok){ if(ex.needTool) needTool = true; errors.push(path.basename(p)+(ex.needTool?': no .rar/.7z extractor installed':': extract failed')); continue; }
+        fs.cpSync(tmp, dest, {recursive:true});
+        added.push(baseName);
+        LOG.info('[PKG] util added (archive):', dest);
+      } else {
+        skipped.push(path.basename(p));
+      }
+    }catch(e){ errors.push(path.basename(p)+': '+e.message); LOG.error('[PKG] util-add failed:', e.message); }
+  }
+  for(const t of tmpDirs){ try{ fs.rmSync(t, {recursive:true, force:true}); }catch(e){} }
+  return {ok:errors.length===0, added, skipped, errors, needTool};
+});
+
 ipcMain.handle('msfs-detect', () => {
   const home = os.homedir();
   const steamCommunity = path.join(home, 'AppData', 'Roaming', 'Microsoft Flight Simulator 2024', 'Packages', 'Community');

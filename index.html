@@ -322,7 +322,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.6.1</div>
+  <div class="tname">A Better Route Planner &mdash; v5.6.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -348,7 +348,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.6.1</div>
+    <div class="sb-ver">v5.6.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1816,12 +1816,17 @@ function paintAddons(){
   }
   html+=addonSectionHeader('Utilities');
   if(!S.utilPkgs.length){
-    html+=addonEmptyNote('No utility packages found. Set your Util folder in Settings. Only real MSFS packages (with a manifest) are listed — tools and installers are skipped automatically.');
+    html+=addonEmptyNote('No utility packages found yet. Only real MSFS packages (with a manifest) are listed — tools and installers are skipped automatically. Add one below.');
   }else{
     html+=`<div class="card" style="padding:0;overflow:hidden">`;
     for(const p of S.utilPkgs) html+=addonRow(p.name,'util',p.name,'',uAct.has(p.name));
     html+=`</div>`;
   }
+  html+=`<div id="util-drop" class="si-drop" style="margin-top:14px" ondragover="onUtilAddDragOver(event)" ondragleave="onUtilAddDragLeave(event)" ondrop="onUtilAddDrop(event)">
+    <div class="si-drop-icon">&#10133;</div>
+    <div class="si-drop-txt"><strong>Add a utility</strong><br>Drop a package folder or a downloaded .zip / .rar / .7z here, or <a href="#" onclick="browseAddUtil();return false;" style="color:var(--acc)">browse&hellip;</a> &mdash; it's copied into your Util folder and appears above.</div>
+  </div>
+  <div id="util-add-result" style="display:none;margin-top:8px;font-size:12px;font-family:'JetBrains Mono',monospace"></div>`;
   el.innerHTML=html;
 }
 
@@ -1859,6 +1864,38 @@ async function togUtil(name,checked){
 }
 function addonSkipNote(skipped,label){
   if(skipped&&skipped.length) gsxToast(label+': '+skipped.length+' item(s) skipped (already in Community, or not a link)');
+}
+
+// Manually add a utility into the Util library (copy folder, or extract archive).
+function onUtilAddDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='copy';const z=document.getElementById('util-drop');if(z)z.classList.add('drag-over');}
+function onUtilAddDragLeave(e){e.preventDefault();const z=document.getElementById('util-drop');if(z)z.classList.remove('drag-over');}
+async function onUtilAddDrop(e){
+  e.preventDefault();
+  const z=document.getElementById('util-drop');if(z)z.classList.remove('drag-over');
+  const paths=[...(e.dataTransfer.files||[])].map(f=>f.path).filter(Boolean);
+  await addUtilPaths(paths);
+}
+async function browseAddUtil(){
+  const p=await window.api.browseFolder();
+  if(p)await addUtilPaths([p]);
+}
+async function addUtilPaths(paths){
+  const rd=document.getElementById('util-add-result');
+  if(!paths||!paths.length){if(rd){rd.style.display='block';rd.style.color='var(--acc)';rd.textContent='Nothing detected in that drop.';}return;}
+  if(rd){rd.style.display='block';rd.style.color='var(--ink3)';rd.textContent='Adding to your Util folder&hellip;';}
+  try{
+    const res=await window.api.utilAdd({paths,utilFolder:S.cfg.utilFolder||''});
+    const n=(res&&res.added&&res.added.length)||0;
+    if(n){
+      await scanAddons();paintAddons();
+      gsxToast('Added '+n+' utility folder(s) — toggle to link');
+    }else if(res&&res.needTool){
+      if(rd){rd.style.color='var(--acc)';rd.textContent='Couldn’t open that .rar/.7z — install 7-Zip or WinRAR, or extract it first and drop the folder.';}
+    }else{
+      if(rd){rd.style.color='var(--acc)';rd.textContent='Nothing added (already in your Util folder, or not a package folder/archive).';}
+    }
+    if(res&&res.errors&&res.errors.length)RLOG('[PKG] util-add errors: '+res.errors.join('; '));
+  }catch(err){if(rd){rd.style.color='var(--acc)';rd.textContent='Add failed: '+err.message;}}
 }
 
 // Map a route aircraft type (e.g. A319, B738, A20N) to the best-matching aircraft
@@ -4233,5 +4270,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.6.1</div>
+  pointer-events:none;">v5.6.2</div>
 </body></html>

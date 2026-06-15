@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.6.2   Add utilities from the Aircraft & Util tab — drop a folder or .zip/.rar/.7z (or browse) to copy it into your Util library
 v5.6.1   Plan a Flight "Activate" now also links the route's aircraft bundle (matched by type) alongside scenery
 v5.6.0   Aircraft & Utility activation — junction add-on bundles into Community on demand (new Aircraft & Util tab; folder-defined groups; per-item utility toggles; symlink-only safety)
 v5.5.7   Settings reordered — GSX Pro moved above Route Backup / Manual Import

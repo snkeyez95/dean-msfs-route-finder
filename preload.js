@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('api', {
   linkPackages:           (o)   => ipcRenderer.invoke('link-packages', o),
   unlinkPackages:         (o)   => ipcRenderer.invoke('unlink-packages', o),
   pkgDefaultRoots:        ()    => ipcRenderer.invoke('pkg-default-roots'),
+  utilAdd:                (o)   => ipcRenderer.invoke('util-add', o),
   launchMsfs:             (o)   => ipcRenderer.invoke('launch-msfs', o),
   openExternal:       (url) => ipcRenderer.send('open-external', url),
   winMinimize:        ()    => ipcRenderer.send('win-minimize'),
