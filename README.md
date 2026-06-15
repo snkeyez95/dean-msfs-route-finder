@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.6.3   Aircraft group dependencies — mark that one group "requires" another (e.g. Fenix 319/321 needs the 320 base); activating it auto-links the required group too
 v5.6.2   Add utilities from the Aircraft & Util tab — drop a folder or .zip/.rar/.7z (or browse) to copy it into your Util library
 v5.6.1   Plan a Flight "Activate" now also links the route's aircraft bundle (matched by type) alongside scenery
 v5.6.0   Aircraft & Utility activation — junction add-on bundles into Community on demand (new Aircraft & Util tab; folder-defined groups; per-item utility toggles; symlink-only safety)
