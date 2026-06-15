@@ -199,6 +199,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.6.0   Aircraft & Utility activation — junction add-on bundles into Community on demand (new Aircraft & Util tab; folder-defined groups; per-item utility toggles; symlink-only safety)
 v5.5.7   Settings reordered — GSX Pro moved above Route Backup / Manual Import
 v5.5.6   GSX drag-and-drop now accepts .rar / .7z archives (via 7-Zip or WinRAR); clear message if no extractor is installed
 v5.5.5   GSX column filter dropdown (All / Installed / Missing); existing Show dropdown relabeled to "ICAO Matched / Unmatched" for clarity

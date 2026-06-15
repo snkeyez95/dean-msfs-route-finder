@@ -515,6 +515,79 @@ ipcMain.handle('deactivate-scenery', (_, {folders, communityFolder}) => {
   return {ok: errors.length === 0, removed, errors};
 });
 
+// ── PACKAGE ACTIVATION (Aircraft / Util) ─────────────────────────────────────
+// Junctions add-on packages into the Community folder on demand. A "package" is
+// any folder containing manifest.json (the MSFS signal). A "group" is any folder
+// that directly contains >=1 package; activating a group links all its packages
+// together (aircraft + liveries + sound = one bundle). Reuses the same junction
+// mechanism as scenery activation.
+function pkgDefaultRoots(){
+  const base = path.join(os.homedir(), 'Documents', 'MSFS');
+  return { aircraft: path.join(base, 'Aircraft'), util: path.join(base, 'Util') };
+}
+function pkgResolveRoot(root, which){
+  return (root && root.trim()) ? root.trim() : pkgDefaultRoots()[which];
+}
+function pkgIsPackageDir(dir){
+  try{ return fs.existsSync(path.join(dir, 'manifest.json')); }catch(e){ return false; }
+}
+
+ipcMain.handle('pkg-default-roots', () => pkgDefaultRoots());
+
+ipcMain.handle('scan-packages', (_, {root, which}) => {
+  const dir = pkgResolveRoot(root, which);
+  try{
+    if(!fs.existsSync(dir)){ LOG.info('[PKG] root not found:', dir); return {ok:true, root:dir, groups:[]}; }
+    const groups = [];
+    (function walk(d, depth){
+      if(depth > 5) return;
+      let ents;
+      try{ ents = fs.readdirSync(d, {withFileTypes:true}).filter(e=>e.isDirectory()); }catch(e){ return; }
+      const packages = [];
+      const subdirs = [];
+      for(const e of ents){
+        const full = path.join(d, e.name);
+        if(pkgIsPackageDir(full)) packages.push({name:e.name, abs:full});
+        else subdirs.push(full);  // only recurse into non-package folders
+      }
+      if(packages.length){
+        const rel = path.relative(dir, d).split(path.sep).join('/');
+        const id = rel || '.';
+        groups.push({ id, label: rel ? path.basename(d) : path.basename(dir), parent: id.split('/')[0], packages });
+      }
+      for(const s of subdirs) walk(s, depth+1);
+    })(dir, 0);
+    LOG.info('[PKG] scan', dir, '→', groups.length, 'group(s)');
+    return {ok:true, root:dir, groups};
+  }catch(e){ LOG.error('[PKG] scan failed:', e.message); return {ok:false, error:e.message, groups:[]}; }
+});
+
+ipcMain.handle('link-packages', (_, {items, communityFolder}) => {
+  const created = [], skipped = [], errors = [];
+  for(const it of (items||[])){
+    const dest = path.join(communityFolder, it.name);
+    try{
+      if(fs.existsSync(dest)){ skipped.push(it.name); LOG.info('[PKG] link skip (exists):', dest); }
+      else{ fs.symlinkSync(it.abs, dest, 'junction'); created.push(it.name); LOG.info('[PKG] linked', dest, '->', it.abs); }
+    }catch(e){ errors.push(it.name+': '+e.message); LOG.error('[PKG] link failed:', e.message); }
+  }
+  return {ok:errors.length===0, created, skipped, errors};
+});
+
+ipcMain.handle('unlink-packages', (_, {names, communityFolder}) => {
+  const removed = [], skipped = [], errors = [];
+  for(const name of (names||[])){
+    const dest = path.join(communityFolder, name);
+    try{
+      if(!fs.existsSync(dest)){ removed.push(name); continue; }
+      // Safety: only remove genuine junctions/symlinks — never a real installed folder.
+      if(fs.lstatSync(dest).isSymbolicLink()){ fs.unlinkSync(dest); removed.push(name); LOG.info('[PKG] unlinked', dest); }
+      else{ skipped.push(name); LOG.warn('[PKG] refusing to remove real folder:', dest); }
+    }catch(e){ errors.push(name+': '+e.message); LOG.error('[PKG] unlink failed:', e.message); }
+  }
+  return {ok:errors.length===0, removed, skipped, errors};
+});
+
 ipcMain.handle('msfs-detect', () => {
   const home = os.homedir();
   const steamCommunity = path.join(home, 'AppData', 'Roaming', 'Microsoft Flight Simulator 2024', 'Packages', 'Community');
