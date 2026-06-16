@@ -534,29 +534,36 @@ function pkgIsPackageDir(dir){
 
 ipcMain.handle('pkg-default-roots', () => pkgDefaultRoots());
 
+// Walk a package root and return its groups (folders directly holding >=1 package).
+function pkgScanGroups(dir){
+  const groups = [];
+  if(!fs.existsSync(dir)) return groups;
+  (function walk(d, depth){
+    if(depth > 5) return;
+    let ents;
+    try{ ents = fs.readdirSync(d, {withFileTypes:true}).filter(e=>e.isDirectory()); }catch(e){ return; }
+    const packages = [];
+    const subdirs = [];
+    for(const e of ents){
+      const full = path.join(d, e.name);
+      if(pkgIsPackageDir(full)) packages.push({name:e.name, abs:full});
+      else subdirs.push(full);  // only recurse into non-package folders
+    }
+    if(packages.length){
+      const rel = path.relative(dir, d).split(path.sep).join('/');
+      const id = rel || '.';
+      groups.push({ id, label: rel ? path.basename(d) : path.basename(dir), parent: id.split('/')[0], packages });
+    }
+    for(const s of subdirs) walk(s, depth+1);
+  })(dir, 0);
+  return groups;
+}
+
 ipcMain.handle('scan-packages', (_, {root, which}) => {
   const dir = pkgResolveRoot(root, which);
   try{
     if(!fs.existsSync(dir)){ LOG.info('[PKG] root not found:', dir); return {ok:true, root:dir, groups:[]}; }
-    const groups = [];
-    (function walk(d, depth){
-      if(depth > 5) return;
-      let ents;
-      try{ ents = fs.readdirSync(d, {withFileTypes:true}).filter(e=>e.isDirectory()); }catch(e){ return; }
-      const packages = [];
-      const subdirs = [];
-      for(const e of ents){
-        const full = path.join(d, e.name);
-        if(pkgIsPackageDir(full)) packages.push({name:e.name, abs:full});
-        else subdirs.push(full);  // only recurse into non-package folders
-      }
-      if(packages.length){
-        const rel = path.relative(dir, d).split(path.sep).join('/');
-        const id = rel || '.';
-        groups.push({ id, label: rel ? path.basename(d) : path.basename(dir), parent: id.split('/')[0], packages });
-      }
-      for(const s of subdirs) walk(s, depth+1);
-    })(dir, 0);
+    const groups = pkgScanGroups(dir);
     LOG.info('[PKG] scan', dir, '→', groups.length, 'group(s)');
     return {ok:true, root:dir, groups};
   }catch(e){ LOG.error('[PKG] scan failed:', e.message); return {ok:false, error:e.message, groups:[]}; }
@@ -587,6 +594,50 @@ ipcMain.handle('unlink-packages', (_, {names, communityFolder}) => {
   }
   return {ok:errors.length===0, removed, skipped, errors};
 });
+
+// On app close, remove the scenery + aircraft junctions we created and clear their
+// checked state, so the next launch starts with both unchecked. Utilities are left
+// active (Dean keeps those on permanently); My Airports library is untouched. Runs
+// synchronously from the on-disk config (the renderer keeps it current on every
+// toggle). Only genuine junctions are removed — never a real installed folder.
+function removeJunctionIfLink(dest, tag){
+  try{
+    if(fs.existsSync(dest) && fs.lstatSync(dest).isSymbolicLink()){
+      fs.unlinkSync(dest);
+      LOG.info(`[QUIT] ${tag} junction removed: ${dest}`);
+    }
+  }catch(e){ LOG.warn(`[QUIT] ${tag} unlink failed: ${e.message}`); }
+}
+function cleanupActivationsOnQuit(){
+  let cfg;
+  try{ cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); }catch(e){ return; }
+  const community = cfg.communityFolder;
+  if(!community) return;
+  let changed = false;
+  // scenery
+  const scenery = cfg.activeJunctions || [];
+  for(const folder of scenery) removeJunctionIfLink(path.join(community, folder), 'scenery');
+  if(scenery.length){ cfg.activeJunctions = []; changed = true; }
+  // aircraft (map active group ids → their package folder names via a fresh scan)
+  const aircraft = cfg.aircraftActive || [];
+  if(aircraft.length){
+    let byId = new Map();
+    try{ byId = new Map(pkgScanGroups(pkgResolveRoot(cfg.aircraftFolder, 'aircraft')).map(g => [g.id, g])); }catch(e){}
+    for(const id of aircraft){
+      const g = byId.get(id);
+      if(!g) continue;
+      for(const pkg of g.packages) removeJunctionIfLink(path.join(community, pkg.name), 'aircraft');
+    }
+    cfg.aircraftActive = [];
+    changed = true;
+  }
+  if(changed){
+    try{ fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2)); LOG.info('[QUIT] cleared scenery + aircraft activations'); }
+    catch(e){ LOG.error('[QUIT] config write failed: ' + e.message); }
+  }
+}
+let _cleanupDone = false;
+app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; cleanupActivationsOnQuit(); });
 
 // Manually add a utility into the Util library folder: copy a dropped/browsed
 // package folder, or extract a downloaded .zip/.rar/.7z, into the Util root. The
