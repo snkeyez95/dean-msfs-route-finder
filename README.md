@@ -17,7 +17,7 @@ A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3
 - **Route Snapshot** — Permanent backup of all routes ever seen. Never pruned. Up to 20,000 routes. Exportable and re-importable.
 - **Live Weather** — METAR data from aviationweather.gov for all relevant airports. Auto-refreshes every 30 minutes. Color-coded VFR / MVFR / IFR / LIFR scoring.
 - **Live D-ATIS** — Real digital ATIS in the expanded route panel: the actual active runway, approach in use, and information letter, pulled from atis.info (US) and atis.guru (international). A built-in interpreter translates the cryptic report into plain English, with the full raw text one click away. Arrival data shows on the arrival airport, departure data on the departure airport.
-- **SimBrief Integration** — One-click opens SimBrief pre-filled with airline, flight number, aircraft type, origin, destination, and callsign.
+- **SimBrief Integration** — One-click opens SimBrief pre-filled with airline, flight number, aircraft type, origin, destination, and callsign. When live D-ATIS is available, the active departure and arrival runways are pre-selected too.
 - **Community Routes** — Download a shared route database from GitHub when you don't have a SayIntentions cookie yet.
 - **Dark / Light theme** — Toggle in the title bar.
 
@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.7.1   SimBrief now pre-fills the active runways from live D-ATIS (origrwy/destrwy) — departure airport's departure runway and arrival airport's landing runway
 v5.7.0   Live D-ATIS in expanded route panels — real active runway, approach & info letter from atis.info (US) / atis.guru (intl), with a plain-English interpreter; arrival/departure data routed to the correct airport; Plan a Flight, Free Route & Trip Planner
 v5.6.3   Aircraft group dependencies — mark that one group "requires" another (e.g. Fenix 319/321 needs the 320 base); activating it auto-links the required group too
 v5.6.2   Add utilities from the Aircraft & Util tab — drop a folder or .zip/.rar/.7z (or browse) to copy it into your Util library
