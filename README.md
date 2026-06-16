@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.7.2   Quick Launch companion apps now accept .bat / .cmd scripts (run via cmd from their own folder, console hidden), not just .exe
 v5.7.1   SimBrief now pre-fills the active runways from live D-ATIS (origrwy/destrwy) — departure airport's departure runway and arrival airport's landing runway
 v5.7.0   Live D-ATIS in expanded route panels — real active runway, approach & info letter from atis.info (US) / atis.guru (intl), with a plain-English interpreter; arrival/departure data routed to the correct airport; Plan a Flight, Free Route & Trip Planner
 v5.6.3   Aircraft group dependencies — mark that one group "requires" another (e.g. Fenix 319/321 needs the 320 base); activating it auto-links the required group too

@@ -794,16 +794,25 @@ ipcMain.handle('get-world-map', () => {
 ipcMain.handle('browse-file', async () => {
   const res = await dialog.showOpenDialog(win, {
     properties: ['openFile'],
-    filters: [{name: 'Executables', extensions: ['exe']}],
+    filters: [
+      {name: 'Programs & Scripts', extensions: ['exe', 'bat', 'cmd']},
+      {name: 'All Files', extensions: ['*']},
+    ],
   });
   return res.canceled ? null : {filePath: res.filePaths[0]};
 });
 
 ipcMain.handle('launch-app', (_, {path: appPath}) => {
   try {
-    const child = spawn(appPath, [], {detached: true, stdio: 'ignore'});
+    const isBat = /\.(bat|cmd)$/i.test(appPath || '');
+    // Windows can't spawn a .bat/.cmd directly — it must run through cmd.exe.
+    // Run it from its own folder (batch files often assume relative paths) and
+    // hide the console window so it doesn't flash on screen.
+    const child = isBat
+      ? spawn('cmd', ['/c', appPath], {detached: true, stdio: 'ignore', cwd: path.dirname(appPath), windowsHide: true})
+      : spawn(appPath, [], {detached: true, stdio: 'ignore'});
     child.unref();
-    LOG.info('[LAUNCH] App launched:', appPath);
+    LOG.info('[LAUNCH] App launched:', appPath, isBat ? '(via cmd)' : '');
     return {ok: true};
   } catch(e) {
     LOG.error('[LAUNCH] Failed to launch app:', e.message);
