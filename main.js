@@ -625,6 +625,102 @@ ipcMain.handle('util-add', (_, {paths, utilFolder}) => {
   return {ok:errors.length===0, added, skipped, errors, needTool};
 });
 
+// ── LIVE D-ATIS ───────────────────────────────────────────────────────────────
+// US/Pacific (K*, P*) → atis.info JSON (FAA). Everything else → atis.guru SSR HTML.
+// Returns a normalized object; interpretation (runway extraction, plain-English) is
+// done in the renderer. Never throws — any failure resolves to {ok:true, hasData:false}.
+function datisSourceFor(icao){
+  const c = (icao||'').trim().toUpperCase()[0];
+  return (c === 'K' || c === 'P') ? 'atis.info' : 'atis.guru';
+}
+function datisGet(url){
+  return new Promise(resolve => {
+    try{
+      const req = https.get(url, {headers:{'User-Agent':'ABRP-RoutePlanner'}}, res => {
+        // follow one redirect (atis.info → datis.clowd.io etc.)
+        if(res.statusCode >= 300 && res.statusCode < 400 && res.headers.location){
+          res.resume();
+          return resolve(datisGet(res.headers.location));
+        }
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => resolve({status:res.statusCode, body:data}));
+      });
+      req.on('error', e => resolve({status:0, body:'', error:e.message}));
+      req.setTimeout(8000, () => { req.destroy(); resolve({status:0, body:'', error:'timeout'}); });
+    }catch(e){ resolve({status:0, body:'', error:e.message}); }
+  });
+}
+function datisDecodeEntities(s){
+  return (s||'')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_,h)=>String.fromCharCode(parseInt(h,16)))
+    .replace(/&#(\d+);/g, (_,d)=>String.fromCharCode(parseInt(d,10)))
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ');
+}
+function datisCleanText(s){
+  return datisDecodeEntities(s).replace(/\r/g,'').replace(/[ \t]+\n/g,'\n')
+    .replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+}
+function datisLetterOf(t){ const m=(t||'').match(/ATIS\s+([A-Z])\b/) || (t||'').match(/INFO\s+([A-Z])\b/); return m?m[1]:null; }
+function datisTimeOf(t){ const m=(t||'').match(/\b(\d{3,4}Z)\b/); return m?m[1]:null; }
+function parseAtisInfo(body){
+  let arr=null, dep=null, combined=null, metar=null;
+  let json; try{ json = JSON.parse(body); }catch(e){ return {hasData:false}; }
+  if(!Array.isArray(json) || !json.length) return {hasData:false};
+  for(const el of json){
+    if(!el || !el.datis) continue;
+    const block = {letter: el.code || datisLetterOf(el.datis), time: el.time || datisTimeOf(el.datis), text: el.datis.trim()};
+    const ty = (el.type||'').toLowerCase();
+    if(ty === 'arr' || ty === 'arrival') arr = block;
+    else if(ty === 'dep' || ty === 'departure') dep = block;
+    else combined = block;
+  }
+  const hasData = !!(arr || dep || combined);
+  return {hasData, arr, dep, combined, metar, taf:null};
+}
+function parseAtisGuru(html){
+  let arr=null, dep=null, combined=null, metar=null, taf=null;
+  const re = /<div[^>]*class="[^"]*\batis\b[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+  let m;
+  while((m = re.exec(html)) !== null){
+    const txt = datisCleanText(m[1]);
+    if(!txt) continue;
+    const head = txt.slice(0, 40).toUpperCase();
+    if(/^METAR\b/.test(head)) { metar = txt; continue; }
+    if(/^TAF\b/.test(head))   { taf = txt; continue; }
+    if(/NO\s+ATIS/i.test(head) && txt.length < 30) continue;
+    const block = {letter: datisLetterOf(txt), time: datisTimeOf(txt), text: txt};
+    if(/\bARR\b/.test(head))      arr = block;
+    else if(/\bDEP\b/.test(head)) dep = block;
+    else                          combined = block;
+  }
+  const hasData = !!(arr || dep || combined);
+  return {hasData, arr, dep, combined, metar, taf};
+}
+ipcMain.handle('fetch-datis', async (_, {icao}) => {
+  const id = (icao||'').trim().toUpperCase();
+  const base = {ok:true, icao:id, source:null, hasData:false, arr:null, dep:null, combined:null, metar:null, taf:null, fetchedAt:new Date().toISOString()};
+  if(!/^[A-Z0-9]{3,4}$/.test(id)) return base;
+  const source = datisSourceFor(id);
+  try{
+    const url = source === 'atis.info'
+      ? `https://atis.info/api/${id}`
+      : `https://atis.guru/atis/${id}`;
+    const res = await datisGet(url);
+    if(!res || res.status < 200 || res.status >= 400 || !res.body){
+      LOG.info(`[DATIS] ${id} via ${source}: no data (status ${res&&res.status})`);
+      return {...base, source};
+    }
+    const parsed = source === 'atis.info' ? parseAtisInfo(res.body) : parseAtisGuru(res.body);
+    LOG.info(`[DATIS] ${id} via ${source}: hasData=${parsed.hasData}`);
+    return {...base, source, ...parsed};
+  }catch(e){
+    LOG.warn(`[DATIS] ${id} fetch error: ${e.message}`);
+    return {...base, source};
+  }
+});
+
 ipcMain.handle('msfs-detect', () => {
   const home = os.homedir();
   const steamCommunity = path.join(home, 'AppData', 'Roaming', 'Microsoft Flight Simulator 2024', 'Packages', 'Community');

@@ -173,6 +173,23 @@ select:focus{outline:none;border-color:rgba(245,166,35,.5)}
 .advg{background:var(--grn2);color:var(--grn);border:1px solid rgba(50,215,75,.2)}
 .adva{background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.2)}
 .advr{background:var(--red2);color:var(--red);border:1px solid rgba(255,69,58,.2)}
+/* D-ATIS */
+.datis-block{margin:4px 0 8px}
+.datis-head{font-size:12px;font-weight:600;color:var(--grn);background:var(--grn2);
+  border:1px solid rgba(50,215,75,.22);border-radius:var(--r3);padding:6px 10px;line-height:1.4}
+.datis-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.4px;
+  background:var(--grn);color:#04210b;border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle}
+.datis-note{font-size:11px;color:var(--ink3);font-style:italic;padding:3px 2px}
+.datis-exp{margin-top:5px}
+.datis-exp summary{font-size:11px;color:var(--acc);cursor:pointer;font-weight:500;
+  list-style:none;padding:2px 0;user-select:none}
+.datis-exp summary::-webkit-details-marker{display:none}
+.datis-exp summary::before{content:'\25B8 ';color:var(--ink3)}
+.datis-exp[open] summary::before{content:'\25BE '}
+.datis-ul{margin:4px 0 4px 0;padding-left:18px;font-size:11px;color:var(--ink2);line-height:1.6}
+.datis-raw{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink3);
+  white-space:pre-wrap;word-break:break-word;line-height:1.5;margin:4px 0 2px;
+  background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r3);padding:7px 9px;max-height:220px;overflow:auto}
 /* API PANEL */
 .api-pan{background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r);padding:18px 22px;margin-bottom:14px}
 .api-t{font-size:15px;font-weight:600;color:var(--ink0);letter-spacing:-0.02em;margin-bottom:4px}
@@ -322,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.6.3</div>
+  <div class="tname">A Better Route Planner &mdash; v5.7.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -348,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.6.3</div>
+    <div class="sb-ver">v5.7.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1071,7 +1088,7 @@ const S={
   regionFilter:'all',
   dirFilter:'either',
   acFilter:'',
-  metarCache:{},rwyCache:{},
+  metarCache:{},rwyCache:{},datisCache:{},
   gsxFiles:[],gsxBundled:{},gsxScanning:false,
   acftGroups:[],utilPkgs:[],depEditOpen:null,
   metarLastFetch:0,
@@ -2463,6 +2480,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${da[0]}</span></div>
           <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_origin||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-dep-${i}">fetching&hellip;</span></div>
+          <div class="datis-block" id="datis-dep-${i}"></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
           ${wxBlock(depM)}
@@ -2472,6 +2490,7 @@ function renderRoutes(){
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${aa[0]}</span></div>
           <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_destination||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="rwy-arr-${i}">fetching&hellip;</span></div>
+          <div class="datis-block" id="datis-arr-${i}"></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
           ${wxBlock(arrM)}
@@ -2498,6 +2517,8 @@ function togR(i){
     if(r){
       fetchMetar(r.departure_airport,S.openRoute,'dep');
       fetchMetar(r.arrival_airport,S.openRoute,'arr');
+      fetchDatis(r.departure_airport,S.openRoute,'dep','');
+      fetchDatis(r.arrival_airport,S.openRoute,'arr','');
     }
     setTimeout(()=>{
       const row=document.querySelector('tr.dr.open');
@@ -2720,6 +2741,7 @@ function renderFreeRouteResults(){
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${depName}</span></div>
           <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_origin||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="frrwy-dep-${i}">fetching&hellip;</span></div>
+          <div class="datis-block" id="frdatis-dep-${i}"></div>
           <div class="metar-raw" id="frmetar-dep-${i}"></div>
           <div id="frwind-dep-${i}"></div>
           ${depWx}
@@ -2729,6 +2751,7 @@ function renderFreeRouteResults(){
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${arrName}</span></div>
           <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${r.gate_destination||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="frrwy-arr-${i}">fetching&hellip;</span></div>
+          <div class="datis-block" id="frdatis-arr-${i}"></div>
           <div class="metar-raw" id="frmetar-arr-${i}"></div>
           <div id="frwind-arr-${i}"></div>
           ${arrWx}
@@ -2753,7 +2776,8 @@ function togFrR(i){
   if(S.frOpenRoute!==null){
     const rs=getFreeRouteResults();
     const r=rs[S.frOpenRoute];
-    if(r){fetchFrMetar(r.departure_airport,S.frOpenRoute,'dep');fetchFrMetar(r.arrival_airport,S.frOpenRoute,'arr');}
+    if(r){fetchFrMetar(r.departure_airport,S.frOpenRoute,'dep');fetchFrMetar(r.arrival_airport,S.frOpenRoute,'arr');
+      fetchDatis(r.departure_airport,S.frOpenRoute,'dep','fr');fetchDatis(r.arrival_airport,S.frOpenRoute,'arr','fr');}
   }
 }
 
@@ -3104,6 +3128,7 @@ function renderTripCard(){
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${frAptName(leg.dep)||leg.dep}</span></div>
           <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${route.gate_origin||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="tprwy-dep-${i}">fetching&hellip;</span></div>
+          <div class="datis-block" id="tpdatis-dep-${i}"></div>
           <div class="metar-raw" id="tpmetar-dep-${i}"></div>
           <div id="tpwind-dep-${i}"></div>
           ${depM2?wxBlock(depM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}
@@ -3113,6 +3138,7 @@ function renderTripCard(){
           <div class="dpr"><span class="dl">Airport</span><span class="dv2" style="font-size:11px;font-family:'Inter',sans-serif">${frAptName(leg.arr)||leg.arr}</span></div>
           <div class="dpr"><span class="dl">Gate</span><span class="dv2 g">${route.gate_destination||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Active Runway</span><span class="dv2 b" id="tprwy-arr-${i}">fetching&hellip;</span></div>
+          <div class="datis-block" id="tpdatis-arr-${i}"></div>
           <div class="metar-raw" id="tpmetar-arr-${i}"></div>
           <div id="tpwind-arr-${i}"></div>
           ${arrM2?wxBlock(arrM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}
@@ -3145,6 +3171,8 @@ function togTpLeg(i){
     if(leg.routeId&&S.routeRegistry[leg.routeId]){
       fetchTpMetar(leg.dep,S.tpOpenLeg,'dep');
       fetchTpMetar(leg.arr,S.tpOpenLeg,'arr');
+      fetchDatis(leg.dep,S.tpOpenLeg,'dep','tp');
+      fetchDatis(leg.arr,S.tpOpenLeg,'arr','tp');
     }
   }
 }
@@ -3898,6 +3926,144 @@ async function fetchRwyData(icao){
   }catch(e){}
 }
 
+// ── D-ATIS INTERPRETER ────────────────────────────────────────────────────────
+// Turns cryptic D-ATIS text into headline facts (active runway, approach, info
+// letter, time) plus a short plain-English breakdown. Raw text stays as ground truth.
+// runway-token validator against the airport's known runways
+function datisValidRwy(icao,tok){
+  const rwys=getRunways(icao);
+  if(!rwys)return true; // no list to check against → accept
+  return rwys.some(r=>r.r===tok);
+}
+// Proximity classification: assign each runway token to whichever cue word
+// (arrival vs departure) sits nearest before it. Robust for combined ATIS where
+// one sentence mixes both, e.g. "ARRIVALS TO RWY 34L AND DEPARTURES TO RWY 34R".
+function extractRunways(text,icao,direction){
+  // normalise "RWY25R" → "RWY 25R" so the runway number is a separate token
+  const t=(text||'').toUpperCase().replace(/\bRWY(S?)(\d)/g,'RWY$1 $2');
+  const cues=[];let m;
+  const arrRe=/(LANDING|LDG|ARRIVAL|ARR|APPROACH|APCH|APP|ILS|VISUAL|VIS|RNP|RNAV|VECTOR)/g;
+  while((m=arrRe.exec(t))!==null)cues.push({pos:m.index,type:'arr'});
+  const depRe=/(DEPARTURE|DEPARTING|DEPG|DEPS|DEP|TKOF|TAKEOFF)/g;
+  while((m=depRe.exec(t))!==null)cues.push({pos:m.index,type:'dep'});
+  const hasArr=cues.some(c=>c.type==='arr'),hasDep=cues.some(c=>c.type==='dep');
+  cues.sort((a,b)=>a.pos-b.pos);
+  const out=[];
+  const tokRe=/\b(\d{1,2}[LRC]?)\b/g;
+  while((m=tokRe.exec(t))!==null){
+    const tok=m[1],pos=m.index;
+    const n=parseInt(tok,10);if(n<1||n>36)continue;        // runway numbers 01–36
+    if(!datisValidRwy(icao,tok))continue;                   // must be a real runway
+    // nearest cue starting at or before this token, within a 30-char window
+    let best=null;
+    for(const c of cues){ if(c.pos>pos)break; if(pos-c.pos<=30)best=c; }
+    if(best&&best.type===direction&&!out.includes(tok))out.push(tok);
+  }
+  // safe fallback: a single-direction block (no opposite-direction cues) where the
+  // runway sits far from its cue, e.g. EDDF "DEP-ATIS … METAR 150950 RWY 25C 18".
+  if(out.length===0){
+    const ownHas=direction==='arr'?hasArr:hasDep, oppHas=direction==='arr'?hasDep:hasArr;
+    if(ownHas&&!oppHas){
+      let r;const rre=/\bRWY\s*(\d{1,2}[LRC]?)/g;
+      while((r=rre.exec(t))!==null){
+        const tok=r[1],n=parseInt(tok,10);
+        if(n>=1&&n<=36&&datisValidRwy(icao,tok)&&!out.includes(tok))out.push(tok);
+      }
+    }
+  }
+  return out;
+}
+function extractApproach(text){
+  const t=(text||'').toUpperCase();
+  const types=[['ILS',/\bILS\b/],['RNP',/\bRNP\b/],['RNAV',/\bRNAV\b/],
+    ['Visual',/\bVISUAL\b/],['VOR',/\bVOR\b/],['LOC',/\bLOC\b/],['NDB',/\bNDB\b/]];
+  for(const [label,re] of types){ if(re.test(t))return label; }
+  return null;
+}
+function datisPlainBullets(text){
+  const t=(text||'').toUpperCase().replace(/\bRWY(S?)(\d)/g,'RWY$1 $2');const b=[];
+  // closed runways — keyword must sit right after the runway (avoids spanning into
+  // unrelated "TWY … CLSD" notes in period-less text like LFPG)
+  let m,re=/\bRWY\s*(\d{1,2}[LRC]?)\s+(?:CL(?:OSE|S)D|CLOSED)\b/g;
+  while((m=re.exec(t))!==null)if(!b.includes('Runway '+m[1]+' is closed'))b.push('Runway '+m[1]+' is closed');
+  // ILS / equipment out of service — bounded gap so it can't reach a distant OTS
+  re=/\b(ILS|LOC|GS|PAPI|RNP|IM)\s*(?:RWY\s*)?(\d{1,2}[LRC]?)?\b[^.]{0,30}?\b(?:U\/S|OTS)\b/g;
+  while((m=re.exec(t))!==null)b.push(m[1]+(m[2]?' runway '+m[2]:'')+' out of service');
+  // transition level
+  m=t.match(/\bTRL\s*(?:FL)?\s*(\d{2,3})\b/);if(m)b.push('Transition level: FL'+m[1]);
+  m=t.match(/\bTRANSITION[\s-]*LEVEL[:\s]*(?:FL)?\s*(\d{2,3})\b/);if(m&&!b.some(x=>x.startsWith('Transition')))b.push('Transition level: FL'+m[1]);
+  // land and hold short
+  if(/\bLAHSO\b/.test(t))b.push('Land-and-hold-short operations in effect');
+  // bird activity
+  if(/\bBIRD\b/.test(t))b.push('Bird activity reported near the airport');
+  return b.slice(0,6);
+}
+function interpretDatis(block,icao,direction){
+  if(!block||!block.text)return null;
+  return{
+    letter:block.letter||null,
+    time:block.time||null,
+    runways:extractRunways(block.text,icao,direction),
+    approach:extractApproach(block.text),
+    bullets:datisPlainBullets(block.text),
+    raw:block.text
+  };
+}
+// pick the directional block for a given side (falls back to combined)
+function datisBlockFor(data,side){
+  if(!data)return null;
+  if(side==='dep')return data.dep||data.combined||null;
+  return data.arr||data.combined||null;
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// fetch + render D-ATIS into the expanded panel. prefix:''|'fr'|'tp', side:'dep'|'arr'
+async function fetchDatis(icao,idx,side,prefix){
+  prefix=prefix||'';
+  const rwyEl=document.getElementById(prefix+'rwy-'+side+'-'+idx);
+  const box=document.getElementById(prefix+'datis-'+side+'-'+idx);
+  if(!box)return;
+  icao=(icao||'').toUpperCase();
+  box.innerHTML='<div class="datis-note">Loading D-ATIS&hellip;</div>';
+  // ensure the airport's runway list is loaded so runway tokens validate correctly
+  try{await fetchRwyData(icao);}catch(e){}
+  let data;
+  const cached=S.datisCache[icao];
+  if(cached&&(Date.now()-cached.ts)<300000){data=cached.data;}
+  else{
+    try{data=await window.api.fetchDatis({icao});}catch(e){data=null;}
+    if(data)S.datisCache[icao]={data,ts:Date.now()};
+  }
+  // make sure the panel is still open on this route
+  if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+  const block=datisBlockFor(data,side);
+  const info=block?interpretDatis(block,icao,side):null;
+  if(!data||!data.hasData||!info){
+    box.innerHTML='<div class="datis-note">No live D-ATIS for '+icao+'</div>';
+    return;
+  }
+  const isArr=side==='arr';
+  const rwyTxt=info.runways.length?info.runways.join('/'):null;
+  // override the Active Runway field with the authoritative value
+  if(rwyEl&&rwyTxt){
+    rwyEl.innerHTML='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+
+      ' <span class="datis-tag">D-ATIS</span>';
+  }
+  const icon=isArr?'&#128757;':'&#128745;'; // 🛬 / 🛫
+  const verb=isArr?'Landing':'Departure';
+  const head=icon+' '+verb+(rwyTxt?' RWY '+rwyTxt:'')+
+    (info.approach?' &middot; '+info.approach:'')+
+    (info.letter?' &middot; Info '+info.letter:'')+
+    (info.time?' &middot; '+info.time:'');
+  const bullets=info.bullets.length
+    ? '<details class="datis-exp"><summary>Plain-English details</summary><ul class="datis-ul">'+
+      info.bullets.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details>'
+    : '';
+  const raw='<details class="datis-exp"><summary>Raw D-ATIS</summary><pre class="datis-raw">'+
+    esc(info.raw)+'</pre></details>';
+  box.innerHTML='<div class="datis-head">'+head+'</div>'+bullets+raw;
+}
+
 // ── CHALLENGES ───────────────────────────────────────────────────────────────
 function gcDist(lat1,lon1,lat2,lon2){
   const R=3440,d2r=Math.PI/180;
@@ -4330,5 +4496,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.6.3</div>
+  pointer-events:none;">v5.7.0</div>
 </body></html>
