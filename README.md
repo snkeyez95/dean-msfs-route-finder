@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.7.4   Fix: D-ATIS/METAR in an expanded route no longer goes blank after switching tabs and back (the panel re-hydrates from cache on every re-render); auto-refresh now survives PC sleep — replaced the single 8-hour timer with a minute-by-minute wall-clock check that self-reschedules, so it no longer ends up "past due" without firing
 v5.7.3   Scenery and aircraft activations now auto-clear when the app closes — both start unchecked next launch (utilities stay active; only real junctions removed, never installed folders)
 v5.7.2   Quick Launch companion apps now accept .bat / .cmd scripts (run via cmd from their own folder, console hidden), not just .exe
 v5.7.1   SimBrief now pre-fills the active runways from live D-ATIS (origrwy/destrwy) — departure airport's departure runway and arrival airport's landing runway

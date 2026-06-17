@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.7.3</div>
+  <div class="tname">A Better Route Planner &mdash; v5.7.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.7.3</div>
+    <div class="sb-ver">v5.7.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1657,7 +1657,7 @@ function startNetworkCountdown(sec,page){
   _siNetCdTimer=setInterval(()=>{r--;if(r<=0){stopRlCountdown();return;}el.textContent='Network error on page '+page+' — retrying in '+r+'s';},1000);
 }
 
-let _arTimer=null;
+let _arTimer=null,_arInterval=null;
 function updateAutoRefreshInfo(){
   const cb=document.getElementById('auto-refresh-cb'),info=document.getElementById('auto-refresh-info');
   if(!cb||!info)return;
@@ -1683,26 +1683,39 @@ function updateAutoRefreshInfo(){
     }else nextEl.textContent='Next refresh: Starting soon';
   }
 }
+let _arRunning=false;
 function scheduleAutoRefresh(){
+  // A single long setTimeout(8h) is suspended by the OS when the PC sleeps, so it
+  // ends up "past due" but never fires, and it never reschedules the next run.
+  // Instead, poll the wall clock every 60s: each tick re-reads the real time, so
+  // it survives sleep and self-reschedules after every refresh.
   if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+  if(_arInterval){clearInterval(_arInterval);_arInterval=null;}
   if(!S.cfg.autoRefreshEnabled||!S.siCookie)return;
-  const last=S.cfg.siLastFetch?new Date(S.cfg.siLastFetch).getTime():0;
-  const delay=last?Math.max(0,last+8*60*60*1000-Date.now()):0;
-  if(delay===0){
-    RLOG('[SI] Auto-refresh scheduled immediately (overdue or first run)');
-    _arTimer=setTimeout(()=>{RLOG('[SI] Auto-refresh triggered (scheduled)');runAutoRefresh();},5000);
-  }else{
-    RLOG('[SI] Auto-refresh scheduled in '+Math.round(delay/60000)+'min');
-    _arTimer=setTimeout(()=>{RLOG('[SI] Auto-refresh triggered (scheduled)');runAutoRefresh();},delay);
-  }
+  RLOG('[SI] Auto-refresh watcher started (checks every 60s, sleep-safe)');
+  const check=()=>{
+    if(!S.cfg.autoRefreshEnabled||!S.siCookie||_arRunning)return;
+    const fb=document.getElementById('fetch-btn');
+    if(fb&&fb.disabled)return;  // a manual refresh is already running
+    const last=S.cfg.siLastFetch?new Date(S.cfg.siLastFetch).getTime():0;
+    const due=!last||Date.now()>=last+8*60*60*1000;
+    if(due){RLOG('[SI] Auto-refresh due — triggering');runAutoRefresh();}
+  };
+  _arTimer=setTimeout(check,5000);          // first check shortly after launch (catches overdue)
+  _arInterval=setInterval(check,60*1000);   // then every minute
 }
 async function runAutoRefresh(){
-  _arTimer=null;
+  if(_arRunning)return;
   if(!S.siCookie){RLOG('[SI] Auto-refresh skipped — cookie expired');showSIError();return;}
+  _arRunning=true;
   const _dot=document.getElementById('ar-running-dot');
   if(_dot)_dot.style.display='inline-block';
-  await fetchSIRoutes({autoMode:true});
-  if(_dot)_dot.style.display='none';
+  try{ await fetchSIRoutes({autoMode:true}); }
+  finally{
+    _arRunning=false;
+    if(_dot)_dot.style.display='none';
+    updateAutoRefreshInfo();  // refresh "Last/Next refresh" display
+  }
 }
 function onAutoRefreshToggle(){
   const cb=document.getElementById('auto-refresh-cb');
@@ -1710,7 +1723,10 @@ function onAutoRefreshToggle(){
   window.api.saveConfig(S.cfg);
   updateAutoRefreshInfo();
   if(S.cfg.autoRefreshEnabled)scheduleAutoRefresh();
-  else if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+  else{
+    if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+    if(_arInterval){clearInterval(_arInterval);_arInterval=null;}
+  }
 }
 
 function setCookieBtnSaved(saved){
@@ -2273,6 +2289,7 @@ async function fetchSIRoutes({autoMode=false}={}){
       setSt('⚠ Last refresh: just now — cookie may have expired','var(--acc)');
       showSIError('SayIntentions cookie may have expired — paste new cookie in the Settings tab');
       if(_arTimer){clearTimeout(_arTimer);_arTimer=null;}
+      if(_arInterval){clearInterval(_arInterval);_arInterval=null;}
       S.cfg.autoRefreshEnabled=false;
       await window.api.saveConfig(S.cfg);
       const _cb=document.getElementById('auto-refresh-cb');if(_cb)_cb.checked=false;
@@ -2332,6 +2349,7 @@ async function fetchSIRoutes({autoMode=false}={}){
   const newRoutes=cnt-cntBefore;
   S.cfg.siLastFetchAdded=newRoutes;
   await window.api.saveConfig(S.cfg);
+  updateAutoRefreshInfo();  // repaint Last/Next refresh after any refresh (manual or auto)
   stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
   const wStr=rateLimitWaits>0?' — '+rateLimitWaits+' rate limit wait'+(rateLimitWaits!==1?'s':''):'';
   setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' routes added'+wStr+'.','var(--grn)');
@@ -2508,18 +2526,25 @@ function renderRoutes(){
     return[main,det];
   }).join('');
   updateStats();
+  hydrateOpenRoute();
+}
+
+// Re-fill the open route's METAR + D-ATIS after any re-render (tab switch, filter,
+// weather refresh). Caches make this instant; without it the data goes blank when
+// the panel is rebuilt by something other than the toggle handler.
+function hydrateOpenRoute(){
+  if(S.openRoute===null)return;
+  const r=getRoutes()[S.openRoute];
+  if(!r)return;
+  fetchMetar(r.departure_airport,S.openRoute,'dep');
+  fetchMetar(r.arrival_airport,S.openRoute,'arr');
+  fetchDatis(r.departure_airport,S.openRoute,'dep','');
+  fetchDatis(r.arrival_airport,S.openRoute,'arr','');
 }
 
 function togR(i){
   S.openRoute=S.openRoute===i?null:i;renderRoutes();
   if(S.openRoute!==null){
-    const r=getRoutes()[S.openRoute];
-    if(r){
-      fetchMetar(r.departure_airport,S.openRoute,'dep');
-      fetchMetar(r.arrival_airport,S.openRoute,'arr');
-      fetchDatis(r.departure_airport,S.openRoute,'dep','');
-      fetchDatis(r.arrival_airport,S.openRoute,'arr','');
-    }
     setTimeout(()=>{
       const row=document.querySelector('tr.dr.open');
       if(row) row.scrollIntoView({behavior:'smooth',block:'start'});
@@ -2768,17 +2793,22 @@ function renderFreeRouteResults(){
     </div></td></tr>`;
     return[main,det];
   }).join('');
+  hydrateFrOpenRoute();
+}
+
+function hydrateFrOpenRoute(){
+  if(S.frOpenRoute===null)return;
+  const r=getFreeRouteResults()[S.frOpenRoute];
+  if(!r)return;
+  fetchFrMetar(r.departure_airport,S.frOpenRoute,'dep');
+  fetchFrMetar(r.arrival_airport,S.frOpenRoute,'arr');
+  fetchDatis(r.departure_airport,S.frOpenRoute,'dep','fr');
+  fetchDatis(r.arrival_airport,S.frOpenRoute,'arr','fr');
 }
 
 function togFrR(i){
   S.frOpenRoute=S.frOpenRoute===i?null:i;
   renderFreeRouteResults();
-  if(S.frOpenRoute!==null){
-    const rs=getFreeRouteResults();
-    const r=rs[S.frOpenRoute];
-    if(r){fetchFrMetar(r.departure_airport,S.frOpenRoute,'dep');fetchFrMetar(r.arrival_airport,S.frOpenRoute,'arr');
-      fetchDatis(r.departure_airport,S.frOpenRoute,'dep','fr');fetchDatis(r.arrival_airport,S.frOpenRoute,'arr','fr');}
-  }
 }
 
 async function fetchFrMetar(icao,idx,side){
@@ -3159,22 +3189,24 @@ function renderTripCard(){
     </div></td></tr>`;
     return[main,det];
   }).join('');
+  hydrateTpOpenLeg();
+}
+
+function hydrateTpOpenLeg(){
+  if(S.tpOpenLeg===null)return;
+  const plan=S.cfg.activeTripPlan;
+  if(!plan||!plan.legs[S.tpOpenLeg])return;
+  const leg=plan.legs[S.tpOpenLeg];
+  if(!leg.routeId||!S.routeRegistry[leg.routeId])return;
+  fetchTpMetar(leg.dep,S.tpOpenLeg,'dep');
+  fetchTpMetar(leg.arr,S.tpOpenLeg,'arr');
+  fetchDatis(leg.dep,S.tpOpenLeg,'dep','tp');
+  fetchDatis(leg.arr,S.tpOpenLeg,'arr','tp');
 }
 
 function togTpLeg(i){
   S.tpOpenLeg=S.tpOpenLeg===i?null:i;
   renderTripCard();
-  if(S.tpOpenLeg!==null){
-    const plan=S.cfg.activeTripPlan;
-    if(!plan||!plan.legs[S.tpOpenLeg])return;
-    const leg=plan.legs[S.tpOpenLeg];
-    if(leg.routeId&&S.routeRegistry[leg.routeId]){
-      fetchTpMetar(leg.dep,S.tpOpenLeg,'dep');
-      fetchTpMetar(leg.arr,S.tpOpenLeg,'arr');
-      fetchDatis(leg.dep,S.tpOpenLeg,'dep','tp');
-      fetchDatis(leg.arr,S.tpOpenLeg,'arr','tp');
-    }
-  }
 }
 
 async function fetchTpMetar(icao,idx,side){
@@ -3853,14 +3885,7 @@ async function fetchMetarBatch(){
     S.wxFetching=false;updateWxAge();
     const callMsg='[WX] buildRouteList called after cache populated';
     console.log(callMsg);RLOG(callMsg);
-    renderRoutes();
-    if(S.openRoute!==null){
-      const _or=getRoutes()[S.openRoute];
-      if(_or){
-        fetchMetar(_or.departure_airport,S.openRoute,'dep');
-        fetchMetar(_or.arrival_airport,S.openRoute,'arr');
-      }
-    }
+    renderRoutes();  // re-hydrates the open route's METAR + D-ATIS via hydrateOpenRoute()
   }catch(e){
     const err=`[WX] Fetch failed: ${e.message}`;
     console.log(err);RLOG(err);
@@ -4510,5 +4535,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.7.3</div>
+  pointer-events:none;">v5.7.4</div>
 </body></html>
