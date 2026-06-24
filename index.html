@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.7.7</div>
+  <div class="tname">A Better Route Planner &mdash; v5.7.8</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.7.7</div>
+    <div class="sb-ver">v5.7.8</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -754,6 +754,16 @@ html[data-theme="light"] .theme-knob{left:30px}
   <div class="card" style="padding:20px">
     <div id="fleet-checks-fleet" style="display:flex;flex-wrap:wrap;gap:12px 28px"></div>
   </div>
+  <div class="card" style="padding:18px;margin-top:14px">
+    <div style="font-size:13px;font-weight:600;color:var(--ink1);margin-bottom:6px">Citation Sovereign+ — SimBrief Airframe</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">Paste your SimBrief airframe ID to auto-select the Skyward Simulations airframe when opening Free Route flights. Leave blank to use the SimBrief default. Find your ID: SimBrief → Saved Airframes → open the Sovereign+ → copy the number from the URL (e.g. <span style="font-family:monospace">423152_...</span>).</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="c680-airframe-id" type="text" placeholder="e.g. 423152_1773260198737" value=""
+        style="flex:1;background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink1);outline:none"/>
+      <button class="btn bp bsm" onclick="saveC680AirframeId()">Save</button>
+    </div>
+    <div id="c680-airframe-note" style="font-size:11px;color:var(--ink3);margin-top:6px;min-height:14px"></div>
+  </div>
 </div></div>
 
 <!-- ── AIRCRAFT & UTIL ── -->
@@ -1135,6 +1145,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderFleetChips();
   S.freeRouteMode=!!S.cfg.freeRouteMode;
   S.frAcft=S.cfg.frAcft||'';
+  const _c680input=document.getElementById('c680-airframe-id');
+  if(_c680input&&S.cfg.c680AirframeId)_c680input.value=S.cfg.c680AirframeId;
   if(S.freeRouteMode)applyFreeRouteMode();
   restoreTripPlan();
   if(S.cfg.siCookie){
@@ -2637,6 +2649,14 @@ function onFrAcftChange(v){
   S.frAcft=v;S.cfg.frAcft=v;window.api.saveConfig(S.cfg);
   renderFreeRouteResults();
 }
+function saveC680AirframeId(){
+  const v=(document.getElementById('c680-airframe-id').value||'').trim();
+  S.cfg.c680AirframeId=v;window.api.saveConfig(S.cfg);
+  const note=document.getElementById('c680-airframe-note');
+  note.textContent=v?'Saved — SimBrief will auto-select your Sovereign+ airframe.':'Cleared — SimBrief will use its default airframe.';
+  note.style.color=v?'var(--gr)':'var(--ink3)';
+  setTimeout(()=>{note.textContent='';},4000);
+}
 
 function onSortChange(){renderRoutes();}
 
@@ -2731,7 +2751,8 @@ function renderFreeRouteResults(){
   if(cnt===0){
     const t=S.frAcft;
     const tLabel=t?(FLEET_LBL[t]||t):'';
-    const sbU='https://dispatch.simbrief.com/options/custom?orig='+S.frDep+'&dest='+S.frArr+(t?'&type='+t:'');
+    const _sbAf=(t==='C680'&&S.cfg.c680AirframeId)?'&airframe_id='+encodeURIComponent(S.cfg.c680AirframeId):'';
+    const sbU='https://dispatch.simbrief.com/options/custom?orig='+S.frDep+'&dest='+S.frArr+(t?'&type='+t:'')+_sbAf;
     const acNote=t?`<br><span style="color:var(--acc)">SimBrief will be set up as ${tLabel}.</span>`:'';
     body.innerHTML=`<tr><td colspan="7"><div class="empty">
       <div class="ei">&#9992;</div>
@@ -2769,7 +2790,8 @@ function renderFreeRouteResults(){
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
     const acType=S.frAcft||r.aircraft_type;
-    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${dep}&dest=${arr}&type=${acType}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
+    const _sbAf2=(acType==='C680'&&S.cfg.c680AirframeId)?'&airframe_id='+encodeURIComponent(S.cfg.c680AirframeId):'';
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${dep}&dest=${arr}&type=${acType}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'')+_sbAf2;
     const faU=`https://www.flightaware.com/live/findflight/?origin=${dep}&destination=${arr}`;
     const svU=`https://skyvector.com/?fpl=${dep}%20${arr}`;
     const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' &rarr; '+r.gate_destination:(r.gate_origin||r.gate_destination||'&mdash;');
@@ -4570,5 +4592,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.7.7</div>
+  pointer-events:none;">v5.7.8</div>
 </body></html>
