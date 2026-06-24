@@ -200,7 +200,6 @@ Key log prefixes:
 ## Changelog
 
 ```
-v5.7.8   My Fleet → Citation Sovereign+ now has an optional SimBrief Airframe ID field — paste your Skyward Simulations ID once and Free Route will auto-select that airframe every time you open SimBrief
 v5.7.7   Free Route adds an Aircraft picker (sourced from My Fleet) that filters routes to the plane you're flying and pre-fills SimBrief — including Marketplace planes with no scheduled routes, e.g. the new Citation Sovereign+ (C680). Plan a Flight is unchanged
 v5.7.6   Only one copy of the app can run at a time (prevents a two-instance race that wiped active add-ons); and closing the app no longer clears scenery/aircraft while MSFS is running, so add-ons reliably reach the sim
 v5.7.5   Quick Launch now delays MSFS by 5 seconds while companion apps still start immediately, avoiding a sim-startup conflict with another tool
