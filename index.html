@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.8.1</div>
+  <div class="tname">A Better Route Planner &mdash; v5.8.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.8.1</div>
+    <div class="sb-ver">v5.8.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2732,24 +2732,18 @@ function renderFreeRouteResults(){
     const t=S.frAcft;
     const tLabel=t?(FLEET_LBL[t]||t):'';
     const sbU='https://dispatch.simbrief.com/options/custom?orig='+S.frDep+'&dest='+S.frArr+(t?'&type='+t:'');
-    const acNote=t?`<br><span style="color:var(--acc)">SimBrief will be set up as ${tLabel}.</span>`:'';
     const nmDep=S.frDep,nmArr=S.frArr;
     const nmDepName=frAptName(nmDep)||nmDep, nmArrName=frAptName(nmArr)||nmArr;
     const nmDepCity=frAptCity(nmDep)||'', nmArrCity=frAptCity(nmArr)||'';
     const nmDepM=S.metarCache[nmDep.toUpperCase()], nmArrM=S.metarCache[nmArr.toUpperCase()];
     const nmDepWx=nmDepM?wxBlock(nmDepM):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>';
     const nmArrWx=nmArrM?wxBlock(nmArrM):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>';
-    body.innerHTML=`<tr><td colspan="7"><div class="empty">
-      <div class="ei">&#9992;</div>
-      <div class="et">No registry match</div>
-      <div class="es">No scheduled routes for ${nmDep} &rarr; ${nmArr}${t?' with the '+tLabel:' with your active fleet'}.<br>You can still open SimBrief and plan this route manually.${acNote}</div>
-      <div style="margin-top:14px"><button class="btn bp bsm" onclick="openSimBrief('${nmDep}','${nmArr}','${t}','${sbU}')">&#9992; Open in SimBrief</button></div>
-    </div>
-    <div class="det-pan" style="margin-top:6px">
+    body.innerHTML=`<tr><td colspan="7">
+    <div class="det-pan">
       <div class="dp-strip">
         <div class="dp-apt"><div class="dp-icao">${nmDep}</div><div class="dp-city">${nmDepCity}</div></div>
         <div class="dp-line"><div class="dp-dash"></div>
-          <div class="dp-mid"><div class="dp-plane">&#9992;</div><div class="dp-info">Weather</div></div>
+          <div class="dp-mid"><div class="dp-plane">&#9992;</div><div class="dp-info">Free Route</div></div>
         <div class="dp-dash"></div></div>
         <div class="dp-apt"><div class="dp-icao">${nmArr}</div><div class="dp-city">${nmArrCity}</div></div>
       </div>
@@ -2775,10 +2769,12 @@ function renderFreeRouteResults(){
       </div>
       <div class="dp-acts">
         <button class="btn bg bsm" onclick="window.api.openExternal('https://www.flightaware.com/live/findflight/?origin=${nmDep}&destination=${nmArr}')">&#128279; Verify on FlightAware</button>
+        <button class="btn bp bsm" onclick="openSimBrief('${nmDep}','${nmArr}','${t}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('https://skyvector.com/?fpl=${nmDep}%20${nmArr}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(nmDep,nmArr,'fr','nm',t)}
         ${qlBtnHtml()}
       </div>
+      <div class="dp-note">No scheduled routes for ${nmDep} &rarr; ${nmArr}${t?' with the '+tLabel:' with your active fleet'} &mdash; open in SimBrief to plan it manually.${t?' SimBrief will be set up as '+tLabel+'.':''}</div>
     </div></td></tr>`;
     fetchFrMetar(nmDep,'nm','dep'); fetchFrMetar(nmArr,'nm','arr');
     fetchDatis(nmDep,'nm','dep','fr'); fetchDatis(nmArr,'nm','arr','fr');
@@ -4613,5 +4609,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.8.1</div>
+  pointer-events:none;">v5.8.2</div>
 </body></html>
