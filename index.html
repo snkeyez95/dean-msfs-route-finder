@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.8.0</div>
+  <div class="tname">A Better Route Planner &mdash; v5.8.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.8.0</div>
+    <div class="sb-ver">v5.8.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2773,6 +2773,12 @@ function renderFreeRouteResults(){
           ${nmArrWx}
         </div>
       </div>
+      <div class="dp-acts">
+        <button class="btn bg bsm" onclick="window.api.openExternal('https://www.flightaware.com/live/findflight/?origin=${nmDep}&destination=${nmArr}')">&#128279; Verify on FlightAware</button>
+        <button class="btn bg bsm" onclick="window.api.openExternal('https://skyvector.com/?fpl=${nmDep}%20${nmArr}')">&#128506; SkyVector</button>
+        ${sceneryBtnHtml(nmDep,nmArr,'fr','nm',t)}
+        ${qlBtnHtml()}
+      </div>
     </div></td></tr>`;
     fetchFrMetar(nmDep,'nm','dep'); fetchFrMetar(nmArr,'nm','arr');
     fetchDatis(nmDep,'nm','dep','fr'); fetchDatis(nmArr,'nm','arr','fr');
@@ -4607,5 +4613,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.8.0</div>
+  pointer-events:none;">v5.8.1</div>
 </body></html>

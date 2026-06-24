@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.8.1   Free Route "No registry match" panel now has Quick Launch and the scenery Activate control, same as Plan a Flight — activate airport scenery (and the aircraft bundle, when it's a PMDG/Fenix) before launching; the Citation links scenery only, no aircraft junction needed
 v5.8.0   Free Route "No registry match" now shows live weather for your departure & arrival — active runway, D-ATIS, METAR and wind — the same panel as matched routes (minus flight info). Helps when flying planes with no scheduled routes, e.g. the Citation Sovereign+
 v5.7.7   Free Route adds an Aircraft picker (sourced from My Fleet) that filters routes to the plane you're flying and pre-fills SimBrief — including Marketplace planes with no scheduled routes, e.g. the new Citation Sovereign+ (C680). Plan a Flight is unchanged
 v5.7.6   Only one copy of the app can run at a time (prevents a two-instance race that wiped active add-ons); and closing the app no longer clears scenery/aircraft while MSFS is running, so add-ons reliably reach the sim
