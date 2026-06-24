@@ -124,7 +124,19 @@ function createWindow() {
   win.loadFile('index.html');
   win.webContents.once('did-finish-load', checkForUpdate);
 }
-app.whenReady().then(createWindow);
+// Only one copy of ABRP may run at a time. Two instances share one config file and
+// one Community folder with no coordination, so the second to close wipes the first's
+// active junctions (and the survivor re-links them minutes later). The losing instance
+// uses app.exit(0) — NOT app.quit() — so before-quit never fires and the existing
+// instance's add-ons are left untouched.
+if(!app.requestSingleInstanceLock()){
+  app.exit(0);
+}else{
+  app.on('second-instance', () => {   // user opened a second copy — focus the existing window
+    if(win){ if(win.isMinimized()) win.restore(); win.focus(); }
+  });
+  app.whenReady().then(createWindow);
+}
 app.on('window-all-closed',()=>{ if(process.platform!=='darwin') app.quit(); });
 app.on('web-contents-created',(_,c)=>{
   c.setWindowOpenHandler(({url})=>{ shell.openExternal(url); return {action:'deny'}; });
@@ -608,9 +620,23 @@ function removeJunctionIfLink(dest, tag){
     }
   }catch(e){ LOG.warn(`[QUIT] ${tag} unlink failed: ${e.message}`); }
 }
+function isMsfsRunning(){
+  try{
+    const cp = require('child_process');
+    const r = cp.spawnSync('tasklist', ['/FI','IMAGENAME eq FlightSimulator2024.exe','/NH'],
+      {encoding:'utf8', timeout:4000, windowsHide:true});
+    return /FlightSimulator2024\.exe/i.test(r.stdout || '');
+  }catch(e){ return false; }
+}
 function cleanupActivationsOnQuit(){
   let cfg;
   try{ cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); }catch(e){ return; }
+  // Don't strip add-ons out from under a live or loading sim — the normal workflow is
+  // activate → Quick Launch → close ABRP while MSFS loads. Clear only when the sim is off.
+  if(isMsfsRunning()){
+    LOG.info('[QUIT] MSFS is running — skipping activation cleanup (sim may still need the add-ons)');
+    return;
+  }
   const community = cfg.communityFolder;
   if(!community) return;
   let changed = false;
