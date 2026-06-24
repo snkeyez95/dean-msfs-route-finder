@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.7.6</div>
+  <div class="tname">A Better Route Planner &mdash; v5.7.7</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.7.6</div>
+    <div class="sb-ver">v5.7.7</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -482,6 +482,10 @@ html[data-theme="light"] .theme-knob{left:30px}
           <div class="fr-field-lbl">ARR &mdash; Arrival</div>
           <input id="fr-arr" class="fr-inp" maxlength="4" placeholder="ICAO" oninput="onFrInput('arr')" onkeydown="onFrKey(event)">
           <div id="fr-arr-hint" class="fr-hint"></div>
+        </div>
+        <div>
+          <div class="fr-field-lbl">AIRCRAFT</div>
+          <select id="fr-acft" onchange="onFrAcftChange(this.value)" style="background:var(--bg0);border:1px solid var(--sep);border-radius:var(--r2);padding:11px 12px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink1);cursor:pointer;outline:none"></select>
         </div>
         <button class="btn bp" id="fr-search-btn" onclick="doFreeRouteSearch()" disabled style="align-self:flex-end;margin-bottom:2px">Search</button>
       </div>
@@ -990,6 +994,7 @@ const FLEET_DEF=[
   {code:'A20N',label:'Fenix A320neo', family:'A320',def:false},
   {code:'A321',label:'Fenix A321',    family:'A321',def:true},
   {code:'A21N',label:'Fenix A321neo', family:'A321',def:false},
+  {code:'C680',label:'Citation Sovereign+',family:'Citation',def:false,freeOnly:true},
 ];
 // API code → specific display label (more precise than SIM_LBL which uses sim key)
 const FLEET_LBL=Object.fromEntries(FLEET_DEF.map(f=>[f.code,f.label]));
@@ -1095,6 +1100,7 @@ const S={
   wxFetching:false,
   freeRouteMode:false,
   frDep:'',frArr:'',
+  frAcft:'',
   frOpenRoute:null,
   frAcFilter:'',
   tpOpenLeg:null,
@@ -1128,6 +1134,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderFleetPanel();
   renderFleetChips();
   S.freeRouteMode=!!S.cfg.freeRouteMode;
+  S.frAcft=S.cfg.frAcft||'';
   if(S.freeRouteMode)applyFreeRouteMode();
   restoreTripPlan();
   if(S.cfg.siCookie){
@@ -2027,7 +2034,7 @@ function renderFleetPanel(){
         return`<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
           <input type="checkbox" ${checked?'checked':''} onchange="toggleFleet('${e.code}',this.checked)" style="accent-color:var(--acc);width:14px;height:14px;cursor:pointer;flex-shrink:0">
           <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);min-width:34px">${e.code}</span>
-          <span style="font-size:13px;color:var(--ink1)">${e.label}</span>
+          <span style="font-size:13px;color:var(--ink1)">${e.label}${e.freeOnly?'<span style="display:block;font-size:10px;color:var(--ink3);font-style:italic">Free Route only · no scheduled routes</span>':''}</span>
         </label>`;
       }).join('')}
     </div>`;
@@ -2041,6 +2048,7 @@ function toggleFleet(code,checked){
   if(S.acft!=='all'&&!getActiveFleet().has(S.acft))S.acft='all';
   // Update chips and routes immediately — no await needed for instant feedback
   renderFleetChips();
+  if(S.freeRouteMode)buildFrAcftDropdown();  // keep the Free Route picker in sync with checked fleet
   renderRoutes();
   window.api.saveConfig(S.cfg);
 }
@@ -2606,9 +2614,28 @@ function applyFreeRouteMode(){
     const far=document.getElementById('fr-airline-row');if(far)far.style.display='none';
     renderRoutes();
   }else{
+    buildFrAcftDropdown();
     renderFreeRouteResults();
     updateStats();
   }
+}
+
+// Build the Free Route aircraft picker from the planes CHECKED in My Fleet.
+// Value = the fleet code (B738/A320/C680…), which doubles as the SimBrief type.
+// '' = "All my fleet" (today's behaviour). Resets the saved pick if it's no longer checked.
+function buildFrAcftDropdown(){
+  const sel=document.getElementById('fr-acft');
+  if(!sel)return;
+  const fleet=S.cfg.myFleet||{};
+  const checked=FLEET_DEF.filter(f=>fleet[f.code]!==undefined?fleet[f.code]:f.def);
+  if(S.frAcft&&!checked.some(f=>f.code===S.frAcft)){S.frAcft='';S.cfg.frAcft='';window.api.saveConfig(S.cfg);}
+  sel.innerHTML='<option value="">All my fleet</option>'+
+    checked.map(f=>`<option value="${f.code}"${f.code===S.frAcft?' selected':''}>${f.label}</option>`).join('');
+}
+
+function onFrAcftChange(v){
+  S.frAcft=v;S.cfg.frAcft=v;window.api.saveConfig(S.cfg);
+  renderFreeRouteResults();
 }
 
 function onSortChange(){renderRoutes();}
@@ -2650,6 +2677,7 @@ function getFreeRouteResults(){
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
   let rs=Object.values(S.routeRegistry).filter(r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
+    if(S.frAcft&&r.aircraft_type!==S.frAcft)return false;  // a specific plane is picked — filter to it
     if(r.departure_airport!==S.frDep||r.arrival_airport!==S.frArr)return false;
     if(S.frAcFilter&&r.airline!==S.frAcFilter)return false;
     return true;
@@ -2701,12 +2729,15 @@ function renderFreeRouteResults(){
   rcnt.innerHTML=`<span class="fr-mode-lbl">&#9992; Free Route</span> <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink3)">${cnt} route${cnt!==1?'s':''} found for ${S.frDep} &rarr; ${S.frArr}</span>`;
   updateFrAirlineDropdown(rs);
   if(cnt===0){
-    const sbU='https://dispatch.simbrief.com/options/custom?orig='+S.frDep+'&dest='+S.frArr;
+    const t=S.frAcft;
+    const tLabel=t?(FLEET_LBL[t]||t):'';
+    const sbU='https://dispatch.simbrief.com/options/custom?orig='+S.frDep+'&dest='+S.frArr+(t?'&type='+t:'');
+    const acNote=t?`<br><span style="color:var(--acc)">SimBrief will be set up as ${tLabel}.</span>`:'';
     body.innerHTML=`<tr><td colspan="7"><div class="empty">
       <div class="ei">&#9992;</div>
       <div class="et">No registry match</div>
-      <div class="es">No routes found for ${S.frDep} &rarr; ${S.frArr} with your active fleet.<br>You can still open SimBrief and plan this route manually.</div>
-      <div style="margin-top:14px"><button class="btn bp bsm" onclick="openSimBrief('${S.frDep}','${S.frArr}','','${sbU}')">&#9992; Open in SimBrief</button></div>
+      <div class="es">No scheduled routes for ${S.frDep} &rarr; ${S.frArr}${t?' with the '+tLabel:' with your active fleet'}.<br>You can still open SimBrief and plan this route manually.${acNote}</div>
+      <div style="margin-top:14px"><button class="btn bp bsm" onclick="openSimBrief('${S.frDep}','${S.frArr}','${t}','${sbU}')">&#9992; Open in SimBrief</button></div>
     </div></td></tr>`;
     return;
   }
@@ -2737,7 +2768,8 @@ function renderFreeRouteResults(){
     if(!isO)return[main];
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
-    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${dep}&dest=${arr}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
+    const acType=S.frAcft||r.aircraft_type;
+    const sbU=`https://dispatch.simbrief.com/options/custom?orig=${dep}&dest=${arr}&type=${acType}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
     const faU=`https://www.flightaware.com/live/findflight/?origin=${dep}&destination=${arr}`;
     const svU=`https://skyvector.com/?fpl=${dep}%20${arr}`;
     const gates=(r.gate_origin&&r.gate_destination)?r.gate_origin+' &rarr; '+r.gate_destination:(r.gate_origin||r.gate_destination||'&mdash;');
@@ -2784,7 +2816,7 @@ function renderFreeRouteResults(){
       </div>
       <div class="dp-acts">
         <button class="btn bg bsm" onclick="window.api.openExternal('${faU}')">&#128279; Verify on FlightAware</button>
-        <button class="btn bp bsm" onclick="openSimBrief('${dep}','${arr}','${r.aircraft_type}','${sbU}')">&#9992; Open in SimBrief</button>
+        <button class="btn bp bsm" onclick="openSimBrief('${dep}','${arr}','${acType}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'fr',i,r.aircraft_type)}
         ${qlBtnHtml()}
@@ -4538,5 +4570,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.7.6</div>
+  pointer-events:none;">v5.7.7</div>
 </body></html>

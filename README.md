@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.7.7   Free Route adds an Aircraft picker (sourced from My Fleet) that filters routes to the plane you're flying and pre-fills SimBrief — including Marketplace planes with no scheduled routes, e.g. the new Citation Sovereign+ (C680). Plan a Flight is unchanged
 v5.7.6   Only one copy of the app can run at a time (prevents a two-instance race that wiped active add-ons); and closing the app no longer clears scenery/aircraft while MSFS is running, so add-ons reliably reach the sim
 v5.7.5   Quick Launch now delays MSFS by 5 seconds while companion apps still start immediately, avoiding a sim-startup conflict with another tool
 v5.7.4   Fix: D-ATIS/METAR in an expanded route no longer goes blank after switching tabs and back (the panel re-hydrates from cache on every re-render); auto-refresh now survives PC sleep — replaced the single 8-hour timer with a minute-by-minute wall-clock check that self-reschedules, so it no longer ends up "past due" without firing
