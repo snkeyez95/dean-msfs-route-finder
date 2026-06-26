@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.8.3   METAR and D-ATIS now show a "· X min ago" freshness stamp (amber if unusually old) so you can see at a glance you're looking at the most recent observation, not stale data
 v5.8.2   Free Route "no match" results now look like a normal route card — Open in SimBrief sits in the action row beside FlightAware / SkyVector / Quick Launch, and the "no scheduled routes" note moves to the bottom
 v5.8.1   Free Route "No registry match" panel now has Quick Launch and the scenery Activate control, same as Plan a Flight — activate airport scenery (and the aircraft bundle, when it's a PMDG/Fenix) before launching; the Citation links scenery only, no aircraft junction needed
 v5.8.0   Free Route "No registry match" now shows live weather for your departure & arrival — active runway, D-ATIS, METAR and wind — the same panel as matched routes (minus flight info). Helps when flying planes with no scheduled routes, e.g. the Citation Sovereign+

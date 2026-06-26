@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.8.2</div>
+  <div class="tname">A Better Route Planner &mdash; v5.8.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.8.2</div>
+    <div class="sb-ver">v5.8.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2896,7 +2896,7 @@ async function fetchFrMetar(icao,idx,side){
     }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   }
   if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
-  rawEl.textContent=rawText;
+  rawEl.innerHTML=metarRawHtml(rawText);
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   const best=bestRwy(icao,w.dir,w.spd);
@@ -3294,7 +3294,7 @@ async function fetchTpMetar(icao,idx,side){
     }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   }
   if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
-  rawEl.textContent=rawText;
+  rawEl.innerHTML=metarRawHtml(rawText);
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   const best=bestRwy(icao,w.dir,w.spd);
@@ -3741,6 +3741,42 @@ async function populateSimIntegration(){
   updateSimDetectStatus();
 }
 
+// ── WEATHER FRESHNESS ────────────────────────────────────────────────────────
+// Age in minutes from a Zulu stamp: 'DDHHMMZ' (METAR) or 'HHMMZ' (D-ATIS).
+// Returns null if unparseable. Handles month/day rollover with a 2-hour grace.
+function zuluAgeMin(z){
+  const m=String(z||'').match(/(\d{2})?(\d{2})(\d{2})Z/);
+  if(!m)return null;
+  const now=new Date();
+  const hh=parseInt(m[2],10), mm=parseInt(m[3],10);
+  if(hh>23||mm>59)return null;
+  let dt;
+  if(m[1]){ // has day-of-month (METAR)
+    const day=parseInt(m[1],10);
+    dt=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),day,hh,mm));
+    if((now-dt)/60000 < -120) dt=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-1,day,hh,mm));
+  }else{ // time only (D-ATIS) — assume today UTC, roll back a day if it lands in the future
+    dt=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),hh,mm));
+    if((now-dt)/60000 < -120) dt=new Date(dt.getTime()-86400000);
+  }
+  return Math.round((now-dt)/60000);
+}
+function ageLabel(min){
+  if(min==null)return '';
+  if(min<0)min=0;
+  if(min<60)return min+' min ago';
+  const h=Math.floor(min/60), m=min%60;
+  return h+' hr'+(h>1?'s':'')+(m?' '+m+' min':'')+' ago';
+}
+// Escaped raw METAR + a subtle "· X min ago" stamp (amber if unusually old).
+function metarRawHtml(rawText){
+  const zm=(String(rawText).match(/\b(\d{6})Z\b/)||[])[1];
+  const age=zm?zuluAgeMin(zm):null;
+  if(age==null)return esc(rawText);
+  const col=age>90?'var(--acc)':'var(--ink3)';
+  return esc(rawText)+` <span style="font-size:10px;color:${col}">&middot; ${ageLabel(age)}</span>`;
+}
+
 // ── METAR ────────────────────────────────────────────────────────────────────
 async function fetchMetar(icao,idx,side){
   const rawEl=document.getElementById('metar-'+side+'-'+idx);
@@ -3756,7 +3792,7 @@ async function fetchMetar(icao,idx,side){
     }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   }
   if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
-  rawEl.textContent=rawText;
+  rawEl.innerHTML=metarRawHtml(rawText);
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   await fetchRwyData(icao);
@@ -4164,10 +4200,12 @@ async function fetchDatis(icao,idx,side,prefix){
   }
   const icon=isArr?'&#128757;':'&#128745;'; // 🛬 / 🛫
   const verb=isArr?'Landing':'Departure';
+  const dAge=info.time?zuluAgeMin(info.time):null;
+  const ageTag=dAge!=null?` &middot; <span style="color:${dAge>90?'var(--acc)':'var(--ink3)'}">${ageLabel(dAge)}</span>`:'';
   const head=icon+' '+verb+(rwyTxt?' RWY '+rwyTxt:'')+
     (info.approach?' &middot; '+info.approach:'')+
     (info.letter?' &middot; Info '+info.letter:'')+
-    (info.time?' &middot; '+info.time:'');
+    (info.time?' &middot; '+info.time:'')+ageTag;
   const bullets=info.bullets.length
     ? '<details class="datis-exp"><summary>Plain-English details</summary><ul class="datis-ul">'+
       info.bullets.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details>'
@@ -4609,5 +4647,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.8.2</div>
+  pointer-events:none;">v5.8.3</div>
 </body></html>
