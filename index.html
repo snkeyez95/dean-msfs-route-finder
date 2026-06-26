@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.8.3</div>
+  <div class="tname">A Better Route Planner &mdash; v5.8.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.8.3</div>
+    <div class="sb-ver">v5.8.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -468,6 +468,9 @@ html[data-theme="light"] .theme-knob{left:30px}
         <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
         <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
         <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
+      </div>
+      <div class="crow" id="fresh-row">
+        <div class="chip sq" id="fresh-toggle-btn" style="margin-left:auto" onclick="toggleFreshOnly()" title="Hide city pairs you've flown recently (either direction)">&#10038; Fresh routes</div>
       </div>
     </div>
     <div id="fr-inputs-wrap" style="display:none;margin-bottom:12px">
@@ -1099,6 +1102,7 @@ const S={
   metarLastFetch:0,
   wxFetching:false,
   freeRouteMode:false,
+  freshOnly:false,
   frDep:'',frArr:'',
   frAcft:'',
   frOpenRoute:null,
@@ -1135,6 +1139,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderFleetChips();
   S.freeRouteMode=!!S.cfg.freeRouteMode;
   S.frAcft=S.cfg.frAcft||'';
+  S.freshOnly=!!S.cfg.freshOnly;
+  {const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);}
   if(S.freeRouteMode)applyFreeRouteMode();
   restoreTripPlan();
   if(S.cfg.siCookie){
@@ -2398,9 +2404,11 @@ function getRoutes(){
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
   const activeFleet=getActiveFleet();
   const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
+  const flownPairs=S.freshOnly?new Set((S.cfg.recentSimBriefRoutes||[]).map(e=>[e.dep,e.arr].sort().join('>'))):null;
   let rs=Object.values(S.routeRegistry).filter(r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
     const dep=r.departure_airport,arr=r.arrival_airport;
+    if(flownPairs&&flownPairs.has([dep,arr].sort().join('>')))return false;
     const di=allLib.has(dep),ai=allLib.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
     if(S.mode==='1'&&!(di||ai))return false;
@@ -2509,7 +2517,7 @@ function renderRoutes(){
           <div class="datis-block" id="datis-dep-${i}"></div>
           <div class="metar-raw" id="metar-dep-${i}"></div>
           <div id="wind-dep-${i}"></div>
-          ${wxBlock(depM)}
+          <div id="wx-dep-${i}">${wxBlock(depM)}</div>
         </div>
         <div class="dp-sec">
           <div class="dp-st">Arrival &mdash; ${r.arrival_airport}</div>
@@ -2519,7 +2527,7 @@ function renderRoutes(){
           <div class="datis-block" id="datis-arr-${i}"></div>
           <div class="metar-raw" id="metar-arr-${i}"></div>
           <div id="wind-arr-${i}"></div>
-          ${wxBlock(arrM)}
+          <div id="wx-arr-${i}">${wxBlock(arrM)}</div>
         </div>
       </div>
       <div class="dp-acts">
@@ -2565,6 +2573,11 @@ function setDirFilter(v){S.dirFilter=v;S.acFilter='';document.querySelectorAll('
 function setAcft(v){S.acft=v;S.acFilter='';document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
 function setMode(v){S.mode=v;S.acFilter='';document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
 function setRegion(v){S.regionFilter=v;S.acFilter='';document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
+function toggleFreshOnly(){
+  S.freshOnly=!S.freshOnly;S.cfg.freshOnly=S.freshOnly;window.api.saveConfig(S.cfg);
+  const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);
+  S.openRoute=null;renderRoutes();
+}
 
 function exportCSV(){
   const rs=getRoutes();
@@ -2755,7 +2768,7 @@ function renderFreeRouteResults(){
           <div class="datis-block" id="frdatis-dep-nm"></div>
           <div class="metar-raw" id="frmetar-dep-nm"></div>
           <div id="frwind-dep-nm"></div>
-          ${nmDepWx}
+          <div id="frwx-dep-nm">${nmDepWx}</div>
         </div>
         <div class="dp-sec">
           <div class="dp-st">Arrival &mdash; ${nmArr}</div>
@@ -2764,7 +2777,7 @@ function renderFreeRouteResults(){
           <div class="datis-block" id="frdatis-arr-nm"></div>
           <div class="metar-raw" id="frmetar-arr-nm"></div>
           <div id="frwind-arr-nm"></div>
-          ${nmArrWx}
+          <div id="frwx-arr-nm">${nmArrWx}</div>
         </div>
       </div>
       <div class="dp-acts">
@@ -2840,7 +2853,7 @@ function renderFreeRouteResults(){
           <div class="datis-block" id="frdatis-dep-${i}"></div>
           <div class="metar-raw" id="frmetar-dep-${i}"></div>
           <div id="frwind-dep-${i}"></div>
-          ${depWx}
+          <div id="frwx-dep-${i}">${depWx}</div>
         </div>
         <div class="dp-sec">
           <div class="dp-st">Arrival &mdash; ${arr}</div>
@@ -2850,7 +2863,7 @@ function renderFreeRouteResults(){
           <div class="datis-block" id="frdatis-arr-${i}"></div>
           <div class="metar-raw" id="frmetar-arr-${i}"></div>
           <div id="frwind-arr-${i}"></div>
-          ${arrWx}
+          <div id="frwx-arr-${i}">${arrWx}</div>
         </div>
       </div>
       <div class="dp-acts">
@@ -2887,16 +2900,12 @@ async function fetchFrMetar(icao,idx,side){
   const rwyEl=document.getElementById('frrwy-'+side+'-'+idx);
   const windEl=document.getElementById('frwind-'+side+'-'+idx);
   if(!rawEl)return;
-  const cached=S.metarCache[(icao||'').toUpperCase()];
-  let rawText=cached?cached.rawOb:null;
-  if(!rawText){
-    try{
-      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
-      rawText=(await res.text()).trim();
-    }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
-  }
+  const m=await fetchMetarObj(icao);
+  const rawText=m?m.rawOb:null;
   if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
   rawEl.innerHTML=metarRawHtml(rawText);
+  const wxEl=document.getElementById('frwx-'+side+'-'+idx);
+  if(wxEl)wxEl.innerHTML=wxBlock(m);
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   const best=bestRwy(icao,w.dir,w.spd);
@@ -3232,7 +3241,7 @@ function renderTripCard(){
           <div class="datis-block" id="tpdatis-dep-${i}"></div>
           <div class="metar-raw" id="tpmetar-dep-${i}"></div>
           <div id="tpwind-dep-${i}"></div>
-          ${depM2?wxBlock(depM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}
+          <div id="tpwx-dep-${i}">${depM2?wxBlock(depM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}</div>
         </div>
         <div class="dp-sec">
           <div class="dp-st">Arrival &mdash; ${leg.arr}</div>
@@ -3242,7 +3251,7 @@ function renderTripCard(){
           <div class="datis-block" id="tpdatis-arr-${i}"></div>
           <div class="metar-raw" id="tpmetar-arr-${i}"></div>
           <div id="tpwind-arr-${i}"></div>
-          ${arrM2?wxBlock(arrM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}
+          <div id="tpwx-arr-${i}">${arrM2?wxBlock(arrM2):'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">WX N/A</div>'}</div>
         </div>
       </div>`;
     }else{
@@ -3285,16 +3294,12 @@ async function fetchTpMetar(icao,idx,side){
   const rwyEl=document.getElementById('tprwy-'+side+'-'+idx);
   const windEl=document.getElementById('tpwind-'+side+'-'+idx);
   if(!rawEl)return;
-  const cached=S.metarCache[(icao||'').toUpperCase()];
-  let rawText=cached?cached.rawOb:null;
-  if(!rawText){
-    try{
-      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
-      rawText=(await res.text()).trim();
-    }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
-  }
+  const m=await fetchMetarObj(icao);
+  const rawText=m?m.rawOb:null;
   if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
   rawEl.innerHTML=metarRawHtml(rawText);
+  const wxEl=document.getElementById('tpwx-'+side+'-'+idx);
+  if(wxEl)wxEl.innerHTML=wxBlock(m);
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   const best=bestRwy(icao,w.dir,w.spd);
@@ -3529,7 +3534,7 @@ function openSimBrief(dep,arr,type,url){
   const entry={dep,arr,type,ts:Date.now()};
   const recent=S.cfg.recentSimBriefRoutes||[];
   const filtered=recent.filter(e=>!(e.dep===dep&&e.arr===arr));
-  S.cfg.recentSimBriefRoutes=[entry,...filtered].slice(0,6);
+  S.cfg.recentSimBriefRoutes=[entry,...filtered].slice(0,30);
   window.api.saveConfig(S.cfg);
   // pre-fill SimBrief runways from live D-ATIS when we have them
   const orw=datisActiveRwy(dep,'dep'), drw=datisActiveRwy(arr,'arr');
@@ -3545,7 +3550,7 @@ function renderDashRecent(){
   const recent=S.cfg.recentSimBriefRoutes||[];
   if(!recent.length){el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No SimBrief flights yet — open a route in SimBrief to track it here.</div>';return;}
   const ago=ts=>{const m=Math.floor((Date.now()-ts)/60000);if(m<60)return m+'m ago';if(m<1440)return Math.floor(m/60)+'h ago';return Math.floor(m/1440)+'d ago';};
-  el.innerHTML=recent.map(e=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
+  el.innerHTML=recent.slice(0,10).map(e=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
     <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--acc);min-width:100px">${e.dep} &#x2192; ${e.arr}</span>
     <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);min-width:40px">${e.type||'—'}</span>
     <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);margin-left:auto">${ago(e.ts)}</span>
@@ -3777,22 +3782,33 @@ function metarRawHtml(rawText){
   return esc(rawText)+` <span style="font-size:10px;color:${col}">&middot; ${ageLabel(age)}</span>`;
 }
 
+// On-demand single-airport METAR object (JSON). Caches into S.metarCache so the scored block,
+// pills, and the raw line all derive from ONE source and can never disagree. Returns object or null.
+async function fetchMetarObj(icao){
+  const key=(icao||'').toUpperCase();
+  if(!key)return null;
+  if(S.metarCache[key])return S.metarCache[key];
+  try{
+    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+key+'&format=json');
+    if(!res.ok)return null;
+    const data=await res.json();
+    if(Array.isArray(data)&&data.length){S.metarCache[key]=data[0];return data[0];}
+  }catch(e){}
+  return null;
+}
+
 // ── METAR ────────────────────────────────────────────────────────────────────
 async function fetchMetar(icao,idx,side){
   const rawEl=document.getElementById('metar-'+side+'-'+idx);
   const rwyEl=document.getElementById('rwy-'+side+'-'+idx);
   const windEl=document.getElementById('wind-'+side+'-'+idx);
   if(!rawEl)return;
-  const cached=S.metarCache[(icao||'').toUpperCase()];
-  let rawText=cached?cached.rawOb:null;
-  if(!rawText){
-    try{
-      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icao+'&format=raw');
-      rawText=(await res.text()).trim();
-    }catch(e){rawEl.textContent='METAR unavailable';if(rwyEl)rwyEl.textContent='Check ATIS';return;}
-  }
+  const m=await fetchMetarObj(icao);
+  const rawText=m?m.rawOb:null;
   if(!rawText){rawEl.textContent='No METAR for '+icao;return;}
   rawEl.innerHTML=metarRawHtml(rawText);
+  const wxEl=document.getElementById('wx-'+side+'-'+idx);
+  if(wxEl)wxEl.innerHTML=wxBlock(m);
   const w=parseWind(rawText);
   if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
   await fetchRwyData(icao);
@@ -3962,29 +3978,36 @@ async function fetchMetarBatch(){
   console.log(msg);RLOG(msg);
   S.wxFetching=true;updateWxAge();
   try{
-    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+icaos.join(',')+'&format=json');
-    if(!res.ok){
-      const e=`[WX] Fetch failed: HTTP ${res.status}`;
-      console.log(e);RLOG(e);
-      S.wxFetching=false;updateWxAge();
-      return;
+    // aviationweather.gov caps a single request at 400 stations — chunk and merge so a large
+    // library doesn't blow the limit (which used to fail the whole batch and blank all weather).
+    const CHUNK=300;
+    const next={};
+    let sampled=false;
+    for(let i=0;i<icaos.length;i+=CHUNK){
+      const slice=icaos.slice(i,i+CHUNK);
+      const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+slice.join(',')+'&format=json');
+      if(!res.ok){
+        const e=`[WX] Chunk ${i/CHUNK+1} failed: HTTP ${res.status} — skipping`;
+        console.log(e);RLOG(e);
+        continue;
+      }
+      const data=await res.json();
+      if(!Array.isArray(data)){
+        const e=`[WX] Chunk ${i/CHUNK+1} not an array (got ${typeof data}) — skipping`;
+        console.log(e);RLOG(e);
+        continue;
+      }
+      if(!sampled&&data.length>0){
+        const sampleKeys='[WX] Sample METAR record fields: '+Object.keys(data[0]).join(', ');
+        console.log(sampleKeys);RLOG(sampleKeys);
+        sampled=true;
+      }
+      data.forEach(m=>{
+        const key=(m.station_id||m.icaoId||'').toUpperCase();
+        if(key)next[key]=m;
+      });
     }
-    const data=await res.json();
-    if(!Array.isArray(data)){
-      const e='[WX] Fetch failed: response was not an array, got: '+typeof data;
-      console.log(e);RLOG(e);
-      S.wxFetching=false;updateWxAge();
-      return;
-    }
-    if(data.length>0){
-      const sampleKeys='[WX] Sample METAR record fields: '+Object.keys(data[0]).join(', ');
-      console.log(sampleKeys);RLOG(sampleKeys);
-    }
-    S.metarCache={};
-    data.forEach(m=>{
-      const key=(m.station_id||m.icaoId||'').toUpperCase();
-      if(key)S.metarCache[key]=m;
-    });
+    S.metarCache=next;  // assign only after all chunks merged — a partial failure never blanks good data
     S.metarLastFetch=Date.now();
     const cachedKeys=Object.keys(S.metarCache);
     const doneMsg=`[WX] METAR fetch complete: ${cachedKeys.length} cached`;
@@ -4647,5 +4670,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.8.3</div>
+  pointer-events:none;">v5.8.4</div>
 </body></html>
