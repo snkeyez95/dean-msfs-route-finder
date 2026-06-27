@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.8.5   Fix: Trip Planner SimBrief calls now logged (dep/arr visible in debug log for future diagnosis). City resolver now explicitly maps Munich→EDDM, Frankfurt→EDDF, Dusseldorf→EDDL, Cologne→EDDK, Stuttgart→EDDS rather than relying on AI lookup fallback
 v5.8.4   Fix: weather went all-N/A once your library passed 400 airports (aviationweather caps a request at 400) — the batch now chunks and merges, and the scored block always matches the live METAR shown. New: "Fresh routes" toggle on Plan a Flight hides city pairs you've flown recently, either direction (now remembers your last 30 SimBrief flights; dashboard shows 10)
 v5.8.3   METAR and D-ATIS now show a "· X min ago" freshness stamp (amber if unusually old) so you can see at a glance you're looking at the most recent observation, not stale data
 v5.8.2   Free Route "no match" results now look like a normal route card — Open in SimBrief sits in the action row beside FlightAware / SkyVector / Quick Launch, and the "no scheduled routes" note moves to the bottom

@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.8.4</div>
+  <div class="tname">A Better Route Planner &mdash; v5.8.5</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.8.4</div>
+    <div class="sb-ver">v5.8.5</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2949,7 +2949,7 @@ const TP_CITY={
   "edinburgh":"EGPH","glasgow":"EGPF","newcastle":"EGNT","bristol":"EGGD","aberdeen":"EGPD","belfast":"EGAA",
   "oslo":"ENGM","bergen":"ENFR","gothenburg":"ESGG","trondheim":"ENVA",
   "tallinn":"EETN","riga":"EVRA","vilnius":"EYVI",
-  "hamburg":"EDDH","berlin":"EDDB","hannover":"EDDV","nuremberg":"EDDN",
+  "munich":"EDDM","frankfurt":"EDDF","hamburg":"EDDH","berlin":"EDDB","hannover":"EDDV","nuremberg":"EDDN","dusseldorf":"EDDL","cologne":"EDDK","stuttgart":"EDDS",
   "marseille":"LFML","nice":"LFMN","toulouse":"LFBO","nantes":"LFRS","lyon":"LFLL","bordeaux":"LFBD",
   "barcelona":"LEBL","alicante":"LEAL","malaga":"LEMG","tenerife":"GCTS",
   "palma":"LEPA","ibiza":"LEIB","porto":"LPPR","faro":"LPFR","funchal":"LPMA","madeira":"LPMA",
@@ -3531,6 +3531,7 @@ function renderDashStats(){
 }
 
 function openSimBrief(dep,arr,type,url){
+  RLOG('[SB] openSimBrief called: dep='+dep+' arr='+arr+' type='+type);
   const entry={dep,arr,type,ts:Date.now()};
   const recent=S.cfg.recentSimBriefRoutes||[];
   const filtered=recent.filter(e=>!(e.dep===dep&&e.arr===arr));
@@ -4670,5 +4671,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.8.4</div>
+  pointer-events:none;">v5.8.5</div>
 </body></html>
