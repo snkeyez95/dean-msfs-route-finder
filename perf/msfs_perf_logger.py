@@ -1095,6 +1095,16 @@ THEME_BASE_CSS = """
   .panel-h { font-size:11px; text-transform:uppercase; letter-spacing:.07em;
     color:var(--text-faint); padding:10px 13px 0; display:flex;
     justify-content:space-between; align-items:center; }
+  /* Slim, theme-aware scrollbar: invisible until the pointer is over the page, then a
+     subtle thumb on the right edge that brightens on hover. Mouse-wheel always works.
+     Colours come from the theme vars above, so it flips with the report's light/dark. */
+  ::-webkit-scrollbar { width:12px; height:12px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:transparent; border-radius:7px;
+    border:3px solid transparent; background-clip:padding-box; }
+  html:hover::-webkit-scrollbar-thumb, body:hover::-webkit-scrollbar-thumb {
+    background:var(--border); background-clip:padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text-faint); background-clip:padding-box; }
 """
 
 # Theme toggle + restore-from-localStorage. Default is dark; the button flips it.

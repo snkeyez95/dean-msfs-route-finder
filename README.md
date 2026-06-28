@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.2   Polish: the embedded performance reports now use a slim, theme-aware scrollbar that stays hidden until you mouse over it (matching ABRP's dark style) instead of the chunky default gray one — it adapts to the report's own light/dark too. Existing reports updated in place; new captures get it built in
 v5.9.1   New: Performance tab — your MSFS smoothness dashboard now lives inside ABRP. Opens straight to your combined dashboard (TLOD-vs-smoothness and VRAM charts, the coverage/"fly next" tracker, and the flight table); click any flight in that table to view its full report — charts, phases, VRAM — embedded right in the app. A Dashboard button returns you to the overview, and an open-in-browser button is there if you want it. Groundwork for folding the standalone performance logger into ABRP (engine relocated under perf/, flight data stored in your AppData folder)
 v5.8.5   Fix: Trip Planner SimBrief calls now logged (dep/arr visible in debug log for future diagnosis). City resolver now explicitly maps Munich→EDDM, Frankfurt→EDDF, Dusseldorf→EDDL, Cologne→EDDK, Stuttgart→EDDS rather than relying on AI lookup fallback
 v5.8.4   Fix: weather went all-N/A once your library passed 400 airports (aviationweather caps a request at 400) — the batch now chunks and merges, and the scored block always matches the live METAR shown. New: "Fresh routes" toggle on Plan a Flight hides city pairs you've flown recently, either direction (now remembers your last 30 SimBrief flights; dashboard shows 10)
