@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.3   Polish: the embedded performance reports now follow ABRP's own light/dark theme — toggle the app's theme and the dashboard/report flip with it (no more separate blue-themed report when the app is dark). Existing reports updated in place; new captures get it built in
 v5.9.2   Polish: the embedded performance reports now use a slim, theme-aware scrollbar that stays hidden until you mouse over it (matching ABRP's dark style) instead of the chunky default gray one — it adapts to the report's own light/dark too. Existing reports updated in place; new captures get it built in
 v5.9.1   New: Performance tab — your MSFS smoothness dashboard now lives inside ABRP. Opens straight to your combined dashboard (TLOD-vs-smoothness and VRAM charts, the coverage/"fly next" tracker, and the flight table); click any flight in that table to view its full report — charts, phases, VRAM — embedded right in the app. A Dashboard button returns you to the overview, and an open-in-browser button is there if you want it. Groundwork for folding the standalone performance logger into ABRP (engine relocated under perf/, flight data stored in your AppData folder)
 v5.8.5   Fix: Trip Planner SimBrief calls now logged (dep/arr visible in debug log for future diagnosis). City resolver now explicitly maps Munich→EDDM, Frankfurt→EDDF, Dusseldorf→EDDL, Cologne→EDDK, Stuttgart→EDDS rather than relying on AI lookup fallback

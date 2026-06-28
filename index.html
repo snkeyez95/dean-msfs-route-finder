@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.2</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.2</div>
+    <div class="sb-ver">v5.9.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1129,6 +1129,7 @@ function toggleTheme(){
   document.documentElement.setAttribute('data-theme',next);
   S.cfg.theme=next;
   window.api.saveConfig(S.cfg);
+  perfPostTheme();   // keep any embedded performance report in sync
 }
 
 window.addEventListener('DOMContentLoaded',async()=>{
@@ -3475,10 +3476,12 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
-    +'<iframe id="perf-frame" referrerpolicy="no-referrer" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:#1b1b1e"></iframe>';
+    +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>';
   perfShowDashboard();
 }
-function perfShowDashboard(){ const fr=document.getElementById('perf-frame'); if(fr&&_perfData&&_perfData.combinedUrl)fr.src=_perfData.combinedUrl; }
+function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
+function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
+function perfShowDashboard(){ const fr=document.getElementById('perf-frame'); if(fr&&_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } }
 
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 function renderDashboard(){
@@ -4714,5 +4717,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.2</div>
+  pointer-events:none;">v5.9.3</div>
 </body></html>
