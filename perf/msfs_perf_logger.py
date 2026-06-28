@@ -1849,9 +1849,9 @@ def write_report(html_path, session_id, settings, stats, vram,
 <script>{REPORT_JS}</script>
 <script src="../../sessions_nav.js"></script>
 <script>{NAV_JS}</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+<script src="../../_lib/chart.umd.min.js"></script>
+<script src="../../_lib/hammer.min.js"></script>
+<script src="../../_lib/chartjs-plugin-zoom.min.js"></script>
 <script>{CHART_JS}</script>
 </body>
 </html>'''

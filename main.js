@@ -112,7 +112,23 @@ function checkForUpdate() {
 }
 
 let win;
+// Ensure the bundled chart libraries are in the perf data home so embedded reports
+// render offline (copies perf/vendor/*.js -> userData\Sessions\_lib\ if missing).
+function seedPerfLibs(){
+  try{
+    const vendor = path.join(__dirname, 'perf', 'vendor');
+    if(!fs.existsSync(vendor)) return;
+    const dest = path.join(USER_DATA, 'Sessions', '_lib');
+    fs.mkdirSync(dest, {recursive:true});
+    for(const f of fs.readdirSync(vendor)){
+      if(!f.toLowerCase().endsWith('.js')) continue;
+      const d = path.join(dest, f);
+      if(!fs.existsSync(d)) fs.copyFileSync(path.join(vendor, f), d);
+    }
+  }catch(e){ try{LOG.warn('seedPerfLibs failed: '+e.message);}catch(_){} }
+}
 function createWindow() {
+  seedPerfLibs();
   win = new BrowserWindow({
     width:1440, height:900, minWidth:1100, minHeight:700,
     frame:false, backgroundColor:'#000000',
