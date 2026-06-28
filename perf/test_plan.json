@@ -1,0 +1,15 @@
+{
+  "philosophy": "Start low and ramp up. Sweep TLOD in fine steps where the sweet spot likely lives (80-200), then bigger jumps (250, 300) to find the ceiling. OLOD is held at 120 (Dean's normal) the whole sweep so TLOD is the only thing changing and the result applies to real use. First lap: one flight per TLOD to map the rough curve. Then repeat flights around the knee to average out real-world variety, and finally an OLOD sweep at the chosen TLOD (Claude adds those after reviewing results).",
+  "conditions": "Keep conditions consistently DEMANDING: high-demand 3rd-party scenery, live weather, BATC traffic. The exact airport can vary flight to flight (real use) - fly a couple at each TLOD so the variety averages out.",
+  "olod_fixed": 120,
+  "combos": [
+    {"tlod": 80,  "olod": 120},
+    {"tlod": 100, "olod": 120},
+    {"tlod": 125, "olod": 120},
+    {"tlod": 150, "olod": 120},
+    {"tlod": 175, "olod": 120},
+    {"tlod": 200, "olod": 120},
+    {"tlod": 250, "olod": 120},
+    {"tlod": 300, "olod": 120}
+  ]
+}

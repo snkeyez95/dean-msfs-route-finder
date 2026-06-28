@@ -2,3 +2,12 @@ node_modules/
 dist/
 dean_msfs_debug.log
 CLAUDE.md
+
+# perf engine runtime artifacts + flight data (data lives in %APPDATA%, never the repo)
+perf/Sessions/
+perf/usercfg_backups/
+perf/__pycache__/
+perf/*.log
+perf/_capture_tmp.csv
+perf/_prep_aircraft.txt
+perf/PresentMon-x64.exe
