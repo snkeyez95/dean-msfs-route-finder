@@ -1,6 +1,6 @@
 {
   "name": "dean-msfs-route-finder",
-  "version": "5.9.5",
+  "version": "5.9.6",
   "description": "A Better Route Planner",
   "main": "main.js",
   "scripts": {
@@ -15,6 +15,14 @@
     "directories": {
       "output": "C:\\Temp\\abrp-build"
     },
+    "files": [
+      "**/*",
+      "!perf/**"
+    ],
+    "extraResources": [
+      { "from": "perf/perf-engine.exe", "to": "perf/perf-engine.exe" },
+      { "from": "perf/vendor", "to": "perf/vendor" }
+    ],
     "win": {
       "target": [
         {

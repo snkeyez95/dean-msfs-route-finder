@@ -112,11 +112,17 @@ function checkForUpdate() {
 }
 
 let win;
+// Resolve the perf engine folder. In the installed app it's shipped OUTSIDE app.asar via
+// extraResources (process.resourcesPath\perf) so the bundled perf-engine.exe is a real file
+// an external process can run; in dev it's the project's perf/ folder.
+function perfDir(){
+  return app.isPackaged ? path.join(process.resourcesPath, 'perf') : path.join(__dirname, 'perf');
+}
 // Ensure the bundled chart libraries are in the perf data home so embedded reports
 // render offline (copies perf/vendor/*.js -> userData\Sessions\_lib\ if missing).
 function seedPerfLibs(){
   try{
-    const vendor = path.join(__dirname, 'perf', 'vendor');
+    const vendor = path.join(perfDir(), 'vendor');
     if(!fs.existsSync(vendor)) return;
     const dest = path.join(USER_DATA, 'Sessions', '_lib');
     fs.mkdirSync(dest, {recursive:true});
@@ -961,17 +967,19 @@ ipcMain.handle('perf-open-path', (_, p) => {
 // writes into the data home via MSFS_PERF_ROOT.
 ipcMain.handle('perf-start-capture', () => {
   try {
-    const exe    = path.join(__dirname, 'perf', 'perf-engine.exe');   // future bundled engine
-    const script = path.join(__dirname, 'perf', 'msfs_perf_logger.py');
+    const dir    = perfDir();
+    const exe    = path.join(dir, 'perf-engine.exe');          // bundled, Python-free engine
+    const script = path.join(dir, 'msfs_perf_logger.py');      // dev fallback (system Python)
     const env    = Object.assign({}, process.env, { MSFS_PERF_ROOT: USER_DATA });
-    const opts   = { detached:true, stdio:'ignore', windowsHide:true, env, cwd: path.join(__dirname,'perf') };
-    const child  = fs.existsSync(exe)
-      ? spawn(exe, ['--headless','--auto'], opts)
-      : spawn('py', [script,'--headless','--auto'], opts);
+    const opts   = { detached:true, stdio:'ignore', windowsHide:true, env, cwd: dir };
+    let child, how;
+    if (fs.existsSync(exe))         { child = spawn(exe, ['--headless','--auto'], opts); how = 'exe'; }
+    else if (fs.existsSync(script)) { child = spawn('py', [script,'--headless','--auto'], opts); how = 'py'; }
+    else { LOG.error('[PERF] capture: engine not found in ' + dir); return { ok:false, error:'engine not found in ' + dir }; }
     child.on('error', e => LOG.error('[PERF] capture spawn failed: ' + e.message));
     child.unref();
-    LOG.info('[PERF] capture armed (headless --auto)' + (fs.existsSync(exe) ? ' [exe]' : ' [py]'));
-    return { ok:true };
+    LOG.info('[PERF] capture armed (headless --auto) [' + how + '] from ' + dir);
+    return { ok:true, how };
   } catch (e) { LOG.error('[PERF] perf-start-capture failed: ' + e.message); return { ok:false, error:e.message }; }
 });
 ipcMain.on('install-update', () => { require('electron-updater').autoUpdater.quitAndInstall(); });

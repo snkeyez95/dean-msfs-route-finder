@@ -11,3 +11,7 @@ perf/*.log
 perf/_capture_tmp.csv
 perf/_prep_aircraft.txt
 perf/PresentMon-x64.exe
+# PyInstaller build artifacts (the built perf-engine.exe IS committed so release.bat can ship it)
+perf/dist/
+perf/build_pyi/
+perf/*.spec
