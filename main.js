@@ -898,6 +898,46 @@ ipcMain.handle('launch-app', (_, {path: appPath}) => {
 });
 
 ipcMain.handle('get-log-path',()=>LOG_PATH);
+
+// ── PERFORMANCE LOGS ──────────────────────────────────────────────────────────
+// Read the perf engine's flight index from the writable data home (userData\Sessions),
+// enriching each flight with a file:// URL (for embedding the report) and an absolute
+// path (for opening it in the default browser). The engine writes here because ABRP
+// launches it with MSFS_PERF_ROOT pointed at userData (see perf/README.md).
+ipcMain.handle('perf-list-sessions', () => {
+  try {
+    const { pathToFileURL } = require('url');
+    const sdir    = path.join(USER_DATA, 'Sessions');
+    const idxPath = path.join(sdir, 'index.json');
+    if (!fs.existsSync(idxPath)) return { ok:false, reason:'no-data', sessions:[] };
+    const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
+    const sessions = (data.sessions || []).map(s => {
+      const folder = (s.folder || '').replace(/\//g, '\\');
+      const rp  = path.join(sdir, folder, 'report.html');
+      const has = !!folder && fs.existsSync(rp);
+      return Object.assign({}, s, {
+        reportUrl:  has ? pathToFileURL(rp).href : null,
+        reportPath: has ? rp : null,
+      });
+    });
+    const cr    = path.join(sdir, 'combined_report.html');
+    const crHas = fs.existsSync(cr);
+    LOG.info('perf-list-sessions: ' + sessions.length + ' flight(s) from ' + sdir);
+    return {
+      ok: true, sessions,
+      combinedUrl:  crHas ? pathToFileURL(cr).href : null,
+      combinedPath: crHas ? cr : null,
+      lastUpdated:  data.last_updated || null,
+    };
+  } catch (e) {
+    LOG.error('perf-list-sessions failed: ' + e.message);
+    return { ok:false, reason:e.message, sessions:[] };
+  }
+});
+ipcMain.handle('perf-open-path', (_, p) => {
+  try { if (p) shell.openPath(p); return { ok:true }; }
+  catch (e) { return { ok:false, error:e.message }; }
+});
 ipcMain.on('install-update', () => { require('electron-updater').autoUpdater.quitAndInstall(); });
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());

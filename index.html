@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.8.5</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.8.5</div>
+    <div class="sb-ver">v5.9.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -375,6 +375,7 @@ html[data-theme="light"] .theme-knob{left:30px}
     <div class="sb-item" data-tab="fleet" onclick="sw('fleet')"><span class="sb-ic">&#128747;</span> My Fleet</div>
     <div class="sb-item" data-tab="addons" onclick="sw('addons')"><span class="sb-ic">&#128279;</span> Aircraft &amp; Util</div>
     <div class="sb-item" data-tab="companions" onclick="sw('companions')"><span class="sb-ic">&#9654;</span> Companion Apps</div>
+    <div class="sb-item" data-tab="perf" onclick="sw('perf')"><span class="sb-ic">&#128202;</span> Performance</div>
     <div class="sb-item" data-tab="settings" onclick="sw('settings')"><span class="sb-ic">&#9881;</span> Settings</div>
   </div>
 </div>
@@ -774,7 +775,16 @@ html[data-theme="light"] .theme-knob{left:30px}
     <div id="ql-app-list-comp" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
     <button class="btn bg bsm" onclick="addQuickLaunchApp()">&#65291; Add App</button>
   </div>
-</div></div></div></div><script>
+</div></div>
+
+<!-- ── PERFORMANCE ── -->
+<div class="pane" id="pane-perf"><div class="scroll">
+  <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Performance</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Your MSFS smoothness logs &mdash; TLOD/OLOD test flights captured by the performance logger.</div>
+  <div id="perf-body"><div style="font-size:13px;color:var(--ink3)">Loading&hellip;</div></div>
+</div></div>
+
+</div></div><script>
 // ── RENDERER LOGGER ──────────────────────────────────────────────────────────
 function RLOG(...args){
   const msg=args.map(a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' ');
@@ -1259,6 +1269,7 @@ function sw(t){
   if(t==='fleet')renderFleetPane();
   if(t==='addons')renderAddonsPane();
   if(t==='companions')renderCompanionsPane();
+  if(t==='perf')renderPerfPane();
 }
 
 // ── AIRPORTS ────────────────────────────────────────────────────────────────
@@ -3437,6 +3448,82 @@ async function launchQuickApp(appPath){
 
 function renderCompanionsPane(){renderQlAppList();}
 
+// ── PERFORMANCE TAB ──────────────────────────────────────────────────────────
+// Reads the perf engine's flight index (via main) and lists flights natively; opening
+// one embeds its self-contained report.html in an iframe, with a browser fallback.
+let _perfData=null;
+async function renderPerfPane(){
+  const el=document.getElementById('perf-body'); if(!el)return;
+  el.innerHTML='<div style="font-size:13px;color:var(--ink3)">Loading flight logs&hellip;</div>';
+  let res; try{ res=await window.api.perfListSessions(); }catch(e){ res={ok:false,reason:(e&&e.message)||'error',sessions:[]}; }
+  _perfData=res;
+  if(!res||!res.ok||!res.sessions||!res.sessions.length){
+    const why=(res&&res.reason==='no-data')?'No flight data found in your performance folder yet.':'';
+    el.innerHTML='<div class="card" style="padding:20px">'
+      +'<div style="font-size:14px;color:var(--ink1);margin-bottom:6px">No flight logs yet</div>'
+      +'<div style="font-size:12px;color:var(--ink3);line-height:1.6">Once a flight is captured by the performance logger, your smoothness reports show up here. '+esc(why)+'</div></div>';
+    return;
+  }
+  const sess=res.sessions.slice().sort((a,b)=>String(b.timestamp||'').localeCompare(String(a.timestamp||'')));
+  _perfData.sorted=sess;
+  const grade=p=>p==null?'var(--ink3)':(p<=20?'var(--grn)':(p<=33.3?'var(--acc)':'#e0533d'));
+  const dispRoute=r=>{ r=String(r||''); const p=r.split(' '); return (p.length>=2&&p[p.length-1].indexOf('-')>-1)?p[p.length-1]:r; };
+  const th='text-align:left;padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3)';
+  const td='padding:7px 8px;font-size:12px';
+  const mono="font-family:'JetBrains Mono',monospace";
+  const rows=sess.map((s,i)=>{
+    const p=s.p99_ft_ms, v=s.peak_vram_mb;
+    const vd=v?(v/1024).toFixed(1)+' GB':'&mdash;';
+    const ref=isPrimaryAc(s.aircraft)?'':' <span style="font-size:9px;color:var(--ink4)">(ref)</span>';
+    const open=s.reportUrl
+      ?`<button class="btn bg bsm" onclick="perfOpen(${i})">Open</button> <button class="btn bg bsm" title="Open in browser" onclick="perfExt(${i})">&#8599;</button>`
+      :'<span style="color:var(--ink4);font-size:11px">no report</span>';
+    return `<tr style="border-bottom:1px solid var(--sep)">
+      <td style="${td};color:var(--ink1)">${esc(s.timestamp_display||'')}</td>
+      <td style="${td};${mono};color:var(--acc)">${esc(s.aircraft||'—')}${ref}</td>
+      <td style="${td};${mono};color:var(--ink2)">${esc(dispRoute(s.route))||'—'}</td>
+      <td style="${td};${mono};color:var(--ink2)">${s.tlod!=null?s.tlod:'—'}</td>
+      <td style="${td};${mono};font-weight:600;color:${grade(p)}">${p!=null?p+' ms':'—'}</td>
+      <td style="${td};${mono};color:var(--ink2)">${vd}</td>
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap">${open}</td>
+    </tr>`;
+  }).join('');
+  const dashBtn=res.combinedUrl
+    ?`<button class="btn bp bsm" onclick="perfOpenUrl(_perfData.combinedUrl,'Combined dashboard')">&#128202; Combined Dashboard</button> <button class="btn bg bsm" title="Open in browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>`
+    :'';
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">${dashBtn}
+      <span style="font-size:12px;color:var(--ink3);margin-left:auto">${sess.length} flight${sess.length>1?'s':''} logged</span></div>
+    <div id="perf-frame-wrap" style="display:none;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span id="perf-frame-title" style="font-size:13px;font-weight:600;color:var(--ink0)"></span>
+        <button class="btn bg bsm" style="margin-left:auto" onclick="perfCloseFrame()">&#10006; Close</button>
+      </div>
+      <iframe id="perf-frame" referrerpolicy="no-referrer" style="width:100%;height:80vh;border:1px solid var(--sep);border-radius:var(--r);background:#1b1b1e"></iframe>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--sep)">
+          <th style="${th}">When</th><th style="${th}">Aircraft</th><th style="${th}">Route</th>
+          <th style="${th}">TLOD</th><th style="${th}">P99</th><th style="${th}">VRAM</th><th style="padding:8px"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+function isPrimaryAc(ac){ return ac==='Fenix'||ac==='PMDG'; }
+function perfOpen(i){ const s=_perfData&&_perfData.sorted&&_perfData.sorted[i]; if(s&&s.reportUrl)perfOpenUrl(s.reportUrl,(s.timestamp_display||s.session_id||'')+' · '+(s.aircraft||'')+' · TLOD '+(s.tlod!=null?s.tlod:'—')); }
+function perfExt(i){ const s=_perfData&&_perfData.sorted&&_perfData.sorted[i]; if(s&&s.reportPath)window.api.perfOpenPath(s.reportPath); }
+function perfOpenUrl(url,title){
+  const wrap=document.getElementById('perf-frame-wrap'),fr=document.getElementById('perf-frame'),t=document.getElementById('perf-frame-title');
+  if(!wrap||!fr)return;
+  if(t)t.textContent=title||''; fr.src=url; wrap.style.display='block';
+  wrap.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function perfCloseFrame(){
+  const wrap=document.getElementById('perf-frame-wrap'),fr=document.getElementById('perf-frame');
+  if(fr)fr.src='about:blank'; if(wrap)wrap.style.display='none';
+}
+
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 function renderDashboard(){
   renderDashMap();
@@ -4671,5 +4758,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.8.5</div>
+  pointer-events:none;">v5.9.0</div>
 </body></html>
