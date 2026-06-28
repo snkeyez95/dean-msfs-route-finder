@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.5   Phase 2 (part 1): ABRP can now start a performance capture itself. New "Arm Capture" button on the Performance tab launches the logging engine headless + auto-start — it records when your aircraft begins its takeoff roll and files automatically when you close the sim, running detached so closing ABRP doesn't stop it. Engine gains a --headless mode (no console window). Still uses your system Python for now; the bundled, install-free engine comes next
 v5.9.4   Offline charts: the 3 chart libraries the per-flight reports used to fetch from the internet (Chart.js, hammer.js, chartjs-plugin-zoom) are now bundled with the app, so report charts render with no internet connection (and load a touch faster). Existing reports repointed in place; the app seeds the libraries into your data folder automatically
 v5.9.3   Polish: the embedded performance reports now follow ABRP's own light/dark theme — toggle the app's theme and the dashboard/report flip with it (no more separate blue-themed report when the app is dark). Existing reports updated in place; new captures get it built in
 v5.9.2   Polish: the embedded performance reports now use a slim, theme-aware scrollbar that stays hidden until you mouse over it (matching ABRP's dark style) instead of the chunky default gray one — it adapts to the report's own light/dark too. Existing reports updated in place; new captures get it built in

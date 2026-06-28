@@ -954,6 +954,26 @@ ipcMain.handle('perf-open-path', (_, p) => {
   try { if (p) shell.openPath(p); return { ok:true }; }
   catch (e) { return { ok:false, error:e.message }; }
 });
+
+// Arm a performance capture for the next flight: spawn the engine headless + auto-start.
+// Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
+// workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine
+// writes into the data home via MSFS_PERF_ROOT.
+ipcMain.handle('perf-start-capture', () => {
+  try {
+    const exe    = path.join(__dirname, 'perf', 'perf-engine.exe');   // future bundled engine
+    const script = path.join(__dirname, 'perf', 'msfs_perf_logger.py');
+    const env    = Object.assign({}, process.env, { MSFS_PERF_ROOT: USER_DATA });
+    const opts   = { detached:true, stdio:'ignore', windowsHide:true, env, cwd: path.join(__dirname,'perf') };
+    const child  = fs.existsSync(exe)
+      ? spawn(exe, ['--headless','--auto'], opts)
+      : spawn('py', [script,'--headless','--auto'], opts);
+    child.on('error', e => LOG.error('[PERF] capture spawn failed: ' + e.message));
+    child.unref();
+    LOG.info('[PERF] capture armed (headless --auto)' + (fs.existsSync(exe) ? ' [exe]' : ' [py]'));
+    return { ok:true };
+  } catch (e) { LOG.error('[PERF] perf-start-capture failed: ' + e.message); return { ok:false, error:e.message }; }
+});
 ipcMain.on('install-update', () => { require('electron-updater').autoUpdater.quitAndInstall(); });
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());

@@ -63,6 +63,13 @@ DATA_ROOT = os.environ.get("MSFS_PERF_ROOT") or SCRIPT_DIR
 SESSIONS_DIR = os.path.join(DATA_ROOT, "Sessions")
 LOG_FILE = os.path.join(DATA_ROOT, "msfs_perf_logger.log")
 
+# Headless mode (ABRP spawns the engine with no console). The "press Enter" watcher threads
+# read stdin; with no console, stdin is closed and input() returns instantly via EOF, which
+# would otherwise trigger/stop a capture the moment it starts. In headless we skip those
+# watchers: auto-start relies purely on SimConnect roll detection, and stop relies on the sim
+# closing (PresentMon --terminate_on_proc_exit). Pass --headless to enable.
+HEADLESS = ("--headless" in sys.argv)
+
 # MSFS 2024 process to watch.
 TARGET_PROCESS = "FlightSimulator2024.exe"
 
@@ -3219,10 +3226,11 @@ def wait_for_auto_start():
     except ImportError:
         say("  SimConnect package not installed (pip install SimConnect).")
         say("  Auto-start unavailable this run - press Enter to start recording.")
-        try:
-            input()
-        except (EOFError, KeyboardInterrupt):
-            pass
+        if not HEADLESS:
+            try:
+                input()
+            except (EOFError, KeyboardInterrupt):
+                pass
         return
 
     say("  Auto-start mode: waiting for MSFS 2024 SimConnect connection...")
@@ -3250,7 +3258,8 @@ def wait_for_auto_start():
             pass
         forced.set()
 
-    threading.Thread(target=_enter_watch, daemon=True).start()
+    if not HEADLESS:
+        threading.Thread(target=_enter_watch, daemon=True).start()
 
     try:
         last_log = 0.0
@@ -3656,7 +3665,8 @@ def main():
             pass
         stop_event.set()
 
-    threading.Thread(target=_wait_for_enter, daemon=True).start()
+    if not HEADLESS:
+        threading.Thread(target=_wait_for_enter, daemon=True).start()
 
     # SimConnect tracker — passively samples ground speed and altitude every second.
     # Updates shared state used for tail-trim and mid-flight-abandonment detection.

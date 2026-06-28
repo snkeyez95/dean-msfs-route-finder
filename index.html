@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.4</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.5</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.4</div>
+    <div class="sb-ver">v5.9.5</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3474,6 +3474,7 @@ async function renderPerfPane(){
   el.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
     +'<button class="btn bg bsm" onclick="perfShowDashboard()" title="Back to the combined dashboard">&#128202; Dashboard</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
+    +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Record your next flight from ABRP (headless capture test)">&#9679; Arm Capture</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>';
@@ -3482,6 +3483,16 @@ async function renderPerfPane(){
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
 function perfShowDashboard(){ const fr=document.getElementById('perf-frame'); if(fr&&_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } }
+async function perfArmCapture(){
+  const msg='Arm a performance capture for your next flight?\n\n'
+    +'• It starts recording when your aircraft begins its takeoff roll, and files automatically when you close the sim.\n'
+    +'• During testing, do NOT also run your old record_clean.bat for this flight — two recorders fight over the same capture.\n\n'
+    +'After arming, launch MSFS and fly as normal.';
+  if(!confirm(msg))return;
+  let r; try{ r=await window.api.perfStartCapture(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.ok){ alert('Capture armed.\n\nLaunch MSFS and fly — it records on your takeoff roll and files when you close the sim. Re-open this tab afterward to see the new flight.'); }
+  else{ alert('Could not arm capture: '+((r&&r.error)||'unknown error')); }
+}
 
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 function renderDashboard(){
@@ -4717,5 +4728,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.4</div>
+  pointer-events:none;">v5.9.5</div>
 </body></html>
