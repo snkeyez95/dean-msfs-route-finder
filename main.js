@@ -704,6 +704,12 @@ function cleanupActivationsOnQuit(){
 }
 let _cleanupDone = false;
 app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; cleanupActivationsOnQuit(); });
+// When the auto-updater restarts ABRP to install a new version, exit FAST: skip the close-confirm
+// dialog and the (slow) activation cleanup so the NSIS installer doesn't catch ABRP still shutting
+// down and show "cannot be closed / Retry". The junctions are intentionally left in place — the
+// freshly-installed copy relaunches immediately with the same config and cleans them up on the next
+// normal close.
+app.on('before-quit-for-update', () => { _perfAllowClose = true; _cleanupDone = true; });
 
 // Manually add a utility into the Util library folder: copy a dropped/browsed
 // package folder, or extract a downloaded .zip/.rar/.7z, into the Util root. The

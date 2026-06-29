@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.15  Fix: the installer's "A Better Route Planner cannot be closed — Retry" prompt during an update. When the auto-updater restarts ABRP to install, it now exits immediately (skips the close-confirm dialog and the on-quit scenery cleanup) so the installer doesn't catch it still shutting down. Takes effect for updates after this one
 v5.9.14  Fix: reopen was relaunching zero apps (regression in v5.9.13 — relaunching with the captured command-line arguments made the launch throw). Reverted to the proven method: a Startup shortcut when the app has one, otherwise a plain exe-path launch (no arguments). Still skips already-running apps, and now logs the exact per-app outcome so any remaining issue points to the specific app
 v5.9.13  App reopen no longer depends on Startup shortcuts: it now relaunches each app exactly how it was running (captured exe path + command-line arguments), so apps without a Startup shortcut come back correctly too. Also skips any app that's already running (prevents duplicate instances / port clashes); the Startup shortcut is now only a last-ditch fallback
 v5.9.12  Fix: the "reopen apps after the sim closes" step now actually works — it relaunches apps through their Startup shortcut when there is one (apps like Plex and the *arr suite only restart correctly that way, matching what record_clean.bat does), falling back to the saved exe path, and logs how many paths were saved/reopened
