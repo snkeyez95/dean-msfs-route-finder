@@ -976,6 +976,27 @@ ipcMain.handle('perf-open-path', (_, p) => {
   catch (e) { return { ok:false, error:e.message }; }
 });
 
+// List running apps that have a launchable path (same idea as the old list_running_apps.bat),
+// for the "Apps to close during flight" picker. Protected system processes have no Path and
+// are filtered out automatically.
+ipcMain.handle('list-running-apps', () => new Promise((resolve) => {
+  try {
+    const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
+      "Get-Process | Where-Object {$_.Path} | Select-Object Name,Path | Sort-Object Name -Unique | ConvertTo-Json -Compress"],
+      { windowsHide:true });
+    let out = '';
+    ps.stdout.on('data', d => out += d);
+    ps.on('close', () => {
+      try {
+        let arr = JSON.parse(out || '[]');
+        if (!Array.isArray(arr)) arr = [arr];
+        resolve({ ok:true, apps: arr.filter(a=>a&&a.Name).map(a => ({ name:a.Name, path:a.Path })) });
+      } catch (e) { resolve({ ok:false, error:'parse failed', apps:[] }); }
+    });
+    ps.on('error', e => resolve({ ok:false, error:e.message, apps:[] }));
+  } catch (e) { resolve({ ok:false, error:e.message, apps:[] }); }
+}));
+
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine
