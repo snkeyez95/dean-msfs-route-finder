@@ -1086,11 +1086,12 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
        foreach($n in $names){ $procs=Get-Process -Name $n -ErrorAction SilentlyContinue;
          if($procs){
            if($reopen -contains $n.ToLower()){
-             foreach($pr in $procs){ try{
-               $ep=$pr.Path
-               if(-not $ep){ $ci=Get-CimInstance Win32_Process -Filter ("ProcessId="+$pr.Id) -ErrorAction SilentlyContinue; if($ci){ $ep=$ci.ExecutablePath } }
+             foreach($pr in $procs){
+               $ep=$null
+               try{ $ci=Get-CimInstance Win32_Process -Filter ("ProcessId="+$pr.Id) -ErrorAction SilentlyContinue; if($ci){ $ep=$ci.ExecutablePath } }catch{}
+               if(-not $ep){ try{ $ep=$pr.Path }catch{} }
                if($ep){ Write-Output ('RPATH|'+$ep) }
-             }catch{} }
+             }
            }
            $procs | Stop-Process -Force -ErrorAction SilentlyContinue } }`],
       { windowsHide:true });
