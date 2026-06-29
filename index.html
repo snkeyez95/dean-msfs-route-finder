@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.10</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.11</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.10</div>
+    <div class="sb-ver">v5.9.11</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -659,7 +659,7 @@ html[data-theme="light"] .theme-knob{left:30px}
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin:24px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Apps to close during flight</div>
   <div class="api-pan" style="margin-bottom:14px">
-    <div class="api-s" style="margin-bottom:12px">Background apps closed before a logged flight (so they don't steal CPU and pollute your smoothness data) and reopened after. Toggle which to close and how. Seeded from your record_clean setup &mdash; edit freely. <span style="color:var(--acc)">Takes effect once one-click Quick-Launch capture is wired in (next step).</span></div>
+    <div class="api-s" style="margin-bottom:12px">Background apps closed before a logged flight (so they don't steal CPU and pollute your smoothness data) and reopened after. Toggle which to close and how. Seeded from your record_clean setup &mdash; edit freely. <span style="color:var(--acc)">Active now: the checked apps close when you hit Arm Capture on the Performance tab, and reopen when the sim closes.</span></div>
     <div id="flight-apps-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-bottom:12px"></div>
     <button class="btn bg bsm" id="detect-apps-btn" onclick="detectFlightApps()">&#128269; Detect running apps</button>
     <div id="flight-apps-detect" style="display:none;margin-top:10px"></div>
@@ -3493,13 +3493,17 @@ function perfTheme(){ return document.documentElement.getAttribute('data-theme')
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
 function perfShowDashboard(){ const fr=document.getElementById('perf-frame'); if(fr&&_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } }
 async function perfArmCapture(){
+  const apps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
+  const n=apps.length;
   const msg='Arm a performance capture for your next flight?\n\n'
-    +'• It starts recording when your aircraft begins its takeoff roll, and files automatically when you close the sim.\n'
-    +'• During testing, do NOT also run your old record_clean.bat for this flight — two recorders fight over the same capture.\n\n'
+    +'• Records when your aircraft begins its takeoff roll; files automatically when you close the sim.\n'
+    +(n?('• Closes your '+n+' checked background app'+(n>1?'s':'')+' now, and reopens them when the sim closes.\n'):'')
+    +'• Don’t also run your old record_clean.bat — ABRP now handles the close/reopen and capture.\n\n'
     +'After arming, launch MSFS and fly as normal.';
   if(!confirm(msg))return;
+  if(n){ try{ await window.api.flightCloseApps(apps); }catch(e){} }
   let r; try{ r=await window.api.perfStartCapture(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
-  if(r&&r.ok){ alert('Capture armed.\n\nLaunch MSFS and fly — it records on your takeoff roll and files when you close the sim. Re-open this tab afterward to see the new flight.'); }
+  if(r&&r.ok){ alert('Capture armed'+(n?(' and '+n+' app'+(n>1?'s':'')+' closed'):'')+'.\n\nLaunch MSFS and fly — it records on your takeoff roll, files when you close the sim, and your apps reopen automatically. Re-open this tab afterward to see the flight.'); }
   else{ alert('Could not arm capture: '+((r&&r.error)||'unknown error')); }
 }
 
@@ -4835,5 +4839,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.10</div>
+  pointer-events:none;">v5.9.11</div>
 </body></html>

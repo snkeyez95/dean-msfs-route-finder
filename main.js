@@ -136,6 +136,9 @@ function seedPerfLibs(){
 let _perfAllowClose = false;
 function createWindow() {
   seedPerfLibs();
+  // Catch-up: if a prior run closed apps but never reopened them (ABRP/sim ended early) and the
+  // sim isn't running now, reopen them so nothing stays closed.
+  try { if (fs.existsSync(FLIGHT_STATE()) && !isMsfsRunning()) { _flightReopenPending = true; flightReopenApps(); } } catch(_){}
   win = new BrowserWindow({
     width:1440, height:900, minWidth:1100, minHeight:700,
     frame:false, backgroundColor:'#000000',
@@ -995,6 +998,64 @@ ipcMain.handle('list-running-apps', () => new Promise((resolve) => {
     });
     ps.on('error', e => resolve({ ok:false, error:e.message, apps:[] }));
   } catch (e) { resolve({ ok:false, error:e.message, apps:[] }); }
+}));
+
+// ── FLIGHT APP CLOSE/REOPEN (Phase 3) ─────────────────────────────────────────
+// ABRP stays open through the flight, so ABRP closes the chosen apps before a capture and
+// reopens them once the sim closes (watched here). The reopen list persists to disk so a
+// catch-up on next launch can recover if ABRP/sim ended unexpectedly.
+const FLIGHT_STATE = () => path.join(USER_DATA, 'flight_closed_apps.json');
+let _flightReopenPending = false;
+let _flightWatch = null;
+function startFlightWatch(){
+  if (_flightWatch) return;
+  let sawSim = false; try { sawSim = isMsfsRunning(); } catch(_){}
+  _flightWatch = setInterval(() => {
+    let up = false; try { up = isMsfsRunning(); } catch(_){}
+    if (up) { sawSim = true; return; }
+    if (sawSim && !up) {
+      clearInterval(_flightWatch); _flightWatch = null;
+      if (_flightReopenPending) { _flightReopenPending = false; flightReopenApps(); }
+    }
+  }, 6000);
+}
+function flightReopenApps(){
+  try {
+    let killAfter = [];
+    try { const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+      killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name); } catch(_){}
+    const sf = FLIGHT_STATE();
+    const killPs = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
+    const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
+      `$kill=@(${killPs}); foreach($n in $kill){ Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
+       if(Test-Path -LiteralPath '${sf}'){ $paths=@(Get-Content -LiteralPath '${sf}' -Raw | ConvertFrom-Json);
+         foreach($p in $paths){ if($p -and (Test-Path -LiteralPath $p)){ Start-Process -FilePath $p -ErrorAction SilentlyContinue } }
+         Remove-Item -LiteralPath '${sf}' -ErrorAction SilentlyContinue }`],
+      { windowsHide:true });
+    ps.on('close', () => LOG.info('[FLIGHT] reopened apps + closed end-of-flight apps'));
+    ps.on('error', e => { try{LOG.warn('[FLIGHT] reopen failed: '+e.message);}catch(_){} });
+  } catch (e) { try{LOG.warn('[FLIGHT] reopen error: '+e.message);}catch(_){} }
+}
+ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
+  try {
+    apps = Array.isArray(apps) ? apps.filter(a=>a&&a.enabled!==false&&a.name) : [];
+    const closeNow = apps.filter(a=>a.mode==='close-reopen'||a.mode==='close-only').map(a=>a.name);
+    const reopen   = apps.filter(a=>a.mode==='close-reopen').map(a=>String(a.name).toLowerCase());
+    const hasKill  = apps.some(a=>a.mode==='kill-after');
+    if (!closeNow.length) { _flightReopenPending = hasKill; if (hasKill) startFlightWatch(); resolve({ ok:true, closed:0 }); return; }
+    const namesPs  = closeNow.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
+    const reopenPs = reopen.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
+    const sf = FLIGHT_STATE();
+    const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
+      `$names=@(${namesPs}); $reopen=@(${reopenPs}); $paths=@();
+       foreach($n in $names){ $p=Get-Process -Name $n -ErrorAction SilentlyContinue;
+         if($p){ if($reopen -contains $n.ToLower()){ $paths += ($p|Where-Object{$_.Path}|Select-Object -ExpandProperty Path) }
+           $p | Stop-Process -Force -ErrorAction SilentlyContinue } }
+       ($paths|Sort-Object -Unique) | ConvertTo-Json | Set-Content -LiteralPath '${sf}'`],
+      { windowsHide:true });
+    ps.on('close', () => { LOG.info('[FLIGHT] closed: '+closeNow.join(', ')); _flightReopenPending = true; startFlightWatch(); resolve({ ok:true, closed:closeNow.length }); });
+    ps.on('error', e => resolve({ ok:false, error:e.message }));
+  } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
 
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
