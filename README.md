@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.12  Fix: the "reopen apps after the sim closes" step now actually works — it relaunches apps through their Startup shortcut when there is one (apps like Plex and the *arr suite only restart correctly that way, matching what record_clean.bat does), falling back to the saved exe path, and logs how many paths were saved/reopened
 v5.9.11  Phase 3 (part 2): the "Apps to close during flight" checkboxes now actually work — hitting Arm Capture closes your checked apps (by their mode) and ABRP reopens them when the sim closes (and kills "close only after sim" apps like Steam then). A safety net reopens anything still closed on the next ABRP launch. This makes Arm Capture a full record_clean.bat replacement (close → capture → reopen) — so don't run record_clean.bat alongside it
 v5.9.10  The "Detect running apps" button now toggles the list open/closed (was open-only) and relabels to "Hide list" while open
 v5.9.9   Settings tidy-up: the "Apps to close during flight" list is now two columns and sits up top right under Route Data Source, and every Settings section header is now click-to-collapse (state remembered). Drag-to-reorder sections is next

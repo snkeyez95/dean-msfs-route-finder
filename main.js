@@ -1026,13 +1026,25 @@ function flightReopenApps(){
       killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name); } catch(_){}
     const sf = FLIGHT_STATE();
     const killPs = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
+    // Reopen the proven record_clean.bat way: relaunch via the app's Startup shortcut when one
+    // matches (apps like the *arr suite only restart correctly that way), else Start-Process the
+    // saved exe path. State saved as plain text lines.
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
       `$kill=@(${killPs}); foreach($n in $kill){ Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
-       if(Test-Path -LiteralPath '${sf}'){ $paths=@(Get-Content -LiteralPath '${sf}' -Raw | ConvertFrom-Json);
-         foreach($p in $paths){ if($p -and (Test-Path -LiteralPath $p)){ Start-Process -FilePath $p -ErrorAction SilentlyContinue } }
-         Remove-Item -LiteralPath '${sf}' -ErrorAction SilentlyContinue }`],
+       $reopened=0
+       if(Test-Path -LiteralPath '${sf}'){
+         $closed=@(Get-Content -LiteralPath '${sf}' | Where-Object {$_ -and (Test-Path -LiteralPath $_)})
+         $dirs=@("$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup")
+         $sh=New-Object -ComObject WScript.Shell; $launched=@()
+         foreach($d in $dirs){ if(Test-Path $d){ Get-ChildItem $d -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
+           try{ $lnk=$sh.CreateShortcut($_.FullName); if($closed -contains $lnk.TargetPath){ Start-Process -FilePath $_.FullName; $launched+=$lnk.TargetPath; $reopened++ } }catch{} } } }
+         foreach($p in $closed){ if($launched -notcontains $p){ try{ Start-Process -FilePath $p; $reopened++ }catch{} } }
+         Remove-Item -LiteralPath '${sf}' -ErrorAction SilentlyContinue
+       }
+       Write-Output ('REOPENED ' + $reopened + ' / killed ' + @(${killPs}).Count)`],
       { windowsHide:true });
-    ps.on('close', () => LOG.info('[FLIGHT] reopened apps + closed end-of-flight apps'));
+    let rout=''; ps.stdout.on('data',d=>rout+=d);
+    ps.on('close', () => LOG.info('[FLIGHT] reopen: ' + rout.trim()));
     ps.on('error', e => { try{LOG.warn('[FLIGHT] reopen failed: '+e.message);}catch(_){} });
   } catch (e) { try{LOG.warn('[FLIGHT] reopen error: '+e.message);}catch(_){} }
 }
@@ -1051,9 +1063,12 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
        foreach($n in $names){ $p=Get-Process -Name $n -ErrorAction SilentlyContinue;
          if($p){ if($reopen -contains $n.ToLower()){ $paths += ($p|Where-Object{$_.Path}|Select-Object -ExpandProperty Path) }
            $p | Stop-Process -Force -ErrorAction SilentlyContinue } }
-       ($paths|Sort-Object -Unique) | ConvertTo-Json | Set-Content -LiteralPath '${sf}'`],
+       $paths=@($paths | Sort-Object -Unique)
+       $paths | Set-Content -LiteralPath '${sf}'
+       Write-Output ('SAVED ' + $paths.Count + ' reopen path(s)')`],
       { windowsHide:true });
-    ps.on('close', () => { LOG.info('[FLIGHT] closed: '+closeNow.join(', ')); _flightReopenPending = true; startFlightWatch(); resolve({ ok:true, closed:closeNow.length }); });
+    let cout=''; ps.stdout.on('data',d=>cout+=d);
+    ps.on('close', () => { LOG.info('[FLIGHT] closed: '+closeNow.join(', ')+' | '+cout.trim()); _flightReopenPending = true; startFlightWatch(); resolve({ ok:true, closed:closeNow.length }); });
     ps.on('error', e => resolve({ ok:false, error:e.message }));
   } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
