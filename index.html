@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.18</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.19</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.18</div>
+    <div class="sb-ver">v5.9.19</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2425,7 +2425,10 @@ function getRoutes(){
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
   const activeFleet=getActiveFleet();
   const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
-  const flownPairs=S.freshOnly?new Set((S.cfg.recentSimBriefRoutes||[]).map(e=>[e.dep,e.arr].sort().join('>'))):null;
+  // Fresh-routes filter hides previously-SimBriefed pairs — but NOT ones SimBriefed this session,
+  // so a route you just sent to SimBrief stays referenceable while planning; it only starts hiding
+  // next launch (S.sessionSimBrief resets each run).
+  const flownPairs=S.freshOnly?(()=>{const s=new Set((S.cfg.recentSimBriefRoutes||[]).map(e=>[e.dep,e.arr].sort().join('>')));(S.sessionSimBrief||new Set()).forEach(k=>s.delete(k));return s;})():null;
   let rs=Object.values(S.routeRegistry).filter(r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
     const dep=r.departure_airport,arr=r.arrival_airport;
@@ -3704,6 +3707,9 @@ function openSimBrief(dep,arr,type,url){
   const recent=S.cfg.recentSimBriefRoutes||[];
   const filtered=recent.filter(e=>!(e.dep===dep&&e.arr===arr));
   S.cfg.recentSimBriefRoutes=[entry,...filtered].slice(0,30);
+  // Track this pair as SimBriefed THIS session so the fresh-routes filter keeps showing it in
+  // Plan a Flight until next launch (it still appears in the dashboard recent list immediately).
+  (S.sessionSimBrief||(S.sessionSimBrief=new Set())).add([dep,arr].sort().join('>'));
   window.api.saveConfig(S.cfg);
   // pre-fill SimBrief runways from live D-ATIS when we have them
   const orw=datisActiveRwy(dep,'dep'), drw=datisActiveRwy(arr,'arr');
@@ -4839,5 +4845,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.18</div>
+  pointer-events:none;">v5.9.19</div>
 </body></html>

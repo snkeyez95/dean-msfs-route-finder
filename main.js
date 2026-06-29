@@ -1050,17 +1050,20 @@ function flightReopenApps(){
        $dirs=@("$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup")
        $sh=New-Object -ComObject WScript.Shell; $byPath=@{}; $byName=@{}
        foreach($d in $dirs){ if(Test-Path $d){ Get-ChildItem $d -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
-         try{ $lnk=$sh.CreateShortcut($_.FullName); $t=$lnk.TargetPath; if($t){ $byPath[$t.ToLower()]=$_.FullName; $bn=[System.IO.Path]::GetFileName($t).ToLower(); if(-not $byName.ContainsKey($bn)){ $byName[$bn]=$_.FullName } } }catch{} } } }
+         try{ $lnk=$sh.CreateShortcut($_.FullName); $t=$lnk.TargetPath; if($t){ $k=$t.ToLower();
+           if(-not $byPath.ContainsKey($k)){ $byPath[$k]=@() }
+           $byPath[$k]=@($byPath[$k]) + $_.FullName
+           $bn=[System.IO.Path]::GetFileName($t).ToLower(); if(-not $byName.ContainsKey($bn)){ $byName[$bn]=$_.FullName } } }catch{} } } }
        foreach($p in $paths){
          $nm=[System.IO.Path]::GetFileName($p)
          if(-not (Test-Path -LiteralPath $p)){ $log+=('MISSING:'+$nm); continue }
          if($running -contains $p.ToLower()){ $log+=('RUNNING:'+$nm); continue }
          $bn=[System.IO.Path]::GetFileName($p).ToLower()
-         $lnk = if($byPath.ContainsKey($p.ToLower())){$byPath[$p.ToLower()]} elseif($byName.ContainsKey($bn)){$byName[$bn]} else {$null}
+         $lnks = if($byPath.ContainsKey($p.ToLower())){ @($byPath[$p.ToLower()]) } elseif($byName.ContainsKey($bn)){ @($byName[$bn]) } else { @() }
          $m=''
-         if($lnk){ try{ Start-Process -FilePath $lnk; $m='shortcut' }catch{} }
-         if(-not $m){ try{ Start-Process -FilePath $p; $m='path' }catch{ $log+=('ERR:'+$nm) } }
-         if($m){ $reopened++; $log+=('OK['+$m+']:'+$nm) }
+         if($lnks.Count -gt 0){ $c2=0; foreach($l in $lnks){ try{ Start-Process -FilePath $l; $c2++ }catch{} }; if($c2 -gt 0){ $m=('shortcut x'+$c2); $reopened+=$c2 } }
+         if(-not $m){ try{ Start-Process -FilePath $p; $m='path'; $reopened++ }catch{ $log+=('ERR:'+$nm) } }
+         if($m){ $log+=('OK['+$m+']:'+$nm) }
        }
        Write-Output ('REOPENED ' + $reopened + ' / killed ' + @(${killPs}).Count + ' | ' + ($log -join '; '))`],
       { windowsHide:true });
