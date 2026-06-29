@@ -1127,7 +1127,15 @@ ipcMain.handle('perf-start-capture', () => {
     return { ok:true, how };
   } catch (e) { LOG.error('[PERF] perf-start-capture failed: ' + e.message); return { ok:false, error:e.message }; }
 });
-ipcMain.on('install-update', () => { require('electron-updater').autoUpdater.quitAndInstall(); });
+ipcMain.on('install-update', () => {
+  // Exit FAST so the NSIS installer doesn't catch ABRP mid-shutdown ("cannot be closed / Retry").
+  // electron-updater on Windows quits via the normal `before-quit` path (it does NOT emit
+  // `before-quit-for-update` — that's the macOS/Squirrel path), so set the skip-flags here: bypass
+  // the close-confirm dialog and the slow on-quit scenery cleanup. Junctions are left for the
+  // freshly-installed copy to tidy on its next normal close.
+  _perfAllowClose = true; _cleanupDone = true;
+  require('electron-updater').autoUpdater.quitAndInstall();
+});
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
 ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());
