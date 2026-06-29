@@ -1026,19 +1026,28 @@ function flightReopenApps(){
       killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name); } catch(_){}
     const sf = FLIGHT_STATE();
     const killPs = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
-    // Reopen the proven record_clean.bat way: relaunch via the app's Startup shortcut when one
-    // matches (apps like the *arr suite only restart correctly that way), else Start-Process the
-    // saved exe path. State saved as plain text lines.
+    // Reopen primarily by relaunching each app exactly how it was running (its captured exe path +
+    // command-line args) — works for any app whether or not it has a Startup shortcut. Skip anything
+    // already running (avoids duplicate instances / port clashes). Startup shortcut is only a
+    // last-ditch fallback if the direct relaunch throws.
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
       `$kill=@(${killPs}); foreach($n in $kill){ Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
        $reopened=0
        if(Test-Path -LiteralPath '${sf}'){
-         $closed=@(Get-Content -LiteralPath '${sf}' | Where-Object {$_ -and (Test-Path -LiteralPath $_)})
+         $items=@(); try{ $items=@(Get-Content -LiteralPath '${sf}' -Raw | ConvertFrom-Json) }catch{}
+         $running=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath} | Select-Object -ExpandProperty ExecutablePath)
          $dirs=@("$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup")
-         $sh=New-Object -ComObject WScript.Shell; $launched=@()
+         $sh=New-Object -ComObject WScript.Shell; $sc=@{}
          foreach($d in $dirs){ if(Test-Path $d){ Get-ChildItem $d -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
-           try{ $lnk=$sh.CreateShortcut($_.FullName); if($closed -contains $lnk.TargetPath){ Start-Process -FilePath $_.FullName; $launched+=$lnk.TargetPath; $reopened++ } }catch{} } } }
-         foreach($p in $closed){ if($launched -notcontains $p){ try{ Start-Process -FilePath $p; $reopened++ }catch{} } }
+           try{ $lnk=$sh.CreateShortcut($_.FullName); if($lnk.TargetPath){ $sc[$lnk.TargetPath.ToLower()]=$_.FullName } }catch{} } } }
+         foreach($it in $items){
+           $p=$it.path; if(-not $p -or -not (Test-Path -LiteralPath $p)){ continue }
+           if($running -contains $p){ continue }
+           $ok=$false
+           try{ if($it.args){ Start-Process -FilePath $p -ArgumentList $it.args } else { Start-Process -FilePath $p }; $ok=$true }catch{}
+           if(-not $ok -and $sc.ContainsKey($p.ToLower())){ try{ Start-Process -FilePath $sc[$p.ToLower()]; $ok=$true }catch{} }
+           if($ok){ $reopened++ }
+         }
          Remove-Item -LiteralPath '${sf}' -ErrorAction SilentlyContinue
        }
        Write-Output ('REOPENED ' + $reopened + ' / killed ' + @(${killPs}).Count)`],
@@ -1059,13 +1068,26 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
     const reopenPs = reopen.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
     const sf = FLIGHT_STATE();
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
-      `$names=@(${namesPs}); $reopen=@(${reopenPs}); $paths=@();
-       foreach($n in $names){ $p=Get-Process -Name $n -ErrorAction SilentlyContinue;
-         if($p){ if($reopen -contains $n.ToLower()){ $paths += ($p|Where-Object{$_.Path}|Select-Object -ExpandProperty Path) }
-           $p | Stop-Process -Force -ErrorAction SilentlyContinue } }
-       $paths=@($paths | Sort-Object -Unique)
-       $paths | Set-Content -LiteralPath '${sf}'
-       Write-Output ('SAVED ' + $paths.Count + ' reopen path(s)')`],
+      `$names=@(${namesPs}); $reopen=@(${reopenPs}); $items=@();
+       foreach($n in $names){ $ps=Get-Process -Name $n -ErrorAction SilentlyContinue;
+         if($ps){
+           if($reopen -contains $n.ToLower()){
+             foreach($pr in $ps){ try{
+               $ci=Get-CimInstance Win32_Process -Filter ("ProcessId="+$pr.Id) -ErrorAction SilentlyContinue
+               if($ci -and $ci.ExecutablePath){
+                 $ep=$ci.ExecutablePath; $a=''
+                 if($ci.CommandLine){ $cl=$ci.CommandLine.Trim()
+                   if($cl.StartsWith('"')){ $q=$cl.IndexOf('"',1); if($q -ge 0){ $a=$cl.Substring($q+1).Trim() } }
+                   elseif($cl.ToLower().StartsWith($ep.ToLower())){ $a=$cl.Substring($ep.Length).Trim() }
+                   else { $sp=$cl.IndexOf(' '); if($sp -ge 0){ $a=$cl.Substring($sp+1).Trim() } } }
+                 $items += [pscustomobject]@{ path=$ep; args=$a }
+               } }catch{} }
+           }
+           $ps | Stop-Process -Force -ErrorAction SilentlyContinue } }
+       $items=@($items | Sort-Object path -Unique)
+       $json = if($items.Count){ $items | ConvertTo-Json -Compress } else { '[]' }
+       $json | Set-Content -LiteralPath '${sf}'
+       Write-Output ('SAVED ' + $items.Count + ' reopen target(s)')`],
       { windowsHide:true });
     let cout=''; ps.stdout.on('data',d=>cout+=d);
     ps.on('close', () => { LOG.info('[FLIGHT] closed: '+closeNow.join(', ')+' | '+cout.trim()); _flightReopenPending = true; startFlightWatch(); resolve({ ok:true, closed:closeNow.length }); });
