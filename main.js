@@ -1026,31 +1026,34 @@ function flightReopenApps(){
       killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name); } catch(_){}
     const sf = FLIGHT_STATE();
     const killPs = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
-    // Reopen primarily by relaunching each app exactly how it was running (its captured exe path +
-    // command-line args) — works for any app whether or not it has a Startup shortcut. Skip anything
-    // already running (avoids duplicate instances / port clashes). Startup shortcut is only a
-    // last-ditch fallback if the direct relaunch throws.
+    // Reopen the proven way: a Startup shortcut when the app has one (the *arr suite / SABnzbd only
+    // restart cleanly that way), otherwise plain Start-Process of the exe path (works for Plex,
+    // qbPortWeaver, etc.). Skip anything already running (no duplicate instances / port clashes).
+    // Per-app outcome is logged so a failure points to the exact app + method.
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
       `$kill=@(${killPs}); foreach($n in $kill){ Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
-       $reopened=0
+       $reopened=0; $log=@()
        if(Test-Path -LiteralPath '${sf}'){
-         $items=@(); try{ $items=@(Get-Content -LiteralPath '${sf}' -Raw | ConvertFrom-Json) }catch{}
-         $running=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath} | Select-Object -ExpandProperty ExecutablePath)
+         $items=@(); try{ $items=@(Get-Content -LiteralPath '${sf}' -Raw | ConvertFrom-Json) }catch{ $log+='PARSE-FAIL' }
+         $running=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath} | ForEach-Object { $_.ExecutablePath.ToLower() })
          $dirs=@("$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup")
-         $sh=New-Object -ComObject WScript.Shell; $sc=@{}
+         $sh=New-Object -ComObject WScript.Shell; $byPath=@{}; $byName=@{}
          foreach($d in $dirs){ if(Test-Path $d){ Get-ChildItem $d -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
-           try{ $lnk=$sh.CreateShortcut($_.FullName); if($lnk.TargetPath){ $sc[$lnk.TargetPath.ToLower()]=$_.FullName } }catch{} } } }
+           try{ $lnk=$sh.CreateShortcut($_.FullName); $t=$lnk.TargetPath; if($t){ $byPath[$t.ToLower()]=$_.FullName; $bn=[System.IO.Path]::GetFileName($t).ToLower(); if(-not $byName.ContainsKey($bn)){ $byName[$bn]=$_.FullName } } }catch{} } } }
          foreach($it in $items){
-           $p=$it.path; if(-not $p -or -not (Test-Path -LiteralPath $p)){ continue }
-           if($running -contains $p){ continue }
-           $ok=$false
-           try{ if($it.args){ Start-Process -FilePath $p -ArgumentList $it.args } else { Start-Process -FilePath $p }; $ok=$true }catch{}
-           if(-not $ok -and $sc.ContainsKey($p.ToLower())){ try{ Start-Process -FilePath $sc[$p.ToLower()]; $ok=$true }catch{} }
-           if($ok){ $reopened++ }
+           $p=$it.path; $nm=if($p){[System.IO.Path]::GetFileName($p)}else{'?'}
+           if(-not $p -or -not (Test-Path -LiteralPath $p)){ $log+=('MISSING:'+$nm); continue }
+           if($running -contains $p.ToLower()){ $log+=('RUNNING:'+$nm); continue }
+           $bn=[System.IO.Path]::GetFileName($p).ToLower()
+           $lnk = if($byPath.ContainsKey($p.ToLower())){$byPath[$p.ToLower()]} elseif($byName.ContainsKey($bn)){$byName[$bn]} else {$null}
+           $m=''
+           if($lnk){ try{ Start-Process -FilePath $lnk; $m='shortcut' }catch{} }
+           if(-not $m){ try{ Start-Process -FilePath $p; $m='path' }catch{ $log+=('ERR:'+$nm+':'+$_.Exception.Message) } }
+           if($m){ $reopened++; $log+=('OK['+$m+']:'+$nm) }
          }
          Remove-Item -LiteralPath '${sf}' -ErrorAction SilentlyContinue
        }
-       Write-Output ('REOPENED ' + $reopened + ' / killed ' + @(${killPs}).Count)`],
+       Write-Output ('REOPENED ' + $reopened + ' / killed ' + @(${killPs}).Count + ' | ' + ($log -join '; '))`],
       { windowsHide:true });
     let rout=''; ps.stdout.on('data',d=>rout+=d);
     ps.on('close', () => LOG.info('[FLIGHT] reopen: ' + rout.trim()));
