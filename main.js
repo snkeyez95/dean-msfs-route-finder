@@ -1031,38 +1031,41 @@ function flightReopenApps(){
     try { const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
       killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name); } catch(_){}
     const sf = FLIGHT_STATE();
-    const killPs = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
-    // Reopen the proven way: a Startup shortcut when the app has one (the *arr suite / SABnzbd only
-    // restart cleanly that way), otherwise plain Start-Process of the exe path (works for Plex,
-    // qbPortWeaver, etc.). Skip anything already running (no duplicate instances / port clashes).
-    // Per-app outcome is logged so a failure points to the exact app + method.
+    // Node owns the data: read + parse the state file here (Node's JSON is reliable across any
+    // Windows PowerShell version — 5.1's `@(... | ConvertFrom-Json)` collapses an N-element array
+    // to 1, which silently broke the reopen before). Embed the paths as a PowerShell array literal,
+    // the same way the kill list is passed.
+    let paths = [];
+    try { const raw = fs.readFileSync(sf, 'utf8'); const j = JSON.parse(raw); if (Array.isArray(j)) paths = j.filter(Boolean); } catch(_){}
+    const killPs  = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
+    const pathsPs = paths.map(p=>`'${String(p).replace(/'/g,"''")}'`).join(',');
+    // PowerShell only does the OS actions: kill the kill-after apps, then for each path skip if it's
+    // already running, relaunch via a matching Startup shortcut (the *arr suite / SABnzbd) else plain
+    // exe launch (Plex, qbPortWeaver). Per-app outcome logged so any failure names the exact app.
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
       `$kill=@(${killPs}); foreach($n in $kill){ Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
+       $paths=@(${pathsPs})
        $reopened=0; $log=@()
-       if(Test-Path -LiteralPath '${sf}'){
-         $items=@(); try{ $items=@(Get-Content -LiteralPath '${sf}' -Raw | ConvertFrom-Json) }catch{ $log+='PARSE-FAIL' }
-         $running=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath} | ForEach-Object { $_.ExecutablePath.ToLower() })
-         $dirs=@("$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup")
-         $sh=New-Object -ComObject WScript.Shell; $byPath=@{}; $byName=@{}
-         foreach($d in $dirs){ if(Test-Path $d){ Get-ChildItem $d -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
-           try{ $lnk=$sh.CreateShortcut($_.FullName); $t=$lnk.TargetPath; if($t){ $byPath[$t.ToLower()]=$_.FullName; $bn=[System.IO.Path]::GetFileName($t).ToLower(); if(-not $byName.ContainsKey($bn)){ $byName[$bn]=$_.FullName } } }catch{} } } }
-         foreach($it in $items){
-           $p=$it.path; $nm=if($p){[System.IO.Path]::GetFileName($p)}else{'?'}
-           if(-not $p -or -not (Test-Path -LiteralPath $p)){ $log+=('MISSING:'+$nm); continue }
-           if($running -contains $p.ToLower()){ $log+=('RUNNING:'+$nm); continue }
-           $bn=[System.IO.Path]::GetFileName($p).ToLower()
-           $lnk = if($byPath.ContainsKey($p.ToLower())){$byPath[$p.ToLower()]} elseif($byName.ContainsKey($bn)){$byName[$bn]} else {$null}
-           $m=''
-           if($lnk){ try{ Start-Process -FilePath $lnk; $m='shortcut' }catch{} }
-           if(-not $m){ try{ Start-Process -FilePath $p; $m='path' }catch{ $log+=('ERR:'+$nm+':'+$_.Exception.Message) } }
-           if($m){ $reopened++; $log+=('OK['+$m+']:'+$nm) }
-         }
-         Remove-Item -LiteralPath '${sf}' -ErrorAction SilentlyContinue
+       $running=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath} | ForEach-Object { $_.ExecutablePath.ToLower() })
+       $dirs=@("$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup")
+       $sh=New-Object -ComObject WScript.Shell; $byPath=@{}; $byName=@{}
+       foreach($d in $dirs){ if(Test-Path $d){ Get-ChildItem $d -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
+         try{ $lnk=$sh.CreateShortcut($_.FullName); $t=$lnk.TargetPath; if($t){ $byPath[$t.ToLower()]=$_.FullName; $bn=[System.IO.Path]::GetFileName($t).ToLower(); if(-not $byName.ContainsKey($bn)){ $byName[$bn]=$_.FullName } } }catch{} } } }
+       foreach($p in $paths){
+         $nm=[System.IO.Path]::GetFileName($p)
+         if(-not (Test-Path -LiteralPath $p)){ $log+=('MISSING:'+$nm); continue }
+         if($running -contains $p.ToLower()){ $log+=('RUNNING:'+$nm); continue }
+         $bn=[System.IO.Path]::GetFileName($p).ToLower()
+         $lnk = if($byPath.ContainsKey($p.ToLower())){$byPath[$p.ToLower()]} elseif($byName.ContainsKey($bn)){$byName[$bn]} else {$null}
+         $m=''
+         if($lnk){ try{ Start-Process -FilePath $lnk; $m='shortcut' }catch{} }
+         if(-not $m){ try{ Start-Process -FilePath $p; $m='path' }catch{ $log+=('ERR:'+$nm) } }
+         if($m){ $reopened++; $log+=('OK['+$m+']:'+$nm) }
        }
        Write-Output ('REOPENED ' + $reopened + ' / killed ' + @(${killPs}).Count + ' | ' + ($log -join '; '))`],
       { windowsHide:true });
     let rout=''; ps.stdout.on('data',d=>rout+=d);
-    ps.on('close', () => LOG.info('[FLIGHT] reopen: ' + rout.trim()));
+    ps.on('close', () => { LOG.info('[FLIGHT] reopen: ' + rout.trim()); try{ fs.unlinkSync(sf); }catch(_){} });
     ps.on('error', e => { try{LOG.warn('[FLIGHT] reopen failed: '+e.message);}catch(_){} });
   } catch (e) { try{LOG.warn('[FLIGHT] reopen error: '+e.message);}catch(_){} }
 }
@@ -1075,31 +1078,30 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
     if (!closeNow.length) { _flightReopenPending = hasKill; if (hasKill) startFlightWatch(); resolve({ ok:true, closed:0 }); return; }
     const namesPs  = closeNow.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
     const reopenPs = reopen.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
-    const sf = FLIGHT_STATE();
+    // PowerShell does the OS work only: for each close-reopen app, emit its exe path to stdout
+    // (RPATH|<path>), then stop every targeted process. Node parses stdout and writes the state file
+    // itself — no PowerShell-side JSON/file round-trip (that was the 5.1 read-back bug).
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
-      `$names=@(${namesPs}); $reopen=@(${reopenPs}); $items=@();
-       foreach($n in $names){ $ps=Get-Process -Name $n -ErrorAction SilentlyContinue;
-         if($ps){
+      `$names=@(${namesPs}); $reopen=@(${reopenPs});
+       foreach($n in $names){ $procs=Get-Process -Name $n -ErrorAction SilentlyContinue;
+         if($procs){
            if($reopen -contains $n.ToLower()){
-             foreach($pr in $ps){ try{
-               $ci=Get-CimInstance Win32_Process -Filter ("ProcessId="+$pr.Id) -ErrorAction SilentlyContinue
-               if($ci -and $ci.ExecutablePath){
-                 $ep=$ci.ExecutablePath; $a=''
-                 if($ci.CommandLine){ $cl=$ci.CommandLine.Trim()
-                   if($cl.StartsWith('"')){ $q=$cl.IndexOf('"',1); if($q -ge 0){ $a=$cl.Substring($q+1).Trim() } }
-                   elseif($cl.ToLower().StartsWith($ep.ToLower())){ $a=$cl.Substring($ep.Length).Trim() }
-                   else { $sp=$cl.IndexOf(' '); if($sp -ge 0){ $a=$cl.Substring($sp+1).Trim() } } }
-                 $items += [pscustomobject]@{ path=$ep; args=$a }
-               } }catch{} }
+             foreach($pr in $procs){ try{
+               $ep=$pr.Path
+               if(-not $ep){ $ci=Get-CimInstance Win32_Process -Filter ("ProcessId="+$pr.Id) -ErrorAction SilentlyContinue; if($ci){ $ep=$ci.ExecutablePath } }
+               if($ep){ Write-Output ('RPATH|'+$ep) }
+             }catch{} }
            }
-           $ps | Stop-Process -Force -ErrorAction SilentlyContinue } }
-       $items=@($items | Sort-Object path -Unique)
-       $json = if($items.Count){ $items | ConvertTo-Json -Compress } else { '[]' }
-       $json | Set-Content -LiteralPath '${sf}'
-       Write-Output ('SAVED ' + $items.Count + ' reopen target(s)')`],
+           $procs | Stop-Process -Force -ErrorAction SilentlyContinue } }`],
       { windowsHide:true });
     let cout=''; ps.stdout.on('data',d=>cout+=d);
-    ps.on('close', () => { LOG.info('[FLIGHT] closed: '+closeNow.join(', ')+' | '+cout.trim()); _flightReopenPending = true; startFlightWatch(); resolve({ ok:true, closed:closeNow.length }); });
+    ps.on('close', () => {
+      const reopenPaths = [...new Set(cout.split(/\r?\n/).filter(l=>l.indexOf('RPATH|')===0).map(l=>l.slice(6).trim()).filter(Boolean))];
+      try { fs.writeFileSync(FLIGHT_STATE(), JSON.stringify(reopenPaths)); } catch(e){ try{LOG.warn('[FLIGHT] state write failed: '+e.message);}catch(_){} }
+      LOG.info('[FLIGHT] closed: '+closeNow.join(', ')+' | SAVED '+reopenPaths.length+' reopen target(s)');
+      _flightReopenPending = true; startFlightWatch();
+      resolve({ ok:true, closed:closeNow.length });
+    });
     ps.on('error', e => resolve({ ok:false, error:e.message }));
   } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
