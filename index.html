@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.9</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.10</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.9</div>
+    <div class="sb-ver">v5.9.10</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -661,7 +661,7 @@ html[data-theme="light"] .theme-knob{left:30px}
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-s" style="margin-bottom:12px">Background apps closed before a logged flight (so they don't steal CPU and pollute your smoothness data) and reopened after. Toggle which to close and how. Seeded from your record_clean setup &mdash; edit freely. <span style="color:var(--acc)">Takes effect once one-click Quick-Launch capture is wired in (next step).</span></div>
     <div id="flight-apps-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-bottom:12px"></div>
-    <button class="btn bg bsm" onclick="detectFlightApps()">&#128269; Detect running apps</button>
+    <button class="btn bg bsm" id="detect-apps-btn" onclick="detectFlightApps()">&#128269; Detect running apps</button>
     <div id="flight-apps-detect" style="display:none;margin-top:10px"></div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">GSX Pro</div>
@@ -3537,9 +3537,15 @@ function renderFlightApps(){
 function toggleFlightApp(i,on){ if(S.cfg.flightCloseApps[i]){S.cfg.flightCloseApps[i].enabled=on;window.api.saveConfig(S.cfg);} }
 function setFlightAppMode(i,m){ if(S.cfg.flightCloseApps[i]){S.cfg.flightCloseApps[i].mode=m;window.api.saveConfig(S.cfg);} }
 function removeFlightApp(i){ S.cfg.flightCloseApps.splice(i,1); window.api.saveConfig(S.cfg); renderFlightApps(); }
-async function detectFlightApps(){
+function detectFlightApps(){ // button toggles the detect list open/closed
   const wrap=document.getElementById('flight-apps-detect'); if(!wrap)return;
-  wrap.style.display='block'; wrap.innerHTML='<div style="font-size:12px;color:var(--ink3)">Scanning&hellip;</div>';
+  const btn=document.getElementById('detect-apps-btn');
+  if(wrap.style.display==='block'){ wrap.style.display='none'; if(btn)btn.innerHTML='&#128269; Detect running apps'; return; }
+  wrap.style.display='block'; if(btn)btn.innerHTML='&#128269; Hide list'; refreshDetectList();
+}
+async function refreshDetectList(){
+  const wrap=document.getElementById('flight-apps-detect'); if(!wrap)return;
+  wrap.innerHTML='<div style="font-size:12px;color:var(--ink3)">Scanning&hellip;</div>';
   let r; try{ r=await window.api.listRunningApps(); }catch(e){ r={ok:false}; }
   if(!r||!r.ok||!r.apps||!r.apps.length){ wrap.innerHTML='<div style="font-size:12px;color:var(--ink3)">Could not list running apps.</div>'; return; }
   const have=new Set((S.cfg.flightCloseApps||[]).map(a=>String(a.name).toLowerCase()));
@@ -3555,7 +3561,7 @@ function addDetectedApp(idx){ const a=_detectedApps[idx]; if(!a)return;
   if(!Array.isArray(S.cfg.flightCloseApps))S.cfg.flightCloseApps=[];
   if(S.cfg.flightCloseApps.some(x=>String(x.name).toLowerCase()===String(a.name).toLowerCase()))return;
   S.cfg.flightCloseApps.push({name:a.name,mode:'close-reopen',enabled:true});
-  window.api.saveConfig(S.cfg); renderFlightApps(); detectFlightApps();
+  window.api.saveConfig(S.cfg); renderFlightApps(); refreshDetectList();
 }
 
 // ── COLLAPSIBLE SETTINGS SECTIONS ─────────────────────────────────────────────
@@ -4829,5 +4835,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.9</div>
+  pointer-events:none;">v5.9.10</div>
 </body></html>

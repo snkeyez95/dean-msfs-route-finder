@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.10  The "Detect running apps" button now toggles the list open/closed (was open-only) and relabels to "Hide list" while open
 v5.9.9   Settings tidy-up: the "Apps to close during flight" list is now two columns and sits up top right under Route Data Source, and every Settings section header is now click-to-collapse (state remembered). Drag-to-reorder sections is next
 v5.9.8   Phase 3 (part 1): new "Apps to close during flight" section in Settings — choose which background apps get closed before a logged flight and how (close & reopen / close, don't reopen / close only after the sim), plus a "Detect running apps" picker. Seeded from your record_clean setup and fully editable. Config-only for now; the actual close/reopen wires into one-click Quick-Launch capture next
 v5.9.7   Phase 2 close-out: PresentMon is now bundled inside the engine exe (capture is fully self-contained — no external tools or Python needed), and ABRP now shows a "MSFS is running — confirm close?" prompt if you close it mid-flight (your capture keeps running regardless, since it runs detached). Phase 2 done: ABRP bundles and starts performance captures on its own
