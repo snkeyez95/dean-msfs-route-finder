@@ -133,6 +133,7 @@ function seedPerfLibs(){
     }
   }catch(e){ try{LOG.warn('seedPerfLibs failed: '+e.message);}catch(_){} }
 }
+let _perfAllowClose = false;
 function createWindow() {
   seedPerfLibs();
   win = new BrowserWindow({
@@ -142,6 +143,20 @@ function createWindow() {
       preload: path.join(__dirname,'preload.js'),
       contextIsolation:true, nodeIntegration:false
     }
+  });
+  // "Sim is running — confirm close" guard (Dean's ask). Capture runs detached, so closing
+  // ABRP never affects it; this is just a deliberate heads-up.
+  win.on('close', (e) => {
+    if (_perfAllowClose) return;
+    let simUp = false; try { simUp = isMsfsRunning(); } catch (_) {}
+    if (!simUp) return;
+    e.preventDefault();
+    const choice = dialog.showMessageBoxSync(win, {
+      type:'question', buttons:['Close ABRP','Cancel'], defaultId:0, cancelId:1, noLink:true,
+      title:'MSFS is running', message:'MSFS 2024 is still running.',
+      detail:'Closing ABRP is fine — any active performance capture runs independently and will keep recording, filing on its own when you close the sim. Close ABRP now?'
+    });
+    if (choice === 0) { _perfAllowClose = true; win.close(); }
   });
   win.loadFile('index.html');
   win.webContents.once('did-finish-load', checkForUpdate);
