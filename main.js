@@ -1250,6 +1250,27 @@ foreach($ver in 'MSFS2020','MSFS2024'){ $base=Join-Path $wasm $ver
   } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
 
+// Maintenance version watcher inputs: current GPU driver (nvidia-smi) + MSFS Steam build id (changes
+// on every sim update). The renderer compares these to the last-seen values it has stored and prompts
+// to clear the right caches when either changed. Read-only; never throws.
+ipcMain.handle('get-maintenance-versions', () => {
+  let driver = null, simBuild = null;
+  try {
+    const r = require('child_process').spawnSync('nvidia-smi', ['--query-gpu=driver_version','--format=csv,noheader'],
+      { encoding:'utf8', timeout:6000, windowsHide:true });
+    const d = ((r.stdout||'').split(/\r?\n/)[0] || '').trim();
+    if (d) driver = d;
+  } catch(_){}
+  try {
+    const roots = ['C:\\Program Files (x86)\\Steam','C:\\Program Files\\Steam','D:\\Steam','D:\\SteamLibrary','E:\\Steam','E:\\SteamLibrary'];
+    for (const root of roots) {
+      const acf = root + '\\steamapps\\appmanifest_2537590.acf';
+      try { if (fs.existsSync(acf)) { const m = fs.readFileSync(acf,'utf8').match(/"buildid"\s+"(\d+)"/); if (m) { simBuild = m[1]; break; } } } catch(_){}
+    }
+  } catch(_){}
+  return { driver, simBuild };
+});
+
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine
