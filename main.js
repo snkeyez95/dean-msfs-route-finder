@@ -591,6 +591,32 @@ function pkgIsPackageDir(dir){
 
 ipcMain.handle('pkg-default-roots', () => pkgDefaultRoots());
 
+// Read PMDG/Fenix aircraft versions from the aircraft library (config root or default). Returns a
+// per-vendor signature ("pkg:version|pkg:version", sorted) so the maintenance watcher can detect an
+// aircraft update. Excludes -liveries packages (liveries hold no WASM, so they don't warrant a clean).
+function readAircraftVersions(aircraftRoot){
+  const out = { pmdg:null, fenix:null };
+  try {
+    const dir = pkgResolveRoot(aircraftRoot, 'aircraft');
+    if(!fs.existsSync(dir)) return out;
+    const pmdg = [], fenix = [];
+    for(const g of pkgScanGroups(dir)){
+      for(const p of (g.packages||[])){
+        const n = (p.name||'').toLowerCase();
+        if(n.includes('liveries')) continue;
+        const vendor = n.startsWith('pmdg-aircraft-') ? 'pmdg' : n.startsWith('fnx-aircraft-') ? 'fenix' : null;
+        if(!vendor) continue;
+        let ver = '';
+        try { const m = fs.readFileSync(path.join(p.abs,'manifest.json'),'utf8').match(/"package_version"\s*:\s*"([^"]+)"/); ver = m ? m[1] : ''; } catch(_){}
+        (vendor==='pmdg'?pmdg:fenix).push(p.name+':'+ver);
+      }
+    }
+    if(pmdg.length)  out.pmdg  = pmdg.sort().join('|');
+    if(fenix.length) out.fenix = fenix.sort().join('|');
+  } catch(_){}
+  return out;
+}
+
 // Walk a package root and return its groups (folders directly holding >=1 package).
 function pkgScanGroups(dir){
   const groups = [];
@@ -1253,7 +1279,7 @@ foreach($ver in 'MSFS2020','MSFS2024'){ $base=Join-Path $wasm $ver
 // Maintenance version watcher inputs: current GPU driver (nvidia-smi) + MSFS Steam build id (changes
 // on every sim update). The renderer compares these to the last-seen values it has stored and prompts
 // to clear the right caches when either changed. Read-only; never throws.
-ipcMain.handle('get-maintenance-versions', () => {
+ipcMain.handle('get-maintenance-versions', (_, aircraftRoot) => {
   let driver = null, simBuild = null;
   try {
     const r = require('child_process').spawnSync('nvidia-smi', ['--query-gpu=driver_version','--format=csv,noheader'],
@@ -1268,7 +1294,8 @@ ipcMain.handle('get-maintenance-versions', () => {
       try { if (fs.existsSync(acf)) { const m = fs.readFileSync(acf,'utf8').match(/"buildid"\s+"(\d+)"/); if (m) { simBuild = m[1]; break; } } } catch(_){}
     }
   } catch(_){}
-  return { driver, simBuild };
+  const ac = readAircraftVersions(aircraftRoot);
+  return { driver, simBuild, pmdg: ac.pmdg, fenix: ac.fenix };
 });
 
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.

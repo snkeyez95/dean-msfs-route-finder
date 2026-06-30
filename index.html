@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.36</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.37</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.36</div>
+    <div class="sb-ver">v5.9.37</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3991,30 +3991,38 @@ async function clearWasmCache(vendor){
 // On launch, compare the current GPU driver + MSFS Steam build to the last-seen values; if either
 // changed, banner-prompt to clear the right caches. First run seeds silently (no false prompt).
 async function checkMaintenanceVersions(){
-  let mv; try{ mv=await window.api.getMaintenanceVersions(); }catch(e){ return; }
+  let mv; try{ mv=await window.api.getMaintenanceVersions(S.cfg.aircraftFolder||''); }catch(e){ return; }
   if(!mv)return;
+  const snap={driver:mv.driver||null,simBuild:mv.simBuild||null,pmdg:mv.pmdg||null,fenix:mv.fenix||null};
   const last=S.cfg.maintLastSeen;
-  if(!last||(!last.driver&&!last.simBuild)){
-    S.cfg.maintLastSeen={driver:mv.driver||null,simBuild:mv.simBuild||null};
+  if(!last||(!last.driver&&!last.simBuild&&!last.pmdg&&!last.fenix)){
+    S.cfg.maintLastSeen=snap;
     try{ await window.api.saveConfig(S.cfg); }catch(e){}
     return;
   }
   const driverChanged=!!(mv.driver&&last.driver&&mv.driver!==last.driver);
-  const simChanged=!!(mv.simBuild&&last.simBuild&&mv.simBuild!==last.simBuild);
-  if(driverChanged||simChanged){
+  const simChanged   =!!(mv.simBuild&&last.simBuild&&mv.simBuild!==last.simBuild);
+  const pmdgChanged  =!!(mv.pmdg&&last.pmdg&&mv.pmdg!==last.pmdg);
+  const fenixChanged =!!(mv.fenix&&last.fenix&&mv.fenix!==last.fenix);
+  if(driverChanged||simChanged||pmdgChanged||fenixChanged){
     const b=document.getElementById('maint-banner'), m=document.getElementById('maint-msg');
     if(b&&m){
-      const parts=[]; if(simChanged)parts.push('a Sim Update'); if(driverChanged)parts.push('a GPU driver update');
-      const rec=simChanged?'clearing the shader cache + PMDG/Fenix WASM is recommended':'clearing the shader cache is recommended';
-      m.textContent='🔧 Detected '+parts.join(' and ')+' since you last opened ABRP — '+rec+'.';
-      b._mv=mv; b.style.display='flex';
+      const parts=[];
+      if(simChanged)parts.push('a Sim Update'); if(driverChanged)parts.push('a GPU driver update');
+      if(pmdgChanged)parts.push('a PMDG update'); if(fenixChanged)parts.push('a Fenix update');
+      let recSet=[];
+      if(simChanged){ recSet=['shader cache','PMDG WASM','Fenix WASM']; }
+      else { if(driverChanged)recSet.push('shader cache'); if(pmdgChanged)recSet.push('PMDG WASM'); if(fenixChanged)recSet.push('Fenix WASM'); }
+      const recs=recSet.filter((v,i,a)=>a.indexOf(v)===i);
+      m.textContent='🔧 Detected '+parts.join(', ')+' since you last opened ABRP — recommended: clear '+recs.join(' + ')+'.';
+      b._mv=snap; b.style.display='flex';
     }
   }
 }
 async function maintAck(){
   const b=document.getElementById('maint-banner'); if(!b)return;
   const mv=b._mv||{}, prev=S.cfg.maintLastSeen||{};
-  S.cfg.maintLastSeen={driver:mv.driver||prev.driver||null,simBuild:mv.simBuild||prev.simBuild||null};
+  S.cfg.maintLastSeen={driver:mv.driver||prev.driver||null,simBuild:mv.simBuild||prev.simBuild||null,pmdg:mv.pmdg||prev.pmdg||null,fenix:mv.fenix||prev.fenix||null};
   try{ await window.api.saveConfig(S.cfg); }catch(e){}
   b.style.display='none';
 }
@@ -5125,5 +5133,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.36</div>
+  pointer-events:none;">v5.9.37</div>
 </body></html>
