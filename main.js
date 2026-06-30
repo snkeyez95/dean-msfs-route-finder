@@ -992,6 +992,41 @@ ipcMain.handle('perf-list-sessions', () => {
     return { ok:false, reason:e.message, sessions:[] };
   }
 });
+
+// Per-flight metrics for the Compare view. Reads index.json + each flight's summary.json (avg_vram
+// lives there; index.json only carries peak). Reads only the tiny summaries, so Compare survives raw
+// frametimes.csv cleanup. Returns a flat array of flight metric records.
+ipcMain.handle('perf-compare-data', () => {
+  try {
+    const sdir    = path.join(USER_DATA, 'Sessions');
+    const idxPath = path.join(sdir, 'index.json');
+    if (!fs.existsSync(idxPath)) return { ok:false, reason:'no-data', flights:[] };
+    const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
+    const flights = (data.sessions || []).map(s => {
+      let avg_vram_mb = null;
+      try {
+        const folder = (s.folder || '').replace(/\//g, '\\');
+        const sp = path.join(sdir, folder, 'summary.json');
+        if (folder && fs.existsSync(sp)) {
+          const sj = JSON.parse(fs.readFileSync(sp, 'utf8'));
+          if (sj && sj.vram && sj.vram.avg_vram_mb != null) avg_vram_mb = sj.vram.avg_vram_mb;
+        }
+      } catch(_){}
+      return {
+        session_id: s.session_id || null, aircraft: s.aircraft || null,
+        tlod: s.tlod ?? null, olod: s.olod ?? null,
+        sim_version: s.sim_version || null, driver_version: s.driver_version || null,
+        p99_ft_ms: s.p99_ft_ms ?? null, stutter_pct: s.stutter_pct ?? null,
+        consistency_pct: s.consistency_pct ?? null, peak_vram_mb: s.peak_vram_mb ?? null,
+        avg_vram_mb, route: s.route || null
+      };
+    });
+    return { ok:true, flights };
+  } catch (e) {
+    LOG.error('perf-compare-data failed: ' + e.message);
+    return { ok:false, reason:e.message, flights:[] };
+  }
+});
 ipcMain.handle('perf-open-path', (_, p) => {
   try { if (p) shell.openPath(p); return { ok:true }; }
   catch (e) { return { ok:false, error:e.message }; }

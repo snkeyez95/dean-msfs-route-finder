@@ -341,7 +341,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.23</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.24</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -371,7 +371,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.23</div>
+    <div class="sb-ver">v5.9.24</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3498,16 +3498,101 @@ async function renderPerfPane(){
   const n=res.sessions.length;
   el.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
     +'<button class="btn bg bsm" onclick="perfShowDashboard()" title="Back to the combined dashboard">&#128202; Dashboard</button>'
+    +'<button class="btn bg bsm" onclick="perfShowCompare()" title="Compare your flights grouped by sim version, GPU driver, aircraft, or TLOD — see whether the numbers actually change">&#9878; Compare</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
-    +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>';
+    +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
+    +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
   perfShowDashboard();
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
-function perfShowDashboard(){ const fr=document.getElementById('perf-frame'); if(fr&&_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } }
+function perfShowDashboard(){ const cmp=document.getElementById('perf-compare'); if(cmp)cmp.style.display='none'; const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
+
+// ── COMPARE VIEW ─────────────────────────────────────────────────────────────
+// Group logged flights by one factor (sim version / driver / aircraft / TLOD) and show whether the
+// metrics actually change. Reads only the small per-flight summaries (survives raw-CSV cleanup).
+let _cmpData=null;
+const _cmpState={dim:'aircraft',fAircraft:'',fTlod:''};
+// metric defs: key, label, unit, lowerIsBetter, decimals
+const _cmpMetrics=[
+  {k:'p99_ft_ms',     label:'P99 frametime', unit:'ms', low:true,  dec:2},
+  {k:'stutter_pct',   label:'Stutter',       unit:'%',  low:true,  dec:2},
+  {k:'consistency_pct',label:'Consistency',  unit:'%',  low:false, dec:1},
+  {k:'avg_vram_mb',   label:'Avg VRAM',      unit:'MB', low:true,  dec:0},
+  {k:'peak_vram_mb',  label:'Peak VRAM',     unit:'MB', low:true,  dec:0},
+];
+const _cmpDimLabel={sim_version:'Sim version',driver_version:'GPU driver',aircraft:'Aircraft',tlod:'TLOD'};
+async function perfShowCompare(){
+  const fr=document.getElementById('perf-frame'); if(fr)fr.style.display='none';
+  const cmp=document.getElementById('perf-compare'); if(!cmp)return; cmp.style.display='block';
+  cmp.innerHTML='<div style="font-size:13px;color:var(--ink3)">Loading flights&hellip;</div>';
+  let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
+  _cmpData=(r&&r.ok&&Array.isArray(r.flights))?r.flights:[];
+  renderCompare();
+}
+function _cmpMean(rows,k){ const v=rows.map(x=>x[k]).filter(x=>x!=null&&!isNaN(x)); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; }
+function renderCompare(){
+  const cmp=document.getElementById('perf-compare'); if(!cmp)return;
+  const all=_cmpData||[];
+  if(!all.length){ cmp.innerHTML='<div style="font-size:13px;color:var(--ink3)">No flights to compare yet.</div>'; return; }
+  // distinct filter options
+  const acs=[...new Set(all.map(f=>f.aircraft).filter(Boolean))].sort();
+  const tls=[...new Set(all.map(f=>f.tlod).filter(x=>x!=null))].sort((a,b)=>a-b);
+  // apply filters (to control confounds)
+  let flights=all.slice();
+  if(_cmpState.fAircraft) flights=flights.filter(f=>f.aircraft===_cmpState.fAircraft);
+  if(_cmpState.fTlod!=='') flights=flights.filter(f=>String(f.tlod)===String(_cmpState.fTlod));
+  // group by dimension
+  const dim=_cmpState.dim;
+  const groupsMap=new Map();
+  for(const f of flights){ const key=(f[dim]==null?'—':String(f[dim])); if(!groupsMap.has(key))groupsMap.set(key,[]); groupsMap.get(key).push(f); }
+  let groups=[...groupsMap.entries()].map(([key,rows])=>({key,rows,n:rows.length}));
+  // sort groups: numeric dims ascending, else by key
+  groups.sort((a,b)=>{ const na=parseFloat(a.key),nb=parseFloat(b.key); if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.key.localeCompare(b.key); });
+  const sel=(id,val,opts)=>'<select id="'+id+'" onchange="cmpOnChange()" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:4px 8px;font-size:12px;font-family:\'Inter\',sans-serif">'+opts.map(o=>'<option value="'+o.v+'"'+(String(o.v)===String(val)?' selected':'')+'>'+o.t+'</option>').join('')+'</select>';
+  const dimOpts=Object.keys(_cmpDimLabel).map(k=>({v:k,t:_cmpDimLabel[k]}));
+  const acOpts=[{v:'',t:'All aircraft'}].concat(acs.map(a=>({v:a,t:a})));
+  const tlOpts=[{v:'',t:'All TLOD'}].concat(tls.map(t=>({v:t,t:'TLOD '+t})));
+  let html='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">'
+    +'<span style="font-size:15px;font-weight:700;color:var(--ink1)">Compare</span>'
+    +'<span style="font-size:12px;color:var(--ink3)">group by</span>'+sel('cmp-dim',dim,dimOpts)
+    +'<span style="font-size:12px;color:var(--ink3);margin-left:6px">holding</span>'+sel('cmp-fac',_cmpState.fAircraft,acOpts)+sel('cmp-ftl',_cmpState.fTlod,tlOpts)
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-bottom:14px">'+flights.length+' of '+all.length+' flights · '+groups.length+' group'+(groups.length!==1?'s':'')+' · averages per group. Hold aircraft + TLOD constant for a clean sim/driver comparison.</div>';
+  if(!groups.length){ html+='<div style="font-size:13px;color:var(--ink3)">No flights match those filters.</div>'; cmp.innerHTML=html; return; }
+  // palette
+  const colors=['var(--acc)','#4ea1ff','#46c46a','#e0823c','#b07cff','#e23','#3cc7c4'];
+  for(const m of _cmpMetrics){
+    const vals=groups.map(g=>({g,v:_cmpMean(g.rows,m.k)}));
+    const present=vals.filter(x=>x.v!=null);
+    if(!present.length) continue;
+    const max=Math.max(...present.map(x=>x.v));
+    const best=m.low?Math.min(...present.map(x=>x.v)):Math.max(...present.map(x=>x.v));
+    html+='<div style="margin-bottom:18px"><div style="font-size:13px;font-weight:600;color:var(--ink1);margin-bottom:7px">'+m.label+' <span style="font-weight:400;color:var(--ink3);font-size:11px">('+m.unit+' · '+(m.low?'lower is better':'higher is better')+')</span></div>';
+    vals.forEach((x,i)=>{
+      const has=x.v!=null;
+      const pct=has&&max>0?Math.max(2,(x.v/max)*100):0;
+      const isBest=has&&Math.abs(x.v-best)<1e-9&&present.length>1;
+      const col=colors[i%colors.length];
+      html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">'
+        +'<span style="flex:0 0 130px;font-size:12px;color:var(--ink2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+x.g.key+'">'+x.g.key+' <span style="color:var(--ink3)">('+x.g.n+')</span></span>'
+        +'<div style="flex:1;height:18px;background:var(--bg);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:5px;transition:width .3s"></div></div>'
+        +'<span style="flex:0 0 92px;font-size:12px;color:var(--ink1);font-family:\'JetBrains Mono\',monospace">'+(has?x.v.toFixed(m.dec)+(isBest?' ★':''):'—')+'</span>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  html+='<div style="font-size:11px;color:var(--ink3);margin-top:6px">★ = best in that metric. For a narrative deep-dive (e.g. "did the sim update actually help?"), ask in chat — the flight-analysis skill reads this same data.</div>';
+  cmp.innerHTML=html;
+}
+function cmpOnChange(){
+  const d=document.getElementById('cmp-dim'), a=document.getElementById('cmp-fac'), t=document.getElementById('cmp-ftl');
+  if(d)_cmpState.dim=d.value; if(a)_cmpState.fAircraft=a.value; if(t)_cmpState.fTlod=t.value;
+  renderCompare();
+}
 async function perfArmCapture(){
   const apps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
   const n=apps.length;
@@ -4911,5 +4996,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.23</div>
+  pointer-events:none;">v5.9.24</div>
 </body></html>

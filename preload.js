@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('api', {
   perfStartCapture:   ()    => ipcRenderer.invoke('perf-start-capture'),
   perfPrepNext:       ()    => ipcRenderer.invoke('perf-prep-next'),
   perfCaptureStatus:  ()    => ipcRenderer.invoke('perf-capture-status'),
+  perfCompareData:    ()    => ipcRenderer.invoke('perf-compare-data'),
   listRunningApps:    ()    => ipcRenderer.invoke('list-running-apps'),
   flightCloseApps:    (a)   => ipcRenderer.invoke('flight-close-apps', a),
   isPackaged:         () => __dirname.includes('app.asar'),
