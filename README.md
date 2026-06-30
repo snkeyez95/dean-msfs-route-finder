@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.31  New Settings → MSFS Maintenance → Shader Cache Cleaner: one button clears the MSFS / NVIDIA / DX12 / Steam shader caches (7 locations, ported from Clear_MSFS2024_ShaderCache.bat). Guards against running while MSFS is open, reports what it cleared, and shows the before/after manual steps (disable + re-enable NVIDIA Shader Cache, reboot). The auto-prompt when a sim or driver version change is detected comes next
 v5.9.30  Companion Apps: new per-app "close on sim exit" checkbox — tick it on any companion you launch (Navigraph Charts, vPilot, etc.) and ABRP auto-closes it when MSFS closes. Works whether you start via Quick Launch or Launch + Capture (it folds into the same sim-close watcher that reopens your background apps)
 v5.9.29  Fix: re-arming a capture (e.g. hitting Arm Capture after a Launch + Capture had already closed your apps) no longer wipes the app-reopen list. The close now MERGES with the existing saved list instead of overwriting it — so a re-arm that finds nothing left to close keeps your original apps queued to reopen. (Found when a salvaged flight left apps closed and none came back.)
 v5.9.28  Plan a Flight (from the audit): region filters expanded from just Europe + North America to the whole world — added Central America, South America, Asia, Middle East, Africa, and Oceania, each mapped by ICAO region prefix. The mapping is now data-driven so it's easy to extend

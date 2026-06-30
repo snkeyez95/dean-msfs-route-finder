@@ -1174,6 +1174,41 @@ ipcMain.handle('flight-watch-companions', () => {
   catch (e) { return { ok:false, error:e.message }; }
 });
 
+// MSFS shader-cache cleaner (ported from Clear_MSFS2024_ShaderCache.bat). Clears the CONTENTS of the
+// 7 cache locations (keeps the folders); caches regenerate. Hard-guards on any MSFS process running.
+// Destructive — the renderer MUST confirm first. Manual pre/post steps (disable+re-enable NVIDIA
+// shader cache, reboot) are surfaced as on-screen notes, not automated.
+ipcMain.handle('clear-shader-cache', () => new Promise((resolve) => {
+  try {
+    const cp = require('child_process');
+    const running = [];
+    for (const pn of ['FlightSimulator2024.exe','sunrisex64_steam_pcr.exe','kittyhawkx64.exe']) {
+      try { const r = cp.spawnSync('tasklist',['/FI','IMAGENAME eq '+pn,'/NH'],{encoding:'utf8',timeout:6000,windowsHide:true});
+        if ((r.stdout||'').toLowerCase().includes(pn.toLowerCase())) running.push(pn); } catch(_){}
+    }
+    if (running.length) { resolve({ ok:false, blocked:true, running }); return; }
+    const ps = `$cleared=@(); $skipped=@()
+$targets=@("$env:LOCALAPPDATA\\NVIDIA\\DXCache","$env:LOCALAPPDATA\\NVIDIA\\GLCache","$env:LOCALAPPDATA\\NVIDIA Corporation\\NV_Cache","$env:LOCALAPPDATA\\D3DSCache","$env:APPDATA\\Microsoft Flight Simulator 2024\\SceneCache","$env:APPDATA\\Microsoft Flight Simulator 2024\\cache")
+foreach($t in $targets){ if(Test-Path -LiteralPath $t){ try{ Get-ChildItem -LiteralPath $t -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; $cleared+=$t }catch{ $skipped+=$t } } else { $skipped+=$t } }
+$steamRoots=@("C:\\Program Files (x86)\\Steam","C:\\Program Files\\Steam","D:\\Steam","D:\\SteamLibrary","E:\\Steam","E:\\SteamLibrary")
+$sFound=$false
+foreach($r in $steamRoots){ $sp=Join-Path $r "steamapps\\shadercache\\2537590"; if(Test-Path -LiteralPath $sp){ try{ Get-ChildItem -LiteralPath $sp -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; $cleared+=$sp; $sFound=$true }catch{} } }
+if(-not $sFound){ $skipped+="Steam shadercache 2537590 (not at common paths)" }
+foreach($c in $cleared){ Write-Output ("OK|"+$c) }
+foreach($s in $skipped){ Write-Output ("SKIP|"+$s) }`;
+    const proc = spawn('powershell',['-NoProfile','-NonInteractive','-Command',ps],{windowsHide:true});
+    let out=''; proc.stdout.on('data',d=>out+=d); proc.stderr.on('data',d=>out+=d);
+    proc.on('close', () => {
+      const lines = out.split(/\r?\n/);
+      const cleared = lines.filter(l=>l.indexOf('OK|')===0).map(l=>l.slice(3));
+      const skipped = lines.filter(l=>l.indexOf('SKIP|')===0).map(l=>l.slice(5));
+      LOG.info('[CACHE] shader cache cleared '+cleared.length+' / skipped '+skipped.length);
+      resolve({ ok:true, cleared, skipped });
+    });
+    proc.on('error', e => resolve({ ok:false, error:e.message }));
+  } catch (e) { resolve({ ok:false, error:e.message }); }
+}));
+
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine

@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('api', {
   listRunningApps:    ()    => ipcRenderer.invoke('list-running-apps'),
   flightCloseApps:    (a)   => ipcRenderer.invoke('flight-close-apps', a),
   flightWatchCompanions: () => ipcRenderer.invoke('flight-watch-companions'),
+  clearShaderCache:   ()    => ipcRenderer.invoke('clear-shader-cache'),
   isPackaged:         () => __dirname.includes('app.asar'),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available',   (_, ver) => cb(ver)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded',  (_, ver) => cb(ver)),
