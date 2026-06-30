@@ -3,7 +3,7 @@
 // _ref_charts.json (real Python). SVG compared byte-for-byte; series compared numerically (json float
 // repr differs across langs, the values don't). Run `python _ref_charts.py` first.
 const fs = require('fs'), path = require('path');
-const { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml } = require('./report_charts.js');
+const { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, displayRoute, readTelemetry, chartAltitudeSeries } = require('./report_charts.js');
 
 const sdir = path.join(process.env.APPDATA, 'A Better Route Planner', 'Sessions');
 const ref = JSON.parse(fs.readFileSync(path.join(__dirname, '_ref_charts.json'), 'utf8'));
@@ -12,9 +12,17 @@ const { ft } = readChronological(path.join(sdir, folder, 'frametimes.csv'));
 const summary = JSON.parse(fs.readFileSync(path.join(sdir, folder, 'summary.json'), 'utf8'));
 const phases = summary.smoothness.phases;
 
-const [maxpts, meanpts] = chartFrametimeSeries(ft);
+const [maxpts, meanpts, total] = chartFrametimeSeries(ft);
 const roll = rollingMeanSeries(meanpts);
 const diffs = [];
+// altitude series + telemetry + display_route
+const sessionDir = path.join(sdir, folder);
+const alt = chartAltitudeSeries(sessionDir, total);
+const tel = readTelemetry(sessionDir);
+if((alt ? alt.length : 0) !== ref.alt_len) diffs.push('alt_len: node=' + (alt ? alt.length : 0) + ' py=' + ref.alt_len);
+else if(alt && ref.alt){ for(let i = 0; i < alt.length; i++) if(alt[i][0] !== ref.alt[i][0] || alt[i][1] !== ref.alt[i][1]){ diffs.push('alt[' + i + ']: node=' + JSON.stringify(alt[i]) + ' py=' + JSON.stringify(ref.alt[i])); break; } }
+if((tel ? tel.length : 0) !== ref.tel_len) diffs.push('tel_len: node=' + (tel ? tel.length : 0) + ' py=' + ref.tel_len);
+for(const [r, exp] of Object.entries(ref.routes)) if(displayRoute(r) !== exp) diffs.push('displayRoute(' + JSON.stringify(r) + '): node=' + JSON.stringify(displayRoute(r)) + ' py=' + JSON.stringify(exp));
 function cmpSeries(name, a, b){
   if(a.length !== b.length){ diffs.push(name + ' len: node=' + a.length + ' py=' + b.length); return; }
   for(let i = 0; i < a.length; i++) if(a[i][0] !== b[i][0] || a[i][1] !== b[i][1]){ diffs.push(name + '[' + i + ']: node=' + JSON.stringify(a[i]) + ' py=' + JSON.stringify(b[i])); if(diffs.length > 8) return; }

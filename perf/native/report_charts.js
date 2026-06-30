@@ -3,12 +3,13 @@
 // _svg_perf_line, _chart_frametime_series, _rolling_mean_series, _variance_bins, _phase_bars_html,
 // + _read_csv_chronological. PORT — must match Python (validated by _parity_charts.js). Python's
 // :.Nf formatting is round-half-to-even, so all coordinate/number formatting goes through fmt().
-const fs = require('fs');
+const fs = require('fs'), path = require('path');
 const { pyRound, pySum } = require('./stats.js');
 
 const TARGET_FRAMETIME_MS = 16.67;
 const STUTTER_FRAMETIME_MS = TARGET_FRAMETIME_MS * 2.0;
 const MIN_VALID_MS = 0.0, MAX_VALID_MS = 1000.0;
+const HEAD_TRIM_S = 5, ALT_SANE_FT = 45000;
 const FRAMETIME_COLUMNS = ["MsBetweenPresents", "msBetweenPresents", "FrameTime", "ms_between_presents", "MsBetweenDisplayChange"];
 const CPUBUSY_COLUMNS = ["MsCPUBusy", "CPUBusy", "msCPUBusy"];
 const GPUBUSY_COLUMNS = ["MsGPUBusy", "GPUBusy", "msGPUBusy"];
@@ -130,4 +131,46 @@ function phaseBarsHtml(phases){
   return '<div class="phase">' + rows + '</div>';
 }
 
-module.exports = { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, fmt };
+function displayRoute(route){
+  if(!route) return '';
+  const parts = route.trim().split(/\s+/);                 // Python str.split(): runs of whitespace
+  if(parts.length >= 2 && parts[parts.length - 1].includes('-')) return parts[parts.length - 1];
+  return route;
+}
+
+function readTelemetry(sessionDir){
+  const p = path.join(sessionDir, 'telemetry.csv');
+  if(!fs.existsSync(p)) return null;
+  let text; try { text = fs.readFileSync(p, 'utf8'); } catch(e){ return null; }
+  if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);   // utf-8-sig BOM
+  const lines = text.split(/\r?\n/); if(!lines.length) return null;
+  const header = lines[0].split(',');
+  const num = (row, k) => { const v = row[k]; if(v == null) return null; const t = String(v).trim(); if(t === '') return null; const n = Number(t); return Number.isNaN(n) ? null : n; };
+  const out = [];
+  for(let i = 1; i < lines.length; i++){
+    if(lines[i] === '' || lines[i] == null) continue;
+    const cols = lines[i].split(','); const row = {}; header.forEach((h, j) => row[h] = cols[j]);
+    out.push({ wall_ms: num(row, 'wall_ms'), phase: row['phase'] || '', alt_ft: num(row, 'alt_ft'),
+      vram_mb: num(row, 'vram_mb'), sys_ram_pct: num(row, 'sys_ram_pct'), sys_cpu_pct: num(row, 'sys_cpu_pct'),
+      top_proc: row['top_proc'] || '', top_proc_cpu: num(row, 'top_proc_cpu') });
+  }
+  const filtered = out.filter(r => r.wall_ms !== null);
+  filtered.sort((a, b) => a.wall_ms - b.wall_ms);
+  return filtered.length ? filtered : null;
+}
+
+function chartAltitudeSeries(sessionDir, totalMin){
+  const tel = readTelemetry(sessionDir);
+  if(!tel) return null;
+  const out = [];
+  for(const r of tel){
+    const alt = r.alt_ft;
+    if(alt == null || alt > ALT_SANE_FT) continue;
+    const x = (r.wall_ms - HEAD_TRIM_S * 1000.0) / 60000.0;
+    if(x < 0 || x > totalMin + 0.5) continue;
+    out.push([pyRound(x, 4), Math.trunc(alt)]);
+  }
+  return out.length ? out : null;
+}
+
+module.exports = { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, displayRoute, readTelemetry, chartAltitudeSeries, fmt };
