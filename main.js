@@ -1147,9 +1147,14 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
       { windowsHide:true });
     let cout=''; ps.stdout.on('data',d=>cout+=d);
     ps.on('close', () => {
-      const reopenPaths = [...new Set(cout.split(/\r?\n/).filter(l=>l.indexOf('RPATH|')===0).map(l=>l.slice(6).trim()).filter(Boolean))];
-      try { fs.writeFileSync(FLIGHT_STATE(), JSON.stringify(reopenPaths)); } catch(e){ try{LOG.warn('[FLIGHT] state write failed: '+e.message);}catch(_){} }
-      LOG.info('[FLIGHT] closed: '+closeNow.join(', ')+' | SAVED '+reopenPaths.length+' reopen target(s)');
+      const captured = [...new Set(cout.split(/\r?\n/).filter(l=>l.indexOf('RPATH|')===0).map(l=>l.slice(6).trim()).filter(Boolean))];
+      // MERGE with any existing reopen list — re-arming (apps already closed → captured 0) must never
+      // clobber the real list the first close saved. Union preserves it and absorbs new closes too.
+      let existing = [];
+      try { const j = JSON.parse(fs.readFileSync(FLIGHT_STATE(),'utf8')); if (Array.isArray(j)) existing = j.filter(Boolean); } catch(_){}
+      const merged = [...new Set([...existing, ...captured])];
+      try { fs.writeFileSync(FLIGHT_STATE(), JSON.stringify(merged)); } catch(e){ try{LOG.warn('[FLIGHT] state write failed: '+e.message);}catch(_){} }
+      LOG.info('[FLIGHT] closed: '+closeNow.join(', ')+' | SAVED '+captured.length+' new (reopen list now '+merged.length+')');
       _flightReopenPending = true; startFlightWatch();
       resolve({ ok:true, closed:closeNow.length });
     });
