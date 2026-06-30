@@ -213,18 +213,16 @@ def _clear_status():
 
 
 def _msfs_running():
-    """True if the MSFS process is up. On any uncertainty return True, so a real flight is never
-    aborted by mistake."""
+    """True if the MSFS process is up. Uses `tasklist` (reliable) — psutil's process_iter MISSED a
+    running MSFS (access-denied on the name read) and falsely aborted a real flight during loading.
+    On ANY uncertainty return True, so a real flight is never aborted by mistake."""
     try:
-        import psutil
-        target = TARGET_PROCESS.lower()
-        for p in psutil.process_iter(["name"]):
-            try:
-                if (p.info.get("name") or "").lower() == target:
-                    return True
-            except Exception:  # noqa: BLE001
-                continue
-        return False
+        out = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {TARGET_PROCESS}", "/NH"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return TARGET_PROCESS.lower() in (out.stdout or "").lower()
     except Exception:  # noqa: BLE001
         return True
 
@@ -3356,14 +3354,15 @@ def wait_for_auto_start():
             # us at the menu). A request made then never refreshes, so rebuild the
             # connection fresh — once the flight is active it reads real speed.
             if none_streak >= 15:
-                # Auto-quit: if MSFS has closed, no flight is coming — exit instead of waiting
-                # forever (an armed-but-never-flown capture used to linger and could misfire on a
-                # later flight). On uncertainty _msfs_running() returns True, so this never aborts a
-                # real, still-loading flight.
+                # Auto-quit ONLY if MSFS is genuinely gone (reliable tasklist + a 3s re-check to rule
+                # out a transient miss). None reads here are NORMAL while a flight loads at the menu —
+                # we must not quit just because reads are empty, only if the sim is truly closed.
                 if not _msfs_running():
-                    say("  MSFS has closed and no flight was started — exiting capture "
-                        "(nothing to record).")
-                    return "no-flight"
+                    time.sleep(3.0)
+                    if not _msfs_running():
+                        say("  MSFS has closed and no flight was started — exiting capture "
+                            "(nothing to record).")
+                        return "no-flight"
                 say("  No speed data yet — refreshing SimConnect connection "
                     "(flight may still be loading).")
                 try:
