@@ -151,13 +151,18 @@ function createWindow() {
   // ABRP never affects it; this is just a deliberate heads-up.
   win.on('close', (e) => {
     if (_perfAllowClose) return;
-    let simUp = false; try { simUp = isMsfsRunning(); } catch (_) {}
-    if (!simUp) return;
+    let simUp = false, capUp = false;
+    try { simUp = isMsfsRunning(); } catch (_) {}
+    try { capUp = isCaptureRunning(); } catch (_) {}
+    if (!simUp && !capUp) return;
     e.preventDefault();
     const choice = dialog.showMessageBoxSync(win, {
       type:'question', buttons:['Close ABRP','Cancel'], defaultId:0, cancelId:1, noLink:true,
-      title:'MSFS is running', message:'MSFS 2024 is still running.',
-      detail:'Closing ABRP is fine — any active performance capture runs independently and will keep recording, filing on its own when you close the sim. Close ABRP now?'
+      title: capUp ? 'Capture is active' : 'MSFS is running',
+      message: capUp ? 'A performance capture is active.' : 'MSFS 2024 is still running.',
+      detail: capUp
+        ? 'It runs independently of ABRP — it will keep recording and file on its own when you close the sim. Closing ABRP will NOT stop or lose it. Close ABRP now?'
+        : 'Closing ABRP is fine — any active performance capture runs independently and will keep recording, filing on its own when you close the sim. Close ABRP now?'
     });
     if (choice === 0) { _perfAllowClose = true; win.close(); }
   });
@@ -668,6 +673,13 @@ function isMsfsRunning(){
     return /FlightSimulator2024\.exe/i.test(r.stdout || '');
   }catch(e){ return false; }
 }
+function isCaptureRunning(){
+  try{
+    const r = require('child_process').spawnSync('tasklist', ['/FI','IMAGENAME eq perf-engine.exe','/NH'],
+      {encoding:'utf8', timeout:4000, windowsHide:true});
+    return /perf-engine\.exe/i.test(r.stdout || '');
+  }catch(e){ return false; }
+}
 function cleanupActivationsOnQuit(){
   let cfg;
   try{ cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); }catch(e){ return; }
@@ -1175,6 +1187,15 @@ ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
     });
   } catch (e) { LOG.error('[PERF] perf-prep-next failed: ' + e.message); resolve({ ok:false, error:e.message }); }
 }));
+// Capture status for the title-bar badge. v1: active = engine process running. state (armed /
+// recording) is read from a status file the engine writes when present (engine pass adds it).
+ipcMain.handle('perf-capture-status', () => {
+  let active = false; try { active = isCaptureRunning(); } catch (_) {}
+  let state = null;
+  if (active) { try { const sf = path.join(USER_DATA, 'capture_status.json');
+    if (fs.existsSync(sf)) { const j = JSON.parse(fs.readFileSync(sf,'utf8')); if (j && j.state) state = j.state; } } catch(_){} }
+  return { active, state };
+});
 ipcMain.on('install-update', () => {
   // Exit FAST so the NSIS installer doesn't catch ABRP mid-shutdown ("cannot be closed / Retry").
   // electron-updater on Windows quits via the normal `before-quit` path (it does NOT emit

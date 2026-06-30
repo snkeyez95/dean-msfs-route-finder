@@ -336,11 +336,17 @@ html[data-theme="light"] .theme-knob{left:30px}
   padding:9px 18px;border-radius:22px;z-index:10000;opacity:0;pointer-events:none;
   transition:opacity .25s ease,transform .25s ease;box-shadow:0 4px 18px rgba(0,0,0,.3)}
 #gsx-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@keyframes cappulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+#cap-badge.recording{background:color-mix(in srgb,#e23 18%,transparent);border-color:#e23;color:#e23}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.22</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.23</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
+  <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
+    <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
+    <span id="cap-badge-text">Capture</span>
+  </div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -365,7 +371,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.22</div>
+    <div class="sb-ver">v5.9.23</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1205,6 +1211,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
   fetchMetarBatch();
   setInterval(async()=>{if(S.selICAOs.size){RLOG('[WX] Auto-refresh triggered');await fetchMetarBatch();RLOG('[WX] Auto-refresh complete: '+Object.keys(S.metarCache).length+' cached');}},30*60*1000);
   setInterval(updateWxAge,60000);
+  // Capture status badge (global): poll whether a logging engine is active.
+  updateCaptureBadge();
+  setInterval(updateCaptureBadge,7000);
   // Auto-refresh routes
   updateAutoRefreshInfo();
   scheduleAutoRefresh();
@@ -3552,6 +3561,21 @@ async function launchAndCapture(){
     +'Fly normally — it records on your takeoff roll, files when you close the sim, and your apps reopen automatically.');
 }
 
+// Global capture-status badge (title bar). v1: active vs idle by whether the engine is running.
+// state (armed/recording) arrives once the engine writes a status file (engine pass).
+async function updateCaptureBadge(){
+  const el=document.getElementById('cap-badge'); if(!el)return;
+  let s; try{ s=await window.api.perfCaptureStatus(); }catch(e){ s=null; }
+  const active=!!(s&&s.active);
+  el.style.display=active?'inline-flex':'none';
+  if(active){
+    const rec=(s.state==='recording');
+    el.classList.toggle('recording',rec);
+    const txt=document.getElementById('cap-badge-text');
+    if(txt)txt.textContent=rec?'Recording':(s.state==='armed'?'Capture armed':'Capture');
+  }
+}
+
 // ── APPS TO CLOSE DURING FLIGHT (Phase 3 — config + UI; engine execution wired next) ──
 const FLIGHT_APP_MODES={'close-reopen':'Close & reopen','close-only':"Close, don't reopen",'kill-after':'Close only after sim'};
 // One-time seed from Dean's record_clean.bat lists (fully editable after).
@@ -4887,5 +4911,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.22</div>
+  pointer-events:none;">v5.9.23</div>
 </body></html>
