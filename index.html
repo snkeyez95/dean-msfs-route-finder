@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.31</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.32</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -375,7 +375,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.31</div>
+    <div class="sb-ver">v5.9.32</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3940,7 +3940,21 @@ async function toggleCompanionClose(idx){
   renderQlAppList();
 }
 async function clearShaderCache(){
-  if(!confirm('Clear the MSFS / NVIDIA / DX12 / Steam shader caches?\n\nThis deletes cached shaders from 7 locations. They rebuild automatically — expect the next flight or two to be a bit stuttery while shaders recompile.\n\nMSFS must be closed (it will refuse otherwise). Recommended: disable Shader Cache in the NVIDIA App first.\n\nProceed?'))return;
+  const msg='Clear the MSFS / NVIDIA / DX12 / Steam shader caches (7 locations)?\n\n'
+    +'━━ BEFORE — confirm all of these ━━\n'
+    +'  1. Shader Cache is DISABLED in the NVIDIA App (Global Settings)\n'
+    +'  2. MSFS 2024 is fully CLOSED\n'
+    +'  3. AutoFPS is CLOSED\n'
+    +'  4. REX Atmos Core is CLOSED\n'
+    +'  5. GPU-Z / MSI Afterburner / RTSS are CLOSED\n'
+    +'  6. Steam is CLOSED (recommended)\n\n'
+    +'━━ AFTER it finishes ━━\n'
+    +'  1. Re-enable Shader Cache in the NVIDIA App (Size 100 GB, Shader Compiler On)\n'
+    +'  2. REBOOT your PC\n'
+    +'  3. First MSFS load is slower; expect 1–2 flights with minor stutters as the DX12 pipeline rebuilds — normal & temporary\n'
+    +'  4. Monitor VRAM over the next 2–3 sessions\n\n'
+    +'Caches rebuild automatically. Proceed with clearing now?';
+  if(!confirm(msg))return;
   const el=document.getElementById('cache-result'); if(el)el.textContent='Clearing…';
   let r; try{ r=await window.api.clearShaderCache(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
   if(r&&r.blocked){ if(el)el.innerHTML='<span style="color:#e23">Blocked — close MSFS first ('+((r.running||[]).join(', '))+' still running).</span>'; return; }
@@ -5051,5 +5065,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.31</div>
+  pointer-events:none;">v5.9.32</div>
 </body></html>
