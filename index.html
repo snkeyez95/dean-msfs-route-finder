@@ -339,7 +339,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.19</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.20</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
@@ -365,7 +365,7 @@ html[data-theme="light"] .theme-knob{left:30px}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.19</div>
+    <div class="sb-ver">v5.9.20</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3486,7 +3486,8 @@ async function renderPerfPane(){
   el.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
     +'<button class="btn bg bsm" onclick="perfShowDashboard()" title="Back to the combined dashboard">&#128202; Dashboard</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
-    +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Record your next flight from ABRP (headless capture test)">&#9679; Arm Capture</button>'
+    +'<button class="btn bg bsm" onclick="launchAndCapture()" title="One click: auto-set the next benchmark TLOD, close your apps, launch companions + MSFS, and capture — apps reopen after the sim">&#128640; Launch + Capture</button>'
+    +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Just arm a capture (set TLOD + launch the sim yourself)">&#9679; Arm Capture</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>';
@@ -3508,6 +3509,44 @@ async function perfArmCapture(){
   let r; try{ r=await window.api.perfStartCapture(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
   if(r&&r.ok){ alert('Capture armed'+(n?(' and '+n+' app'+(n>1?'s':'')+' closed'):'')+'.\n\nLaunch MSFS and fly — it records on your takeoff roll, files when you close the sim, and your apps reopen automatically. Re-open this tab afterward to see the flight.'); }
   else{ alert('Could not arm capture: '+((r&&r.error)||'unknown error')); }
+}
+
+// One-click clean benchmark flight: auto-set the next benchmark TLOD (engine --prep-next, same
+// coverage model as the tracker) -> close checked apps -> launch companions -> launch MSFS -> arm
+// capture. Apps reopen on sim-close via the watcher. The TLOD it set is surfaced so it visibly
+// matches the Performance tracker. Assumes you've already generated your SimBrief plan + MSFS is cold.
+async function launchAndCapture(){
+  const closeApps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
+  const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path);
+  const msg='Launch a clean benchmark flight?\n\nThis will, in order:\n'
+    +'1. Auto-set the next benchmark TLOD for your SimBrief aircraft\n'
+    +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
+    +(comps.length?('3. Launch your '+comps.length+' companion app'+(comps.length>1?'s':'')+'\n'):'')
+    +'4. Launch MSFS and start the performance capture\n\n'
+    +'Make sure you’ve already generated your SimBrief plan and MSFS isn’t already running.';
+  if(!confirm(msg))return;
+  // 1) Auto-TLOD — must finish BEFORE MSFS launches (it writes UserCfg.opt; engine backs it up).
+  let prep; try{ prep=await window.api.perfPrepNext(); }catch(e){ prep={ok:false,error:(e&&e.message)||'error'}; }
+  if(!(prep&&prep.set)){
+    const why = (prep&&prep.reason==='no-simbrief') ? 'No SimBrief plan detected — TLOD left unchanged. Generate your SimBrief flight plan first for auto-TLOD to work.'
+              : (prep&&prep.reason==='coverage-complete') ? 'This aircraft’s benchmark coverage is already complete — TLOD left unchanged.'
+              : 'Could not auto-set TLOD ('+((prep&&(prep.error||prep.reason))||'unknown')+') — TLOD left unchanged.';
+    if(!confirm(why+'\n\nContinue launching anyway with TLOD as-is?'))return;
+  }
+  // 2) Close the checked background apps (reopen on sim-close via the watcher).
+  if(closeApps.length){ try{ await window.api.flightCloseApps(closeApps); }catch(e){} }
+  // 3) Launch companion apps.
+  for(const a of comps){ try{ await window.api.launchApp({path:a.path}); }catch(e){} }
+  // 4) Launch MSFS after a short delay (companions settle; UserCfg already written).
+  setTimeout(()=>{ window.api.launchMsfs({version:S.cfg.msfsVersion||'steam',steamExePath:S.cfg.steamExePath||''}); },5000);
+  // 5) Arm the capture (waits for your takeoff roll).
+  let cap; try{ cap=await window.api.perfStartCapture(); }catch(e){ cap={ok:false}; }
+  const setLine = (prep&&prep.set) ? ('✓ TLOD '+prep.tlod+' set for '+prep.aircraft+' — confirm this matches the tracker’s next-flight cell.') : '• TLOD left unchanged.';
+  alert('Clean flight launching 🚀\n\n'+setLine+'\n'
+    +(closeApps.length?('• '+closeApps.length+' app'+(closeApps.length>1?'s':'')+' closed (reopen after the sim).\n'):'')
+    +(comps.length?('• '+comps.length+' companion app'+(comps.length>1?'s':'')+' launched.\n'):'')
+    +'• MSFS starting in ~5s; capture '+((cap&&cap.ok)?'armed':'could NOT arm — check the log')+'.\n\n'
+    +'Fly normally — it records on your takeoff roll, files when you close the sim, and your apps reopen automatically.');
 }
 
 // ── APPS TO CLOSE DURING FLIGHT (Phase 3 — config + UI; engine execution wired next) ──
@@ -4845,5 +4884,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.19</div>
+  pointer-events:none;">v5.9.20</div>
 </body></html>

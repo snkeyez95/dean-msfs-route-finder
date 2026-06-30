@@ -1131,6 +1131,41 @@ ipcMain.handle('perf-start-capture', () => {
     return { ok:true, how };
   } catch (e) { LOG.error('[PERF] perf-start-capture failed: ' + e.message); return { ok:false, error:e.message }; }
 });
+
+// Auto-TLOD: run the engine's --prep-next to pick + write the next benchmark TLOD for the aircraft on
+// the current SimBrief plan. This uses the SAME coverage model (compute_coverage + next_gap_for_aircraft)
+// that renders the Performance tracker, so the set value can't diverge from the tracker. The engine
+// backs up UserCfg.opt itself. Waits for exit, parses stdout, returns {set, aircraft, tlod} so ABRP can
+// surface "Set TLOD X for <aircraft>". 30s timeout guard so a stuck prep can never block the launch.
+ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
+  try {
+    const dir    = perfDir();
+    const exe    = path.join(dir, 'perf-engine.exe');
+    const script = path.join(dir, 'msfs_perf_logger.py');
+    const env    = Object.assign({}, process.env, { MSFS_PERF_ROOT: USER_DATA });
+    const opts   = { windowsHide:true, env, cwd: dir };
+    let child;
+    if (fs.existsSync(exe))         { child = spawn(exe, ['--prep-next'], opts); }
+    else if (fs.existsSync(script)) { child = spawn('py', [script,'--prep-next'], opts); }
+    else { LOG.error('[PERF] prep-next: engine not found in ' + dir); resolve({ ok:false, error:'engine not found' }); return; }
+    let out=''; let done=false;
+    const finish = (res) => { if(done) return; done=true; clearTimeout(timer); resolve(res); };
+    const timer = setTimeout(() => { try{ child.kill(); }catch(_){}; LOG.warn('[PERF] prep-next timed out'); finish({ ok:false, error:'prep-next timed out' }); }, 30000);
+    if (child.stdout) child.stdout.on('data', d => out += d);
+    if (child.stderr) child.stderr.on('data', d => out += d);
+    child.on('error', e => { LOG.error('[PERF] prep-next spawn failed: ' + e.message); finish({ ok:false, error:e.message }); });
+    child.on('close', () => {
+      const m = out.match(/->\s*(\S+).*?TLOD\s+(\d+)/i);
+      const unchanged = /leaving TLOD unchanged/i.test(out);
+      let res;
+      if (m)              res = { ok:true, set:true, aircraft:m[1], tlod:parseInt(m[2],10) };
+      else if (unchanged) res = { ok:true, set:false, reason: /not recognized/i.test(out) ? 'no-simbrief' : 'coverage-complete' };
+      else                res = { ok:true, set:false, reason:'unknown' };
+      LOG.info('[PERF] prep-next: ' + (res.set ? ('TLOD '+res.tlod+' for '+res.aircraft) : ('no change ('+res.reason+')')) + ' | ' + out.replace(/\s+/g,' ').trim().slice(0,300));
+      finish(res);
+    });
+  } catch (e) { LOG.error('[PERF] perf-prep-next failed: ' + e.message); resolve({ ok:false, error:e.message }); }
+}));
 ipcMain.on('install-update', () => {
   // Exit FAST so the NSIS installer doesn't catch ABRP mid-shutdown ("cannot be closed / Retry").
   // electron-updater on Windows quits via the normal `before-quit` path (it does NOT emit
