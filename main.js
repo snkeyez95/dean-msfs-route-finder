@@ -1188,7 +1188,12 @@ ipcMain.handle('clear-shader-cache', () => new Promise((resolve) => {
     }
     if (running.length) { resolve({ ok:false, blocked:true, running }); return; }
     const ps = `$cleared=@(); $skipped=@()
-$targets=@("$env:LOCALAPPDATA\\NVIDIA\\DXCache","$env:LOCALAPPDATA\\NVIDIA\\GLCache","$env:LOCALAPPDATA\\NVIDIA Corporation\\NV_Cache","$env:LOCALAPPDATA\\D3DSCache","$env:APPDATA\\Microsoft Flight Simulator 2024\\SceneCache","$env:APPDATA\\Microsoft Flight Simulator 2024\\cache")
+$targets=@("$env:LOCALAPPDATA\\NVIDIA Corporation\\NV_Cache","$env:LOCALAPPDATA\\D3DSCache","$env:APPDATA\\Microsoft Flight Simulator 2024\\SceneCache","$env:APPDATA\\Microsoft Flight Simulator 2024\\cache")
+# NVIDIA DXCache/GLCache live under EITHER Local\\NVIDIA OR LocalLow\\NVIDIA\\PerDriverVersion (newer
+# drivers — the big one). Sweep both roots for any DXCache/GLCache folder so we never miss it.
+$nvRoots=@("$env:LOCALAPPDATA\\NVIDIA",(Join-Path $env:USERPROFILE 'AppData\\LocalLow\\NVIDIA'))
+foreach($root in $nvRoots){ if(Test-Path -LiteralPath $root){ Get-ChildItem -LiteralPath $root -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'DXCache' -or $_.Name -eq 'GLCache' } | ForEach-Object { $targets+=$_.FullName } } }
+$targets=@($targets | Select-Object -Unique)
 foreach($t in $targets){ if(Test-Path -LiteralPath $t){ try{ Get-ChildItem -LiteralPath $t -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; $cleared+=$t }catch{ $skipped+=$t } } else { $skipped+=$t } }
 $steamRoots=@("C:\\Program Files (x86)\\Steam","C:\\Program Files\\Steam","D:\\Steam","D:\\SteamLibrary","E:\\Steam","E:\\SteamLibrary")
 $sFound=$false
