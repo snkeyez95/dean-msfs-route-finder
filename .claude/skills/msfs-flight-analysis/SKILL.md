@@ -161,6 +161,32 @@ Verdict first, evidence second - e.g. *"That rough approach was three CPU-bound 
 Not a TLOD or VRAM problem. The other 22 minutes of 'spikes' were just alt-tabs to your pilot
 client."* Keep it stat-first and plain, same as the rest of this skill.
 
+## Baseline recommendation - the single best TLOD ("what should I set?")
+
+When Dean asks **"what's my baseline", "best TLOD", "what should I set globally", "did my baseline
+change"** - this matches the in-app Performance -> Baseline view, and your answer MUST agree with it
+(one spec, two surfaces). The method:
+
+1. **Clean subset only - never all-vs-all** (the confound trap that faked a 2ms "sim update win" on
+   2026-06-30). Use only: aircraft in {Fenix, PMDG}; TLOD in {100,125,150,175}; the modal
+   `driver_version` (drop 591.86 / 610.47 flights); non-AutoFPS. Exclude the Citation (reference) and
+   the out-of-grid Fenix-80 flight. Say how many you excluded and why.
+2. **Per-aircraft, per-TLOD means** over the (target 3) flights/cell - averaging the 3 routes smooths
+   the route-driven peak-VRAM noise.
+3. **Blend = worst-of-the-two** at each TLOD across Fenix & PMDG (max p99, max stutter, MIN consistency,
+   max peak VRAM). One number, safe for both heavies; lighter planes only do better. NOT per-aircraft.
+4. **Hard limits:** consistency >= 99%, stutter <= 0.1%, peak VRAM <= 90% of 12,288 MB (~11,059). A
+   TLOD "passes" if its blended profile clears all three.
+5. **Three modes:** Smoothest = lowest-p99 passing TLOD; Best-visuals = highest passing TLOD; **Balanced
+   (the headline) = the knee** = highest TLOD whose blended p99 is within ~1.0ms of the best AND VRAM
+   still under the limit. Lead with Balanced; break out the other two only if asked.
+6. **Honesty at low n:** with <3 flights/cell a single rough flight sways the pick - say "preliminary,
+   firms up as the benchmark completes." A `sim_version` seam in the set is a caveat, not a result.
+
+As of 2026-06-30 (18/24 flights) the tool recommends **TLOD 125** - PMDG's 150/175 cells each carry one
+outlier flight at n=2 that drag the blend down; it will likely rise toward 150 as those cells get a 3rd
+flight. Fenix's own knee is already 150; PMDG is the binding constraint.
+
 ## Presentation style Dean likes
 
 Stat-first, then a short plain-English read - not a wall of caveats, not flowery narrative. Pattern

@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.40</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.41</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.40</div>
+    <div class="sb-ver">v5.9.41</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3569,17 +3569,19 @@ async function renderPerfPane(){
   el.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
     +'<button class="btn bg bsm" onclick="perfShowDashboard()" title="Back to the combined dashboard">&#128202; Dashboard</button>'
     +'<button class="btn bg bsm" onclick="perfShowCompare()" title="Compare your flights grouped by sim version, GPU driver, aircraft, or TLOD — see whether the numbers actually change">&#9878; Compare</button>'
+    +'<button class="btn bg bsm" onclick="perfShowBaseline()" title="One blended TLOD that keeps both PMDG and Fenix smooth — your recommended global setting">&#127919; Baseline</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
-    +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
+    +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
+    +'<div id="perf-baseline" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
   perfShowDashboard();
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
-function perfShowDashboard(){ const cmp=document.getElementById('perf-compare'); if(cmp)cmp.style.display='none'; const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
+function perfShowDashboard(){ const cmp=document.getElementById('perf-compare'); if(cmp)cmp.style.display='none'; const bl=document.getElementById('perf-baseline'); if(bl)bl.style.display='none'; const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
 
 // ── COMPARE VIEW ─────────────────────────────────────────────────────────────
 // Group logged flights by one factor (sim version / driver / aircraft / TLOD) and show whether the
@@ -3597,6 +3599,7 @@ const _cmpMetrics=[
 const _cmpDimLabel={sim_version:'Sim version',driver_version:'GPU driver',aircraft:'Aircraft',tlod:'TLOD'};
 async function perfShowCompare(){
   const fr=document.getElementById('perf-frame'); if(fr)fr.style.display='none';
+  const bl=document.getElementById('perf-baseline'); if(bl)bl.style.display='none';
   const cmp=document.getElementById('perf-compare'); if(!cmp)return; cmp.style.display='block';
   cmp.innerHTML='<div style="font-size:13px;color:var(--ink3)">Loading flights&hellip;</div>';
   let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
@@ -3662,6 +3665,109 @@ function cmpOnChange(){
   const d=document.getElementById('cmp-dim'), a=document.getElementById('cmp-fac'), t=document.getElementById('cmp-ftl');
   if(d)_cmpState.dim=d.value; if(a)_cmpState.fAircraft=a.value; if(t)_cmpState.fTlod=t.value;
   renderCompare();
+}
+
+// ── BASELINE RECOMMENDATION ──────────────────────────────────────────────────
+// One blended TLOD that holds for BOTH heavy planes (Fenix + PMDG), from a CLEAN subset (modal driver,
+// in-grid TLOD, no reference aircraft, non-AutoFPS) — never all-vs-all (the confound trap). Combine =
+// worst-of-the-two per TLOD, so a passing TLOD is safe for both; lighter planes just do better.
+// Coverage cells mirror compute_coverage() in msfs_perf_logger.py — keep in sync.
+const _BL={AC:['Fenix','PMDG'],TL:[100,125,150,175],VRAM_CAP:12288,LIM:{cons:99,stut:0.1,vramPct:0.90},KNEE_MS:1.0,PER_CELL:3};
+let _blData=null,_blDetail=false;
+function _blCompute(all){
+  const f=all||[];
+  const grid=f.filter(x=>_BL.AC.includes(x.aircraft)&&_BL.TL.includes(x.tlod)&&x.p99_ft_ms!=null);
+  const dc={}; grid.forEach(x=>{ if(x.driver_version)dc[x.driver_version]=(dc[x.driver_version]||0)+1; });
+  const modalDrv=(Object.entries(dc).sort((a,b)=>b[1]-a[1])[0]||[null])[0];
+  const clean=grid.filter(x=>x.driver_version===modalDrv&&!x.autofps_active);
+  const cell=(ac,t)=>clean.filter(x=>x.aircraft===ac&&x.tlod===t);
+  const VRAM_LIM=_BL.VRAM_CAP*_BL.LIM.vramPct;
+  const perAc={}; for(const ac of _BL.AC){ perAc[ac]={}; for(const t of _BL.TL){ const c=cell(ac,t); perAc[ac][t]=c.length?{n:c.length,p99:_cmpMean(c,'p99_ft_ms'),stut:_cmpMean(c,'stutter_pct'),cons:_cmpMean(c,'consistency_pct'),pvram:_cmpMean(c,'peak_vram_mb')}:null; } }
+  const prof={};
+  for(const t of _BL.TL){ const fc=perAc.Fenix[t],pc=perAc.PMDG[t];
+    if(!fc||!pc){ prof[t]={incomplete:true}; continue; }
+    const p99=Math.max(fc.p99,pc.p99),stut=Math.max(fc.stut,pc.stut),cons=Math.min(fc.cons,pc.cons),pv=Math.max(fc.pvram,pc.pvram);
+    prof[t]={p99,stut,cons,pvram:pv,minN:Math.min(fc.n,pc.n),pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
+  }
+  const passT=_BL.TL.filter(t=>prof[t]&&prof[t].pass);
+  const bestP99=passT.length?Math.min(...passT.map(t=>prof[t].p99)):null;
+  const smoothest=passT.length?passT.slice().sort((a,b)=>prof[a].p99-prof[b].p99)[0]:null;
+  const balanced=passT.length?passT.filter(t=>prof[t].p99<=bestP99+_BL.KNEE_MS).sort((a,b)=>b-a)[0]:null;
+  const bestVis=passT.length?Math.max(...passT):null;
+  const perAcKnee=ac=>{ const ok=_BL.TL.filter(t=>perAc[ac][t]&&perAc[ac][t].cons>=_BL.LIM.cons&&perAc[ac][t].stut<=_BL.LIM.stut&&perAc[ac][t].pvram<=VRAM_LIM); if(!ok.length)return null; const bp=Math.min(...ok.map(t=>perAc[ac][t].p99)); return ok.filter(t=>perAc[ac][t].p99<=bp+_BL.KNEE_MS).sort((a,b)=>b-a)[0]; };
+  // Coverage counts ALL in-grid flights (matches compute_coverage / auto-TLOD) — a flight still fills a
+  // benchmark cell even if a different driver later keeps it out of the clean recommendation set.
+  const gridN=(ac,t)=>grid.filter(x=>x.aircraft===ac&&x.tlod===t).length;
+  let filled=0,short=[]; for(const ac of _BL.AC)for(const t of _BL.TL){ const n=Math.min(gridN(ac,t),_BL.PER_CELL); filled+=n; if(n<_BL.PER_CELL)short.push(ac+' '+t); }
+  const sims=[...new Set(clean.map(x=>x.sim_version).filter(Boolean))];
+  return {modalDrv,excluded:f.length-clean.length,cleanN:clean.length,perAc,prof,smoothest,balanced,bestVis,VRAM_LIM,
+    knee:{Fenix:perAcKnee('Fenix'),PMDG:perAcKnee('PMDG')},
+    coverage:{filled,total:_BL.AC.length*_BL.TL.length*_BL.PER_CELL,short,ready:short.length===0},sims};
+}
+async function perfShowBaseline(){
+  const fr=document.getElementById('perf-frame'); if(fr)fr.style.display='none';
+  const cmp=document.getElementById('perf-compare'); if(cmp)cmp.style.display='none';
+  const bl=document.getElementById('perf-baseline'); if(!bl)return; bl.style.display='block';
+  bl.innerHTML='<div style="font-size:13px;color:var(--ink3)">Crunching your flights&hellip;</div>';
+  let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
+  _blData=(r&&r.ok&&Array.isArray(r.flights))?r.flights:[];
+  renderBaseline();
+}
+function baselineToggleDetail(){ _blDetail=!_blDetail; renderBaseline(); }
+function renderBaseline(){
+  const bl=document.getElementById('perf-baseline'); if(!bl)return;
+  const d=_blCompute(_blData||[]);
+  const rec=d.balanced||d.smoothest||100;
+  const recKnown=(d.balanced!=null||d.smoothest!=null);
+  const cov=d.coverage, vlimPct=Math.round(_BL.LIM.vramPct*100);
+  let h='<div style="font-size:15px;font-weight:700;color:var(--ink1);margin-bottom:14px">&#127919; Baseline recommendation</div>';
+  // headline card
+  h+='<div style="background:var(--bg);border:1px solid '+(cov.ready?'#46c46a':'var(--acc)')+';border-radius:10px;padding:20px 22px;margin-bottom:14px">'
+    +'<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">Recommended baseline &mdash; one setting for everything</div>'
+    +'<div style="font-size:38px;font-weight:800;color:'+(cov.ready?'#46c46a':'var(--acc)')+';letter-spacing:-.02em;margin:4px 0 2px">'+(recKnown?('TLOD '+rec):'Need more data')+'</div>'
+    +'<div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(recKnown
+        ?('Keeps your two heaviest planes &mdash; <b>PMDG</b> &amp; <b>Fenix</b> &mdash; smooth with VRAM headroom. Lighter aircraft only do better, so this is safe to set globally.')
+        :('No TLOD currently clears all limits for both planes &mdash; fly the remaining cells and re-open this.'))+'</div>'
+    +'</div>';
+  // readiness / progress
+  if(!cov.ready){
+    h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6">'
+      +'<b>Preliminary &mdash; '+cov.filled+'/'+cov.total+' benchmark flights.</b> '+cov.short.length+' cell'+(cov.short.length!==1?'s':'')+' still need a 3rd flight ('+cov.short.join(', ')+'). '
+      +'With only 1&ndash;2 flights per cell a single rough flight can sway the pick &mdash; it firms up as you finish the last few.</div>';
+  } else {
+    h+='<div style="font-size:12px;color:#46c46a;margin-bottom:14px">&#10003; Full benchmark complete ('+cov.filled+'/'+cov.total+') &mdash; this recommendation is on solid data.</div>';
+  }
+  // expand toggle
+  h+='<div onclick="baselineToggleDetail()" style="cursor:pointer;font-size:12px;color:var(--ink2);font-family:\'JetBrains Mono\',monospace;user-select:none;margin-bottom:'+(_blDetail?'14px':'0')+'">'
+    +(_blDetail?'&#9662;':'&#9656;')+' '+(_blDetail?'Hide':'Show')+' the full picture (modes, per-plane, data table)</div>';
+  if(_blDetail){
+    const md=t=>t==null?'&mdash;':('TLOD '+t);
+    // three modes
+    h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'
+      +['Smoothest|'+md(d.smoothest)+'|fewest stutters (floor)','Balanced|'+md(d.balanced)+'|the knee — the pick','Best visuals|'+md(d.bestVis)+'|highest that still passes']
+        .map((s,i)=>{const[a,b,c]=s.split('|');return '<div style="flex:1;min-width:150px;background:var(--bg);border:1px solid '+(i===1?'var(--acc)':'var(--sep)')+';border-radius:8px;padding:11px 13px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)">'+a+'</div><div style="font-size:18px;font-weight:700;color:'+(i===1?'var(--acc)':'var(--ink1)')+'">'+b+'</div><div style="font-size:11px;color:var(--ink3)">'+c+'</div></div>';}).join('')
+      +'</div>';
+    // per-aircraft knees
+    h+='<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Per-plane knee (before blending): <b>Fenix</b> '+md(d.knee.Fenix)+' &nbsp;&middot;&nbsp; <b>PMDG</b> '+md(d.knee.PMDG)+'. The blended pick takes the more constrained of the two at each step.</div>';
+    // combined table
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:\'JetBrains Mono\',monospace;margin-bottom:12px">'
+      +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:4px 6px">TLOD (both planes, worst-case)</th><th style="padding:4px 6px">min n</th><th style="padding:4px 6px">p99 ms</th><th style="padding:4px 6px">stutter%</th><th style="padding:4px 6px">cons%</th><th style="padding:4px 6px">peak VRAM</th><th style="padding:4px 6px">verdict</th></tr>';
+    for(const t of _BL.TL){ const p=d.prof[t];
+      if(!p||p.incomplete){ h+='<tr style="color:var(--ink3)"><td style="padding:4px 6px">'+t+'</td><td colspan="6" style="padding:4px 6px;text-align:right">missing a plane at this TLOD</td></tr>'; continue; }
+      const ok=p.pass;
+      h+='<tr style="text-align:right;color:'+(ok?'var(--ink1)':'var(--ink3)')+'"><td style="text-align:left;padding:4px 6px">'+t+(t===rec?' <span style="color:'+(cov.ready?'#46c46a':'var(--acc)')+'">&#9664; pick</span>':'')+'</td>'
+        +'<td style="padding:4px 6px">'+p.minN+'</td><td style="padding:4px 6px">'+p.p99.toFixed(1)+'</td><td style="padding:4px 6px">'+p.stut.toFixed(2)+'</td><td style="padding:4px 6px">'+p.cons.toFixed(1)+'</td><td style="padding:4px 6px">'+Math.round(p.pvram)+'</td>'
+        +'<td style="padding:4px 6px;color:'+(ok?'#46c46a':'#e0823c')+'">'+(ok?'pass':'fail')+'</td></tr>';
+    }
+    h+='</table>';
+    // caveats
+    h+='<div style="font-size:11px;color:var(--ink3);line-height:1.7;border-top:1px solid var(--sep);padding-top:10px">'
+      +'<b>How this was built:</b> '+d.cleanN+' clean flights on driver '+(d.modalDrv||'?')+' ('+d.excluded+' excluded — other drivers, the Citation, and out-of-grid TLODs). '
+      +'Limits: consistency &ge; '+_BL.LIM.cons+'%, stutter &le; '+_BL.LIM.stut+'%, peak VRAM &le; '+vlimPct+'% ('+Math.round(d.VRAM_LIM)+' MB of '+_BL.VRAM_CAP+'). '
+      +'Sim version'+(d.sims.length>1?'s in this set: '+d.sims.join(' + ')+' (a seam — most flights predate the latest update)':': '+(d.sims[0]||'n/a'))+'. '
+      +'Peak VRAM is route-dependent, so it steadies as each cell averages 3 flights.</div>';
+  }
+  bl.innerHTML=h;
 }
 async function perfArmCapture(){
   const apps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
@@ -5172,5 +5278,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.40</div>
+  pointer-events:none;">v5.9.41</div>
 </body></html>
