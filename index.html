@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.38</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.39</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.38</div>
+    <div class="sb-ver">v5.9.39</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -392,6 +392,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     <div class="sb-item" data-tab="companions" onclick="sw('companions')"><span class="sb-ic">&#9654;</span> Companion Apps</div>
     <div class="sb-item" data-tab="perf" onclick="sw('perf')"><span class="sb-ic">&#128202;</span> Performance</div>
     <div class="sb-item" data-tab="settings" onclick="sw('settings')"><span class="sb-ic">&#9881;</span> Settings</div>
+    <div class="sb-item" data-tab="maintenance" onclick="sw('maintenance')"><span class="sb-ic">&#128295;</span> Maintenance</div>
   </div>
 </div>
 <div class="content">
@@ -685,33 +686,6 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     <button class="btn bg bsm" id="detect-apps-btn" onclick="detectFlightApps()">&#128269; Detect running apps</button>
     <div id="flight-apps-detect" style="display:none;margin-top:10px"></div>
   </div>
-  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">MSFS Maintenance</div>
-  <div class="api-pan" style="margin-bottom:14px">
-    <div class="api-t">Shader Cache Cleaner</div>
-    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Clears the MSFS / NVIDIA / DX12 / Steam shader caches (7 locations). Worth doing after a sim or GPU-driver update. Caches rebuild on their own &mdash; expect the next flight or two to be slightly stuttery while shaders recompile.</div>
-    <button class="btn bp bsm" onclick="clearShaderCache()">&#129529; Clear Shader Cache</button>
-    <div id="cache-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
-    <div style="font-size:11px;color:var(--ink3);font-family:'Inter',sans-serif;margin-top:12px;line-height:1.6"><b>Before:</b> disable Shader Cache in the NVIDIA App &rarr; <b>reboot</b> &rarr; close MSFS &amp; overlays. <b>After:</b> re-enable NVIDIA Shader Cache &rarr; <b>reboot again</b>. Two reboots — the first one releases the locked cache so it can be deleted. (Full steps are in the confirm dialog.)</div>
-  </div>
-  <div class="api-pan" style="margin-bottom:14px">
-    <div class="api-t">Aircraft WASM Cache (PMDG / Fenix)</div>
-    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Rebuilds an aircraft&rsquo;s compiled WASM modules fresh. <b>When:</b> after a major Sim Update, or after a PMDG/Fenix update if you hit crashes / the &ldquo;orange screen&rdquo;. <b>Not</b> needed for GPU-driver updates. Your saved panel states &amp; options (the &ldquo;work&rdquo; folder) are preserved.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn bg bsm" onclick="clearWasmCache('pmdg')">&#129529; Clean PMDG WASM</button>
-      <button class="btn bg bsm" onclick="clearWasmCache('fenix')">&#129529; Clean Fenix WASM</button>
-    </div>
-    <div id="wasm-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
-  </div>
-  <div class="api-pan" style="margin-bottom:14px">
-    <div class="api-t">NVIDIA Control Panel Settings (Backup / Restore)</div>
-    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Saves &amp; restores your NVIDIA global 3D settings + game profiles (incl. MSFS) — the two driver <code>.bin</code> files. <b>Back up</b> while your settings are dialed in (e.g. before a driver wipe / DDU); <b>Restore</b> after a driver reinstall, then <b>reboot</b>. Previous backups are kept, timestamped.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="btn bg bsm" onclick="nvcpBackup()">&#128190; Back up NVCP Settings</button>
-      <button class="btn bg bsm" onclick="nvcpRestore()">&#8635; Restore NVCP Settings</button>
-      <span id="nvcp-stamp" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
-    </div>
-    <div id="nvcp-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
-  </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">GSX Pro</div>
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-t">GSX Profile Folder</div>
@@ -804,6 +778,39 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     </div>
   </div>
 
+</div></div>
+
+
+<!-- ── TAB: MAINTENANCE ── -->
+<div class="pane" id="pane-maintenance"><div class="scroll">
+  <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">MSFS Maintenance</div>
+  <div style="font-size:12px;color:var(--ink3);font-family:'Inter',sans-serif;margin-bottom:20px">Cache cleaners and NVIDIA settings backup — run these around sim, driver, or aircraft updates.</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">Shader Cache Cleaner</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Clears the MSFS / NVIDIA / DX12 / Steam shader caches (7 locations). Worth doing after a sim or GPU-driver update. Caches rebuild on their own &mdash; expect the next flight or two to be slightly stuttery while shaders recompile.</div>
+    <button class="btn bp bsm" onclick="clearShaderCache()">&#129529; Clear Shader Cache</button>
+    <div id="cache-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
+    <div style="font-size:11px;color:var(--ink3);font-family:'Inter',sans-serif;margin-top:12px;line-height:1.6"><b>Before:</b> disable Shader Cache in the NVIDIA App &rarr; <b>reboot</b> &rarr; close MSFS &amp; overlays. <b>After:</b> re-enable NVIDIA Shader Cache &rarr; <b>reboot again</b>. Two reboots — the first one releases the locked cache so it can be deleted. (Full steps are in the confirm dialog.)</div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">Aircraft WASM Cache (PMDG / Fenix)</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Rebuilds an aircraft&rsquo;s compiled WASM modules fresh. <b>When:</b> after a major Sim Update, or after a PMDG/Fenix update if you hit crashes / the &ldquo;orange screen&rdquo;. <b>Not</b> needed for GPU-driver updates. Your saved panel states &amp; options (the &ldquo;work&rdquo; folder) are preserved.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn bg bsm" onclick="clearWasmCache('pmdg')">&#129529; Clean PMDG WASM</button>
+      <button class="btn bg bsm" onclick="clearWasmCache('fenix')">&#129529; Clean Fenix WASM</button>
+    </div>
+    <div id="wasm-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">NVIDIA Control Panel Settings (Backup / Restore)</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Saves &amp; restores your NVIDIA global 3D settings + game profiles (incl. MSFS) — the two driver <code>.bin</code> files. <b>Back up</b> while your settings are dialed in (e.g. before a driver wipe / DDU); <b>Restore</b> after a driver reinstall, then <b>reboot</b>. Previous backups are kept, timestamped.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn bg bsm" onclick="nvcpBackup()">&#128190; Back up NVCP Settings</button>
+      <button class="btn bg bsm" onclick="nvcpRestore()">&#8635; Restore NVCP Settings</button>
+      <span id="nvcp-stamp" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    </div>
+    <div id="nvcp-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
+  </div>
 </div></div>
 
 
@@ -1335,6 +1342,7 @@ function sw(t){
   if(t==='companions')renderCompanionsPane();
   if(t==='perf')renderPerfPane();
   if(t==='settings'){renderFlightApps();enhanceSettingsSections();}
+  if(t==='maintenance')nvcpRefreshStatus();
 }
 
 // ── AIRPORTS ────────────────────────────────────────────────────────────────
@@ -4039,8 +4047,7 @@ async function maintAck(){
   b.style.display='none';
 }
 function openMaintenance(){
-  sw('settings');
-  setTimeout(()=>{ const e=document.getElementById('cache-result'); if(e&&e.scrollIntoView)e.scrollIntoView({behavior:'smooth',block:'center'}); },150);
+  sw('maintenance');
   maintAck();
 }
 // ── NVIDIA Control Panel backup/restore ──────────────────────────────────────
@@ -5165,5 +5172,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.38</div>
+  pointer-events:none;">v5.9.39</div>
 </body></html>
