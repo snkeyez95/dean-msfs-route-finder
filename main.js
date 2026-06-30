@@ -1116,6 +1116,15 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
 // writes into the data home via MSFS_PERF_ROOT.
 ipcMain.handle('perf-start-capture', () => {
   try {
+    // ONE capture engine only. Arming repeatedly without flying (or re-arming) leaves engines
+    // waiting; they ALL fire on the next takeoff and collide over _capture_tmp.csv + PresentMon's
+    // ETW session (observed: 7 engines piling onto one flight, 6 "Nothing filed" errors). Kill any
+    // existing engine + orphaned PresentMon before arming a fresh one.
+    try {
+      const cp = require('child_process');
+      cp.spawnSync('taskkill', ['/F','/IM','perf-engine.exe','/T'],   { windowsHide:true, timeout:5000 });
+      cp.spawnSync('taskkill', ['/F','/IM','PresentMon-x64.exe','/T'], { windowsHide:true, timeout:5000 });
+    } catch(_){}
     const dir    = perfDir();
     const exe    = path.join(dir, 'perf-engine.exe');          // bundled, Python-free engine
     const script = path.join(dir, 'msfs_perf_logger.py');      // dev fallback (system Python)
