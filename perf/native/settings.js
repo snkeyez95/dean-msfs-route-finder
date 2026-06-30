@@ -49,4 +49,29 @@ function readSettings(usercfgPath){
   return settings;
 }
 
-module.exports = { readSettings, searchFloat };
+// Pure-string side of write_settings (msfs_perf_logger.py:534) — the surgical TLOD/OLOD swap in the
+// flat {Graphics} block. Returns {ok, text} (the new file content) or {ok:false, reason}. File I/O +
+// backup live in the caller (main.js later). Newlines normalized to \n to match Python's text-mode read.
+function writeSettingsText(rawText, tlod, olod){
+  tlod = Math.max(10, Math.min(Math.trunc(tlod), 400));
+  olod = Math.max(10, Math.min(Math.trunc(olod), 400));
+  const text = rawText.replace(/\r\n?/g, '\n');            // universal newlines (Python read does this)
+  const mGfx = text.match(/\{Graphics(?!VR)/i);
+  if(!mGfx) return { ok:false, reason:'no-graphics' };
+  const start = mGfx.index + mGfx[0].length;
+  const mVr = text.match(/\{GraphicsVR/i);
+  const end = (mVr && mVr.index > start) ? mVr.index : text.length;
+  const head = text.slice(0, start); let gfx = text.slice(start, end); const tail = text.slice(end);
+  function replaceInBlock(block, name, value){
+    const re = new RegExp('(\\{' + name + '\\b[\\s\\S]*?LoDFactor\\s+)([0-9.]+)', 'i');  // first match only (count=1)
+    let n = 0;
+    const out = block.replace(re, (m, g1) => { n++; return g1 + (value / 100.0).toFixed(6); });
+    return { out, n };
+  }
+  const rt = replaceInBlock(gfx, 'Terrain', tlod); gfx = rt.out;
+  const ro = replaceInBlock(gfx, 'ObjectsLoD', olod); gfx = ro.out;
+  if(rt.n === 0 || ro.n === 0) return { ok:false, reason:'no-lod-lines', nT:rt.n, nO:ro.n };
+  return { ok:true, text: head + gfx + tail };
+}
+
+module.exports = { readSettings, searchFloat, writeSettingsText };
