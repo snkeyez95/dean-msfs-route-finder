@@ -16,21 +16,45 @@ const FRAMETIME_COLUMNS = ["MsBetweenPresents","msBetweenPresents","FrameTime","
 const CPUBUSY_COLUMNS   = ["MsCPUBusy","CPUBusy","msCPUBusy"];
 const GPUBUSY_COLUMNS   = ["MsGPUBusy","GPUBusy","msGPUBusy"];
 
-// Python round(): round-half-to-EVEN ("banker's"). JS Math.round is half-up, so replicate the tie case.
+// Python round(x, nd): correctly-rounded, ties-to-even. We read the value's exact decimal digits via
+// toFixed (V8 is correctly rounded at high precision, and a double IS an exact dyadic so the digits are
+// real) then round with BigInt — no x*10^nd float error, no toFixed half-away tie bug. Validated:
+// stats + charts byte/numeric-match Python across 20 flights.
 function pyRound(x, nd){
-  if(x === null || x === undefined || Number.isNaN(x)) return x;
-  const m = Math.pow(10, nd);
-  const y = x * m;
-  const fl = Math.floor(y);
-  const frac = y - fl;
-  let n;
-  if(Math.abs(frac - 0.5) < 1e-9) n = (fl % 2 === 0) ? fl : fl + 1;  // exact tie -> nearest even
-  else n = Math.round(y);                                            // otherwise nearest (ties up, but ties handled above)
-  return n / m;
+  if(x === null || x === undefined || Number.isNaN(x) || !Number.isFinite(x)) return x;
+  if(x === 0) return 0;
+  const neg = x < 0, ax = Math.abs(x);
+  const s = ax.toFixed(nd + 25);                 // exact-enough decimal expansion of the double
+  const dot = s.indexOf('.');
+  const frac = s.slice(dot + 1);
+  let digits = s.slice(0, dot) + frac.slice(0, nd);     // value * 10^nd as an exact integer string
+  const rd = frac.charCodeAt(nd) - 48;                  // first dropped digit
+  const tailNonZero = /[1-9]/.test(frac.slice(nd + 1));
+  let up;
+  if(rd < 5) up = false;
+  else if(rd > 5 || tailNonZero) up = true;
+  else up = ((digits.charCodeAt(digits.length - 1) - 48) % 2) === 1;   // exact tie -> round to even
+  let str = (BigInt(digits) + (up ? 1n : 0n)).toString();
+  let r;
+  if(nd === 0) r = Number(str);
+  else { str = str.padStart(nd + 1, '0'); r = Number(str.slice(0, -nd) + '.' + str.slice(-nd)); }
+  return neg ? -r : r;
 }
 // Strict float parse matching Python float(): trims, empty/garbage -> NaN (skip).
 function pyFloat(s){ if(s == null) return NaN; const t = String(s).trim(); if(t === '') return NaN; return Number(t); }
 
+// Python 3.12+ sum() over floats uses Neumaier compensated summation — replicate it so float sums
+// match bit-for-bit (a naive fold drifts in the last bits and occasionally tips a rounding tie).
+function pySum(arr, lo, hi){
+  lo = lo || 0; hi = (hi === undefined) ? arr.length : hi;
+  let s = 0.0, c = 0.0;
+  for(let i = lo; i < hi; i++){
+    const x = arr[i], t = s + x;
+    c += (Math.abs(s) >= Math.abs(x)) ? ((s - t) + x) : ((x - t) + s);
+    s = t;
+  }
+  return s + c;
+}
 function percentile(sorted, pct){
   if(!sorted.length) return null;
   if(sorted.length === 1) return sorted[0];
@@ -55,7 +79,7 @@ function pickColumn(header, candidates){
 function computeStats(frametimes, cpuBusy, gpuBusy){
   const s = frametimes.slice().sort((a, b) => a - b);
   const n = s.length;
-  let sum = 0; for(const v of s) sum += v;
+  const sum = pySum(s);
   const avg = sum / n;
   const p50 = percentile(s, 50), p95 = percentile(s, 95), p99 = percentile(s, 99), p999 = percentile(s, 99.9);
   const mx = s[n - 1];
@@ -77,8 +101,8 @@ function computeStats(frametimes, cpuBusy, gpuBusy){
     let gpuBound = 0; for(let i = 0; i < cpuBusy.length; i++){ if(gpuBusy[i] >= cpuBusy[i]) gpuBound++; }
     stats.gpu_bound_pct = pyRound(gpuBound / cpuBusy.length * 100, 1);
     stats.cpu_bound_pct = pyRound((1 - gpuBound / cpuBusy.length) * 100, 1);
-    let cs = 0; for(const v of cpuBusy) cs += v; stats.avg_cpu_busy_ms = pyRound(cs / cpuBusy.length, 2);
-    let gs = 0; for(const v of gpuBusy) gs += v; stats.avg_gpu_busy_ms = pyRound(gs / gpuBusy.length, 2);
+    stats.avg_cpu_busy_ms = pyRound(pySum(cpuBusy) / cpuBusy.length, 2);
+    stats.avg_gpu_busy_ms = pyRound(pySum(gpuBusy) / gpuBusy.length, 2);
   } else { stats.gpu_bound_pct = null; stats.cpu_bound_pct = null; }
   return stats;
 }
@@ -117,4 +141,4 @@ function parseFrametimes(csvPath){
   return computeStats(ft, cpu, gpu);
 }
 
-module.exports = { computeStats, parseFrametimes, percentile, pstdev, pyRound, pickColumn };
+module.exports = { computeStats, parseFrametimes, percentile, pstdev, pyRound, pySum, pickColumn };

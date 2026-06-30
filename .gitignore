@@ -20,3 +20,6 @@ perf/native/_ref_cov.json
 perf/native/_ref_settings.json
 perf/native/_ref_write.json
 perf/native/_ref_writers.json
+_phase8_preview_flight.html
+perf/native/_preview.js
+perf/native/_ref_charts.json
