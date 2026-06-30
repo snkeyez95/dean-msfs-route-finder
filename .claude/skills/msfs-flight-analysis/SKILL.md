@@ -178,8 +178,9 @@ change"** - this matches the in-app Performance -> Baseline view, and your answe
 4. **Hard limits:** consistency >= 99%, stutter <= 0.1%, peak VRAM <= 90% of 12,288 MB (~11,059). A
    TLOD "passes" if its blended profile clears all three.
 5. **Three modes:** Smoothest = lowest-p99 passing TLOD; Best-visuals = highest passing TLOD; **Balanced
-   (the headline) = the knee** = highest TLOD whose blended p99 is within ~1.0ms of the best AND VRAM
-   still under the limit. Lead with Balanced; break out the other two only if asked.
+   (the headline) = the best-balance point** = highest TLOD whose blended p99 is within ~1.0ms of the
+   best AND VRAM still under the limit. Lead with Balanced; break out the other two only if asked. (Avoid
+   the word "knee" with Dean — say "best balance" / "sweet spot".)
 6. **Honesty at low n:** with <3 flights/cell a single rough flight sways the pick - say "preliminary,
    firms up as the benchmark completes." A `sim_version` seam in the set is a caveat, not a result.
 
