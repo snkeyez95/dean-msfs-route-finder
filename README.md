@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.30  Companion Apps: new per-app "close on sim exit" checkbox — tick it on any companion you launch (Navigraph Charts, vPilot, etc.) and ABRP auto-closes it when MSFS closes. Works whether you start via Quick Launch or Launch + Capture (it folds into the same sim-close watcher that reopens your background apps)
 v5.9.29  Fix: re-arming a capture (e.g. hitting Arm Capture after a Launch + Capture had already closed your apps) no longer wipes the app-reopen list. The close now MERGES with the existing saved list instead of overwriting it — so a re-arm that finds nothing left to close keeps your original apps queued to reopen. (Found when a salvaged flight left apps closed and none came back.)
 v5.9.28  Plan a Flight (from the audit): region filters expanded from just Europe + North America to the whole world — added Central America, South America, Asia, Middle East, Africa, and Oceania, each mapped by ICAO region prefix. The mapping is now data-driven so it's easy to extend
 v5.9.27  CRITICAL fix: the v5.9.26 auto-quit checked whether MSFS was running via psutil, which returned a false negative (couldn't read the process name) and wrongly quit the capture ~15s into normal flight loading — killing a real flight's capture. Switched to the reliable tasklist check (the same method the rest of the app uses) plus a 3-second re-check, so a loading flight can never be aborted. Rebuilt perf-engine.exe

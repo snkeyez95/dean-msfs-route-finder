@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.29</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.30</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -375,7 +375,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.29</div>
+    <div class="sb-ver">v5.9.30</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3478,14 +3478,17 @@ function qlBtnHtml(){
 }
 
 async function quickLaunchAll(){
-  // Companion apps start immediately; MSFS is delayed 5s to avoid a launch
-  // conflict with another project that also touches the sim on startup.
+  // Companion apps start immediately; MSFS is delayed 5s (the 5s lets companions settle before the
+  // sim starts).
   const apps=S.cfg.quickLaunchApps||[];
   for(const a of apps){
     if(!a.path)continue;
     const res=await window.api.launchApp({path:a.path});
     if(res&&!res.ok)RLOG('[LAUNCH] App failed: '+a.name+': '+(res.error||'unknown'));
   }
+  // If any companion is flagged "close on sim exit", arm the sim-close watcher so it gets killed
+  // when the sim closes (Launch + Capture already arms the watcher itself).
+  if(apps.some(a=>a&&a.closeOnSimExit)){ try{ await window.api.flightWatchCompanions(); }catch(e){} }
   RLOG('[LAUNCH] Companion apps launched — starting MSFS in 5s');
   setTimeout(()=>launchMSFS(),5000);
 }
@@ -3914,8 +3917,19 @@ function renderQlAppList(){
   list.innerHTML=apps.map((a,i)=>`<div style="display:flex;align-items:center;gap:6px">
     <span style="flex:0 0 100px;font-size:12px;color:var(--ink1);font-family:'Inter',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.name}">${a.name}</span>
     <span style="flex:1;font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.path}">${a.path}</span>
+    <label style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink2);font-family:'Inter',sans-serif;cursor:pointer;white-space:nowrap" title="Automatically close this app when MSFS closes">
+      <input type="checkbox" ${a.closeOnSimExit?'checked':''} onchange="toggleCompanionClose(${i})" style="cursor:pointer"> close on sim exit
+    </label>
     <button class="btn bg bsm" style="flex-shrink:0;padding:2px 7px;font-size:11px" onclick="removeQuickLaunchApp(${i})">&#10005;</button>
   </div>`).join('');
+}
+async function toggleCompanionClose(idx){
+  const apps=S.cfg.quickLaunchApps||[];
+  if(!apps[idx])return;
+  apps[idx].closeOnSimExit=!apps[idx].closeOnSimExit;
+  S.cfg.quickLaunchApps=apps;
+  await window.api.saveConfig(S.cfg);
+  renderQlAppList();
 }
 
 async function addQuickLaunchApp(){
@@ -5019,5 +5033,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.29</div>
+  pointer-events:none;">v5.9.30</div>
 </body></html>

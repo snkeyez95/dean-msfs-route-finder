@@ -1076,7 +1076,11 @@ function flightReopenApps(){
   try {
     let killAfter = [];
     try { const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
-      killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name); } catch(_){}
+      killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name);
+      // Companion apps flagged "close when the sim closes" (Navigraph, vPilot, …) get killed here too.
+      const comps = (c.quickLaunchApps||[]).filter(a=>a&&a.closeOnSimExit&&a.name).map(a=>a.name);
+      killAfter = [...new Set([...killAfter, ...comps])];
+    } catch(_){}
     const sf = FLIGHT_STATE();
     // Node owns the data: read + parse the state file here (Node's JSON is reliable across any
     // Windows PowerShell version — 5.1's `@(... | ConvertFrom-Json)` collapses an N-element array
@@ -1161,6 +1165,14 @@ ipcMain.handle('flight-close-apps', (_, apps) => new Promise((resolve) => {
     ps.on('error', e => resolve({ ok:false, error:e.message }));
   } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
+
+// Arm the sim-close watcher for "close on sim exit" companions on a plain Quick Launch (Launch +
+// Capture already arms it via flight-close-apps). On sim-close, flightReopenApps kills the flagged
+// companions (it reopens nothing if no apps were closed).
+ipcMain.handle('flight-watch-companions', () => {
+  try { _flightReopenPending = true; startFlightWatch(); return { ok:true }; }
+  catch (e) { return { ok:false, error:e.message }; }
+});
 
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget

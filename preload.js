@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('api', {
   perfCompareData:    ()    => ipcRenderer.invoke('perf-compare-data'),
   listRunningApps:    ()    => ipcRenderer.invoke('list-running-apps'),
   flightCloseApps:    (a)   => ipcRenderer.invoke('flight-close-apps', a),
+  flightWatchCompanions: () => ipcRenderer.invoke('flight-watch-companions'),
   isPackaged:         () => __dirname.includes('app.asar'),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available',   (_, ver) => cb(ver)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded',  (_, ver) => cb(ver)),
