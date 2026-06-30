@@ -172,6 +172,63 @@ logging.basicConfig(
 )
 
 
+class _NoiseFilter(logging.Filter):
+    """Drop the benign SimConnect data-def retry spam logged during flight-load (the SimConnect lib
+    logs `SIM def(...)` at ERROR until the flight is active). Keeps the engine log readable; every
+    other record passes through unchanged."""
+    def filter(self, record):  # noqa: A003
+        try:
+            return not str(record.getMessage()).startswith("SIM def")
+        except Exception:  # noqa: BLE001
+            return True
+
+
+for _h in logging.getLogger().handlers:
+    _h.addFilter(_NoiseFilter())
+try:
+    logging.getLogger("SimConnect").setLevel(logging.CRITICAL)
+except Exception:  # noqa: BLE001
+    pass
+
+
+# ── Capture status (for ABRP's title-bar badge) + MSFS process check ───────────
+STATUS_FILE = os.path.join(DATA_ROOT, "capture_status.json")
+
+
+def _write_status(state):
+    """Write a tiny marker ABRP's title-bar badge reads (armed / recording). Never raises."""
+    try:
+        with open(STATUS_FILE, "w", encoding="utf-8") as fh:
+            json.dump({"state": state, "pid": os.getpid(), "ts": time.time()}, fh)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _clear_status():
+    try:
+        if os.path.isfile(STATUS_FILE):
+            os.remove(STATUS_FILE)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _msfs_running():
+    """True if the MSFS process is up. On any uncertainty return True, so a real flight is never
+    aborted by mistake."""
+    try:
+        import psutil
+        target = TARGET_PROCESS.lower()
+        for p in psutil.process_iter(["name"]):
+            try:
+                if (p.info.get("name") or "").lower() == target:
+                    return True
+            except Exception:  # noqa: BLE001
+                continue
+        return False
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def say(msg):
     """Print to console AND log it."""
     print(msg)
@@ -3235,14 +3292,20 @@ def wait_for_auto_start():
 
     say("  Auto-start mode: waiting for MSFS 2024 SimConnect connection...")
     sm = None
+    _connect_start = time.monotonic()
     while sm is None:
         try:
             sm = SimConnect()
         except Exception:  # noqa: BLE001 - sim not up yet, keep retrying
+            # Backstop: armed but MSFS never launched — don't wait forever.
+            if time.monotonic() - _connect_start > 1800:
+                say("  MSFS did not start within 30 min — exiting capture (nothing to record).")
+                return "no-flight"
             time.sleep(2.0)
 
     say("  Connected. Waiting for rolling...")
-    say("  (Press ENTER to start capture manually if it doesn't roll on its own.)")
+    if not HEADLESS:
+        say("  (Press ENTER to start capture manually if it doesn't roll on its own.)")
     aq = AircraftRequests(sm, _time=0)
     confirmed_since = None
     altitude = None
@@ -3293,6 +3356,14 @@ def wait_for_auto_start():
             # us at the menu). A request made then never refreshes, so rebuild the
             # connection fresh — once the flight is active it reads real speed.
             if none_streak >= 15:
+                # Auto-quit: if MSFS has closed, no flight is coming — exit instead of waiting
+                # forever (an armed-but-never-flown capture used to linger and could misfire on a
+                # later flight). On uncertainty _msfs_running() returns True, so this never aborts a
+                # real, still-loading flight.
+                if not _msfs_running():
+                    say("  MSFS has closed and no flight was started — exiting capture "
+                        "(nothing to record).")
+                    return "no-flight"
                 say("  No speed data yet — refreshing SimConnect connection "
                     "(flight may still be loading).")
                 try:
@@ -3301,6 +3372,9 @@ def wait_for_auto_start():
                     pass
                 sm = None
                 while sm is None and not forced.is_set():
+                    if not _msfs_running():
+                        say("  MSFS closed while reconnecting — exiting capture.")
+                        return "no-flight"
                     try:
                         sm = SimConnect()
                     except Exception:  # noqa: BLE001
@@ -3613,7 +3687,10 @@ def main():
             pass
 
     if "--auto" in sys.argv:
-        wait_for_auto_start()
+        _write_status("armed")
+        if wait_for_auto_start() == "no-flight":
+            _clear_status()
+            return
 
     # Re-read settings now — MSFS is loaded and TLOD/OLOD reflect what the user set in-sim.
     fresh = read_settings()
@@ -3653,6 +3730,7 @@ def main():
 
     proc = start_presentmon(pm_path, tmp_csv)
     vram.start()
+    _write_status("recording")
 
     # Stop when the user presses Enter (clean - no batch-terminate prompt), or
     # when PresentMon exits on its own because MSFS closed.
