@@ -200,6 +200,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.28  Plan a Flight (from the audit): region filters expanded from just Europe + North America to the whole world — added Central America, South America, Asia, Middle East, Africa, and Oceania, each mapped by ICAO region prefix. The mapping is now data-driven so it's easy to extend
 v5.9.27  CRITICAL fix: the v5.9.26 auto-quit checked whether MSFS was running via psutil, which returned a false negative (couldn't read the process name) and wrongly quit the capture ~15s into normal flight loading — killing a real flight's capture. Switched to the reliable tasklist check (the same method the rest of the app uses) plus a 3-second re-check, so a loading flight can never be aborted. Rebuilt perf-engine.exe
 v5.9.26  Engine update pass (rebuilt perf-engine.exe): (1) the capture engine now auto-quits if you arm a capture but close the sim without flying — no more lingering engines piling onto a later flight; (2) the engine log no longer floods with benign "SIM def" SimConnect retries during flight load, so it's actually readable; (3) the engine writes its status so the title-bar badge can show amber "Capture armed" vs red "Recording". Validated the rebuilt engine runs and the new logic behaves; the live capture path confirms on your next flight
 v5.9.25  Fix: the Compare view's "group by" / "holding" dropdown menus were grey-on-grey and unreadable when open — they now theme with the app (dark popup in dark mode, light in light mode)

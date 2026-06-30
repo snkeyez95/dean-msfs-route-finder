@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.27</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.28</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -375,7 +375,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.27</div>
+    <div class="sb-ver">v5.9.28</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -478,7 +478,13 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
         <span class="clbl">Region</span>
         <div class="chip sq on" data-region="all" onclick="setRegion('all')">All</div>
         <div class="chip sq" data-region="europe" onclick="setRegion('europe')">Europe</div>
-        <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">North America</div>
+        <div class="chip sq" data-region="namerica" onclick="setRegion('namerica')">N. America</div>
+        <div class="chip sq" data-region="camerica" onclick="setRegion('camerica')">C. America</div>
+        <div class="chip sq" data-region="samerica" onclick="setRegion('samerica')">S. America</div>
+        <div class="chip sq" data-region="asia" onclick="setRegion('asia')">Asia</div>
+        <div class="chip sq" data-region="meast" onclick="setRegion('meast')">Mid East</div>
+        <div class="chip sq" data-region="africa" onclick="setRegion('africa')">Africa</div>
+        <div class="chip sq" data-region="oceania" onclick="setRegion('oceania')">Oceania</div>
       </div>
       <div class="crow" id="fresh-row">
         <div class="chip sq" id="fresh-toggle-btn" style="margin-left:auto" onclick="toggleFreshOnly()" title="Hide city pairs you've flown recently (either direction)">&#10038; Fresh routes</div>
@@ -2432,6 +2438,17 @@ function getActiveFleet(){
   return new Set(FLEET_DEF.filter(f=>fleet[f.code]).map(f=>f.code));
 }
 
+// Region filter — ICAO first-letter prefixes per region (data-driven so it's easy to extend).
+const REGION_PREFIXES={
+  europe:['E','L','B'],            // E=N.Europe · L=S.Europe/Med · B=Iceland
+  namerica:['K','C','P'],          // K=USA · C=Canada · P=Alaska/Hawaii/Pacific US
+  camerica:['M','T'],              // M=Mexico/Central America · T=Caribbean
+  samerica:['S'],                  // S=South America
+  asia:['R','V','W','Z','U'],      // R=E.Asia · V=S/SE Asia · W=Maritime SE Asia · Z=China · U=Russia
+  meast:['O'],                     // O=Middle East (+Pakistan/Afghanistan)
+  africa:['D','F','G','H'],        // D/F/G/H=Africa
+  oceania:['Y','N'],               // Y=Australia · N=NZ & South Pacific
+};
 function getRoutes(){
   const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
   const durMaxHrs=parseFloat((document.getElementById('dur-f')||{value:''}).value)||0;
@@ -2454,8 +2471,10 @@ function getRoutes(){
     if(S.acft!=='all'&&r.aircraft_type!==S.acft)return false;
     const fl=parseInt(r.flight_length)||0;
     if(durMaxHrs&&fl>durMaxHrs*60)return false;
-    if(S.regionFilter==='europe'&&!/^[ELGB]/.test(dep)&&!/^[ELGB]/.test(arr))return false;
-    if(S.regionFilter==='namerica'&&!'KCP'.includes(dep[0])&&!'KCP'.includes(arr[0]))return false;
+    if(S.regionFilter!=='all'){
+      const pfx=REGION_PREFIXES[S.regionFilter];
+      if(pfx){ const inR=ic=>ic&&pfx.includes(ic[0]); if(!inR(dep)&&!inR(arr))return false; }
+    }
     if(q&&!([dep,arr,r.airline||'',r.callsign||'',r.description||''].some(x=>x.toLowerCase().includes(q))))return false;
     if(S.acFilter&&r.airline!==S.acFilter)return false;
     return true;
@@ -5000,5 +5019,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.27</div>
+  pointer-events:none;">v5.9.28</div>
 </body></html>
