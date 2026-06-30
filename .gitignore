@@ -17,3 +17,4 @@ perf/build_pyi/
 perf/*.spec
 perf/native/_ref.json
 perf/native/_ref_cov.json
+perf/native/_ref_settings.json
