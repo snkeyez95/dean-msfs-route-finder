@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.34</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.35</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -375,7 +375,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.34</div>
+    <div class="sb-ver">v5.9.35</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -687,6 +687,15 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     <button class="btn bp bsm" onclick="clearShaderCache()">&#129529; Clear Shader Cache</button>
     <div id="cache-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
     <div style="font-size:11px;color:var(--ink3);font-family:'Inter',sans-serif;margin-top:12px;line-height:1.6"><b>Before:</b> disable Shader Cache in the NVIDIA App &rarr; <b>reboot</b> &rarr; close MSFS &amp; overlays. <b>After:</b> re-enable NVIDIA Shader Cache &rarr; <b>reboot again</b>. Two reboots — the first one releases the locked cache so it can be deleted. (Full steps are in the confirm dialog.)</div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">Aircraft WASM Cache (PMDG / Fenix)</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Rebuilds an aircraft&rsquo;s compiled WASM modules fresh. <b>When:</b> after a major Sim Update, or after a PMDG/Fenix update if you hit crashes / the &ldquo;orange screen&rdquo;. <b>Not</b> needed for GPU-driver updates. Your saved panel states &amp; options (the &ldquo;work&rdquo; folder) are preserved.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn bg bsm" onclick="clearWasmCache('pmdg')">&#129529; Clean PMDG WASM</button>
+      <button class="btn bg bsm" onclick="clearWasmCache('fenix')">&#129529; Clean Fenix WASM</button>
+    </div>
+    <div id="wasm-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">GSX Pro</div>
   <div class="api-pan" style="margin-bottom:14px">
@@ -3960,6 +3969,17 @@ async function clearShaderCache(){
     if(el)el.innerHTML='&#10003; Cleared '+c+' location'+(c!==1?'s':'')+(s?(' &middot; '+s+' not present'):'')+'.<br>Now re-enable NVIDIA Shader Cache and reboot before your next flight.';
   } else { if(el)el.innerHTML='<span style="color:#e23">Could not clear: '+((r&&r.error)||'unknown error')+'</span>'; }
 }
+async function clearWasmCache(vendor){
+  const name=vendor==='pmdg'?'PMDG':'Fenix';
+  if(!confirm('Clear the '+name+' WASM cache?\n\nThis deletes '+name+'’s COMPILED WASM modules so MSFS rebuilds them clean on next load — the fix for stale-cache crashes / the "orange screen" after a Sim Update or a '+name+' update.\n\n✓ PRESERVED: your saved aircraft state (panel states, options, airframe hours — the "work" folder).\n\nMSFS must be CLOSED (it will refuse otherwise). The first load after will be a little slower while modules recompile.\n\nProceed?'))return;
+  const el=document.getElementById('wasm-result'); if(el)el.textContent='Clearing '+name+' WASM…';
+  let r; try{ r=await window.api.clearWasmCache(vendor); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.blocked){ if(el)el.innerHTML='<span style="color:#e23">Blocked — close MSFS first ('+((r.running||[]).join(', '))+' still running).</span>'; return; }
+  if(r&&r.ok){
+    const c=(r.cleared||[]).length, k=(r.kept||[]).length;
+    if(el)el.innerHTML = c ? ('&#10003; Cleared '+name+' WASM &mdash; '+c+' module folder'+(c!==1?'s':'')+' rebuilt, '+k+' saved-state folder'+(k!==1?'s':'')+' preserved. Recompiles on next load.') : (name+' WASM not found (nothing to clear).');
+  } else { if(el)el.innerHTML='<span style="color:#e23">Could not clear: '+((r&&r.error)||'unknown error')+'</span>'; }
+}
 
 async function addQuickLaunchApp(){
   const res=await window.api.browseFile();
@@ -5062,5 +5082,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.34</div>
+  pointer-events:none;">v5.9.35</div>
 </body></html>

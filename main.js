@@ -1215,6 +1215,41 @@ foreach($s in $skipped){ Write-Output ("SKIP|"+$s) }`;
   } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
 
+// Per-aircraft WASM cache cleaner (PMDG / Fenix). Deletes the COMPILED WASM modules so MSFS rebuilds
+// them fresh (fixes stale-cache CTDs / "orange screen" after a Sim Update or an aircraft update), but
+// PRESERVES each aircraft's "work" subfolder — that holds PMDG/Fenix saved state (panel states, options,
+// airframe hours), which is NOT cache. Hard-guards on MSFS running. Renderer MUST confirm.
+ipcMain.handle('clear-wasm-cache', (_, vendor) => new Promise((resolve) => {
+  try {
+    const map = { pmdg:'pmdg-aircraft-*', fenix:'fnx-aircraft-*' };
+    const pattern = map[vendor];
+    if (!pattern) { resolve({ ok:false, error:'unknown vendor' }); return; }
+    const cp = require('child_process');
+    const running = [];
+    for (const pn of ['FlightSimulator2024.exe','sunrisex64_steam_pcr.exe','kittyhawkx64.exe']) {
+      try { const r = cp.spawnSync('tasklist',['/FI','IMAGENAME eq '+pn,'/NH'],{encoding:'utf8',timeout:6000,windowsHide:true});
+        if ((r.stdout||'').toLowerCase().includes(pn.toLowerCase())) running.push(pn); } catch(_){}
+    }
+    if (running.length) { resolve({ ok:false, blocked:true, running }); return; }
+    const ps = `$wasm="$env:APPDATA\\Microsoft Flight Simulator 2024\\WASM"
+foreach($ver in 'MSFS2020','MSFS2024'){ $base=Join-Path $wasm $ver
+  if(Test-Path -LiteralPath $base){ Get-ChildItem -LiteralPath $base -Directory -Filter '${pattern}' -ErrorAction SilentlyContinue | ForEach-Object { $a=$_.FullName
+    Get-ChildItem -LiteralPath $a -File -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -LiteralPath $a -Directory -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'work' } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Output ('CLEARED|'+$_.Name); if(Test-Path -LiteralPath (Join-Path $a 'work')){ Write-Output ('KEPT|'+$_.Name) } } } }`;
+    const proc = spawn('powershell',['-NoProfile','-NonInteractive','-Command',ps],{windowsHide:true});
+    let out=''; proc.stdout.on('data',d=>out+=d); proc.stderr.on('data',d=>out+=d);
+    proc.on('close', () => {
+      const lines = out.split(/\r?\n/);
+      const cleared = lines.filter(l=>l.indexOf('CLEARED|')===0).map(l=>l.slice(8));
+      const kept    = lines.filter(l=>l.indexOf('KEPT|')===0).map(l=>l.slice(5));
+      LOG.info('[WASM] '+vendor+' cleared '+cleared.length+' module folder(s), preserved '+kept.length+' work folder(s)');
+      resolve({ ok:true, vendor, cleared, kept });
+    });
+    proc.on('error', e => resolve({ ok:false, error:e.message }));
+  } catch (e) { resolve({ ok:false, error:e.message }); }
+}));
+
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine
