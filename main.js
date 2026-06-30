@@ -1298,6 +1298,54 @@ ipcMain.handle('get-maintenance-versions', (_, aircraftRoot) => {
   return { driver, simBuild, pmdg: ac.pmdg, fenix: ac.fenix };
 });
 
+// ── NVIDIA Control Panel (NVCP) settings backup/restore ──────────────────────
+// Ports tools/backup_nvidia_settings.bat + restore_nvidia_settings.bat: the global 3D settings + all
+// game profiles live in two driver .bin files under C:\ProgramData\NVIDIA Corporation\Drs. Back up =
+// copy them into userData (archiving any previous with a timestamp); Restore = copy them back (reboot
+// to apply). Reading/writing ProgramData needs admin — Dean runs ABRP elevated; otherwise we surface
+// an admin-needed message instead of failing silently. Pure fs ops (no shell).
+const NVCP_DRS   = 'C:\\ProgramData\\NVIDIA Corporation\\Drs';
+const NVCP_FILES = ['nvdrsdb0.bin','nvdrsdb1.bin'];
+function nvcpBackupDir(){ return path.join(USER_DATA, 'nvidia_settings_backup'); }
+function nvcpTs(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes()); }
+function nvcpErr(e){ return (e && (e.code==='EPERM'||e.code==='EACCES')) ? 'Access denied — this needs ABRP running as Administrator.' : (e && e.message) || 'unknown error'; }
+
+ipcMain.handle('nvcp-status', () => {
+  try {
+    const f0 = path.join(nvcpBackupDir(), 'nvdrsdb0.bin');
+    if (fs.existsSync(f0)) return { hasBackup:true, ts: fs.statSync(f0).mtime.toISOString(), dir: nvcpBackupDir() };
+    return { hasBackup:false, dir: nvcpBackupDir() };
+  } catch(e){ return { hasBackup:false, error: e.message }; }
+});
+
+ipcMain.handle('nvcp-backup', () => {
+  try {
+    if (!fs.existsSync(path.join(NVCP_DRS,'nvdrsdb0.bin'))) return { ok:false, error:'NVIDIA settings not found — is the driver installed?' };
+    const dir = nvcpBackupDir();
+    fs.mkdirSync(dir, { recursive:true });
+    let archived = null;
+    if (fs.existsSync(path.join(dir,'nvdrsdb0.bin'))) {
+      const ts = nvcpTs();
+      for (const f of NVCP_FILES) { const p = path.join(dir,f); if (fs.existsSync(p)) fs.renameSync(p, path.join(dir, f.replace('.bin','_'+ts+'.bin'))); }
+      archived = ts;
+    }
+    for (const f of NVCP_FILES) fs.copyFileSync(path.join(NVCP_DRS,f), path.join(dir,f));
+    LOG.info('[NVCP] backed up to '+dir+(archived?' (archived previous as _'+archived+')':''));
+    return { ok:true, dir, archived };
+  } catch(e){ LOG.error('[NVCP] backup failed: '+e.message); return { ok:false, error: nvcpErr(e) }; }
+});
+
+ipcMain.handle('nvcp-restore', () => {
+  try {
+    const dir = nvcpBackupDir();
+    if (!fs.existsSync(path.join(dir,'nvdrsdb0.bin'))) return { ok:false, error:'No backup found yet — back up first.' };
+    if (!fs.existsSync(NVCP_DRS)) return { ok:false, error:'NVIDIA Drs folder not found — is the driver installed?' };
+    for (const f of NVCP_FILES) fs.copyFileSync(path.join(dir,f), path.join(NVCP_DRS,f));
+    LOG.info('[NVCP] restored from '+dir);
+    return { ok:true, needsReboot:true };
+  } catch(e){ LOG.error('[NVCP] restore failed: '+e.message); return { ok:false, error: nvcpErr(e) }; }
+});
+
 // Arm a performance capture for the next flight: spawn the engine headless + auto-start.
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine

@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.37</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.38</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.37</div>
+    <div class="sb-ver">v5.9.38</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -701,6 +701,16 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       <button class="btn bg bsm" onclick="clearWasmCache('fenix')">&#129529; Clean Fenix WASM</button>
     </div>
     <div id="wasm-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">NVIDIA Control Panel Settings (Backup / Restore)</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Saves &amp; restores your NVIDIA global 3D settings + game profiles (incl. MSFS) — the two driver <code>.bin</code> files. <b>Back up</b> while your settings are dialed in (e.g. before a driver wipe / DDU); <b>Restore</b> after a driver reinstall, then <b>reboot</b>. Previous backups are kept, timestamped.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn bg bsm" onclick="nvcpBackup()">&#128190; Back up NVCP Settings</button>
+      <button class="btn bg bsm" onclick="nvcpRestore()">&#8635; Restore NVCP Settings</button>
+      <span id="nvcp-stamp" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    </div>
+    <div id="nvcp-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">GSX Pro</div>
   <div class="api-pan" style="margin-bottom:14px">
@@ -1248,6 +1258,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   setInterval(updateCaptureBadge,7000);
   // Maintenance watcher: prompt to clear caches if the sim or GPU driver changed since last launch.
   checkMaintenanceVersions();
+  // NVCP backup stamp.
+  nvcpRefreshStatus();
   // Auto-refresh routes
   updateAutoRefreshInfo();
   scheduleAutoRefresh();
@@ -4031,6 +4043,26 @@ function openMaintenance(){
   setTimeout(()=>{ const e=document.getElementById('cache-result'); if(e&&e.scrollIntoView)e.scrollIntoView({behavior:'smooth',block:'center'}); },150);
   maintAck();
 }
+// ── NVIDIA Control Panel backup/restore ──────────────────────────────────────
+async function nvcpRefreshStatus(){
+  const el=document.getElementById('nvcp-stamp'); if(!el)return;
+  let s; try{ s=await window.api.nvcpStatus(); }catch(e){ return; }
+  el.textContent = (s&&s.hasBackup) ? ('Last backup: '+new Date(s.ts).toLocaleString()) : 'No backup yet';
+}
+async function nvcpBackup(){
+  if(!confirm('Back up your current NVIDIA Control Panel settings?\n\nSaves your global 3D settings + all game profiles (including MSFS) into ABRP’s data folder. Any previous backup is archived with a timestamp, so you can always go back further.\n\nBest done while your settings are exactly how you like them (e.g. before a driver wipe / DDU).\n\nProceed?'))return;
+  const el=document.getElementById('nvcp-result'); if(el)el.textContent='Backing up…';
+  let r; try{ r=await window.api.nvcpBackup(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.ok){ if(el)el.innerHTML='&#10003; NVIDIA settings backed up'+(r.archived?' (previous backup archived).':'.'); nvcpRefreshStatus(); }
+  else { if(el)el.innerHTML='<span style="color:#e23">Backup failed: '+((r&&r.error)||'unknown error')+'</span>'; }
+}
+async function nvcpRestore(){
+  if(!confirm('Restore your NVIDIA Control Panel settings from the last backup?\n\nThis OVERWRITES your current NVCP 3D settings + game profiles with the backed-up ones. Best used AFTER a driver reinstall / rollback.\n\nYou must REBOOT afterward for them to take effect.\n\nProceed?'))return;
+  const el=document.getElementById('nvcp-result'); if(el)el.textContent='Restoring…';
+  let r; try{ r=await window.api.nvcpRestore(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.ok){ if(el)el.innerHTML='&#10003; NVIDIA settings restored. <b>Reboot now</b> for them to take effect.'; }
+  else { if(el)el.innerHTML='<span style="color:#e23">Restore failed: '+((r&&r.error)||'unknown error')+'</span>'; }
+}
 
 async function addQuickLaunchApp(){
   const res=await window.api.browseFile();
@@ -5133,5 +5165,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.37</div>
+  pointer-events:none;">v5.9.38</div>
 </body></html>
