@@ -384,18 +384,31 @@ const CFG = path.join(USER_DATA, 'config.json');
     }
   } catch(e) { LOG.warn('Community routes migration failed:', e.message); }
 })();
-ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length)+' registry='+(Object.keys(c.routeRegistry||{}).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
+
+// Route data lives in its own files, NOT in config.json — so a settings save no longer rewrites the
+// ~13 MB route blob (config.json drops from ~16 MB to ~18 KB). One-time, non-destructive migration:
+// write the route data out of config into these files, then strip the keys from config.
+const REG_FILE  = path.join(USER_DATA, 'routeRegistry.json');
+const SNAP_FILE = path.join(USER_DATA, 'routeSnapshot.json');
+(()=>{
+  try {
+    if (!fs.existsSync(CFG)) return;
+    const c = JSON.parse(fs.readFileSync(CFG,'utf8'));
+    let changed = false;
+    if (c.routeRegistry)         { fs.writeFileSync(REG_FILE,  JSON.stringify(c.routeRegistry));         LOG.info('[MIGRATE] routeRegistry -> routeRegistry.json ('+Object.keys(c.routeRegistry).length+')');         delete c.routeRegistry;         changed = true; }
+    if (c.routeRegistrySnapshot) { fs.writeFileSync(SNAP_FILE, JSON.stringify(c.routeRegistrySnapshot)); LOG.info('[MIGRATE] routeRegistrySnapshot -> routeSnapshot.json ('+Object.keys(c.routeRegistrySnapshot).length+')'); delete c.routeRegistrySnapshot; changed = true; }
+    if (changed) { fs.writeFileSync(CFG, JSON.stringify(c, null, 2)); LOG.info('[MIGRATE] config.json slimmed (route data split out)'); }
+  } catch(e) { LOG.warn('[MIGRATE] route-data split failed (non-fatal):', e.message); }
+})();
+ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
 ipcMain.handle('save-config',(_,cfg)=>{
   try{
-    // Read existing file so we never clobber routeRegistry, which is written
-    // independently by si-save-registry and is not held in the renderer's S.cfg.
     let existing={};
     try{existing=JSON.parse(fs.readFileSync(CFG,'utf8'));}catch(e){}
     const merged=Object.assign({},existing,cfg);
-    // Carry forward routeRegistry if the incoming cfg doesn't include it
-    if(existing.routeRegistry&&!cfg.routeRegistry)merged.routeRegistry=existing.routeRegistry;
-    // Remove retired AirLabs key
-    delete merged.routeCache;
+    // Route data lives in routeRegistry.json / routeSnapshot.json now — never store it in config
+    // (this is what kept config.json at ~16 MB). Strip defensively + drop the retired AirLabs key.
+    delete merged.routeRegistry; delete merged.routeRegistrySnapshot; delete merged.routeCache;
     fs.writeFileSync(CFG,JSON.stringify(merged,null,2));
     LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);
   }catch(e){LOG.error('save-config failed:',e.message);}
@@ -439,8 +452,7 @@ ipcMain.handle('si-fetch-page', (_, {page, cookie}) => new Promise(resolve => {
 
 ipcMain.handle('si-get-registry', () => {
   try {
-    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
-    const reg = c.routeRegistry || {};
+    const reg = fs.existsSync(REG_FILE) ? JSON.parse(fs.readFileSync(REG_FILE, 'utf8')) : {};
     LOG.info('[SI] Registry loaded: ' + Object.keys(reg).length + ' entries');
     return reg;
   } catch(e) {
@@ -451,14 +463,8 @@ ipcMain.handle('si-get-registry', () => {
 
 ipcMain.handle('si-save-registry', (_, registry) => {
   try {
-    let c = {};
-    try { c = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(e) {}
-    c.routeRegistry = registry;
-    // Remove retired AirLabs key
-    delete c.routeCache;
-    LOG.info('[SI] Saving registry: ' + Object.keys(registry).length + ' entries');
-    fs.writeFileSync(CFG, JSON.stringify(c, null, 2));
-    LOG.info('[SI] Registry saved successfully');
+    fs.writeFileSync(REG_FILE, JSON.stringify(registry));
+    LOG.info('[SI] Registry saved: ' + Object.keys(registry||{}).length + ' entries');
   } catch(e) {
     LOG.error('si-save-registry failed:', e.message);
   }
@@ -466,8 +472,7 @@ ipcMain.handle('si-save-registry', (_, registry) => {
 
 ipcMain.handle('si-get-snapshot', () => {
   try {
-    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
-    const snap = c.routeRegistrySnapshot || {};
+    const snap = fs.existsSync(SNAP_FILE) ? JSON.parse(fs.readFileSync(SNAP_FILE, 'utf8')) : {};
     LOG.info('[SI] Snapshot loaded: ' + Object.keys(snap).length + ' entries');
     return snap;
   } catch(e) {
@@ -478,12 +483,8 @@ ipcMain.handle('si-get-snapshot', () => {
 
 ipcMain.handle('si-save-snapshot', (_, snapshot) => {
   try {
-    let c = {};
-    try { c = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(e) {}
-    c.routeRegistrySnapshot = snapshot;
-    delete c.routeCache;
-    LOG.info('[SI] Saving snapshot: ' + Object.keys(snapshot).length + ' entries');
-    fs.writeFileSync(CFG, JSON.stringify(c, null, 2));
+    fs.writeFileSync(SNAP_FILE, JSON.stringify(snapshot));
+    LOG.info('[SI] Snapshot saved: ' + Object.keys(snapshot||{}).length + ' entries');
   } catch(e) {
     LOG.error('si-save-snapshot failed:', e.message);
   }
