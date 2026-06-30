@@ -1,8 +1,8 @@
 @echo off
-title A Better Route Planner — Release Builder
+title A Better Route Planner - Release Builder
 echo.
 echo ================================================
-echo   A Better Route Planner — Release Builder
+echo   A Better Route Planner - Release Builder
 echo ================================================
 echo.
 echo This will build the installer AND publish a

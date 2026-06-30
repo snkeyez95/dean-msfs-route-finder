@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.42</div>
+  <div class="tname">A Better Route Planner &mdash; v5.9.43</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.42</div>
+    <div class="sb-ver">v5.9.43</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3754,9 +3754,12 @@ function renderBaseline(){
       +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:4px 6px">TLOD (both planes, worst-case)</th><th style="padding:4px 6px">min n</th><th style="padding:4px 6px">p99 ms</th><th style="padding:4px 6px">stutter%</th><th style="padding:4px 6px">cons%</th><th style="padding:4px 6px">peak VRAM</th><th style="padding:4px 6px">verdict</th></tr>';
     for(const t of _BL.TL){ const p=d.prof[t];
       if(!p||p.incomplete){ h+='<tr style="color:var(--ink3)"><td style="padding:4px 6px">'+t+'</td><td colspan="6" style="padding:4px 6px;text-align:right">missing a plane at this TLOD</td></tr>'; continue; }
-      const ok=p.pass;
+      const ok=p.pass, bS=p.stut>_BL.LIM.stut, bC=p.cons<_BL.LIM.cons, bV=p.pvram>d.VRAM_LIM, rd=';color:#e23;font-weight:700';
       h+='<tr style="text-align:right;color:'+(ok?'var(--ink1)':'var(--ink3)')+'"><td style="text-align:left;padding:4px 6px">'+t+(t===rec?' <span style="color:'+(cov.ready?'#46c46a':'var(--acc)')+'">&#9664; pick</span>':'')+'</td>'
-        +'<td style="padding:4px 6px">'+p.minN+'</td><td style="padding:4px 6px">'+p.p99.toFixed(1)+'</td><td style="padding:4px 6px">'+p.stut.toFixed(2)+'</td><td style="padding:4px 6px">'+p.cons.toFixed(1)+'</td><td style="padding:4px 6px">'+Math.round(p.pvram)+'</td>'
+        +'<td style="padding:4px 6px">'+p.minN+'</td><td style="padding:4px 6px">'+p.p99.toFixed(1)+'</td>'
+        +'<td style="padding:4px 6px'+(bS?rd:'')+'" title="'+(bS?'over the '+_BL.LIM.stut+'% stutter limit':'')+'">'+p.stut.toFixed(2)+'</td>'
+        +'<td style="padding:4px 6px'+(bC?rd:'')+'" title="'+(bC?'under the '+_BL.LIM.cons+'% consistency floor':'')+'">'+p.cons.toFixed(1)+'</td>'
+        +'<td style="padding:4px 6px'+(bV?rd:'')+'" title="'+(bV?'over the '+Math.round(d.VRAM_LIM)+' MB VRAM ceiling':'')+'">'+Math.round(p.pvram)+'</td>'
         +'<td style="padding:4px 6px;color:'+(ok?'#46c46a':'#e0823c')+'">'+(ok?'pass':'fail')+'</td></tr>';
     }
     h+='</table>';
@@ -5278,5 +5281,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.42</div>
+  pointer-events:none;">v5.9.43</div>
 </body></html>
