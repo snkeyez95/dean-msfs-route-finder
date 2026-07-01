@@ -17,7 +17,8 @@
     },
     "files": [
       "**/*",
-      "!perf/**"
+      "!perf/**",
+      "!community_routes.json"
     ],
     "extraResources": [
       { "from": "perf/perf-engine.exe", "to": "perf/perf-engine.exe" },

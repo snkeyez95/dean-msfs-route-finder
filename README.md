@@ -1,4 +1,4 @@
-# A Better Route Planner — v5.0.8
+# A Better Route Planner — v5.9.43
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -19,6 +19,12 @@ A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3
 - **Live D-ATIS** — Real digital ATIS in the expanded route panel: the actual active runway, approach in use, and information letter, pulled from atis.info (US) and atis.guru (international). A built-in interpreter translates the cryptic report into plain English, with the full raw text one click away. Arrival data shows on the arrival airport, departure data on the departure airport.
 - **SimBrief Integration** — One-click opens SimBrief pre-filled with airline, flight number, aircraft type, origin, destination, and callsign. When live D-ATIS is available, the active departure and arrival runways are pre-selected too.
 - **Community Routes** — Download a shared route database from GitHub when you don't have a SayIntentions cookie yet.
+- **Performance Logging** — A built-in engine captures real per-frame timing (via Intel PresentMon), VRAM, and system telemetry during a flight, then files a self-contained dashboard: frametime/FPS charts, stutter and variance breakdowns, phase-of-flight split, and VRAM headroom — all offline, no internet needed to view.
+- **Baseline Recommendation** — Analyzes your fixed-TLOD benchmark flights and recommends one balanced Terrain-LOD setting that keeps both heavy aircraft (PMDG + Fenix) smooth with VRAM headroom, with Smoothest / Balanced / Best-visuals modes.
+- **Maintenance Tools** — Dedicated tab: MSFS shader-cache cleaner, per-aircraft WASM cache cleaners (PMDG/Fenix), and NVIDIA Control Panel backup/restore — surfaced automatically when a sim update, GPU driver update, or aircraft update is detected.
+- **GSX Pro Profiles** — Per-airport GSX profile detection with auto-install of bundled profiles and a flightsim.to fallback link.
+- **Aircraft & Utility Activation** — Junction-based activation for aircraft and utility add-ons, so you can keep your Community folder slim for performance.
+- **Companion Apps** — Optionally close background apps during a flight and reopen them when the sim closes, plus one-click launch of companion apps alongside MSFS.
 - **Dark / Light theme** — Toggle in the title bar.
 
 ---
@@ -156,27 +162,34 @@ In *Settings → My Fleet*, check the aircraft you own. This filters routes to o
 
 ```
 DeanMSFS_v2/
-  index.html           frontend (HTML/CSS/JS — single file)
-  main.js              Electron main process, IPC handlers, API proxy
-  preload.js           contextBridge exposing APIs to renderer
-  package.json         Electron app config and version
-  CLAUDE.md            dev instructions (read automatically by Claude Code)
-  README.md            this file
-  start.bat            launch the app
-  setup.bat            install Node dependencies (first run)
-  update.bat           pull latest from GitHub and relaunch
-  _updater.ps1         PowerShell updater script
-  build.bat            electron-builder packaging (future)
-  dean_msfs_debug.log  session log, fresh each launch (cookies redacted)
+  index.html            frontend (HTML/CSS/JS — single file)
+  main.js               Electron main process, IPC handlers, API proxy
+  preload.js            contextBridge exposing APIs to renderer
+  package.json          Electron app config and version
+  CLAUDE.md             dev instructions (read automatically by Claude Code)
+  README.md             this file
+  start.bat             launch the app
+  setup.bat             install Node dependencies (first run)
+  update.bat            pull latest from GitHub and relaunch
+  publish.bat           push community_routes.json to GitHub
+  release.bat           build installer + publish GitHub Release (auto-updater)
+  _updater.ps1          PowerShell updater script
+  community_routes.json shared route database (dev copy; published to GitHub)
+  perf/                 performance-logging engine (Python engine + bundled PresentMon + chart libs)
+    perf-engine.exe     the frozen capture engine (bundled into the installer)
+    native/             Node port of the engine (in progress; replaces Python at v6)
+    vendor/             bundled chart libraries (offline report rendering)
 ```
 
-Config saved to: `%USERPROFILE%\.dean_msfs_v4.json`
+All writable user data lives in `%APPDATA%\A Better Route Planner\`:
+`config.json` (preferences), `routeRegistry.json` + `routeSnapshot.json` (route data),
+`Sessions\` (logged flights), `dean_msfs_debug.log` (session log, cookies redacted).
 
 ---
 
 ## Debug Log
 
-The app writes a session log to `dean_msfs_debug.log` in the app folder. Fresh each session. Cookies are redacted automatically.
+The app writes a session log to `dean_msfs_debug.log` in the user-data folder (`%APPDATA%\A Better Route Planner\`). Fresh each session. Cookies are redacted automatically.
 
 Key log prefixes:
 ```
