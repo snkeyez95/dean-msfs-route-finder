@@ -3266,6 +3266,9 @@ AUTO_MIN_SPEED_KT = 2.0     # above GSX spawn-reposition speed, below pushback s
 AUTO_CONFIRM_SECONDS = 3.0  # how long the condition must hold before triggering
 AUTO_POLL_INTERVAL = 1.0
 ALT_SANE_FT = 45000         # above this = SimConnect not yet settled; disarm trigger + clamp telemetry
+AUTO_GIVEUP_SECONDS = 90    # give up on the armed wait ONLY after SimConnect stays unreachable this
+                            # long (sim truly closed). A menu<->flight transition drops it for seconds;
+                            # NEVER abort a live flight over a transient miss (cost a 76-min capture once).
 
 
 def wait_for_auto_start():
@@ -3354,15 +3357,16 @@ def wait_for_auto_start():
             # us at the menu). A request made then never refreshes, so rebuild the
             # connection fresh — once the flight is active it reads real speed.
             if none_streak >= 15:
-                # Auto-quit ONLY if MSFS is genuinely gone (reliable tasklist + a 3s re-check to rule
-                # out a transient miss). None reads here are NORMAL while a flight loads at the menu —
-                # we must not quit just because reads are empty, only if the sim is truly closed.
-                if not _msfs_running():
-                    time.sleep(3.0)
-                    if not _msfs_running():
-                        say("  MSFS has closed and no flight was started — exiting capture "
-                            "(nothing to record).")
-                        return "no-flight"
+                # Data isn't refreshing — we almost certainly connected at the menu before the flight
+                # finished loading (Quick Launch fires us there). Rebuild the connection; once the
+                # flight is active a fresh request reads real speed.
+                #
+                # GROUND TRUTH for "is the sim alive?" is whether SimConnect will (re)connect: you
+                # cannot open a SimConnect session to a sim that isn't running, and if you can, it IS
+                # running — full stop. So we trust connectability, NEVER a process-list check. tasklist
+                # can transiently miss a busy, loading MSFS and falsely abort a real flight (the bug
+                # that cost a 76-minute capture). We give up ONLY if SimConnect stays unreachable for a
+                # sustained window — a menu<->flight transition drops it for seconds, a closed sim forever.
                 say("  No speed data yet — refreshing SimConnect connection "
                     "(flight may still be loading).")
                 try:
@@ -3370,13 +3374,15 @@ def wait_for_auto_start():
                 except Exception:  # noqa: BLE001
                     pass
                 sm = None
+                unreachable_since = time.monotonic()
                 while sm is None and not forced.is_set():
-                    if not _msfs_running():
-                        say("  MSFS closed while reconnecting — exiting capture.")
-                        return "no-flight"
                     try:
-                        sm = SimConnect()
-                    except Exception:  # noqa: BLE001
+                        sm = SimConnect()          # success => MSFS is definitely running
+                    except Exception:  # noqa: BLE001 - can't connect yet
+                        if time.monotonic() - unreachable_since > AUTO_GIVEUP_SECONDS:
+                            say(f"  SimConnect unreachable for {int(AUTO_GIVEUP_SECONDS)}s — MSFS "
+                                f"appears closed, exiting capture (nothing to record).")
+                            return "no-flight"
                         time.sleep(2.0)
                 if sm is not None:
                     aq = AircraftRequests(sm, _time=0)
