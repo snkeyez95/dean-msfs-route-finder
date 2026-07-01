@@ -1,4 +1,4 @@
-# A Better Route Planner — v5.9.43
+# A Better Route Planner — v5.9.44
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -213,6 +213,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v5.9.44  Capture reliability fix. The performance logger could quit itself mid-arming — before you ever took off — if Windows briefly failed to see the MSFS process during a heavy flight load, falsely concluding "the sim closed" (this cost a real 76-minute capture). It now confirms the sim is alive by whether it can reach SimConnect (the sim's own data link), which is impossible unless MSFS is actually running, and only gives up after that link stays unreachable for a sustained 90 seconds. A transient hiccup during loading can no longer abort a real flight.
 v5.9.43  Baseline table now highlights the exact metric(s) that failed a TLOD in red — e.g. TLOD 175's consistency (under 99%) and peak VRAM (over the ceiling) light up red so you see at a glance what tripped the "fail", with a hover tooltip naming each limit. Also fixed garbled dashes in release.bat (em-dash rendered as mojibake in the console) — now plain hyphens
 v5.9.42  Baseline view wording: the "how this was built" line now reconciles with the benchmark count — "16 of your 18 benchmark flights — 2 ran on a different GPU driver (your baseline is 566.36), left out so it's apples-to-apples" — instead of a confusing "4 excluded" that didn't match the 18/24 on screen. Replaced the engineering jargon "knee" with plain "best balance" throughout. Recommendation logic unchanged
 v5.9.41  New Performance → Baseline view: one blended TLOD recommendation — your best single global setting that keeps BOTH heavy planes (PMDG + Fenix) smooth with VRAM headroom (lighter aircraft only do better). Built from a clean subset (modal driver, in-grid TLODs, no reference aircraft, non-AutoFPS — fixes the all-vs-all confound trap), blended worst-of-the-two so it's safe for both. One headline number, with an optional expand for the 3 modes (Smoothest / Balanced / Best-visuals), per-plane knees, the supporting metric table, and honest caveats (driver used, excluded flights, sim-version seam, VRAM route-noise). Shows benchmark progress (X/24) and firms up as cells reach 3 flights. Reads TLOD 125 at 18/24 (PMDG outliers; will likely rise toward 150 as the last cells fill). The msfs-flight-analysis chat skill uses the same spec
