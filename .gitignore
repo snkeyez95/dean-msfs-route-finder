@@ -26,3 +26,7 @@ perf/native/_ref_charts.json
 perf/native/_ref_report_meta.json
 perf/native/_ref_combined.html
 perf/native/_gen_native.js
+
+perf/native/_ref_cfx.json
+perf/native/_cfx_ref_out/
+perf/native/_cfx_nat_out/
