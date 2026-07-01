@@ -118,25 +118,27 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const frameCount = g(stats, 'frame_count') || 0;
   const durationSeconds = g(stats, 'duration_seconds');
 
-  // Flight verdict — fills the space under the metric bars with a plain-English read of the flight.
+  // Flight verdict — keep the grade headline; make the BODY the thing that actually varies flight to
+  // flight on a smooth rig: the VRAM ceiling (the real constraint) + the worst frame. Not a footer echo.
   const p99v = g(stats, 'p99_ft_ms'), grd = gradeP99(p99v);
   const gword = { good: 'Smooth', ok: 'Playable', bad: 'Rough', na: '—' }[grd];
   const gcol = { good: 'var(--good)', ok: 'var(--ok)', bad: 'var(--bad)', na: 'var(--text-faint)' }[grd];
-  const consV = g(stats, 'consistency_pct'), cpuB = g(stats, 'cpu_bound_pct'), gpuB = g(stats, 'gpu_bound_pct'), vpk = g(vram, 'peak_pct');
-  const readTxt = (p99v != null)
-    ? ((consV != null ? floatRepr(consV) + '% of frames' : 'Frames') + ' landed within ±20% of the median frametime' + (grd === 'good' ? ' — effectively flat.' : (grd === 'ok' ? ' — mostly steady.' : ' — with some rough patches.')))
-    : 'No frametime data.';
-  const boundTxt = (cpuB != null)
-    ? (cpuB >= gpuB ? floatRepr(cpuB) + '% CPU-bound' + (gpuB != null && gpuB < 10 ? ' · GPU has headroom' : '') : floatRepr(gpuB) + '% GPU-bound')
-    : '';
-  const vramTxt = (vpk != null) ? ('VRAM peak ' + floatRepr(vpk) + '% of 12 GB' + (vpk >= 90 ? ' · tight headroom' : ' · comfortable headroom')) : '';
+  const vpk = g(vram, 'peak_pct'), peakMb = g(vram, 'peak_vram_mb'), totMb = g(vram, 'total_vram_mb') || 12288;
+  const headGB = peakMb != null ? pyRound((totMb - peakMb) / 1024, 1) : null;
+  const cpuB2 = g(stats, 'cpu_bound_pct');
+  let insight;
+  if (vpk == null) insight = 'VRAM wasn’t captured for this flight.';
+  else if (vpk < 85) insight = 'Room to climb — VRAM peaked at ' + floatRepr(vpk) + '% (' + floatRepr(headGB) + ' GB free)' + (cpuB2 != null && cpuB2 > 90 ? ' with the GPU mostly idle' : '') + '. This TLOD isn’t the limiter.';
+  else if (vpk < 92) insight = 'VRAM is the ceiling here — peaked at ' + floatRepr(vpk) + '%, only ' + floatRepr(headGB) + ' GB to spare. About as high as this TLOD comfortably sustains.';
+  else insight = 'VRAM-limited — peaked at ' + floatRepr(vpk) + '% (' + floatRepr(headGB) + ' GB left). A higher TLOD risks running dry.';
+  const maxSpike = g(stats, 'max_ft_ms'), stutN2 = g(stats, 'stutter_count') || 0, fc2 = g(stats, 'frame_count') || 0;
+  const spikeTxt = (maxSpike != null) ? ('Worst single frame ' + floatRepr(maxSpike) + ' ms · ' + thousands(stutN2) + ' stutter' + (stutN2 !== 1 ? 's' : '') + ' across ' + thousands(fc2) + ' frames') : '';
   const verdictHtml = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">' +
     '<div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px">Verdict</div>' +
     '<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:25px;font-weight:700;color:' + gcol + '">' + gword + '</span>' +
     '<span style="font-size:13px;color:var(--text-dim);font-family:Consolas,monospace">P99 ' + (p99v != null ? floatRepr(p99v) : '—') + ' ms</span></div>' +
-    '<div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:9px">' + readTxt + '</div>' +
-    (boundTxt ? '<div style="font-size:11px;color:var(--text-dim);margin-top:9px">' + boundTxt + '</div>' : '') +
-    (vramTxt ? '<div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + vramTxt + '</div>' : '') +
+    '<div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:9px">' + insight + '</div>' +
+    (spikeTxt ? '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;font-family:Consolas,monospace">' + spikeTxt + '</div>' : '') +
     '</div>';
 
   return `<!DOCTYPE html>
@@ -212,9 +214,8 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
         <div class="pietab active" id="ptStut" onclick="showPie('stut')">Stuttering</div>
         <div class="pietab" id="ptVar" onclick="showPie('var')">Variances</div>
       </div>
-      <div class="pie-wrap" style="display:block">
-        <div id="pieBar" style="display:flex;height:30px;width:100%;border-radius:7px;overflow:hidden;border:1px solid var(--border)"></div>
-        <div class="graph-hint" id="pieScaleNote" style="margin:6px 0 10px">To scale — tiny segments get a minimum sliver so they stay visible. Hover for the exact split.</div>
+      <div class="pie-wrap">
+        <svg id="pieSvg" viewBox="0 0 120 120" width="112" height="112" role="img" aria-label="breakdown"></svg>
         <div class="legend" id="pieLegend"></div>
       </div>
     </div>

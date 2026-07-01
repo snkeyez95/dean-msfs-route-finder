@@ -21,11 +21,18 @@
       document.getElementById('ptStut').classList.toggle('active',which==='stut');
       document.getElementById('ptVar').classList.toggle('active',which==='var');
       var items=RD.pies[which];
-      // to-scale stacked bar; non-zero segments get a min sliver so tiny ones stay visible
-      var bar='';
-      items.forEach(function(s){var p=(s.pct!=null?s.pct:0);if(p<=0)return;
-        bar+='<div title="'+s.label+'" style="background:'+s.color+';flex:'+p+' 0 0;min-width:4px"></div>';});
-      var pb=document.getElementById('pieBar');if(pb)pb.innerHTML=bar||'<div style="flex:1;background:var(--panel-2)"></div>';
+      // real to-scale pie (CapFrameX-style): a mostly-smooth flight is a near-solid disc — that's the point
+      var total=0;items.forEach(function(s){total+=(s.pct!=null?s.pct:0);});
+      var cx=60,cy=60,r=52,ang=-Math.PI/2,svg='';
+      if(total<=0){svg='<circle cx="60" cy="60" r="52" fill="var(--panel-2)"/>';}
+      else items.forEach(function(s){var p=(s.pct!=null?s.pct:0);if(p<=0)return;
+        var frac=p/total,a2=ang+frac*2*Math.PI;
+        if(frac>=0.99995){svg+='<circle cx="60" cy="60" r="52" fill="'+s.color+'"/>';ang=a2;return;}
+        var x1=cx+r*Math.cos(ang),y1=cy+r*Math.sin(ang),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+        var lg=frac>0.5?1:0;
+        svg+='<path d="M'+cx+' '+cy+' L'+x1.toFixed(2)+' '+y1.toFixed(2)+' A'+r+' '+r+' 0 '+lg+' 1 '+x2.toFixed(2)+' '+y2.toFixed(2)+' Z" fill="'+s.color+'"><title>'+s.label+'</title></path>';
+        ang=a2;});
+      var ps=document.getElementById('pieSvg');if(ps)ps.innerHTML=svg;
       var html='';items.forEach(function(s){
         html+='<div class="row"><span class="sw" style="background:'+s.color+'"></span>'+s.label+'</div>';});
       document.getElementById('pieLegend').innerHTML=html;};
