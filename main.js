@@ -1380,6 +1380,9 @@ ipcMain.handle('perf-start-capture', () => {
         ELECTRON_RUN_AS_NODE: '1', MSFS_PERF_ROOT: USER_DATA, ABRP_ASSET_DIR: dir,
         ABRP_SESSIONS_DIR: path.join(USER_DATA, 'Sessions'), ABRP_USERCFG: USERCFG_PATH,
         ABRP_SIMBRIEF_USER: simbriefUser(),
+        // node-simconnect (+ its 13 deps) is asarUnpack'd; point the detached process at it.
+        NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
+                                  : path.join(__dirname, 'node_modules'),
       });
       const nchild = spawn(process.execPath, [entry], { detached:true, stdio:'ignore', windowsHide:true, env:nenv });
       nchild.on('error', e => LOG.error('[PERF] native capture spawn failed: ' + e.message));
@@ -1413,7 +1416,7 @@ ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
       // Native prep-next runs IN-PROCESS (quick: SimBrief fetch + coverage + UserCfg write, no Python).
       (async () => {
         try {
-          const { prepNext } = require('./perf/native/prep.js');
+          const { prepNext } = require(path.join(perfDir(), 'native', 'prep.js'));  // perfDir = resources/perf when packaged
           let sessions = [];
           try { sessions = (JSON.parse(fs.readFileSync(path.join(USER_DATA, 'Sessions', 'index.json'), 'utf8')).sessions) || []; } catch(_){}
           const r = await prepNext(sessions, { username: simbriefUser(), usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA, 'usercfg_backups') });

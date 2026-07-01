@@ -20,6 +20,22 @@
       "!perf/**",
       "!community_routes.json"
     ],
+    "asarUnpack": [
+      "node_modules/node-simconnect/**",
+      "node_modules/debug/**",
+      "node_modules/if-async/**",
+      "node_modules/inherits/**",
+      "node_modules/ini/**",
+      "node_modules/ms/**",
+      "node_modules/readable-stream/**",
+      "node_modules/regedit/**",
+      "node_modules/safe-buffer/**",
+      "node_modules/stream-slicer/**",
+      "node_modules/string_decoder/**",
+      "node_modules/through2/**",
+      "node_modules/util-deprecate/**",
+      "node_modules/xtend/**"
+    ],
     "extraResources": [
       {
         "from": "perf/perf-engine.exe",
@@ -28,6 +44,11 @@
       {
         "from": "perf/vendor",
         "to": "perf/vendor"
+      },
+      {
+        "from": "perf/native",
+        "to": "perf/native",
+        "filter": [ "**/*.js", "report_assets/**", "!_*", "!**/*.py", "!*.bat" ]
       }
     ],
     "win": {
