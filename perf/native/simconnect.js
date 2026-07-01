@@ -104,7 +104,28 @@ function attachSampler(handle, tracker) {
   return state;
 }
 
+// One-shot read of the loaded aircraft TITLE (e.g. "PMDG 737-800"). Resolves the string or null after
+// a short timeout. Mirrors get_aircraft_title's SimConnect read (the caller normalizes + falls back).
+const DEF_TITLE = 2, REQ_TITLE = 2;
+function readTitle(handle, timeoutMs = 4000) {
+  const { SimConnectDataType, SimConnectPeriod } = require('node-simconnect');
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    try {
+      handle.addToDataDefinition(DEF_TITLE, 'TITLE', null, SimConnectDataType.STRING256);
+      handle.requestDataOnSimObject(REQ_TITLE, DEF_TITLE, 0 /* USER */, SimConnectPeriod.ONCE);
+      const onData = (recv) => {
+        if (recv.requestID !== REQ_TITLE) return;
+        try { finish((recv.data.readString(256) || '').trim() || null); } catch (_) { finish(null); }
+      };
+      handle.on('simObjectData', onData);
+      setTimeout(() => finish(null), timeoutMs);
+    } catch (_) { finish(null); }
+  });
+}
+
 module.exports = {
-  computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler,
+  computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler, readTitle,
   AUTO_MIN_SPEED_KT, AUTO_CONFIRM_SECONDS, ALT_SANE_FT, PHASE_VS_FPM, AUTO_GIVEUP_SECONDS,
 };
