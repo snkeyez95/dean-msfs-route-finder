@@ -147,13 +147,13 @@ function buildCombinedReport(sessions){
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>MSFS Performance — All Flights</title>
+<title>Performance — All Flights</title>
 <style>${A.THEME_BASE_CSS}${A.DASH_CSS}</style>
 </head>
 <body>
   <header>
     <div>
-      <div class="title">MSFS Performance — All Flights</div>
+      <div class="title">Performance — All Flights</div>
       <div class="sub mono">${nFlights} baseline flights logged${nRef ? ' · ' + nRef + ' reference' : ''}</div>
     </div>
     <div class="chips">${chips}</div>

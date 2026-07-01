@@ -14,6 +14,7 @@ function htmlEscape(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&
 function thousands(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }          // Python {:,} on an int
 function floatRepr(x){ if(x === null || x === undefined) return String(x); let s = String(x); if(!/[.eE]/.test(s)) s += '.0'; return s; }   // Python str(float) / float repr — keeps ".0"
 function PInt(n){ return { __int: n }; }                                                  // mark a value that must serialize as an int
+function gradeP99(p){ if(p == null) return 'na'; if(p <= 20) return 'good'; if(p <= 33.3) return 'ok'; return 'bad'; }
 function jsonStr(s){
   let out = '"';
   for(const ch of String(s)){
@@ -117,18 +118,39 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const frameCount = g(stats, 'frame_count') || 0;
   const durationSeconds = g(stats, 'duration_seconds');
 
+  // Flight verdict — fills the space under the metric bars with a plain-English read of the flight.
+  const p99v = g(stats, 'p99_ft_ms'), grd = gradeP99(p99v);
+  const gword = { good: 'Smooth', ok: 'Playable', bad: 'Rough', na: '—' }[grd];
+  const gcol = { good: 'var(--good)', ok: 'var(--ok)', bad: 'var(--bad)', na: 'var(--text-faint)' }[grd];
+  const consV = g(stats, 'consistency_pct'), cpuB = g(stats, 'cpu_bound_pct'), gpuB = g(stats, 'gpu_bound_pct'), vpk = g(vram, 'peak_pct');
+  const readTxt = (p99v != null)
+    ? ((consV != null ? floatRepr(consV) + '% of frames' : 'Frames') + ' landed within ±20% of the median frametime' + (grd === 'good' ? ' — effectively flat.' : (grd === 'ok' ? ' — mostly steady.' : ' — with some rough patches.')))
+    : 'No frametime data.';
+  const boundTxt = (cpuB != null)
+    ? (cpuB >= gpuB ? floatRepr(cpuB) + '% CPU-bound' + (gpuB != null && gpuB < 10 ? ' · GPU has headroom' : '') : floatRepr(gpuB) + '% GPU-bound')
+    : '';
+  const vramTxt = (vpk != null) ? ('VRAM peak ' + floatRepr(vpk) + '% of 12 GB' + (vpk >= 90 ? ' · tight headroom' : ' · comfortable headroom')) : '';
+  const verdictHtml = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">' +
+    '<div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px">Verdict</div>' +
+    '<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:25px;font-weight:700;color:' + gcol + '">' + gword + '</span>' +
+    '<span style="font-size:13px;color:var(--text-dim);font-family:Consolas,monospace">P99 ' + (p99v != null ? floatRepr(p99v) : '—') + ' ms</span></div>' +
+    '<div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:9px">' + readTxt + '</div>' +
+    (boundTxt ? '<div style="font-size:11px;color:var(--text-dim);margin-top:9px">' + boundTxt + '</div>' : '') +
+    (vramTxt ? '<div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + vramTxt + '</div>' : '') +
+    '</div>';
+
   return `<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>MSFS Performance — ${sessionId}</title>
+<title>Performance — ${sessionId}</title>
 <style>${A.THEME_BASE_CSS}${A.REPORT_CSS}</style>
 </head>
 <body>
   <header>
     <div>
-      <div class="title">MSFS Performance Analysis</div>
+      <div class="title">Performance Analysis</div>
       <div class="sub mono">${sessionId}</div>
     </div>
     <div class="chips">${chipsHtml}</div>
@@ -147,6 +169,7 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
     <div class="panel">
       <div class="panel-h">Metrics<button class="unit-btn" id="unitBtn" onclick="toggleUnit()">FPS</button></div>
       <div class="metrics" id="metrics"></div>
+      ${verdictHtml}
     </div>
     <div class="rcol">
       <div class="panel">
