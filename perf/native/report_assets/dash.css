@@ -1,0 +1,47 @@
+
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .acard { padding:12px 15px; }
+  .acard .name { font-size:14px; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .dot { width:11px; height:11px; border-radius:3px; }
+  .agrid { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; }
+  .lab { font-size:11px; color:var(--text-dim); }
+  .aval { font-family:Consolas,monospace; font-size:18px; font-weight:600; }
+  .ctrls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .seg { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .seg button { background:var(--panel-2); color:var(--text-dim); border:none; padding:6px 14px; font-size:12px; cursor:pointer; }
+  .seg button.active { background:var(--accent); color:#fff; font-weight:600; }
+  .tlodf { display:flex; gap:6px; flex-wrap:wrap; }
+  .tchip { display:flex; align-items:center; gap:5px; background:var(--panel-2); border:1px solid var(--border);
+    border-radius:6px; padding:4px 9px; font-size:12px; cursor:pointer; color:var(--text-dim); user-select:none; }
+  .tchip.on { border-color:var(--accent); color:var(--text); }
+  .tchip input { margin:0; accent-color:var(--accent); }
+  .tchip .ct { color:var(--text-faint); font-size:11px; }
+  .charts { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .graph-wrap { padding:8px 12px 12px; }
+  .legend { display:flex; gap:16px; padding:0 13px 10px; font-size:11px; color:var(--text-dim); }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .legend .sw { width:10px; height:10px; border-radius:2px; }
+  .note { background:var(--panel); border:1px solid var(--border); border-radius:7px;
+    padding:11px 15px; margin-bottom:12px; font-size:12px; color:var(--text-dim); }
+  .note b { color:var(--text); }
+  table { width:100%; border-collapse:collapse; font-size:12px; background:var(--panel);
+    border:1px solid var(--border); border-radius:7px; overflow:hidden; }
+  th,td { text-align:left; padding:7px 11px; border-bottom:1px solid var(--grid); }
+  th { color:var(--text-faint); font-weight:500; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+  tbody tr:last-child td { border-bottom:none; }
+  td.mono { font-family:Consolas,monospace; }
+  .g-good { color:var(--good); } .g-ok { color:var(--ok); } .g-bad { color:var(--bad); } .g-na { color:var(--text-faint); }
+  .covbody { padding:11px 15px 14px; }
+  .covrec { font-size:15px; font-weight:600; margin-bottom:10px; }
+  .covrec .pick { color:var(--accent); }
+  .covgrid { border-collapse:collapse; font-size:12px; margin-bottom:8px; background:none; border:none; }
+  .covgrid th { color:var(--text-faint); font-weight:500; padding:3px 10px; text-align:center;
+    font-size:11px; text-transform:none; letter-spacing:0; border:none; }
+  .covgrid td { padding:3px 10px; text-align:center; border:none; }
+  .covgrid td.lbl { text-align:left; color:var(--text-dim); }
+  .covcell { font-family:Consolas,monospace; border-radius:4px; padding:2px 9px; }
+  .cov0 { background:rgba(224,83,61,0.18); color:var(--bad); }
+  .cov1 { background:rgba(240,168,48,0.18); color:var(--ok); }
+  .cov3 { background:rgba(91,191,91,0.18); color:var(--good); }
+  .covnext { font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .covnote { font-size:11px; color:var(--text-faint); margin-top:6px; }

@@ -3,7 +3,7 @@
 // report.html from the proven chart helpers + the extracted static assets. PORT — must byte-match
 // Python (validated by _parity_report.js). The fiddly bits are Python-exact: json.dumps format
 // (", "/": " separators, ensure_ascii, float repr keeps ".0"), html.escape, and {:,} thousands.
-const A = require('./report_assets.json');
+const A = require('./report_assets.js');
 const { pyRound } = require('./stats.js');
 const RC = require('./report_charts.js');
 
@@ -103,8 +103,7 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
       '<div class="vram-nums"><span>' + thousands(peak) + ' MB peak</span>' +
       '<span>' + floatRepr(vpct) + '% of ' + pyRound(total / 1024, 0) + ' GB</span></div>' +
       '<div class="vram-nums"><span>avg ' + thousands(avg) + ' MB</span>' +
-      '<span>headroom ' + floatRepr(head) + ' GB</span></div>' +
-      '<div class="vram-nums" style="color:var(--text-faint);margin-top:10px"><span>(CapFrameX can\'t capture this)</span></div>';
+      '<span>headroom ' + floatRepr(head) + ' GB</span></div>';
   } else {
     vramHtml = '<div class="vram-nums"><span>VRAM not captured</span><span>install nvidia-ml-py</span></div>';
   }
@@ -175,11 +174,11 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
         <div class="graph-hint">Scroll to zoom · drag to pan · double-click to reset</div>
       </div>
       <div class="panel">
-        <div class="panel-h">Moving average · what the flight actually felt like (ms)</div>
+        <div class="panel-h">Frametime moving average · the smoothed trend you actually feel (ms)</div>
         <div class="graph-wrap" style="height:150px;position:relative">
           <canvas id="ftAvgChart" role="img" aria-label="moving-average frametime over the flight"></canvas>
         </div>
-        <div class="graph-hint">The orange line above, on its own zoomed scale — gentle = smooth.</div>
+        <div class="graph-hint">A rolling average of frametime that filters out one-off spikes to show the typical smoothness at each point of the flight — plotted on its own tight scale so small drifts are visible. Flat and low = smooth.</div>
       </div>
     </div>
   </div>
@@ -211,7 +210,7 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
 
   <footer>
     ${thousands(frameCount)} frames · ${durationSeconds != null ? floatRepr(durationSeconds) : 0} s · ${cpuGpu}<br/>
-    Captured by MSFS Silent Performance Logger · raw per-frame data in frametimes.csv
+    Captured by the ABRP Performance Logger · raw per-frame data in frametimes.csv
   </footer>
 
 <script>var RD = ${rdJson};</script>

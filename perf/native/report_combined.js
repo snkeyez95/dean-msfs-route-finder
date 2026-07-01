@@ -1,7 +1,7 @@
 'use strict';
 // Phase 8a — native port of rebuild_combined_report (msfs_perf_logger.py:2154): the combined dashboard
 // (Sessions/combined_report.html). PORT — must byte-match Python (validated by _parity_combined.js).
-const A = require('./report_assets.json');
+const A = require('./report_assets.js');
 const { pyRound, pySum } = require('./stats.js');
 const RC = require('./report_charts.js');
 const { computeCoverage, COVERAGE_AIRCRAFT, COVERAGE_TLODS } = require('./coverage.js');
