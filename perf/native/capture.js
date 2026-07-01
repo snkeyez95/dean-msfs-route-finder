@@ -76,12 +76,15 @@ async function runAutoCapture(opts) {
   if (conn === 'no-flight') { setStatus('idle'); return { ok: false, reason: 'no-flight' }; }
   const handle = conn.handle;
 
-  const recordingWallStart = Date.now() / 1000;
-  const tracker = new PhaseTracker(recordingWallStart);
   const state = attachSampler(handle, null);   // live {gspeed,onGround,alt}; we drive the tracker in the tick
   let lastMovingTs = null, wasAirborne = false, endedOnGround = true;
 
   await waitForRolling(state, say);
+  // Baseline is set HERE — at actual capture start, NOT at connect. The taxi-to-rolling gap can be
+  // minutes; anchoring earlier drifts frame-elapsed vs phase transitions (all frames mis-bucket to
+  // 'ground', telemetry wall_ms starts huge). Matches Python (_recording_wall_start set at record start).
+  const recordingWallStart = Date.now() / 1000;
+  const tracker = new PhaseTracker(recordingWallStart);
 
   // flight facts (sim is loaded now)
   const fresh = readSettings(opts.usercfgPath) || {};

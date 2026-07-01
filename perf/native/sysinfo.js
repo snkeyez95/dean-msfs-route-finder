@@ -37,7 +37,7 @@ function getSimVersion() {
     const p2 = spawnSync('powershell', ['-NoProfile', '-Command',
       `(Get-Item -LiteralPath '${exePath}').VersionInfo.FileVersion`],
       { encoding: 'utf8', timeout: 10000, windowsHide: true });
-    return (p2.stdout || '').trim() || null;
+    return (p2.stdout || '').trim().replace(/,/g, '.') || null;   // Windows FileVersion uses commas -> dots
   } catch (_) { return null; }
 }
 
