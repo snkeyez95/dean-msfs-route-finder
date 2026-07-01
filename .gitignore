@@ -32,3 +32,4 @@ perf/native/_cfx_ref_out/
 perf/native/_cfx_nat_out/
 
 perf/native/_ref_phases.json
+perf/native/_ref_engine.json
