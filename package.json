@@ -21,8 +21,14 @@
       "!community_routes.json"
     ],
     "extraResources": [
-      { "from": "perf/perf-engine.exe", "to": "perf/perf-engine.exe" },
-      { "from": "perf/vendor", "to": "perf/vendor" }
+      {
+        "from": "perf/perf-engine.exe",
+        "to": "perf/perf-engine.exe"
+      },
+      {
+        "from": "perf/vendor",
+        "to": "perf/vendor"
+      }
     ],
     "win": {
       "target": [
@@ -50,6 +56,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
+    "node-simconnect": "^4.2.0",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
