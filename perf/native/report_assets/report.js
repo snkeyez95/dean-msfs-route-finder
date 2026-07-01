@@ -20,7 +20,13 @@
     window.showPie=function(which){
       document.getElementById('ptStut').classList.toggle('active',which==='stut');
       document.getElementById('ptVar').classList.toggle('active',which==='var');
-      var html='';RD.pies[which].forEach(function(s){
+      var items=RD.pies[which];
+      // to-scale stacked bar; non-zero segments get a min sliver so tiny ones stay visible
+      var bar='';
+      items.forEach(function(s){var p=(s.pct!=null?s.pct:0);if(p<=0)return;
+        bar+='<div title="'+s.label+'" style="background:'+s.color+';flex:'+p+' 0 0;min-width:4px"></div>';});
+      var pb=document.getElementById('pieBar');if(pb)pb.innerHTML=bar||'<div style="flex:1;background:var(--panel-2)"></div>';
+      var html='';items.forEach(function(s){
         html+='<div class="row"><span class="sw" style="background:'+s.color+'"></span>'+s.label+'</div>';});
       document.getElementById('pieLegend').innerHTML=html;};
     window.showGraph=function(which){

@@ -123,10 +123,12 @@ function phaseBarsHtml(phases){
       rows += '<div class="phase-row"><span class="lbl">' + l + '</span><div class="ph-track"></div><span class="num" style="color:var(--text-faint)">—</span></div>';
       continue;
     }
-    const p99 = phases[k].p99_ft;
+    const ph = phases[k];
+    const p99 = ph.p99_ft;
     const w = Math.min(p99 / mx * 100, 100);
     const col = p99 <= 20 ? 'var(--good)' : (p99 <= 33.3 ? 'var(--ok)' : 'var(--bad)');
-    rows += '<div class="phase-row"><span class="lbl">' + l + '</span><div class="ph-track"><div class="ph-fill" style="width:' + fmt(w, 0) + '%;background:' + col + '"></div></div><span class="num" style="color:' + col + '">' + fmt(p99, 1) + ' ms</span></div>';
+    const tip = l + ' — ' + (ph.frame_count != null ? ph.frame_count.toLocaleString() : '?') + ' frames · avg ' + ph.avg_ft + ' ms · P99 ' + ph.p99_ft + ' ms · stutter ' + ph.stutter_pct + '% · ' + ph.pct_of_total + '% of the flight';
+    rows += '<div class="phase-row" title="' + tip + '" style="cursor:help"><span class="lbl">' + l + '</span><div class="ph-track"><div class="ph-fill" style="width:' + fmt(w, 0) + '%;background:' + col + '"></div></div><span class="num" style="color:' + col + '">' + fmt(p99, 1) + ' ms</span></div>';
   }
   return '<div class="phase">' + rows + '</div>';
 }

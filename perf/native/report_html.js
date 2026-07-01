@@ -66,18 +66,18 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const smoothN = Math.max(fc - stutN, 0), midN = Math.max(stutN - spikeN, 0);
   const pct = x => fc ? pyRound(x / fc * 100, 2) : 0.0;
   const stutPie = [
-    { label: 'Smooth: ' + floatRepr(pct(smoothN)) + '%', color: 'var(--accent)' },
-    { label: 'Stutter 33-50ms: ' + floatRepr(pct(midN)) + '%', color: 'var(--amber)' },
-    { label: 'Spike >50ms: ' + floatRepr(pct(spikeN)) + '%', color: 'var(--bad)' },
+    { label: 'Smooth: ' + floatRepr(pct(smoothN)) + '%', color: 'var(--accent)', pct: pct(smoothN) },
+    { label: 'Stutter 33-50ms: ' + floatRepr(pct(midN)) + '%', color: 'var(--amber)', pct: pct(midN) },
+    { label: 'Spike >50ms: ' + floatRepr(pct(spikeN)) + '%', color: 'var(--bad)', pct: pct(spikeN) },
   ];
   const vb = RC.varianceBins(ftInOrder);
   const varPie = vb ? [
-    { label: '< 2ms: ' + floatRepr(vb[0]) + '%', color: 'var(--accent)' },
-    { label: '< 4ms: ' + floatRepr(vb[1]) + '%', color: 'var(--blue2)' },
-    { label: '< 8ms: ' + floatRepr(vb[2]) + '%', color: 'var(--amber)' },
-    { label: '< 12ms: ' + floatRepr(vb[3]) + '%', color: 'var(--orange)' },
-    { label: '> 12ms: ' + floatRepr(vb[4]) + '%', color: 'var(--bad)' },
-  ] : [{ label: 'no data', color: 'var(--text-faint)' }];
+    { label: '< 2ms: ' + floatRepr(vb[0]) + '%', color: 'var(--accent)', pct: vb[0] },
+    { label: '< 4ms: ' + floatRepr(vb[1]) + '%', color: 'var(--blue2)', pct: vb[1] },
+    { label: '< 8ms: ' + floatRepr(vb[2]) + '%', color: 'var(--amber)', pct: vb[2] },
+    { label: '< 12ms: ' + floatRepr(vb[3]) + '%', color: 'var(--orange)', pct: vb[3] },
+    { label: '> 12ms: ' + floatRepr(vb[4]) + '%', color: 'var(--bad)', pct: vb[4] },
+  ] : [{ label: 'no data', color: 'var(--text-faint)', pct: 0 }];
 
   const rdJson = pyJson({ metrics, pies: { stut: stutPie, var: varPie } });
   const sessionIdJson = pyJson(sessionId);
@@ -212,11 +212,9 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
         <div class="pietab active" id="ptStut" onclick="showPie('stut')">Stuttering</div>
         <div class="pietab" id="ptVar" onclick="showPie('var')">Variances</div>
       </div>
-      <div class="pie-wrap">
-        <svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="stutter breakdown">
-          <circle cx="60" cy="60" r="50" fill="var(--accent)"/>
-          <line x1="60" y1="10" x2="60" y2="60" stroke="var(--bad)" stroke-width="1"/>
-        </svg>
+      <div class="pie-wrap" style="display:block">
+        <div id="pieBar" style="display:flex;height:30px;width:100%;border-radius:7px;overflow:hidden;border:1px solid var(--border)"></div>
+        <div class="graph-hint" id="pieScaleNote" style="margin:6px 0 10px">To scale — tiny segments get a minimum sliver so they stay visible. Hover for the exact split.</div>
         <div class="legend" id="pieLegend"></div>
       </div>
     </div>
