@@ -1351,6 +1351,14 @@ ipcMain.handle('nvcp-restore', () => {
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine
 // writes into the data home via MSFS_PERF_ROOT.
+// --- Native (Node) perf engine — v6 transition. OPT-IN behind config.nativePerfEngine (default OFF),
+// so the proven Python path stays the default until the full-flight parity passes and we flip it.
+function _perfCfg(){ try { return JSON.parse(fs.readFileSync(CFG,'utf8')) || {}; } catch(_){ return {}; } }
+function nativePerfEnabled(){ return _perfCfg().nativePerfEngine === true; }
+function simbriefUser(){ return _perfCfg().simbriefUser || 'snkeyez95'; }
+// Steam UserCfg.opt (matches the Python engine). Store-vs-Steam detection is a cutover TODO.
+const USERCFG_PATH = path.join(app.getPath('appData'), 'Microsoft Flight Simulator 2024', 'UserCfg.opt');
+
 ipcMain.handle('perf-start-capture', () => {
   try {
     // ONE capture engine only. Arming repeatedly without flying (or re-arming) leaves engines
@@ -1363,6 +1371,22 @@ ipcMain.handle('perf-start-capture', () => {
       cp.spawnSync('taskkill', ['/F','/IM','PresentMon-x64.exe','/T'], { windowsHide:true, timeout:5000 });
     } catch(_){}
     const dir    = perfDir();
+    if (nativePerfEnabled()) {
+      // Native engine: run the capture in a DETACHED Electron-as-node process (survives closing ABRP
+      // mid-flight, exactly like perf-engine.exe --auto). Config passed via env.
+      const entry = path.join(dir, 'native', 'run_capture.js');
+      if (!fs.existsSync(entry)) { LOG.error('[PERF] native capture entry not found: ' + entry); return { ok:false, error:'native entry not found' }; }
+      const nenv = Object.assign({}, process.env, {
+        ELECTRON_RUN_AS_NODE: '1', MSFS_PERF_ROOT: USER_DATA, ABRP_ASSET_DIR: dir,
+        ABRP_SESSIONS_DIR: path.join(USER_DATA, 'Sessions'), ABRP_USERCFG: USERCFG_PATH,
+        ABRP_SIMBRIEF_USER: simbriefUser(),
+      });
+      const nchild = spawn(process.execPath, [entry], { detached:true, stdio:'ignore', windowsHide:true, env:nenv });
+      nchild.on('error', e => LOG.error('[PERF] native capture spawn failed: ' + e.message));
+      nchild.unref();
+      LOG.info('[PERF] native capture armed (Electron-as-node --auto) from ' + entry);
+      return { ok:true, how:'native' };
+    }
     const exe    = path.join(dir, 'perf-engine.exe');          // bundled, Python-free engine
     const script = path.join(dir, 'msfs_perf_logger.py');      // dev fallback (system Python)
     const env    = Object.assign({}, process.env, { MSFS_PERF_ROOT: USER_DATA });
@@ -1385,6 +1409,20 @@ ipcMain.handle('perf-start-capture', () => {
 // surface "Set TLOD X for <aircraft>". 30s timeout guard so a stuck prep can never block the launch.
 ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
   try {
+    if (nativePerfEnabled()) {
+      // Native prep-next runs IN-PROCESS (quick: SimBrief fetch + coverage + UserCfg write, no Python).
+      (async () => {
+        try {
+          const { prepNext } = require('./perf/native/prep.js');
+          let sessions = [];
+          try { sessions = (JSON.parse(fs.readFileSync(path.join(USER_DATA, 'Sessions', 'index.json'), 'utf8')).sessions) || []; } catch(_){}
+          const r = await prepNext(sessions, { username: simbriefUser(), usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA, 'usercfg_backups') });
+          LOG.info('[PERF] native prep-next: ' + (r.msg || ''));
+          resolve({ ok: !!r.ok, set: !!r.set, aircraft: r.aircraft, tlod: r.tlod, reason: r.reason });
+        } catch (e) { LOG.error('[PERF] native prep-next failed: ' + e.message); resolve({ ok:false, error:e.message }); }
+      })();
+      return;
+    }
     const dir    = perfDir();
     const exe    = path.join(dir, 'perf-engine.exe');
     const script = path.join(dir, 'msfs_perf_logger.py');
