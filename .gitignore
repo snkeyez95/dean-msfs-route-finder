@@ -30,3 +30,5 @@ perf/native/_gen_native.js
 perf/native/_ref_cfx.json
 perf/native/_cfx_ref_out/
 perf/native/_cfx_nat_out/
+
+perf/native/_ref_phases.json
