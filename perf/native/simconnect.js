@@ -177,6 +177,16 @@ class ResilientSampler {
     }
     return { gspeed: s.gspeed, onGround: s.onGround, alt: s.alt };
   }
+  // Wall-clock seconds of the last REAL sample — i.e. the last moment the sim was provably alive.
+  // Used as the end-of-capture trim anchor (Date.now() lies if PresentMon lingers past sim close).
+  lastAliveTs() { return this._state ? this._state.lastUpdate : null; }
+  // Seconds the stream has been dead (0 while healthy). Sustained unreachability while the
+  // reconnect loop keeps failing = the sim is closed (connectability doctrine).
+  unreachableFor() {
+    const s = this._state; if (!s) return 0;
+    const age = Date.now() / 1000 - s.lastUpdate;
+    return age >= STALE_DATA_SECONDS ? age : 0;
+  }
   _reconnect(why) {
     if (this._stopped || this._reconnecting) return;
     this._reconnecting = true;

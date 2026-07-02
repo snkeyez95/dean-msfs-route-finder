@@ -8,7 +8,7 @@
 // validated with the sim running (a ~5-min gate+taxi session). This is the assembly, not new math.
 const fs = require('fs'), path = require('path');
 const { armAndWaitForRolling, ResilientSampler, readTitle, PhaseTracker,
-        AUTO_MIN_SPEED_KT } = require('./simconnect.js');
+        AUTO_MIN_SPEED_KT, AUTO_GIVEUP_SECONDS } = require('./simconnect.js');
 const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
 const { startPresentmon, stopPresentmon, findPresentmon, killStrayPresentmon, TARGET_PROCESS } = require('./presentmon.js');
@@ -23,13 +23,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // (--terminate_on_proc_exit). That is the ONLY end condition — Python parity (py:3845 waits solely on
 // proc.poll()). A SimConnect 'quit'/'close' mid-flight is a transient the ResilientSampler absorbs;
 // treating it as capture-end filed truncated flights (deep-review finding 4).
-function waitForCaptureEnd(proc, say) {
+function waitForCaptureEnd(proc, sampler, say) {
   return new Promise((resolve) => {
     let done = false, poll = null;
     const finish = (why) => { if (!done) { done = true; if (poll) clearInterval(poll); say('  Capture ended (' + why + ').'); resolve(); } };
     proc.on('exit', () => finish('sim closed — PresentMon exited'));
     proc.on('error', (e) => { say('  PresentMon process error: ' + (e && e.message)); finish('PresentMon error'); });
-    poll = setInterval(() => { if (proc.exitCode !== null || proc.signalCode) finish('PresentMon gone'); }, 2000);
+    poll = setInterval(() => {
+      if (proc.exitCode !== null || proc.signalCode) return finish('PresentMon gone');
+      // BACKSTOP (2026-07-02 hang): PresentMon's --terminate_on_proc_exit failed once in the wild,
+      // leaving it — and this wait — running forever after the sim closed. SimConnect connectability
+      // is ground truth: sustained unreachability with the reconnect loop failing = sim closed, so
+      // end the capture ourselves (the caller stops PresentMon right after).
+      if (sampler && sampler.unreachableFor() >= AUTO_GIVEUP_SECONDS)
+        finish('sim closed — SimConnect unreachable ' + AUTO_GIVEUP_SECONDS + 's; stopping PresentMon');
+    }, 2000);
   });
 }
 
@@ -115,7 +123,12 @@ async function runAutoCapture(opts) {
     ]);
   }, 1000);
 
-  await waitForCaptureEnd(proc, say);
+  await waitForCaptureEnd(proc, sampler, say);
+
+  // End-of-capture anchor for the tail trim: the last moment the sim was provably ALIVE (last
+  // SimConnect sample), never bare Date.now() — if PresentMon lingered past sim close (2026-07-02
+  // hang), wall-now inflates the trim and cuts real flight data (it cost a landing before re-file).
+  const captureEndTs = Math.min(Date.now() / 1000, sampler.lastAliveTs() || Infinity);
 
   clearInterval(tick);
   stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop();
@@ -130,7 +143,7 @@ async function runAutoCapture(opts) {
   let trimS;
   if (lastMovingTs != null) {
     const lastElapsed = lastMovingTs - recordingWallStart;
-    const totalElapsed = Date.now() / 1000 - recordingWallStart;
+    const totalElapsed = captureEndTs - recordingWallStart;   // sim-alive anchor, not wall-now
     trimS = Math.max(MIN_TAIL_TRIM_S, totalElapsed - lastElapsed - STOP_BUFFER_S);
   } else trimS = TAIL_FALLBACK_S;
 
