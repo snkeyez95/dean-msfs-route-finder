@@ -42,6 +42,10 @@
         "to": "perf/perf-engine.exe"
       },
       {
+        "from": "perf/PresentMon-x64.exe",
+        "to": "perf/PresentMon-x64.exe"
+      },
+      {
         "from": "perf/vendor",
         "to": "perf/vendor"
       },

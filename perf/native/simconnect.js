@@ -15,7 +15,12 @@ const AUTO_MIN_SPEED_KT   = 2.0;      // above GSX reposition, below pushback
 const AUTO_CONFIRM_SECONDS = 3.0;     // rolling must hold this long before triggering
 const ALT_SANE_FT         = 45000;    // above this = SimConnect not settled
 const PHASE_VS_FPM        = 150.0;    // climb/descent vs level deadband (feet/min)
-const AUTO_GIVEUP_SECONDS = 90;       // give up only after this long unreachable (the fix)
+const AUTO_GIVEUP_SECONDS = 90;       // give up only after this long unreachable — RECONNECTS ONLY
+const AUTO_START_TIMEOUT_S = 1800;    // initial connect: MSFS may not even be LAUNCHED yet when we arm
+                                      // (both UI arm flows fire before/at launch) — Python waits 30 min
+                                      // here (msfs_perf_logger.py:3302) and applies 90s only to REconnects
+const STALE_DATA_SECONDS  = 15;       // no samples this long = connection made at the menu / went dead;
+                                      // rebuild it (Python's none_streak >= 15 self-heal, py:3359)
 
 // --- pure decision logic (no I/O — desk-testable) ---
 function computeFpm(alt, prevAlt, dtSec) {
@@ -89,7 +94,7 @@ function attachSampler(handle, tracker) {
   handle.addToDataDefinition(DEF_ID, 'SIM ON GROUND', 'Bool', SimConnectDataType.INT32);
   handle.addToDataDefinition(DEF_ID, 'PLANE ALTITUDE', 'Feet', SimConnectDataType.FLOAT64);
   handle.requestDataOnSimObject(REQ_ID, DEF_ID, 0 /* USER */, SimConnectPeriod.SECOND);
-  const state = { gspeed: null, onGround: null, alt: null };
+  const state = { gspeed: null, onGround: null, alt: null, lastUpdate: Date.now() / 1000 };
   handle.on('simObjectData', (recv) => {
     if (recv.requestID !== REQ_ID) return;
     try {
@@ -98,10 +103,101 @@ function attachSampler(handle, tracker) {
       let alt = recv.data.readFloat64();
       if (alt > ALT_SANE_FT) alt = null;                      // discard unsettled garbage
       state.gspeed = gspeed; state.onGround = onGround; state.alt = alt;
+      state.lastUpdate = Date.now() / 1000;                   // freshness: stale = dead/menu connection
       if (tracker) tracker.update(onGround, alt, Date.now() / 1000);
     } catch (_) {}
   });
   return state;
+}
+
+// Watch one connection for rolling. Resolves 'rolling' when ground-roll holds AUTO_CONFIRM_SECONDS,
+// or 'dropped' when the connection dies / goes stale (caller rebuilds it — never gives up here).
+function _rollingOrDropped(handle, state, say) {
+  return new Promise((resolve) => {
+    let confirmedSince = null, done = false, iv = null;
+    const finish = (v) => { if (!done) { done = true; if (iv) clearInterval(iv); resolve(v); } };
+    try { handle.on('quit', () => finish('dropped')); handle.on('close', () => finish('dropped')); } catch (_) {}
+    iv = setInterval(() => {
+      // Stale stream = we almost certainly connected at the menu before the flight loaded (a request
+      // made then never refreshes) or the connection silently died. Python none_streak self-heal.
+      if (Date.now() / 1000 - state.lastUpdate >= STALE_DATA_SECONDS) return finish('dropped');
+      if (isRolling(state.gspeed, state.onGround, state.alt)) {
+        if (confirmedSince == null) confirmedSince = Date.now() / 1000;
+        else if (Date.now() / 1000 - confirmedSince >= AUTO_CONFIRM_SECONDS) {
+          say(`  Rolling (${(state.gspeed || 0).toFixed(1)} kt) — starting capture now.`);
+          finish('rolling');
+        }
+      } else confirmedSince = null;
+    }, 1000);
+  });
+}
+
+// The full armed wait (Python wait_for_auto_start, py:3274): connect with the LONG launch timeout,
+// then wait for rolling, self-healing the connection whenever it drops or goes stale — the 90s
+// give-up applies ONLY to those rebuilds (a sim that's truly closed never reconnects; a loading or
+// transitioning sim comes back in seconds). Resolves {handle, state} at rolling, or 'no-flight'.
+async function armAndWaitForRolling(appName, log) {
+  const say = log || (() => {});
+  let conn = await openWithRetry(appName, AUTO_START_TIMEOUT_S, say);
+  if (conn === 'no-flight') return 'no-flight';
+  let handle = conn.handle;
+  say('  Connected. Waiting for rolling...');
+  for (;;) {
+    const state = attachSampler(handle, null);
+    const outcome = await _rollingOrDropped(handle, state, say);
+    if (outcome === 'rolling') return { handle, state };
+    say('  No speed data — refreshing SimConnect connection (flight may still be loading).');
+    try { handle.close(); } catch (_) {}
+    conn = await openWithRetry(appName, AUTO_GIVEUP_SECONDS, say);   // 90s of sustained failure = sim closed
+    if (conn === 'no-flight') return 'no-flight';
+    handle = conn.handle;
+  }
+}
+
+// Mid-RECORDING sampler that survives SimConnect drops. A transient 'close' (or silent freeze) must
+// NEVER end the capture — Python ends a capture ONLY when PresentMon exits (py:3845) and swallows
+// every tracker read failure. This goes one better: it reconnects so phase/movement data resumes,
+// while latest() nulls out stale values in the meantime (matching Python's failed-read → None rows).
+class ResilientSampler {
+  constructor(appName, handle, state, log) {
+    this._appName = appName; this._say = log || (() => {});
+    this._stopped = false; this._reconnecting = false;
+    this._adopt(handle, state);
+  }
+  _adopt(handle, state) {
+    this._handle = handle; this._state = state;
+    const onDrop = () => this._reconnect('connection dropped');
+    try { handle.on('quit', onDrop); handle.on('close', onDrop); } catch (_) {}
+  }
+  latest() {
+    const s = this._state;
+    if (!s || Date.now() / 1000 - s.lastUpdate >= STALE_DATA_SECONDS) {
+      this._reconnect('no data');                    // silent freeze without a close event
+      return { gspeed: null, onGround: null, alt: null };
+    }
+    return { gspeed: s.gspeed, onGround: s.onGround, alt: s.alt };
+  }
+  _reconnect(why) {
+    if (this._stopped || this._reconnecting) return;
+    this._reconnecting = true;
+    this._say('  SimConnect ' + why + ' mid-recording — reconnecting (PresentMon is unaffected and still recording).');
+    const { open, Protocol } = require('node-simconnect');
+    try { this._handle.close(); } catch (_) {}
+    const tryOpen = () => {
+      if (this._stopped) return;
+      open(this._appName, Protocol.SunRise)
+        .then(({ handle }) => {
+          if (this._stopped) { try { handle.close(); } catch (_) {} return; }
+          this._adopt(handle, attachSampler(handle, null));
+          this._reconnecting = false;
+          this._say('  SimConnect reconnected — phase/movement tracking resumed.');
+        })
+        .catch(() => { if (!this._stopped) setTimeout(tryOpen, 5000); });   // retry until stop(); the
+        // capture's end is PresentMon's job, so endless retries here can never lose a flight
+    };
+    setTimeout(tryOpen, 2000);
+  }
+  stop() { this._stopped = true; try { this._handle.close(); } catch (_) {} }
 }
 
 // One-shot read of the loaded aircraft TITLE (e.g. "PMDG 737-800"). Resolves the string or null after
@@ -127,5 +223,7 @@ function readTitle(handle, timeoutMs = 4000) {
 
 module.exports = {
   computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler, readTitle,
+  armAndWaitForRolling, ResilientSampler,
   AUTO_MIN_SPEED_KT, AUTO_CONFIRM_SECONDS, ALT_SANE_FT, PHASE_VS_FPM, AUTO_GIVEUP_SECONDS,
+  AUTO_START_TIMEOUT_S, STALE_DATA_SECONDS,
 };

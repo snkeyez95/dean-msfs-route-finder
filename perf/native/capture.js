@@ -7,8 +7,8 @@
 // ⚠ INTEGRATION MODULE: every piece it calls is individually tested, but the full path can only be
 // validated with the sim running (a ~5-min gate+taxi session). This is the assembly, not new math.
 const fs = require('fs'), path = require('path');
-const { openWithRetry, attachSampler, readTitle, PhaseTracker, isRolling,
-        AUTO_CONFIRM_SECONDS, AUTO_GIVEUP_SECONDS, AUTO_MIN_SPEED_KT } = require('./simconnect.js');
+const { armAndWaitForRolling, ResilientSampler, readTitle, PhaseTracker,
+        AUTO_MIN_SPEED_KT } = require('./simconnect.js');
 const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
 const { startPresentmon, stopPresentmon, findPresentmon, killStrayPresentmon, TARGET_PROCESS } = require('./presentmon.js');
@@ -19,31 +19,17 @@ const { fileSession } = require('./engine.js');
 const HEAD_TRIM_S = 5, STOP_BUFFER_S = 30, TAIL_FALLBACK_S = 60, MIN_TAIL_TRIM_S = 5;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Wait until ground-roll is confirmed for AUTO_CONFIRM_SECONDS (reads the live `state` from attachSampler).
-function waitForRolling(state, say) {
+// Resolve to the end of capture: PresentMon exits on its own when MSFS closes
+// (--terminate_on_proc_exit). That is the ONLY end condition — Python parity (py:3845 waits solely on
+// proc.poll()). A SimConnect 'quit'/'close' mid-flight is a transient the ResilientSampler absorbs;
+// treating it as capture-end filed truncated flights (deep-review finding 4).
+function waitForCaptureEnd(proc, say) {
   return new Promise((resolve) => {
-    let confirmedSince = null;
-    const iv = setInterval(() => {
-      if (isRolling(state.gspeed, state.onGround, state.alt)) {
-        if (confirmedSince == null) confirmedSince = Date.now() / 1000;
-        else if (Date.now() / 1000 - confirmedSince >= AUTO_CONFIRM_SECONDS) {
-          clearInterval(iv); say(`  Rolling (${(state.gspeed || 0).toFixed(1)} kt) — starting capture now.`); resolve();
-        }
-      } else confirmedSince = null;
-    }, 1000);
-  });
-}
-
-// Resolve to the end of capture: PresentMon exits on its own when MSFS closes (--terminate_on_proc_exit),
-// or the SimConnect connection quits/closes and can't be re-established.
-function waitForCaptureEnd(proc, handle, say) {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (why) => { if (!done) { done = true; say('  Capture ended (' + why + ').'); resolve(); } };
-    proc.on('exit', () => finish('sim closed / PresentMon exited'));
-    handle.on('quit', () => finish('sim quit'));
-    handle.on('close', () => finish('connection closed'));
-    const poll = setInterval(() => { if (proc.exitCode !== null || proc.signalCode) { clearInterval(poll); finish('PresentMon gone'); } }, 2000);
+    let done = false, poll = null;
+    const finish = (why) => { if (!done) { done = true; if (poll) clearInterval(poll); say('  Capture ended (' + why + ').'); resolve(); } };
+    proc.on('exit', () => finish('sim closed — PresentMon exited'));
+    proc.on('error', (e) => { say('  PresentMon process error: ' + (e && e.message)); finish('PresentMon error'); });
+    poll = setInterval(() => { if (proc.exitCode !== null || proc.signalCode) finish('PresentMon gone'); }, 2000);
   });
 }
 
@@ -51,13 +37,13 @@ async function resolveAircraft(handle, opts) {
   let title = null;
   try { title = await readTitle(handle); } catch (_) {}
   const norm = normalizeAircraftTitle(title);
-  if (norm === 'Fenix' || norm === 'PMDG') return norm;
-  // fallback: the aircraft --prep-next saved before launch
+  if (norm) return norm;   // a real title always wins (a stale _prep_aircraft.txt must never relabel it)
+  // fallback ONLY when the title read failed entirely: the aircraft --prep-next saved before launch
   try {
     const f = path.join(opts.dataRoot, '_prep_aircraft.txt');
     if (fs.existsSync(f)) { const v = fs.readFileSync(f, 'utf8').trim(); if (v) return v; }
   } catch (_) {}
-  return norm || null;
+  return null;
 }
 
 // Full --auto capture. opts: {assetDir, dataRoot, sessionsDir, usercfgPath, username, appName, log, status}
@@ -71,29 +57,23 @@ async function runAutoCapture(opts) {
 
   killStrayPresentmon();                       // one capture path only
 
+  const appName = opts.appName || 'ABRP Perf';
   setStatus('armed');
-  const conn = await openWithRetry(opts.appName || 'ABRP Perf', AUTO_GIVEUP_SECONDS, say);
-  if (conn === 'no-flight') { setStatus('idle'); return { ok: false, reason: 'no-flight' }; }
-  const handle = conn.handle;
+  // Armed wait — the long launch timeout + self-healing reconnects live in armAndWaitForRolling
+  // (Python wait_for_auto_start parity: 1800s for MSFS to appear, 90s give-up on REconnects only).
+  const armed = await armAndWaitForRolling(appName, say);
+  if (armed === 'no-flight') { setStatus('idle'); return { ok: false, reason: 'no-flight' }; }
 
-  const state = attachSampler(handle, null);   // live {gspeed,onGround,alt}; we drive the tracker in the tick
-  let lastMovingTs = null, wasAirborne = false, endedOnGround = true;
-
-  await waitForRolling(state, say);
-  // Baseline is set HERE — at actual capture start, NOT at connect. The taxi-to-rolling gap can be
-  // minutes; anchoring earlier drifts frame-elapsed vs phase transitions (all frames mis-bucket to
-  // 'ground', telemetry wall_ms starts huge). Matches Python (_recording_wall_start set at record start).
-  const recordingWallStart = Date.now() / 1000;
-  const tracker = new PhaseTracker(recordingWallStart);
-
-  // flight facts (sim is loaded now)
+  // Flight facts BEFORE starting PresentMon — Python gathers read_settings/title/SimBrief/sim_version
+  // first (py:3701-3726) and only then start_presentmon + the wall anchor, so these slow calls
+  // (title read ≤4s, SimBrief ≤10s, 2 PowerShell spawns) can't skew the recording baseline.
   const fresh = readSettings(opts.usercfgPath) || {};
   const settings = {
     tlod: fresh.tlod, olod: fresh.olod, upscaling: fresh.upscaling, frame_gen: fresh.frame_gen,
     target_fps: fresh.target_fps, fg_multiplier: fresh.fg_multiplier,
     texture_quality: fresh.texture_quality, usercfg_found: fresh.usercfg_found,
   };
-  settings.aircraft = await resolveAircraft(handle, opts);
+  settings.aircraft = await resolveAircraft(armed.handle, opts);
   settings.simbrief_route = await getSimbriefRoute(opts.username);
   settings.sim_version = getSimVersion();
   const driverVersion = getDriverVersion();
@@ -104,12 +84,20 @@ async function runAutoCapture(opts) {
   const proc = startPresentmon(pmPath, tmpCsv, TARGET_PROCESS);
   const vram = new VramSampler(1000); vram.start();
   const telem = new TelemetrySampler(['perf-engine', 'node']); telem.start();
+  // Anchor IMMEDIATELY AFTER start_presentmon — Python sets _recording_wall_start right after the
+  // spawn (py:3736 → 3759). Anchoring any earlier skews every frame-elapsed vs phase/telemetry
+  // wall time by however long the metadata calls took (deep-review finding 6).
+  const recordingWallStart = Date.now() / 1000;
+  const tracker = new PhaseTracker(recordingWallStart);
+  // Mid-recording SimConnect drops are absorbed here — they must never end the capture (finding 4).
+  const sampler = new ResilientSampler(appName, armed.handle, armed.state, say);
+  let lastMovingTs = null, wasAirborne = false, endedOnGround = true;
   setStatus('recording');
   say('  >> RECORDING. Closing the sim files it automatically.');
 
   const telemetryRows = [];
   const tick = setInterval(() => {
-    const g = state.gspeed, onG = state.onGround, alt = state.alt;
+    const { gspeed: g, onGround: onG, alt } = sampler.latest();   // nulls when the stream is stale
     if (g != null && g > AUTO_MIN_SPEED_KT) lastMovingTs = Date.now() / 1000;
     if (onG != null) { if (!onG) wasAirborne = true; endedOnGround = !!onG; }
     const phase = tracker.update(onG, alt, Date.now() / 1000);
@@ -127,11 +115,10 @@ async function runAutoCapture(opts) {
     ]);
   }, 1000);
 
-  await waitForCaptureEnd(proc, handle, say);
+  await waitForCaptureEnd(proc, say);
 
   clearInterval(tick);
-  stopPresentmon(proc); vram.stop(); telem.stop();
-  try { handle.close(); } catch (_) {}
+  stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop();
   await sleep(1000);                            // CSV flush grace
 
   if (!fs.existsSync(tmpCsv) || fs.statSync(tmpCsv).size < 1024) {
@@ -162,4 +149,4 @@ async function runAutoCapture(opts) {
   return { ok: true, sessionDir };
 }
 
-module.exports = { runAutoCapture, waitForRolling, resolveAircraft, HEAD_TRIM_S };
+module.exports = { runAutoCapture, waitForCaptureEnd, resolveAircraft, HEAD_TRIM_S };

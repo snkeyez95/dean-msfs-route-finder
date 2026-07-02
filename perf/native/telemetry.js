@@ -29,7 +29,7 @@ class TelemetrySampler {
     this._proc = spawn('typeperf',
       ['\\Process(*)\\% Processor Time', '\\Processor(_Total)\\% Processor Time',
        '\\Memory\\Available MBytes', '-si', '1'],
-      { windowsHide: true });
+      { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });   // stderr ignored: an unread pipe can wedge the child
     this._proc.stdout.on('data', (d) => {
       this._buf += d.toString();
       let nl;

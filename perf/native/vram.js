@@ -34,7 +34,7 @@ class VramSampler {
     if (!this.available || this._proc) return;
     this._proc = spawn(this._exe,
       ['--query-gpu=memory.used', '--format=csv,noheader,nounits', '--loop-ms=' + this.interval],
-      { windowsHide: true });
+      { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });   // stderr ignored: an unread pipe can wedge the child
     this._proc.stdout.on('data', (d) => {
       this._buf += d.toString();
       let nl;

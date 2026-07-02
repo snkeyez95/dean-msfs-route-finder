@@ -704,8 +704,19 @@ function isCaptureRunning(){
   try{
     const r = require('child_process').spawnSync('tasklist', ['/FI','IMAGENAME eq perf-engine.exe','/NH'],
       {encoding:'utf8', timeout:4000, windowsHide:true});
-    return /perf-engine\.exe/i.test(r.stdout || '');
-  }catch(e){ return false; }
+    if (/perf-engine\.exe/i.test(r.stdout || '')) return true;
+  }catch(e){}
+  // Native engine: a detached Electron-as-node process, invisible to an image-name check. It writes
+  // its pid to capture_status.json; an alive pid = capture running (stale file after a crash fails
+  // the signal-0 probe, so no false positives).
+  try{
+    const sf = path.join(USER_DATA, 'capture_status.json');
+    if (fs.existsSync(sf)) {
+      const j = JSON.parse(fs.readFileSync(sf, 'utf8'));
+      if (j && j.pid) { try { process.kill(j.pid, 0); return true; } catch(_){} }
+    }
+  }catch(e){}
+  return false;
 }
 function cleanupActivationsOnQuit(){
   let cfg;
@@ -1367,6 +1378,20 @@ ipcMain.handle('perf-start-capture', () => {
     // existing engine + orphaned PresentMon before arming a fresh one.
     try {
       const cp = require('child_process');
+      // Native engine first: it's an Electron-image process, INVISIBLE to a taskkill-by-name — kill it
+      // by the pid it wrote to capture_status.json (deep-review finding 5: a surviving armed/recording
+      // native engine collides with the fresh one exactly like the old "7 engines" pile-up).
+      try {
+        const sf = path.join(USER_DATA, 'capture_status.json');
+        if (fs.existsSync(sf)) {
+          const j = JSON.parse(fs.readFileSync(sf, 'utf8'));
+          if (j && j.pid && j.pid !== process.pid) {
+            cp.spawnSync('taskkill', ['/F','/PID', String(j.pid), '/T'], { windowsHide:true, timeout:5000 });
+            LOG.info('[PERF] killed existing native capture (pid ' + j.pid + ', state ' + (j.state||'?') + ') before re-arm');
+          }
+          try { fs.unlinkSync(sf); } catch(_){}
+        }
+      } catch(_){}
       cp.spawnSync('taskkill', ['/F','/IM','perf-engine.exe','/T'],   { windowsHide:true, timeout:5000 });
       cp.spawnSync('taskkill', ['/F','/IM','PresentMon-x64.exe','/T'], { windowsHide:true, timeout:5000 });
     } catch(_){}
