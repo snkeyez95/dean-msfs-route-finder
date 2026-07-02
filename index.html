@@ -2545,7 +2545,7 @@ function populateAirlineDropdown(){
   const base=getRoutes();
   S.acFilter=prev;
   const airlines=[...new Set(base.map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${esc(a)}"${a===prev?' selected':''}>${esc(a)}</option>`).join('');
   if(prev&&!airlines.includes(prev))S.acFilter='';
 }
 
@@ -2575,7 +2575,7 @@ function renderRoutes(){
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</div>
           <div class="rc">${da[1]||r.departure_airport} &rarr; ${aa[1]||r.arrival_airport}</div></td>
-      <td><div class="ra">${r.airline||r.callsign||'—'}</div></td>
+      <td><div class="ra">${esc(r.airline||r.callsign)||'—'}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
       <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
@@ -2602,12 +2602,12 @@ function renderRoutes(){
       <div class="dp-grid">
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
-          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airline||'—'}</span></div>
-          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'—'}</span></div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${esc(r.airline)||'—'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${esc(r.callsign)||'—'}</span></div>
           <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
           <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
           <div class="dpr"><span class="dl">First seen</span><span class="dv2" title="Seen ${r.times_seen} time${r.times_seen!==1?'s':''}">${fmtFirstSeen(r.first_seen)}</span></div>
-          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
+          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${esc(r.description)}</span></div>`:''}
         </div>
         <div class="dp-sec">
           <div class="dp-st">Departure &mdash; ${r.departure_airport}</div>
@@ -2817,7 +2817,7 @@ function updateFrAirlineDropdown(rs){
   if(!sel)return;
   const prev=S.frAcFilter;
   const airlines=[...new Set(rs.map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${esc(a)}"${a===prev?' selected':''}>${esc(a)}</option>`).join('');
   if(prev&&!airlines.includes(prev))S.frAcFilter='';
   if(row)row.style.display=(rs.length>0&&airlines.length>1)?'':'none';
 }
@@ -2911,7 +2911,7 @@ function renderFreeRouteResults(){
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${dep}&thinsp;&rarr;&thinsp;${arr}</div>
           <div class="rc">${depCity||depName} &rarr; ${arrCity||arrName}</div></td>
-      <td><div class="ra">${r.airline||r.callsign||'&mdash;'}</div></td>
+      <td><div class="ra">${esc(r.airline||r.callsign)||'&mdash;'}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
       <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
@@ -2938,12 +2938,12 @@ function renderFreeRouteResults(){
       <div class="dp-grid">
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
-          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airline||'&mdash;'}</span></div>
-          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${esc(r.airline)||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${esc(r.callsign)||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
           <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
           <div class="dpr"><span class="dl">First seen</span><span class="dv2" title="Seen ${r.times_seen} time${r.times_seen!==1?'s':''}">${fmtFirstSeen(r.first_seen)}</span></div>
-          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
+          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${esc(r.description)}</span></div>`:''}
         </div>
         <div class="dp-sec">
           <div class="dp-st">Departure &mdash; ${dep}</div>
@@ -3128,7 +3128,7 @@ function populateTpCarrier(){
   if(!sel)return;
   const prev=sel.value;
   const airlines=[...new Set(Object.values(S.routeRegistry).map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML='<option value="">Select airline&hellip;</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  sel.innerHTML='<option value="">Select airline&hellip;</option>'+airlines.map(a=>`<option value="${esc(a)}"${a===prev?' selected':''}>${esc(a)}</option>`).join('');
 }
 
 function onTpInput(){
@@ -4798,7 +4798,7 @@ function datisActiveRwy(icao,side){
   const rwys=extractRunways(block.text,(icao||'').toUpperCase(),side);
   return rwys.length?rwys[0]:null;
 }
-function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // fetch + render D-ATIS into the expanded panel. prefix:''|'fr'|'tp', side:'dep'|'arr'
 async function fetchDatis(icao,idx,side,prefix){
@@ -4948,7 +4948,7 @@ function chRoutesHTML(ch){
     const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep);font-size:12px">
       <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--acc);white-space:nowrap;flex-shrink:0">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</span>
-      <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.airline||r.callsign||'&mdash;'}</span>
+      <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.airline||r.callsign)||'&mdash;'}</span>
       <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${r.aircraft_type}</span>
       <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${dist}</span>
       <button class="btn bg bxs" onclick="openSimBrief('${r.departure_airport}','${r.arrival_airport}','${r.aircraft_type}','${sbU}')" style="flex-shrink:0">&rarr; SimBrief</button>

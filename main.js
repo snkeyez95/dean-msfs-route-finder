@@ -302,8 +302,11 @@ function gsxExtractArchive(archivePath, tmp){
   const cp=require('child_process');
   const ext=path.extname(archivePath).toLowerCase();
   if(ext==='.zip'){
+    // Single-quoted PS literals (with '' escaping) — a filename containing " or $(...) must never be
+    // interpreted by PowerShell (double quotes would expand/execute it).
+    const psq = s => `'${String(s).replace(/'/g,"''")}'`;
     const r=cp.spawnSync('powershell',
-      ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${tmp}" -Force`],
+      ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath ${psq(archivePath)} -DestinationPath ${psq(tmp)} -Force`],
       {windowsHide:true});
     if(r.status===0) return {ok:true};
     // some zips trip Expand-Archive — fall through to a real archiver if present
@@ -363,6 +366,14 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
 });
 
 const CFG = path.join(USER_DATA, 'config.json');
+// Atomic JSON write: write to a sibling tmp file then rename over the target. A crash or power cut
+// mid-write can otherwise leave a truncated file — load-config/si-get-* would then silently start
+// "fresh", losing settings or the never-pruned 20k route snapshot. rename on the same volume is atomic.
+function writeFileAtomic(file, data){
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, file);
+}
 // One-time migration into the renamed userData folder. Copy-only — the source
 // files are left untouched as a backup. Prefer the legacy userData folder
 // (dean-msfs-route-finder), then fall back to the original home-root dot-file.
@@ -395,9 +406,9 @@ const SNAP_FILE = path.join(USER_DATA, 'routeSnapshot.json');
     if (!fs.existsSync(CFG)) return;
     const c = JSON.parse(fs.readFileSync(CFG,'utf8'));
     let changed = false;
-    if (c.routeRegistry)         { fs.writeFileSync(REG_FILE,  JSON.stringify(c.routeRegistry));         LOG.info('[MIGRATE] routeRegistry -> routeRegistry.json ('+Object.keys(c.routeRegistry).length+')');         delete c.routeRegistry;         changed = true; }
-    if (c.routeRegistrySnapshot) { fs.writeFileSync(SNAP_FILE, JSON.stringify(c.routeRegistrySnapshot)); LOG.info('[MIGRATE] routeRegistrySnapshot -> routeSnapshot.json ('+Object.keys(c.routeRegistrySnapshot).length+')'); delete c.routeRegistrySnapshot; changed = true; }
-    if (changed) { fs.writeFileSync(CFG, JSON.stringify(c, null, 2)); LOG.info('[MIGRATE] config.json slimmed (route data split out)'); }
+    if (c.routeRegistry)         { writeFileAtomic(REG_FILE,  JSON.stringify(c.routeRegistry));         LOG.info('[MIGRATE] routeRegistry -> routeRegistry.json ('+Object.keys(c.routeRegistry).length+')');         delete c.routeRegistry;         changed = true; }
+    if (c.routeRegistrySnapshot) { writeFileAtomic(SNAP_FILE, JSON.stringify(c.routeRegistrySnapshot)); LOG.info('[MIGRATE] routeRegistrySnapshot -> routeSnapshot.json ('+Object.keys(c.routeRegistrySnapshot).length+')'); delete c.routeRegistrySnapshot; changed = true; }
+    if (changed) { writeFileAtomic(CFG, JSON.stringify(c, null, 2)); LOG.info('[MIGRATE] config.json slimmed (route data split out)'); }
   } catch(e) { LOG.warn('[MIGRATE] route-data split failed (non-fatal):', e.message); }
 })();
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
@@ -409,7 +420,7 @@ ipcMain.handle('save-config',(_,cfg)=>{
     // Route data lives in routeRegistry.json / routeSnapshot.json now — never store it in config
     // (this is what kept config.json at ~16 MB). Strip defensively + drop the retired AirLabs key.
     delete merged.routeRegistry; delete merged.routeRegistrySnapshot; delete merged.routeCache;
-    fs.writeFileSync(CFG,JSON.stringify(merged,null,2));
+    writeFileAtomic(CFG,JSON.stringify(merged,null,2));
     LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);
   }catch(e){LOG.error('save-config failed:',e.message);}
 });
@@ -463,7 +474,7 @@ ipcMain.handle('si-get-registry', () => {
 
 ipcMain.handle('si-save-registry', (_, registry) => {
   try {
-    fs.writeFileSync(REG_FILE, JSON.stringify(registry));
+    writeFileAtomic(REG_FILE, JSON.stringify(registry));
     LOG.info('[SI] Registry saved: ' + Object.keys(registry||{}).length + ' entries');
   } catch(e) {
     LOG.error('si-save-registry failed:', e.message);
@@ -483,7 +494,7 @@ ipcMain.handle('si-get-snapshot', () => {
 
 ipcMain.handle('si-save-snapshot', (_, snapshot) => {
   try {
-    fs.writeFileSync(SNAP_FILE, JSON.stringify(snapshot));
+    writeFileAtomic(SNAP_FILE, JSON.stringify(snapshot));
     LOG.info('[SI] Snapshot saved: ' + Object.keys(snapshot||{}).length + ' entries');
   } catch(e) {
     LOG.error('si-save-snapshot failed:', e.message);
@@ -498,7 +509,7 @@ const COMMUNITY_ROUTES = app.isPackaged
 ipcMain.handle('si-export-snapshot', (_, snapshot) => {
   try {
     const routes = Object.values(snapshot);
-    fs.writeFileSync(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
+    writeFileAtomic(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
     LOG.info('[SI] community_routes.json exported: ' + routes.length + ' routes to ' + COMMUNITY_ROUTES);
     return {ok: true, path: COMMUNITY_ROUTES};
   } catch(e) {
@@ -510,11 +521,13 @@ ipcMain.handle('si-export-snapshot', (_, snapshot) => {
 ipcMain.handle('si-write-community-routes', (_, snapshot) => {
   try {
     const routes = Object.values(snapshot);
-    fs.writeFileSync(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
+    writeFileAtomic(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
     LOG.info('[SI] community_routes.json updated: ' + routes.length + ' routes to ' + COMMUNITY_ROUTES);
     // Auto-publish only makes sense in dev where git is set up
     if (!app.isPackaged) {
-      const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat')], {
+      // 'auto' arg makes publish.bat skip its trailing `pause` — spawned hidden with no stdin, a
+      // pause would leave a zombie cmd window waiting forever for a keypress nobody can give.
+      const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat'), 'auto'], {
         windowsHide: true, shell: false, cwd: __dirname, stdio: 'ignore',
       });
       pub.on('close', code => {
@@ -559,6 +572,13 @@ ipcMain.handle('deactivate-scenery', (_, {folders, communityFolder}) => {
     const dest = path.join(communityFolder, folder);
     try {
       if (fs.existsSync(dest)) {
+        // Safety: only remove genuine junctions/symlinks — never a real installed folder/file that
+        // happens to share the name (same guard as unlink-packages / removeJunctionIfLink).
+        if (!fs.lstatSync(dest).isSymbolicLink()) {
+          LOG.warn(`[SCENE] refusing to remove non-junction: ${dest}`);
+          removed.push(folder);   // not ours to remove — treat as done so the UI unchecks cleanly
+          continue;
+        }
         fs.unlinkSync(dest);
         removed.push(folder);
         LOG.info(`[SCENE] Junction removed: ${dest}`);
@@ -748,7 +768,7 @@ function cleanupActivationsOnQuit(){
     changed = true;
   }
   if(changed){
-    try{ fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2)); LOG.info('[QUIT] cleared scenery + aircraft activations'); }
+    try{ writeFileAtomic(CFG, JSON.stringify(cfg, null, 2)); LOG.info('[QUIT] cleared scenery + aircraft activations'); }
     catch(e){ LOG.error('[QUIT] config write failed: ' + e.message); }
   }
 }
@@ -806,14 +826,15 @@ function datisSourceFor(icao){
   const c = (icao||'').trim().toUpperCase()[0];
   return (c === 'K' || c === 'P') ? 'atis.info' : 'atis.guru';
 }
-function datisGet(url){
+function datisGet(url, depth = 0){
   return new Promise(resolve => {
     try{
       const req = https.get(url, {headers:{'User-Agent':'ABRP-RoutePlanner'}}, res => {
-        // follow one redirect (atis.info → datis.clowd.io etc.)
+        // follow redirects (atis.info → datis.clowd.io etc.) — capped so a redirect loop can't spin forever
         if(res.statusCode >= 300 && res.statusCode < 400 && res.headers.location){
           res.resume();
-          return resolve(datisGet(res.headers.location));
+          if(depth >= 5) return resolve({status:res.statusCode, body:'', error:'too many redirects'});
+          return resolve(datisGet(res.headers.location, depth + 1));
         }
         let data = '';
         res.on('data', c => data += c);
