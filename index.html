@@ -2187,14 +2187,28 @@ function processPage(routes){
 
 function pruneRegistry(){
   const cutoff=new Date(Date.now()-21*24*60*60*1000).toISOString();
+  // ACTIVE-FLIGHT PROTECTION (2026-07-02): an auto-refresh's prune deleted KFLL-MMUN ten minutes
+  // after Dean SimBriefed it (last_seen 29d > the 21-day cutoff) — his flight plan vanished from
+  // Plan a Flight mid-session. Any pair in recentSimBriefRoutes (the last 30 SimBriefed flights,
+  // recorded the moment "Open in SimBrief" is clicked) is exempt from BOTH prunes.
+  const protectedPairs=new Set((S.cfg.recentSimBriefRoutes||[]).map(e=>[e.dep,e.arr].sort().join('>')));
+  const isProtected=r=>r&&protectedPairs.has([r.departure_airport,r.arrival_airport].sort().join('>'));
+  let shielded=0;
   for(const id of Object.keys(S.routeRegistry)){
-    if(S.routeRegistry[id].last_seen<cutoff)delete S.routeRegistry[id];
+    const r=S.routeRegistry[id];
+    if(r.last_seen<cutoff){ if(isProtected(r)){shielded++;continue;} delete S.routeRegistry[id]; }
   }
   const keys=Object.keys(S.routeRegistry);
   if(keys.length>5000){
     keys.sort((a,b)=>S.routeRegistry[a].last_seen.localeCompare(S.routeRegistry[b].last_seen));
-    keys.slice(0,keys.length-5000).forEach(id=>delete S.routeRegistry[id]);
+    let excess=keys.length-5000;
+    for(const id of keys){
+      if(excess<=0)break;
+      if(isProtected(S.routeRegistry[id])){shielded++;continue;}   // cap-prune skips active flights too
+      delete S.routeRegistry[id];excess--;
+    }
   }
+  if(shielded)RLOG('[SI] prune: shielded '+shielded+' route(s) on recently-SimBriefed pairs');
   const size=JSON.stringify(S.routeRegistry).length;
   if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
 }
