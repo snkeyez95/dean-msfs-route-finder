@@ -22,6 +22,7 @@
     ],
     "asarUnpack": [
       "node_modules/node-simconnect/**",
+      "node_modules/core-util-is/**",
       "node_modules/debug/**",
       "node_modules/if-async/**",
       "node_modules/inherits/**",
