@@ -53,6 +53,7 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -67,7 +68,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "A Better Route Planner"
+      "shortcutName": "A Better Route Planner",
+      "include": "build/installer.nsh"
     },
     "publish": {
       "provider": "github",
