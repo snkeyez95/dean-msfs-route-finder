@@ -2542,8 +2542,12 @@ function getRoutes(){
     if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
     if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
     if(srt==='wx-worst'||srt==='wx-best'){
-      const sa=scoreMETAR(S.metarCache[(a.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(a.arrival_airport||'').toUpperCase()]);
-      const sb=scoreMETAR(S.metarCache[(b.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(b.arrival_airport||'').toUpperCase()]);
+      // Stale observations (>3h — e.g. airports that don't report overnight) can't be trusted to
+      // rank an airport "best" OR "worst": park them at a middling score so fresh data wins the
+      // extremes. The stale pill in the route panel tells the user why.
+      const sc=ic=>{const m=S.metarCache[(ic||'').toUpperCase()];const age=metarObsAgeMin(m);return(age!=null&&age>METAR_STALE_MIN)?5:scoreMETAR(m);};
+      const sa=sc(a.departure_airport)+sc(a.arrival_airport);
+      const sb=sc(b.departure_airport)+sc(b.arrival_airport);
       return srt==='wx-worst'?sb-sa:sa-sb;
     }
     return(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0);
@@ -2802,20 +2806,31 @@ function getFreeRouteResults(){
   if(!S.frDep||!S.frArr)return[];
   const activeFleet=getActiveFleet();
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
-  let rs=Object.values(S.routeRegistry).filter(r=>{
+  const pairMatch=r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
     if(S.frAcft&&r.aircraft_type!==S.frAcft)return false;  // a specific plane is picked — filter to it
     if(r.departure_airport!==S.frDep||r.arrival_airport!==S.frArr)return false;
     if(S.frAcFilter&&r.airline!==S.frAcFilter)return false;
     return true;
-  });
+  };
+  let rs=Object.values(S.routeRegistry).filter(pairMatch);
+  // SNAPSHOT FALLBACK (2026-07-05): the registry is a rolling 21-day window — routes SI stops
+  // serving age out (one vanished mid-planning once). The 20k snapshot never prunes, so when the
+  // registry has nothing for this pair, surface the archived routes instead, clearly labeled.
+  if(!rs.length&&S.routeRegistrySnapshot){
+    rs=Object.values(S.routeRegistrySnapshot).filter(pairMatch).map(r=>({...r,_archived:true}));
+  }
   rs.sort((a,b)=>{
     if(srt==='airline')return(a.airline||'').localeCompare(b.airline||'');
     if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
     if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
     if(srt==='wx-worst'||srt==='wx-best'){
-      const sa=scoreMETAR(S.metarCache[(a.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(a.arrival_airport||'').toUpperCase()]);
-      const sb=scoreMETAR(S.metarCache[(b.departure_airport||'').toUpperCase()])+scoreMETAR(S.metarCache[(b.arrival_airport||'').toUpperCase()]);
+      // Stale observations (>3h — e.g. airports that don't report overnight) can't be trusted to
+      // rank an airport "best" OR "worst": park them at a middling score so fresh data wins the
+      // extremes. The stale pill in the route panel tells the user why.
+      const sc=ic=>{const m=S.metarCache[(ic||'').toUpperCase()];const age=metarObsAgeMin(m);return(age!=null&&age>METAR_STALE_MIN)?5:scoreMETAR(m);};
+      const sa=sc(a.departure_airport)+sc(a.arrival_airport);
+      const sb=sc(b.departure_airport)+sc(b.arrival_airport);
       return srt==='wx-worst'?sb-sa:sa-sb;
     }
     return(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0);
@@ -2853,7 +2868,9 @@ function renderFreeRouteResults(){
   }
   const rs=getFreeRouteResults();
   const cnt=rs.length;
-  rcnt.innerHTML=`<span class="fr-mode-lbl">&#9992; Free Route</span> <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink3)">${cnt} route${cnt!==1?'s':''} found for ${S.frDep} &rarr; ${S.frArr}</span>`;
+  const frArchived=cnt&&getFreeRouteResults()[0]&&getFreeRouteResults()[0]._archived;
+  rcnt.innerHTML=`<span class="fr-mode-lbl">&#9992; Free Route</span> <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink3)">${cnt} route${cnt!==1?'s':''} found for ${S.frDep} &rarr; ${S.frArr}</span>`
+    +(frArchived?` <span style="background:#f5a62322;border:1px solid #f5a62355;color:#f5a623;font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:20px" title="No longer in SayIntentions' current data — recovered from your 20,000-route snapshot archive. Route details may be dated, but weather, runways, and SimBrief all still work.">&#128451; From snapshot archive</span>`:'');
   updateFrAirlineDropdown(rs);
   if(cnt===0){
     const t=S.frAcft;
@@ -4063,15 +4080,27 @@ function openSimBrief(dep,arr,type,url){
   renderDashRecent();
 }
 
+// One click from the dashboard back to a planned flight's full panel (weather, D-ATIS, runways,
+// SimBrief) — regardless of how it was planned. Runs a Free Route search for the pair, which now
+// falls back to the never-pruned snapshot when SI's current data no longer carries the route.
+function openRecentRoute(dep,arr){
+  sw('routes');
+  if(!S.freeRouteMode)toggleFreeRoute();
+  const di=document.getElementById('fr-dep');if(di)di.value=dep;
+  const ai=document.getElementById('fr-arr');if(ai)ai.value=arr;
+  onFrInput('dep');onFrInput('arr');
+  doFreeRouteSearch();
+}
+
 function renderDashRecent(){
   const el=document.getElementById('dash-recent');
   if(!el)return;
   const recent=S.cfg.recentSimBriefRoutes||[];
   if(!recent.length){el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No SimBrief flights yet — open a route in SimBrief to track it here.</div>';return;}
   const ago=ts=>{const m=Math.floor((Date.now()-ts)/60000);if(m<60)return m+'m ago';if(m<1440)return Math.floor(m/60)+'h ago';return Math.floor(m/1440)+'d ago';};
-  el.innerHTML=recent.slice(0,10).map(e=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2)">
-    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--acc);min-width:100px">${e.dep} &#x2192; ${e.arr}</span>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);min-width:40px">${e.type||'—'}</span>
+  el.innerHTML=recent.slice(0,10).map(e=>`<div onclick="openRecentRoute('${esc(e.dep)}','${esc(e.arr)}')" title="Reopen this route — weather, runways, D-ATIS, SimBrief" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--sep)'" style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);cursor:pointer">
+    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--acc);min-width:100px">${esc(e.dep)} &#x2192; ${esc(e.arr)}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);min-width:40px">${esc(e.type)||'—'}</span>
     <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);margin-left:auto">${ago(e.ts)}</span>
   </div>`).join('');
 }
@@ -4448,9 +4477,18 @@ async function fetchMetar(icao,idx,side){
 }
 
 // ── WEATHER SCORING ──────────────────────────────────────────────────────────
+// Minutes since the METAR was OBSERVED (obsTime = epoch seconds from aviationweather.gov).
+// Fetch age ≠ observation age: airports that don't report overnight can be hours stale even
+// seconds after a fetch (Dean's confirmed hunch, 2026-07-02). null = no obsTime available.
+function metarObsAgeMin(m){
+  if(!m||!m.obsTime)return null;
+  const age=Math.floor((Date.now()/1000-m.obsTime)/60);
+  return age>=0?age:null;
+}
+const METAR_STALE_MIN=180;   // >3h old = don't trust it for ranking; flag it in the UI
 function scoreMETAR(m){
   if(!m)return 0;
-  let s={LIFR:8,IFR:6,MVFR:3,VFR:1}[(m.fltcat||'').toUpperCase()]||0;
+  let s={LIFR:8,IFR:6,MVFR:3,VFR:1}[(m.fltCat||'').toUpperCase()]||0;
   const tokens=(m.wxString||'').split(/\s+/).filter(t=>t);
   for(const t of tokens){
     if(/\+TS|\+TSRA/.test(t))s+=6;
@@ -4485,8 +4523,8 @@ function getWorstCategory(depICAO,arrICAO){
   const rank={LIFR:4,IFR:3,MVFR:2,VFR:1};
   const m1=S.metarCache[(depICAO||'').toUpperCase()];
   const m2=S.metarCache[(arrICAO||'').toUpperCase()];
-  const fc1=m1?(m1.fltcat||'').toUpperCase():'';
-  const fc2=m2?(m2.fltcat||'').toUpperCase():'';
+  const fc1=m1?(m1.fltCat||'').toUpperCase():'';
+  const fc2=m2?(m2.fltCat||'').toUpperCase():'';
   const r1=rank[fc1]||0,r2=rank[fc2]||0;
   if(!r1&&!r2)return'N/A';
   if(!r1)return fc2||'N/A';
@@ -4558,6 +4596,8 @@ function metarPills(m){
 }
 
 function pillColor(p){
+  if(p.startsWith('⚠ Report'))return'#ff453a';   // stale observation (>3h)
+  if(p.startsWith('Obs '))return'#f5a623';        // aging observation (90min-3h)
   if(p==='Thunderstorm')return'#ff453a';
   if(p==='Freezing rain')return'#bf5af2';
   if(p==='Heavy rain'||p==='Rain'||p==='Light rain')return'#0a84ff';
@@ -4573,9 +4613,13 @@ function pillColor(p){
 
 function wxBlock(m){
   if(!m)return'<div style="font-size:11px;color:var(--ink4);margin-top:6px;font-family:\'JetBrains Mono\',monospace">Weather unavailable</div>';
-  const fc=(m.fltcat||'VFR').toUpperCase();
+  const fc=(m.fltCat||'VFR').toUpperCase();
   const fcCol={VFR:'#32d74b',MVFR:'#0a84ff',IFR:'#f5a623',LIFR:'#ff453a'}[fc]||'#32d74b';
   const pills=metarPills(m);
+  // Observation-age warning: >3h = red "report Xh old" (many airports don't report overnight —
+  // this data may not reflect current conditions); 90min-3h = amber note. Fresh obs = no pill.
+  const obsAge=metarObsAgeMin(m);
+  if(obsAge!=null&&obsAge>90)pills.unshift(obsAge>METAR_STALE_MIN?('⚠ Report '+(obsAge>=120?Math.floor(obsAge/60)+'h':obsAge+'m')+' old'):('Obs '+obsAge+'m ago'));
   const pillHTML=pills.map(p=>{const pc=pillColor(p);return`<span style="background:${pc}22;border:1px solid ${pc}55;color:${pc};font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;white-space:nowrap">${p}</span>`;}).join('');
   return`<div style="display:flex;align-items:center;gap:6px;margin-top:6px"><div style="width:8px;height:8px;border-radius:50%;background:${fcCol};flex-shrink:0;box-shadow:0 0 4px ${fcCol}88"></div><span style="font-size:11px;font-weight:700;color:${fcCol};font-family:'JetBrains Mono',monospace">${fc}</span></div>${pills.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${pillHTML}</div>`:''}`;
 }
@@ -4662,7 +4706,7 @@ function updateWxAge(){
   if(!S.metarLastFetch){el.innerHTML='';return;}
   const mins=Math.floor((Date.now()-S.metarLastFetch)/60000);
   const timeStr=mins<1?'just now':mins+'m ago';
-  el.innerHTML='<span style="'+ps+'">&#9679; Weather updated '+timeStr+' <button onclick="fetchMetarBatch()" style="background:none;border:none;color:#32d74b;cursor:pointer;font-size:11px;padding:0;line-height:1;font-family:\'JetBrains Mono\',monospace" title="Refresh weather">&#8634;</button></span>';
+  el.innerHTML='<span style="'+ps+'" title="When ABRP last FETCHED weather. Each airport&#39;s report also shows its own observation age — some airports don&#39;t issue new reports overnight, so a fresh fetch can still carry an old observation.">&#9679; Weather updated '+timeStr+' <button onclick="fetchMetarBatch()" style="background:none;border:none;color:#32d74b;cursor:pointer;font-size:11px;padding:0;line-height:1;font-family:\'JetBrains Mono\',monospace" title="Refresh weather">&#8634;</button></span>';
 }
 
 function parseWind(m){
