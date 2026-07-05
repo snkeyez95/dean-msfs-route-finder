@@ -11,25 +11,20 @@ perf/*.log
 perf/_capture_tmp.csv
 perf/_prep_aircraft.txt
 perf/PresentMon-x64.exe
-# PyInstaller build artifacts (the built perf-engine.exe IS committed so release.bat can ship it)
+# Retired Python engine binary: kept ON DISK as the dev-only fallback (nativePerfEngine:false),
+# no longer tracked or shipped (v6.0.0 runs the native Node engine). Regenerable via
+# perf/build_pyi/perf-engine.spec if ever needed.
+perf/perf-engine.exe
 perf/dist/
 perf/build_pyi/
 perf/*.spec
-perf/native/_ref.json
-perf/native/_ref_cov.json
-perf/native/_ref_settings.json
-perf/native/_ref_write.json
-perf/native/_ref_writers.json
-_phase8_preview_flight.html
-perf/native/_preview.js
-perf/native/_ref_charts.json
-perf/native/_ref_report_meta.json
-perf/native/_ref_combined.html
-perf/native/_gen_native.js
 
-perf/native/_ref_cfx.json
+# v6 cleanup note: the _ref*/_parity*/_gen/_preview migration harnesses were deleted 2026-07-05
+# (native engine proven + shipped); patterns kept so stray regenerated oracles never get committed
+perf/native/_ref*
+perf/native/_parity*
+perf/native/_gen_native.js
+perf/native/_preview.js
 perf/native/_cfx_ref_out/
 perf/native/_cfx_nat_out/
-
-perf/native/_ref_phases.json
-perf/native/_ref_engine.json
+_phase8_preview_flight.html
