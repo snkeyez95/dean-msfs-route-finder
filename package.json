@@ -1,6 +1,6 @@
 {
   "name": "dean-msfs-route-finder",
-  "version": "5.9.43",
+  "version": "6.0.0",
   "description": "A Better Route Planner",
   "main": "main.js",
   "scripts": {
@@ -38,10 +38,6 @@
       "node_modules/xtend/**"
     ],
     "extraResources": [
-      {
-        "from": "perf/perf-engine.exe",
-        "to": "perf/perf-engine.exe"
-      },
       {
         "from": "perf/PresentMon-x64.exe",
         "to": "perf/PresentMon-x64.exe"

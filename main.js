@@ -1386,7 +1386,10 @@ ipcMain.handle('nvcp-restore', () => {
 // --- Native (Node) perf engine — v6 transition. OPT-IN behind config.nativePerfEngine (default OFF),
 // so the proven Python path stays the default until the full-flight parity passes and we flip it.
 function _perfCfg(){ try { return JSON.parse(fs.readFileSync(CFG,'utf8')) || {}; } catch(_){ return {}; } }
-function nativePerfEnabled(){ return _perfCfg().nativePerfEngine === true; }
+// v6.0.0: the NATIVE engine is the default (byte-parity proven vs Python over 21 flights + a live
+// baseline flight; packaging runtime-probed). Setting nativePerfEngine:false in config falls back to
+// the legacy Python paths — a DEV-ONLY escape hatch: the installer no longer ships perf-engine.exe.
+function nativePerfEnabled(){ return _perfCfg().nativePerfEngine !== false; }
 function simbriefUser(){ return _perfCfg().simbriefUser || 'snkeyez95'; }
 // Steam UserCfg.opt (matches the Python engine). Store-vs-Steam detection is a cutover TODO.
 const USERCFG_PATH = path.join(app.getPath('appData'), 'Microsoft Flight Simulator 2024', 'UserCfg.opt');
