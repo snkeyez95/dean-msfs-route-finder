@@ -2701,14 +2701,17 @@ function hydrateOpenRoute(){
   fetchDatis(r.arrival_airport,S.openRoute,'arr','');
 }
 
+// Align an expanded route's header row to the top of the view. Two INSTANT jumps: one right after
+// render, and a corrective one after the async METAR/D-ATIS hydration has grown the panel — a
+// single smooth scroll could land mid-panel (or get abandoned) when the layout shifted under it.
+function scrollOpenRowTop(){
+  const jump=()=>{const row=document.querySelector('tr.dr.open');if(row)row.scrollIntoView({behavior:'auto',block:'start'});};
+  setTimeout(jump,30);
+  setTimeout(jump,450);
+}
 function togR(i){
   S.openRoute=S.openRoute===i?null:i;renderRoutes();
-  if(S.openRoute!==null){
-    setTimeout(()=>{
-      const row=document.querySelector('tr.dr.open');
-      if(row) row.scrollIntoView({behavior:'smooth',block:'start'});
-    },0);
-  }
+  if(S.openRoute!==null)scrollOpenRowTop();
 }
 
 function setAirlineFilter(v){S.acFilter=v;S.openRoute=null;renderRoutes();}
@@ -3049,6 +3052,7 @@ function hydrateFrOpenRoute(){
 function togFrR(i){
   S.frOpenRoute=S.frOpenRoute===i?null:i;
   renderFreeRouteResults();
+  if(S.frOpenRoute!==null)scrollOpenRowTop();
 }
 
 async function fetchFrMetar(icao,idx,side){
@@ -3443,6 +3447,7 @@ function hydrateTpOpenLeg(){
 function togTpLeg(i){
   S.tpOpenLeg=S.tpOpenLeg===i?null:i;
   renderTripCard();
+  if(S.tpOpenLeg!==null)scrollOpenRowTop();
 }
 
 async function fetchTpMetar(icao,idx,side){
