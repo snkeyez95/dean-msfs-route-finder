@@ -1478,7 +1478,11 @@ async function resolveUnknownAirports(){
     try{
       const resp=await fetch('https://aviationweather.gov/api/data/airport?ids='+row.icao+'&format=json');
       if(!resp.ok)continue;  // inconclusive (server/network) — leave the row as-is
-      const data=await resp.json();
+      // aviationweather sometimes 200s with an EMPTY body for ids it doesn't know (e.g. KLVB) —
+      // resp.json() then throws "Unexpected end of JSON input" into the log. Inconclusive: skip quietly.
+      const body=await resp.text();
+      if(!body.trim())continue;
+      let data; try{ data=JSON.parse(body); }catch(_){ continue; }
       if(data&&data.length){
         const a=data[0];
         const nm=titleCaseName(a.name)||row.icao;
@@ -2453,6 +2457,9 @@ async function fetchSIRoutes({autoMode=false}={}){
     processPage(res.data?.data||res.data?.routes||[]);
     pagesFetched++;
     siSetFetchAdded(Object.keys(S.routeRegistry).length-cntBefore);
+    // Incremental save every 20 pages: a full refresh spans ~140+ pages with 65s rate-limit waits
+    // (30-60 min) — closing ABRP mid-refresh used to lose ALL fetched pages (only saved at the end).
+    if(pagesFetched%20===0)window.api.siSaveRegistry(S.routeRegistry);
   }
   pruneRegistry();
   await window.api.siSaveRegistry(S.routeRegistry);

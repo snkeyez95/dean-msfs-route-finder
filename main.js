@@ -128,8 +128,12 @@ function seedPerfLibs(){
     fs.mkdirSync(dest, {recursive:true});
     for(const f of fs.readdirSync(vendor)){
       if(!f.toLowerCase().endsWith('.js')) continue;
-      const d = path.join(dest, f);
-      if(!fs.existsSync(d)) fs.copyFileSync(path.join(vendor, f), d);
+      const s = path.join(vendor, f), d = path.join(dest, f);
+      // copy when missing OR stale (size differs) — a vendored chart-lib update must actually
+      // reach the reports, not sit behind a copy-once check forever
+      let need = !fs.existsSync(d);
+      if(!need){ try{ need = fs.statSync(s).size !== fs.statSync(d).size; }catch(_){ need = true; } }
+      if(need) fs.copyFileSync(s, d);
     }
   }catch(e){ try{LOG.warn('seedPerfLibs failed: '+e.message);}catch(_){} }
 }
