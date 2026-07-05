@@ -10,6 +10,7 @@
     MessageBox MB_YESNO|MB_ICONQUESTION "Also remove your A Better Route Planner data?$\r$\n$\r$\nThis permanently deletes your settings, routes, and ALL LOGGED FLIGHT DATA under:$\r$\n$APPDATA\A Better Route Planner$\r$\n$\r$\nChoose No to keep everything for a future reinstall." /SD IDNO IDNO abrpKeepData
       RMDir /r "$APPDATA\A Better Route Planner"
       RMDir /r "$APPDATA\dean-msfs-route-finder"
+      RMDir /r "$LOCALAPPDATA\dean-msfs-route-finder-updater"  ; electron-updater download cache (found on disk 2026-07-05)
     abrpKeepData:
   ${endIf}
 !macroend

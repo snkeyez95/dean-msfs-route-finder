@@ -1432,32 +1432,34 @@ ipcMain.handle('perf-storage-stats', () => {
              gzCount: gzFiles.length, gzBytes: sum(gzFiles), keepRaw: ARCHIVE_KEEP_RAW };
   } catch (e) { return { ok:false, error:e.message }; }
 });
-ipcMain.handle('perf-archive-raw', async () => {
-  const zlib = require('zlib');
-  const results = { archived: 0, savedBytes: 0, kept: 0, errors: [] };
+ipcMain.handle('perf-archive-raw', () => new Promise((resolve) => {
   try {
-    const raws = listRawCaptures().filter(r => !r.gz).sort((a,b) => b.mtime - a.mtime);
-    const targets = raws.slice(ARCHIVE_KEEP_RAW);          // newest N stay raw
-    results.kept = Math.min(raws.length, ARCHIVE_KEEP_RAW);
-    for (const t of targets) {
+    // Self-review findings (2026-07-05): (a) gzip of 100MB+ files is sync CPU work — run it in a
+    // CHILD process (like the CapFrameX export), never on the Electron main thread; (b) never
+    // archive while a capture could be mid-FILING — a partially-copied frametimes.csv could be
+    // archived truncated. Capture ground truth is the same check the badge uses.
+    if (isCaptureRunning()) { resolve({ ok:false, error:'A capture is armed or recording — archive after the flight files.' }); return; }
+    const mod = path.join(perfDir(), 'native', 'archive.js');
+    if (!fs.existsSync(mod)) { resolve({ ok:false, error:'archiver module not found' }); return; }
+    const child = spawn(process.execPath, ['-e',
+      'const a=require(process.env.ARC_MOD);' +
+      'console.log(JSON.stringify(a.archiveRaw(process.env.ARC_SRC, parseInt(process.env.ARC_KEEP,10))));'],
+      { windowsHide:true, env: Object.assign({}, process.env, {
+          ELECTRON_RUN_AS_NODE:'1', ARC_MOD: mod, ARC_SRC: path.join(USER_DATA,'Sessions'), ARC_KEEP: String(ARCHIVE_KEEP_RAW) }) });
+    let out=''; child.stdout.on('data', d => out += d);
+    let err=''; child.stderr.on('data', d => err += d);
+    const timer = setTimeout(() => { try{ child.kill(); }catch(_){}; resolve({ ok:false, error:'archive timed out' }); }, 600000);
+    child.on('close', (code) => {
+      clearTimeout(timer);
       try {
-        const orig = fs.readFileSync(t.p);
-        const gz = zlib.gzipSync(orig, { level: 6 });
-        const gzPath = t.p + '.gz';
-        fs.writeFileSync(gzPath + '.tmp', gz);
-        // integrity gate: decompress the written file and byte-compare BEFORE touching the original
-        const back = zlib.gunzipSync(fs.readFileSync(gzPath + '.tmp'));
-        if (back.length !== orig.length || !back.equals(orig)) { try{fs.unlinkSync(gzPath+'.tmp');}catch(_){}; results.errors.push(path.basename(path.dirname(t.p))+': verify failed'); continue; }
-        fs.renameSync(gzPath + '.tmp', gzPath);
-        fs.unlinkSync(t.p);
-        results.archived++; results.savedBytes += (orig.length - gz.length);
-        await new Promise(r => setImmediate(r));           // yield between files; UI stays live
-      } catch (e) { results.errors.push(path.basename(path.dirname(t.p)) + ': ' + e.message); }
-    }
-    LOG.info('[STORAGE] archived ' + results.archived + ' raw capture(s), saved ' + Math.round(results.savedBytes/1048576) + ' MB, kept ' + results.kept + ' raw');
-    return { ok: true, ...results };
-  } catch (e) { LOG.error('[STORAGE] archive failed: ' + e.message); return { ok:false, error:e.message, ...results }; }
-});
+        const j = JSON.parse(out.trim().split(/\r?\n/).pop());
+        LOG.info('[STORAGE] archived ' + j.archived + ' raw capture(s), saved ' + Math.round(j.savedBytes/1048576) + ' MB, kept ' + j.kept + ' raw' + (j.errors.length ? ' | errors: ' + j.errors.join('; ') : ''));
+        resolve({ ok:true, ...j });
+      } catch(_) { LOG.error('[STORAGE] archive failed (code '+code+'): '+err.slice(0,300)); resolve({ ok:false, error: err.slice(0,200) || ('exit '+code) }); }
+    });
+    child.on('error', e => { clearTimeout(timer); resolve({ ok:false, error:e.message }); });
+  } catch (e) { LOG.error('[STORAGE] archive failed: ' + e.message); resolve({ ok:false, error:e.message }); }
+}));
 
 // ── NVIDIA Control Panel (NVCP) settings backup/restore ──────────────────────
 // Ports tools/backup_nvidia_settings.bat + restore_nvidia_settings.bat: the global 3D settings + all

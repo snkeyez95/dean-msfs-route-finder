@@ -4248,6 +4248,13 @@ async function setupExportUi(){
   if(r&&r.ok)RLOG('[SETUP] exported to '+r.path);
 }
 async function setupImportUi(){
+  // Self-review finding (2026-07-05): an in-flight SI refresh saves the registry when it FINISHES —
+  // importing mid-refresh would let that late save silently overwrite the just-imported routes.
+  const _fb=document.getElementById('fetch-btn');
+  if((typeof _arRunning!=='undefined'&&_arRunning)||(_fb&&_fb.disabled)){
+    alert('A route refresh is currently running.\n\nImporting now would be undone when the refresh finishes and saves its routes. Let it finish (or restart ABRP), then import.');
+    return;
+  }
   if(!confirm('Import a setup backup?\n\nThis replaces your current settings, route registry, and snapshot with the backup’s versions. Your CURRENT setup is saved to a timestamped backup folder first, so this is reversible.\n\nFlight logs are not touched.'))return;
   const el=document.getElementById('setup-bk-result');
   let r; try{ r=await window.api.setupImport(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
