@@ -784,7 +784,24 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <!-- ── TAB: MAINTENANCE ── -->
 <div class="pane" id="pane-maintenance"><div class="scroll">
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">MSFS Maintenance</div>
-  <div style="font-size:12px;color:var(--ink3);font-family:'Inter',sans-serif;margin-bottom:20px">Cache cleaners and NVIDIA settings backup — run these around sim, driver, or aircraft updates.</div>
+  <div style="font-size:12px;color:var(--ink3);font-family:'Inter',sans-serif;margin-bottom:20px">Cache cleaners, NVIDIA settings backup, ABRP setup backup, and flight-log storage.</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">ABRP Setup Backup</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Export everything that defines this install &mdash; all settings + your route registry + the 20,000-route snapshot &mdash; as one .zip. Import restores it on a fresh install or new PC (your current setup is backed up first, automatically). Flight logs are separate; archive them below.</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn bp bsm" onclick="setupExportUi()">&#128229; Export My Setup</button>
+      <button class="btn bg bsm" onclick="setupImportUi()">&#128228; Import Setup&hellip;</button>
+      <span id="setup-bk-result" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    </div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">Flight Log Storage</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Raw frame captures are ~93% of your flight-log disk use, but all analysis (Baseline, Compare, reports) reads only the small summaries. Archiving compresses older raw captures in place (~79% smaller, fully reversible, <b>nothing is ever deleted</b>) and keeps the newest 5 uncompressed. CapFrameX export reads archived captures transparently.</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn bp bsm" id="arch-btn" onclick="perfArchiveUi()">&#128451; Archive Older Raw Captures</button>
+      <span id="storage-stat" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    </div>
+  </div>
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-t">Shader Cache Cleaner</div>
     <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Clears the MSFS / NVIDIA / DX12 / Steam shader caches (7 locations). Worth doing after a sim or GPU-driver update. Caches rebuild on their own &mdash; expect the next flight or two to be slightly stuttery while shaders recompile.</div>
@@ -1342,7 +1359,7 @@ function sw(t){
   if(t==='companions')renderCompanionsPane();
   if(t==='perf')renderPerfPane();
   if(t==='settings'){renderFlightApps();enhanceSettingsSections();}
-  if(t==='maintenance')nvcpRefreshStatus();
+  if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();}
 }
 
 // ── AIRPORTS ────────────────────────────────────────────────────────────────
@@ -4222,6 +4239,47 @@ function openMaintenance(){
   maintAck();
 }
 // ── NVIDIA Control Panel backup/restore ──────────────────────────────────────
+// ── SETUP BACKUP + FLIGHT-LOG STORAGE (Maintenance tab) ─────────────────────
+async function setupExportUi(){
+  const el=document.getElementById('setup-bk-result');
+  let r; try{ r=await window.api.setupExport(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.canceled)return;
+  if(el)el.textContent=r&&r.ok?('✓ Saved '+(r.files||[]).length+' file(s) to '+r.path):('Export failed: '+((r&&r.error)||'unknown'));
+  if(r&&r.ok)RLOG('[SETUP] exported to '+r.path);
+}
+async function setupImportUi(){
+  if(!confirm('Import a setup backup?\n\nThis replaces your current settings, route registry, and snapshot with the backup’s versions. Your CURRENT setup is saved to a timestamped backup folder first, so this is reversible.\n\nFlight logs are not touched.'))return;
+  const el=document.getElementById('setup-bk-result');
+  let r; try{ r=await window.api.setupImport(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.canceled)return;
+  if(r&&r.ok){
+    alert('Setup imported ('+r.imported+' file(s)).\nYour previous setup was saved to:\n'+r.backupDir+'\n\nABRP will now reload to apply it.');
+    location.reload();
+  } else if(el)el.textContent='Import failed: '+((r&&r.error)||'unknown');
+}
+const _fmtGb=b=>b>=1073741824?(b/1073741824).toFixed(2)+' GB':Math.round(b/1048576)+' MB';
+async function updateStorageStat(){
+  const el=document.getElementById('storage-stat');
+  if(!el)return;
+  let s; try{ s=await window.api.perfStorageStats(); }catch(e){ s=null; }
+  if(!s||!s.ok){el.textContent='';return;}
+  el.textContent='Flight logs: '+_fmtGb(s.totalBytes)+' total · '+s.rawCount+' raw capture(s) ('+_fmtGb(s.rawBytes)+')'+(s.gzCount?' · '+s.gzCount+' archived ('+_fmtGb(s.gzBytes)+')':'');
+}
+async function perfArchiveUi(){
+  const btn=document.getElementById('arch-btn');
+  let s; try{ s=await window.api.perfStorageStats(); }catch(e){ s=null; }
+  const toArchive=s&&s.ok?Math.max(0,s.rawCount-(s.keepRaw||5)):0;
+  if(!toArchive){alert('Nothing to archive — the newest '+((s&&s.keepRaw)||5)+' captures always stay uncompressed, and everything older is already archived.');return;}
+  if(!confirm('Archive '+toArchive+' older raw capture(s)?\n\nEach file is compressed in place (~79% smaller) and verified byte-for-byte before the original is replaced. Nothing is deleted — archives can always be decompressed. The newest '+((s&&s.keepRaw)||5)+' captures stay raw. All analysis and reports are unaffected.'))return;
+  if(btn){btn.disabled=true;btn.innerHTML='&#8987; Archiving…';}
+  let r; try{ r=await window.api.perfArchiveRaw(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(btn){btn.disabled=false;btn.innerHTML='&#128451; Archive Older Raw Captures';}
+  if(r&&r.ok){
+    alert('Archived '+r.archived+' capture(s) — saved '+_fmtGb(r.savedBytes)+'.'+(r.errors&&r.errors.length?'\n\nSkipped (kept raw):\n'+r.errors.join('\n'):''));
+    updateStorageStat();
+  } else alert('Archive failed: '+((r&&r.error)||'unknown'));
+}
+
 async function nvcpRefreshStatus(){
   const el=document.getElementById('nvcp-stamp'); if(!el)return;
   let s; try{ s=await window.api.nvcpStatus(); }catch(e){ return; }

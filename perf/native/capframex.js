@@ -68,7 +68,12 @@ function headerLines(meta, gpuName) {
 // Convert one raw frametimes.csv to a CapFrameX-loadable CSV. Returns {outPath, trimmed} or null.
 function convertOne(srcCsv, outDir, meta, gpuName) {
   let raw;
-  try { raw = fs.readFileSync(srcCsv, 'utf8'); } catch (_) { return null; }
+  try {
+    // archived captures (frametimes.csv.gz from the storage archiver) decompress transparently
+    raw = /\.gz$/i.test(srcCsv)
+      ? require('zlib').gunzipSync(fs.readFileSync(srcCsv)).toString('utf8')
+      : fs.readFileSync(srcCsv, 'utf8');
+  } catch (_) { return null; }
   if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);            // strip BOM (utf-8-sig)
   const srcLines = raw.split(/\r\n|\r|\n/);                        // like Python splitlines()...
   if (srcLines.length && srcLines[srcLines.length - 1] === '') srcLines.pop(); // ...drop trailing empty
@@ -104,17 +109,20 @@ function convertOne(srcCsv, outDir, meta, gpuName) {
 // Resolve a dropped file/folder into [ [frametimes.csv, sessionDir], ... ]. Only files named exactly
 // 'frametimes.csv' match, so already-converted exports are never re-processed.
 function findSessionCsvs(p) {
+  const isRaw = n => { n = n.toLowerCase(); return n === 'frametimes.csv' || n === 'frametimes.csv.gz'; };
   p = path.resolve(p);
   let st; try { st = fs.statSync(p); } catch (_) { return []; }
-  if (st.isFile()) return path.basename(p).toLowerCase() === 'frametimes.csv' ? [[p, path.dirname(p)]] : [];
-  const direct = path.join(p, 'frametimes.csv');
-  if (fs.existsSync(direct)) return [[direct, p]];
+  if (st.isFile()) return isRaw(path.basename(p)) ? [[p, path.dirname(p)]] : [];
+  for (const n of ['frametimes.csv', 'frametimes.csv.gz']) {
+    const direct = path.join(p, n);
+    if (fs.existsSync(direct)) return [[direct, p]];
+  }
   const out = [];
   (function walk(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const fp = path.join(dir, e.name);
       if (e.isDirectory()) walk(fp);
-      else if (e.name.toLowerCase() === 'frametimes.csv') out.push([fp, dir]);
+      else if (isRaw(e.name)) out.push([fp, dir]);
     }
   })(p);
   return out;

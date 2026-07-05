@@ -1342,6 +1342,123 @@ ipcMain.handle('get-maintenance-versions', (_, aircraftRoot) => {
   return { driver, simBuild, pmdg: ac.pmdg, fenix: ac.fenix };
 });
 
+// ── SETUP EXPORT / IMPORT (backup & restore) ──────────────────────────────────
+// One .zip of the three files that define an ABRP install: config.json (all settings) +
+// routeRegistry.json + routeSnapshot.json. Flight logs (Sessions, GBs) are deliberately excluded.
+// Import validates first, backs up the current files, then swaps in — reload finishes it.
+const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json'];
+function psq(s){ return `'${String(s).replace(/'/g,"''")}'`; }
+ipcMain.handle('setup-export', async () => {
+  try {
+    const d = new Date(), p2 = n => String(n).padStart(2,'0');
+    const defName = `abrp_setup_backup_${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}.zip`;
+    const r = await dialog.showSaveDialog(win, { title:'Export ABRP setup', defaultPath: defName,
+      filters:[{name:'Zip archive', extensions:['zip']}] });
+    if (r.canceled || !r.filePath) return { ok:false, canceled:true };
+    const have = SETUP_FILES.map(f => path.join(USER_DATA, f)).filter(p => fs.existsSync(p));
+    if (!have.length) return { ok:false, error:'nothing to export' };
+    const cp = require('child_process');
+    const list = have.map(psq).join(',');
+    const res = cp.spawnSync('powershell', ['-NoProfile','-NonInteractive','-Command',
+      `Compress-Archive -LiteralPath ${list} -DestinationPath ${psq(r.filePath)} -Force`],
+      { windowsHide:true, timeout:120000, encoding:'utf8' });
+    if (res.status !== 0 || !fs.existsSync(r.filePath))
+      return { ok:false, error:'zip failed: ' + ((res.stderr||'').trim().slice(0,200) || 'unknown') };
+    LOG.info('[SETUP] exported ' + have.length + ' file(s) -> ' + r.filePath);
+    return { ok:true, path: r.filePath, files: have.map(p => path.basename(p)) };
+  } catch (e) { LOG.error('[SETUP] export failed: ' + e.message); return { ok:false, error:e.message }; }
+});
+ipcMain.handle('setup-import', async () => {
+  try {
+    const r = await dialog.showOpenDialog(win, { title:'Import ABRP setup', properties:['openFile'],
+      filters:[{name:'ABRP setup backup', extensions:['zip']}] });
+    if (r.canceled || !r.filePaths.length) return { ok:false, canceled:true };
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'abrpsetup-'));
+    try {
+      const cp = require('child_process');
+      const ex = cp.spawnSync('powershell', ['-NoProfile','-NonInteractive','-Command',
+        `Expand-Archive -LiteralPath ${psq(r.filePaths[0])} -DestinationPath ${psq(tmp)} -Force`],
+        { windowsHide:true, timeout:120000 });
+      if (ex.status !== 0) return { ok:false, error:'could not open the zip' };
+      // validate BEFORE touching anything: config.json must exist and parse
+      const newCfg = path.join(tmp, 'config.json');
+      if (!fs.existsSync(newCfg)) return { ok:false, error:'not an ABRP setup backup (no config.json inside)' };
+      JSON.parse(fs.readFileSync(newCfg, 'utf8'));
+      for (const f of ['routeRegistry.json','routeSnapshot.json']) {
+        const p = path.join(tmp, f);
+        if (fs.existsSync(p)) JSON.parse(fs.readFileSync(p, 'utf8'));   // corrupt file in zip = abort
+      }
+      // safety net: current files -> timestamped backup folder (never overwritten blind)
+      const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+      const bak = path.join(USER_DATA, 'setup_backup_pre_import_' + ts);
+      fs.mkdirSync(bak, { recursive:true });
+      for (const f of SETUP_FILES) { const p = path.join(USER_DATA, f); if (fs.existsSync(p)) fs.copyFileSync(p, path.join(bak, f)); }
+      let imported = 0;
+      for (const f of SETUP_FILES) { const p = path.join(tmp, f); if (fs.existsSync(p)) { writeFileAtomic(path.join(USER_DATA, f), fs.readFileSync(tmp+path.sep+f)); imported++; } }
+      LOG.info('[SETUP] imported ' + imported + ' file(s); previous setup saved to ' + bak);
+      return { ok:true, imported, backupDir: bak };
+    } finally { try { fs.rmSync(tmp, { recursive:true, force:true }); } catch(_){} }
+  } catch (e) { LOG.error('[SETUP] import failed: ' + e.message); return { ok:false, error:e.message }; }
+});
+
+// ── FLIGHT-LOG STORAGE (archive raw captures) ─────────────────────────────────
+// Raw frametimes.csv files are 93% of Sessions (measured 1.4 of 1.5 GB). Baseline/Compare/reports
+// read only the tiny summaries, so old raw files can be gzipped IN PLACE (~79% saving, reversible,
+// NEVER deleted). Keep the newest N raw for instant re-analysis. Each gzip is verified by a full
+// decompress-and-compare BEFORE the original is removed — flight data is irreplaceable.
+const ARCHIVE_KEEP_RAW = 5;
+function listRawCaptures(){
+  const sdir = path.join(USER_DATA, 'Sessions');
+  const out = [];
+  (function walk(d){
+    let ents; try { ents = fs.readdirSync(d, { withFileTypes:true }); } catch(_) { return; }
+    for (const e of ents) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { if (e.name.toLowerCase() !== 'capframex') walk(p); }
+      else if (/^frametimes\.csv(\.gz)?$/i.test(e.name)) out.push({ p, gz: e.name.toLowerCase().endsWith('.gz'), size: (()=>{try{return fs.statSync(p).size;}catch(_){return 0;}})(), mtime: (()=>{try{return fs.statSync(p).mtimeMs;}catch(_){return 0;}})() });
+    }
+  })(sdir);
+  return out;
+}
+ipcMain.handle('perf-storage-stats', () => {
+  try {
+    const raws = listRawCaptures();
+    const rawFiles = raws.filter(r=>!r.gz), gzFiles = raws.filter(r=>r.gz);
+    const sum = a => a.reduce((x,y)=>x+y.size,0);
+    let total = 0;
+    (function walk(d){ let e2; try{ e2=fs.readdirSync(d,{withFileTypes:true}); }catch(_){ return; }
+      for(const e of e2){ const p=path.join(d,e.name); if(e.isDirectory())walk(p); else { try{ total+=fs.statSync(p).size; }catch(_){} } } })(path.join(USER_DATA,'Sessions'));
+    return { ok:true, totalBytes: total, rawCount: rawFiles.length, rawBytes: sum(rawFiles),
+             gzCount: gzFiles.length, gzBytes: sum(gzFiles), keepRaw: ARCHIVE_KEEP_RAW };
+  } catch (e) { return { ok:false, error:e.message }; }
+});
+ipcMain.handle('perf-archive-raw', async () => {
+  const zlib = require('zlib');
+  const results = { archived: 0, savedBytes: 0, kept: 0, errors: [] };
+  try {
+    const raws = listRawCaptures().filter(r => !r.gz).sort((a,b) => b.mtime - a.mtime);
+    const targets = raws.slice(ARCHIVE_KEEP_RAW);          // newest N stay raw
+    results.kept = Math.min(raws.length, ARCHIVE_KEEP_RAW);
+    for (const t of targets) {
+      try {
+        const orig = fs.readFileSync(t.p);
+        const gz = zlib.gzipSync(orig, { level: 6 });
+        const gzPath = t.p + '.gz';
+        fs.writeFileSync(gzPath + '.tmp', gz);
+        // integrity gate: decompress the written file and byte-compare BEFORE touching the original
+        const back = zlib.gunzipSync(fs.readFileSync(gzPath + '.tmp'));
+        if (back.length !== orig.length || !back.equals(orig)) { try{fs.unlinkSync(gzPath+'.tmp');}catch(_){}; results.errors.push(path.basename(path.dirname(t.p))+': verify failed'); continue; }
+        fs.renameSync(gzPath + '.tmp', gzPath);
+        fs.unlinkSync(t.p);
+        results.archived++; results.savedBytes += (orig.length - gz.length);
+        await new Promise(r => setImmediate(r));           // yield between files; UI stays live
+      } catch (e) { results.errors.push(path.basename(path.dirname(t.p)) + ': ' + e.message); }
+    }
+    LOG.info('[STORAGE] archived ' + results.archived + ' raw capture(s), saved ' + Math.round(results.savedBytes/1048576) + ' MB, kept ' + results.kept + ' raw');
+    return { ok: true, ...results };
+  } catch (e) { LOG.error('[STORAGE] archive failed: ' + e.message); return { ok:false, error:e.message, ...results }; }
+});
+
 // ── NVIDIA Control Panel (NVCP) settings backup/restore ──────────────────────
 // Ports tools/backup_nvidia_settings.bat + restore_nvidia_settings.bat: the global 3D settings + all
 // game profiles live in two driver .bin files under C:\ProgramData\NVIDIA Corporation\Drs. Back up =
