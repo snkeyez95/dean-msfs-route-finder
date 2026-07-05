@@ -4899,7 +4899,32 @@ async function fetchDatis(icao,idx,side,prefix){
   const block=datisBlockFor(data,side);
   const info=block?interpretDatis(block,icao,side):null;
   if(!data||!data.hasData||!info){
-    box.innerHTML='<div class="datis-note">No live D-ATIS for '+icao+'</div>';
+    // SYNTHETIC ATIS (2026-07-05): only the US publishes public D-ATIS feeds — everywhere else
+    // used to dead-end at "No live D-ATIS". Generate an ATIS-style briefing FROM THE METAR
+    // instead, clearly labeled, so international airports still get wind/runway/altimeter value.
+    const m=await fetchMetarObj(icao);
+    if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+    const w=m?parseWind(m.rawOb||''):null;
+    if(m&&w){
+      const isArr=side==='arr';
+      const best=bestRwy(icao,w.dir,w.spd);
+      const hasRwy=best&&best!=='Check ATIS';
+      const alt=(m.rawOb||'').match(/\b(?:A(\d{4})|Q(\d{4}))\b/);
+      const altTxt=alt?(alt[1]?('Altimeter '+alt[1].slice(0,2)+'.'+alt[1].slice(2)):('QNH '+alt[2])):null;
+      const fc=(m.fltCat||'').toUpperCase();
+      const obsAge=metarObsAgeMin(m);
+      const bits=[];
+      bits.push('Wind '+(w.dir==='VRB'?'variable':w.dir+'&deg;')+' at '+w.spd+'kt'+(w.gust>w.spd?', gusting '+w.gust+'kt':''));
+      if(hasRwy)bits.push('Suggest RWY '+esc(best)+' ('+(isArr?'landing':'departing')+' into wind)');
+      if(altTxt)bits.push(altTxt);
+      if(fc)bits.push(fc+' conditions');
+      if(obsAge!=null)bits.push('obs '+ageLabel(obsAge));
+      box.innerHTML='<div class="datis-head" style="color:var(--ink2)">&#9889; '+(isArr?'Arrival':'Departure')+' briefing <span class="datis-tag" title="No public D-ATIS exists for this airport — this briefing is generated from its current METAR">from METAR</span></div>'
+        +'<div class="datis-note" style="margin-top:3px">'+bits.join(' &middot; ')+'</div>';
+      if(rwyEl&&hasRwy&&/Check ATIS/i.test(rwyEl.textContent||''))rwyEl.textContent=best;
+      return;
+    }
+    box.innerHTML='<div class="datis-note">No live D-ATIS for '+icao+(m?'':' (and no METAR to brief from)')+'</div>';
     return;
   }
   const isArr=side==='arr';

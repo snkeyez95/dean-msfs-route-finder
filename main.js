@@ -906,11 +906,18 @@ ipcMain.handle('fetch-datis', async (_, {icao}) => {
       ? `https://atis.info/api/${id}`
       : `https://atis.guru/atis/${id}`;
     const res = await datisGet(url);
-    if(!res || res.status < 200 || res.status >= 400 || !res.body){
-      LOG.info(`[DATIS] ${id} via ${source}: no data (status ${res&&res.status})`);
-      return {...base, source};
+    let parsed = (!res || res.status < 200 || res.status >= 400 || !res.body)
+      ? {hasData:false}
+      : (source === 'atis.info' ? parseAtisInfo(res.body) : parseAtisGuru(res.body));
+    // US redundancy: datis.clowd.io fronts the same FAA SWIM feed as atis.info from a different
+    // host + same JSON shape — a free resilience fallback when the primary is down or empty.
+    if(!parsed.hasData && source === 'atis.info'){
+      const res2 = await datisGet(`https://datis.clowd.io/api/${id}`);
+      if(res2 && res2.status >= 200 && res2.status < 400 && res2.body){
+        const p2 = parseAtisInfo(res2.body);
+        if(p2.hasData){ LOG.info(`[DATIS] ${id} via clowd.io fallback: hasData=true`); return {...base, source:'datis.clowd.io', ...p2}; }
+      }
     }
-    const parsed = source === 'atis.info' ? parseAtisInfo(res.body) : parseAtisGuru(res.body);
     LOG.info(`[DATIS] ${id} via ${source}: hasData=${parsed.hasData}`);
     return {...base, source, ...parsed};
   }catch(e){
