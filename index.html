@@ -3603,6 +3603,7 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" onclick="perfShowBaseline()" title="One blended TLOD that keeps both PMDG and Fenix smooth — your recommended global setting">&#127919; Baseline</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
+    +'<button class="btn bg bsm" id="cfx-export-btn" onclick="perfExportCfx()" title="Convert every logged flight to CapFrameX-format CSVs (Sessions\\CapFrameX) so you can open them in CapFrameX for deep frame analysis">&#8687; CapFrameX</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
@@ -3803,6 +3804,17 @@ function renderBaseline(){
   }
   bl.innerHTML=h;
 }
+async function perfExportCfx(){
+  const btn=document.getElementById('cfx-export-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='&#8987; Converting&hellip;';}
+  let r; try{ r=await window.api.perfExportCapframex(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(btn){btn.disabled=false;btn.innerHTML='&#8687; CapFrameX';}
+  if(r&&r.ok){
+    alert('Exported '+r.count+' flight'+(r.count!==1?'s':'')+' to CapFrameX format:\n'+r.outDir+'\n\nOpening the folder — load the CSVs in CapFrameX for deep frame analysis.');
+    window.api.perfOpenPath(r.outDir);
+  }else alert('CapFrameX export failed: '+((r&&r.error)||'unknown error'));
+}
+
 async function perfArmCapture(){
   const apps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
   const n=apps.length;

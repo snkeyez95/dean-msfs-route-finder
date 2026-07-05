@@ -1502,6 +1502,37 @@ ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
     });
   } catch (e) { LOG.error('[PERF] perf-prep-next failed: ' + e.message); resolve({ ok:false, error:e.message }); }
 }));
+// Export all logged flights to CapFrameX-format CSVs (Sessions\CapFrameX\) via the native
+// converter (byte-parity proven vs the old Python --convert-path). Runs in a CHILD process —
+// it re-reads every raw frametimes.csv (can be GBs) and must never freeze the UI.
+ipcMain.handle('perf-export-capframex', () => new Promise((resolve) => {
+  try {
+    const mod = path.join(perfDir(), 'native', 'capframex.js');
+    if (!fs.existsSync(mod)) { resolve({ ok:false, error:'converter not found' }); return; }
+    let gpu = '';
+    try {
+      const r = require('child_process').spawnSync('nvidia-smi', ['--query-gpu=name','--format=csv,noheader'],
+        { encoding:'utf8', timeout:6000, windowsHide:true });
+      gpu = ((r.stdout||'').split(/\r?\n/)[0]||'').trim();
+    } catch(_){}
+    const sessions = path.join(USER_DATA, 'Sessions');
+    const child = spawn(process.execPath, ['-e',
+      'const c=require(process.env.CFX_MOD);' +
+      'const r=c.convertPaths([process.env.CFX_SRC], process.env.CFX_SRC, process.env.CFX_GPU||null);' +
+      'console.log(JSON.stringify({outDir:r.outDir,count:r.count}));'],
+      { windowsHide:true, env: Object.assign({}, process.env, {
+          ELECTRON_RUN_AS_NODE:'1', CFX_MOD: mod, CFX_SRC: sessions, CFX_GPU: gpu }) });
+    let out=''; child.stdout.on('data', d => out += d);
+    let err=''; child.stderr.on('data', d => err += d);
+    const timer = setTimeout(() => { try{ child.kill(); }catch(_){}; resolve({ ok:false, error:'export timed out' }); }, 180000);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      try { const j = JSON.parse(out.trim().split(/\r?\n/).pop()); LOG.info('[PERF] CapFrameX export: '+j.count+' flight(s) -> '+j.outDir); resolve({ ok:true, ...j }); }
+      catch(_) { LOG.error('[PERF] CapFrameX export failed (code '+code+'): '+err.slice(0,300)); resolve({ ok:false, error: err.slice(0,200) || ('exit '+code) }); }
+    });
+    child.on('error', e => { clearTimeout(timer); resolve({ ok:false, error:e.message }); });
+  } catch (e) { resolve({ ok:false, error:e.message }); }
+}));
 // Capture status for the title-bar badge. v1: active = engine process running. state (armed /
 // recording) is read from a status file the engine writes when present (engine pass adds it).
 ipcMain.handle('perf-capture-status', () => {
