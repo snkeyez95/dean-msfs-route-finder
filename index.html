@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v5.9.44</div>
+  <div class="tname">A Better Route Planner &mdash; v6.0.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v5.9.44</div>
+    <div class="sb-ver">v6.0.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2187,14 +2187,28 @@ function processPage(routes){
 
 function pruneRegistry(){
   const cutoff=new Date(Date.now()-21*24*60*60*1000).toISOString();
+  // ACTIVE-FLIGHT PROTECTION (2026-07-02): an auto-refresh's prune deleted KFLL-MMUN ten minutes
+  // after Dean SimBriefed it (last_seen 29d > the 21-day cutoff) — his flight plan vanished from
+  // Plan a Flight mid-session. Any pair in recentSimBriefRoutes (the last 30 SimBriefed flights,
+  // recorded the moment "Open in SimBrief" is clicked) is exempt from BOTH prunes.
+  const protectedPairs=new Set((S.cfg.recentSimBriefRoutes||[]).map(e=>[e.dep,e.arr].sort().join('>')));
+  const isProtected=r=>r&&protectedPairs.has([r.departure_airport,r.arrival_airport].sort().join('>'));
+  let shielded=0;
   for(const id of Object.keys(S.routeRegistry)){
-    if(S.routeRegistry[id].last_seen<cutoff)delete S.routeRegistry[id];
+    const r=S.routeRegistry[id];
+    if(r.last_seen<cutoff){ if(isProtected(r)){shielded++;continue;} delete S.routeRegistry[id]; }
   }
   const keys=Object.keys(S.routeRegistry);
   if(keys.length>5000){
     keys.sort((a,b)=>S.routeRegistry[a].last_seen.localeCompare(S.routeRegistry[b].last_seen));
-    keys.slice(0,keys.length-5000).forEach(id=>delete S.routeRegistry[id]);
+    let excess=keys.length-5000;
+    for(const id of keys){
+      if(excess<=0)break;
+      if(isProtected(S.routeRegistry[id])){shielded++;continue;}   // cap-prune skips active flights too
+      delete S.routeRegistry[id];excess--;
+    }
   }
+  if(shielded)RLOG('[SI] prune: shielded '+shielded+' route(s) on recently-SimBriefed pairs');
   const size=JSON.stringify(S.routeRegistry).length;
   if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
 }
@@ -2545,7 +2559,7 @@ function populateAirlineDropdown(){
   const base=getRoutes();
   S.acFilter=prev;
   const airlines=[...new Set(base.map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${esc(a)}"${a===prev?' selected':''}>${esc(a)}</option>`).join('');
   if(prev&&!airlines.includes(prev))S.acFilter='';
 }
 
@@ -2575,7 +2589,7 @@ function renderRoutes(){
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</div>
           <div class="rc">${da[1]||r.departure_airport} &rarr; ${aa[1]||r.arrival_airport}</div></td>
-      <td><div class="ra">${r.airline||r.callsign||'—'}</div></td>
+      <td><div class="ra">${esc(r.airline||r.callsign)||'—'}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
       <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
@@ -2602,12 +2616,12 @@ function renderRoutes(){
       <div class="dp-grid">
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
-          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airline||'—'}</span></div>
-          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'—'}</span></div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${esc(r.airline)||'—'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${esc(r.callsign)||'—'}</span></div>
           <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
           <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
           <div class="dpr"><span class="dl">First seen</span><span class="dv2" title="Seen ${r.times_seen} time${r.times_seen!==1?'s':''}">${fmtFirstSeen(r.first_seen)}</span></div>
-          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
+          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${esc(r.description)}</span></div>`:''}
         </div>
         <div class="dp-sec">
           <div class="dp-st">Departure &mdash; ${r.departure_airport}</div>
@@ -2817,7 +2831,7 @@ function updateFrAirlineDropdown(rs){
   if(!sel)return;
   const prev=S.frAcFilter;
   const airlines=[...new Set(rs.map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  sel.innerHTML='<option value="">All Airlines</option>'+airlines.map(a=>`<option value="${esc(a)}"${a===prev?' selected':''}>${esc(a)}</option>`).join('');
   if(prev&&!airlines.includes(prev))S.frAcFilter='';
   if(row)row.style.display=(rs.length>0&&airlines.length>1)?'':'none';
 }
@@ -2911,7 +2925,7 @@ function renderFreeRouteResults(){
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${dep}&thinsp;&rarr;&thinsp;${arr}</div>
           <div class="rc">${depCity||depName} &rarr; ${arrCity||arrName}</div></td>
-      <td><div class="ra">${r.airline||r.callsign||'&mdash;'}</div></td>
+      <td><div class="ra">${esc(r.airline||r.callsign)||'&mdash;'}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
       <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
@@ -2938,12 +2952,12 @@ function renderFreeRouteResults(){
       <div class="dp-grid">
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
-          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${r.airline||'&mdash;'}</span></div>
-          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${r.callsign||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Airline</span><span class="dv2">${esc(r.airline)||'&mdash;'}</span></div>
+          <div class="dpr"><span class="dl">Callsign</span><span class="dv2 a">${esc(r.callsign)||'&mdash;'}</span></div>
           <div class="dpr"><span class="dl">Aircraft</span><span class="dv2" style="color:var(--grn)">${r.aircraft_type} &mdash; ${simLbl}</span></div>
           <div class="dpr"><span class="dl">Gates</span><span class="dv2 b">${gates}</span></div>
           <div class="dpr"><span class="dl">First seen</span><span class="dv2" title="Seen ${r.times_seen} time${r.times_seen!==1?'s':''}">${fmtFirstSeen(r.first_seen)}</span></div>
-          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${r.description}</span></div>`:''}
+          ${r.description?`<div class="dpr" style="flex-direction:column;gap:3px"><span class="dl">Description</span><span class="dv2" style="text-align:left;font-size:11px;font-family:'Inter',sans-serif;color:var(--ink2)">${esc(r.description)}</span></div>`:''}
         </div>
         <div class="dp-sec">
           <div class="dp-st">Departure &mdash; ${dep}</div>
@@ -3128,7 +3142,7 @@ function populateTpCarrier(){
   if(!sel)return;
   const prev=sel.value;
   const airlines=[...new Set(Object.values(S.routeRegistry).map(r=>r.airline).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML='<option value="">Select airline&hellip;</option>'+airlines.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  sel.innerHTML='<option value="">Select airline&hellip;</option>'+airlines.map(a=>`<option value="${esc(a)}"${a===prev?' selected':''}>${esc(a)}</option>`).join('');
 }
 
 function onTpInput(){
@@ -4798,7 +4812,7 @@ function datisActiveRwy(icao,side){
   const rwys=extractRunways(block.text,(icao||'').toUpperCase(),side);
   return rwys.length?rwys[0]:null;
 }
-function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // fetch + render D-ATIS into the expanded panel. prefix:''|'fr'|'tp', side:'dep'|'arr'
 async function fetchDatis(icao,idx,side,prefix){
@@ -4948,7 +4962,7 @@ function chRoutesHTML(ch){
     const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep);font-size:12px">
       <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--acc);white-space:nowrap;flex-shrink:0">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</span>
-      <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.airline||r.callsign||'&mdash;'}</span>
+      <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.airline||r.callsign)||'&mdash;'}</span>
       <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${r.aircraft_type}</span>
       <span style="color:var(--ink3);white-space:nowrap;flex-shrink:0">${dist}</span>
       <button class="btn bg bxs" onclick="openSimBrief('${r.departure_airport}','${r.arrival_airport}','${r.aircraft_type}','${sbU}')" style="flex-shrink:0">&rarr; SimBrief</button>
@@ -5281,5 +5295,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v5.9.44</div>
+  pointer-events:none;">v6.0.0</div>
 </body></html>

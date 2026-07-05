@@ -302,8 +302,11 @@ function gsxExtractArchive(archivePath, tmp){
   const cp=require('child_process');
   const ext=path.extname(archivePath).toLowerCase();
   if(ext==='.zip'){
+    // Single-quoted PS literals (with '' escaping) — a filename containing " or $(...) must never be
+    // interpreted by PowerShell (double quotes would expand/execute it).
+    const psq = s => `'${String(s).replace(/'/g,"''")}'`;
     const r=cp.spawnSync('powershell',
-      ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${tmp}" -Force`],
+      ['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath ${psq(archivePath)} -DestinationPath ${psq(tmp)} -Force`],
       {windowsHide:true});
     if(r.status===0) return {ok:true};
     // some zips trip Expand-Archive — fall through to a real archiver if present
@@ -363,6 +366,14 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
 });
 
 const CFG = path.join(USER_DATA, 'config.json');
+// Atomic JSON write: write to a sibling tmp file then rename over the target. A crash or power cut
+// mid-write can otherwise leave a truncated file — load-config/si-get-* would then silently start
+// "fresh", losing settings or the never-pruned 20k route snapshot. rename on the same volume is atomic.
+function writeFileAtomic(file, data){
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, file);
+}
 // One-time migration into the renamed userData folder. Copy-only — the source
 // files are left untouched as a backup. Prefer the legacy userData folder
 // (dean-msfs-route-finder), then fall back to the original home-root dot-file.
@@ -395,9 +406,9 @@ const SNAP_FILE = path.join(USER_DATA, 'routeSnapshot.json');
     if (!fs.existsSync(CFG)) return;
     const c = JSON.parse(fs.readFileSync(CFG,'utf8'));
     let changed = false;
-    if (c.routeRegistry)         { fs.writeFileSync(REG_FILE,  JSON.stringify(c.routeRegistry));         LOG.info('[MIGRATE] routeRegistry -> routeRegistry.json ('+Object.keys(c.routeRegistry).length+')');         delete c.routeRegistry;         changed = true; }
-    if (c.routeRegistrySnapshot) { fs.writeFileSync(SNAP_FILE, JSON.stringify(c.routeRegistrySnapshot)); LOG.info('[MIGRATE] routeRegistrySnapshot -> routeSnapshot.json ('+Object.keys(c.routeRegistrySnapshot).length+')'); delete c.routeRegistrySnapshot; changed = true; }
-    if (changed) { fs.writeFileSync(CFG, JSON.stringify(c, null, 2)); LOG.info('[MIGRATE] config.json slimmed (route data split out)'); }
+    if (c.routeRegistry)         { writeFileAtomic(REG_FILE,  JSON.stringify(c.routeRegistry));         LOG.info('[MIGRATE] routeRegistry -> routeRegistry.json ('+Object.keys(c.routeRegistry).length+')');         delete c.routeRegistry;         changed = true; }
+    if (c.routeRegistrySnapshot) { writeFileAtomic(SNAP_FILE, JSON.stringify(c.routeRegistrySnapshot)); LOG.info('[MIGRATE] routeRegistrySnapshot -> routeSnapshot.json ('+Object.keys(c.routeRegistrySnapshot).length+')'); delete c.routeRegistrySnapshot; changed = true; }
+    if (changed) { writeFileAtomic(CFG, JSON.stringify(c, null, 2)); LOG.info('[MIGRATE] config.json slimmed (route data split out)'); }
   } catch(e) { LOG.warn('[MIGRATE] route-data split failed (non-fatal):', e.message); }
 })();
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
@@ -409,7 +420,7 @@ ipcMain.handle('save-config',(_,cfg)=>{
     // Route data lives in routeRegistry.json / routeSnapshot.json now — never store it in config
     // (this is what kept config.json at ~16 MB). Strip defensively + drop the retired AirLabs key.
     delete merged.routeRegistry; delete merged.routeRegistrySnapshot; delete merged.routeCache;
-    fs.writeFileSync(CFG,JSON.stringify(merged,null,2));
+    writeFileAtomic(CFG,JSON.stringify(merged,null,2));
     LOG.info('save-config: saved savedRows='+(cfg.savedRows||[]).length);
   }catch(e){LOG.error('save-config failed:',e.message);}
 });
@@ -463,7 +474,7 @@ ipcMain.handle('si-get-registry', () => {
 
 ipcMain.handle('si-save-registry', (_, registry) => {
   try {
-    fs.writeFileSync(REG_FILE, JSON.stringify(registry));
+    writeFileAtomic(REG_FILE, JSON.stringify(registry));
     LOG.info('[SI] Registry saved: ' + Object.keys(registry||{}).length + ' entries');
   } catch(e) {
     LOG.error('si-save-registry failed:', e.message);
@@ -483,7 +494,7 @@ ipcMain.handle('si-get-snapshot', () => {
 
 ipcMain.handle('si-save-snapshot', (_, snapshot) => {
   try {
-    fs.writeFileSync(SNAP_FILE, JSON.stringify(snapshot));
+    writeFileAtomic(SNAP_FILE, JSON.stringify(snapshot));
     LOG.info('[SI] Snapshot saved: ' + Object.keys(snapshot||{}).length + ' entries');
   } catch(e) {
     LOG.error('si-save-snapshot failed:', e.message);
@@ -498,7 +509,7 @@ const COMMUNITY_ROUTES = app.isPackaged
 ipcMain.handle('si-export-snapshot', (_, snapshot) => {
   try {
     const routes = Object.values(snapshot);
-    fs.writeFileSync(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
+    writeFileAtomic(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
     LOG.info('[SI] community_routes.json exported: ' + routes.length + ' routes to ' + COMMUNITY_ROUTES);
     return {ok: true, path: COMMUNITY_ROUTES};
   } catch(e) {
@@ -510,11 +521,13 @@ ipcMain.handle('si-export-snapshot', (_, snapshot) => {
 ipcMain.handle('si-write-community-routes', (_, snapshot) => {
   try {
     const routes = Object.values(snapshot);
-    fs.writeFileSync(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
+    writeFileAtomic(COMMUNITY_ROUTES, JSON.stringify({routes}, null, 2));
     LOG.info('[SI] community_routes.json updated: ' + routes.length + ' routes to ' + COMMUNITY_ROUTES);
     // Auto-publish only makes sense in dev where git is set up
     if (!app.isPackaged) {
-      const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat')], {
+      // 'auto' arg makes publish.bat skip its trailing `pause` — spawned hidden with no stdin, a
+      // pause would leave a zombie cmd window waiting forever for a keypress nobody can give.
+      const pub = spawn('cmd', ['/c', path.join(__dirname, 'publish.bat'), 'auto'], {
         windowsHide: true, shell: false, cwd: __dirname, stdio: 'ignore',
       });
       pub.on('close', code => {
@@ -559,6 +572,13 @@ ipcMain.handle('deactivate-scenery', (_, {folders, communityFolder}) => {
     const dest = path.join(communityFolder, folder);
     try {
       if (fs.existsSync(dest)) {
+        // Safety: only remove genuine junctions/symlinks — never a real installed folder/file that
+        // happens to share the name (same guard as unlink-packages / removeJunctionIfLink).
+        if (!fs.lstatSync(dest).isSymbolicLink()) {
+          LOG.warn(`[SCENE] refusing to remove non-junction: ${dest}`);
+          removed.push(folder);   // not ours to remove — treat as done so the UI unchecks cleanly
+          continue;
+        }
         fs.unlinkSync(dest);
         removed.push(folder);
         LOG.info(`[SCENE] Junction removed: ${dest}`);
@@ -704,8 +724,19 @@ function isCaptureRunning(){
   try{
     const r = require('child_process').spawnSync('tasklist', ['/FI','IMAGENAME eq perf-engine.exe','/NH'],
       {encoding:'utf8', timeout:4000, windowsHide:true});
-    return /perf-engine\.exe/i.test(r.stdout || '');
-  }catch(e){ return false; }
+    if (/perf-engine\.exe/i.test(r.stdout || '')) return true;
+  }catch(e){}
+  // Native engine: a detached Electron-as-node process, invisible to an image-name check. It writes
+  // its pid to capture_status.json; an alive pid = capture running (stale file after a crash fails
+  // the signal-0 probe, so no false positives).
+  try{
+    const sf = path.join(USER_DATA, 'capture_status.json');
+    if (fs.existsSync(sf)) {
+      const j = JSON.parse(fs.readFileSync(sf, 'utf8'));
+      if (j && j.pid) { try { process.kill(j.pid, 0); return true; } catch(_){} }
+    }
+  }catch(e){}
+  return false;
 }
 function cleanupActivationsOnQuit(){
   let cfg;
@@ -737,7 +768,7 @@ function cleanupActivationsOnQuit(){
     changed = true;
   }
   if(changed){
-    try{ fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2)); LOG.info('[QUIT] cleared scenery + aircraft activations'); }
+    try{ writeFileAtomic(CFG, JSON.stringify(cfg, null, 2)); LOG.info('[QUIT] cleared scenery + aircraft activations'); }
     catch(e){ LOG.error('[QUIT] config write failed: ' + e.message); }
   }
 }
@@ -795,14 +826,15 @@ function datisSourceFor(icao){
   const c = (icao||'').trim().toUpperCase()[0];
   return (c === 'K' || c === 'P') ? 'atis.info' : 'atis.guru';
 }
-function datisGet(url){
+function datisGet(url, depth = 0){
   return new Promise(resolve => {
     try{
       const req = https.get(url, {headers:{'User-Agent':'ABRP-RoutePlanner'}}, res => {
-        // follow one redirect (atis.info → datis.clowd.io etc.)
+        // follow redirects (atis.info → datis.clowd.io etc.) — capped so a redirect loop can't spin forever
         if(res.statusCode >= 300 && res.statusCode < 400 && res.headers.location){
           res.resume();
-          return resolve(datisGet(res.headers.location));
+          if(depth >= 5) return resolve({status:res.statusCode, body:'', error:'too many redirects'});
+          return resolve(datisGet(res.headers.location, depth + 1));
         }
         let data = '';
         res.on('data', c => data += c);
@@ -1351,6 +1383,17 @@ ipcMain.handle('nvcp-restore', () => {
 // Detached + unref so closing ABRP never kills an in-flight capture (matches the set-and-forget
 // workflow). Uses the bundled perf-engine.exe when present, else system Python (dev). The engine
 // writes into the data home via MSFS_PERF_ROOT.
+// --- Native (Node) perf engine — v6 transition. OPT-IN behind config.nativePerfEngine (default OFF),
+// so the proven Python path stays the default until the full-flight parity passes and we flip it.
+function _perfCfg(){ try { return JSON.parse(fs.readFileSync(CFG,'utf8')) || {}; } catch(_){ return {}; } }
+// v6.0.0: the NATIVE engine is the default (byte-parity proven vs Python over 21 flights + a live
+// baseline flight; packaging runtime-probed). Setting nativePerfEngine:false in config falls back to
+// the legacy Python paths — a DEV-ONLY escape hatch: the installer no longer ships perf-engine.exe.
+function nativePerfEnabled(){ return _perfCfg().nativePerfEngine !== false; }
+function simbriefUser(){ return _perfCfg().simbriefUser || 'snkeyez95'; }
+// Steam UserCfg.opt (matches the Python engine). Store-vs-Steam detection is a cutover TODO.
+const USERCFG_PATH = path.join(app.getPath('appData'), 'Microsoft Flight Simulator 2024', 'UserCfg.opt');
+
 ipcMain.handle('perf-start-capture', () => {
   try {
     // ONE capture engine only. Arming repeatedly without flying (or re-arming) leaves engines
@@ -1359,10 +1402,43 @@ ipcMain.handle('perf-start-capture', () => {
     // existing engine + orphaned PresentMon before arming a fresh one.
     try {
       const cp = require('child_process');
+      // Native engine first: it's an Electron-image process, INVISIBLE to a taskkill-by-name — kill it
+      // by the pid it wrote to capture_status.json (deep-review finding 5: a surviving armed/recording
+      // native engine collides with the fresh one exactly like the old "7 engines" pile-up).
+      try {
+        const sf = path.join(USER_DATA, 'capture_status.json');
+        if (fs.existsSync(sf)) {
+          const j = JSON.parse(fs.readFileSync(sf, 'utf8'));
+          if (j && j.pid && j.pid !== process.pid) {
+            cp.spawnSync('taskkill', ['/F','/PID', String(j.pid), '/T'], { windowsHide:true, timeout:5000 });
+            LOG.info('[PERF] killed existing native capture (pid ' + j.pid + ', state ' + (j.state||'?') + ') before re-arm');
+          }
+          try { fs.unlinkSync(sf); } catch(_){}
+        }
+      } catch(_){}
       cp.spawnSync('taskkill', ['/F','/IM','perf-engine.exe','/T'],   { windowsHide:true, timeout:5000 });
       cp.spawnSync('taskkill', ['/F','/IM','PresentMon-x64.exe','/T'], { windowsHide:true, timeout:5000 });
     } catch(_){}
     const dir    = perfDir();
+    if (nativePerfEnabled()) {
+      // Native engine: run the capture in a DETACHED Electron-as-node process (survives closing ABRP
+      // mid-flight, exactly like perf-engine.exe --auto). Config passed via env.
+      const entry = path.join(dir, 'native', 'run_capture.js');
+      if (!fs.existsSync(entry)) { LOG.error('[PERF] native capture entry not found: ' + entry); return { ok:false, error:'native entry not found' }; }
+      const nenv = Object.assign({}, process.env, {
+        ELECTRON_RUN_AS_NODE: '1', MSFS_PERF_ROOT: USER_DATA, ABRP_ASSET_DIR: dir,
+        ABRP_SESSIONS_DIR: path.join(USER_DATA, 'Sessions'), ABRP_USERCFG: USERCFG_PATH,
+        ABRP_SIMBRIEF_USER: simbriefUser(),
+        // node-simconnect (+ its 13 deps) is asarUnpack'd; point the detached process at it.
+        NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
+                                  : path.join(__dirname, 'node_modules'),
+      });
+      const nchild = spawn(process.execPath, [entry], { detached:true, stdio:'ignore', windowsHide:true, env:nenv });
+      nchild.on('error', e => LOG.error('[PERF] native capture spawn failed: ' + e.message));
+      nchild.unref();
+      LOG.info('[PERF] native capture armed (Electron-as-node --auto) from ' + entry);
+      return { ok:true, how:'native' };
+    }
     const exe    = path.join(dir, 'perf-engine.exe');          // bundled, Python-free engine
     const script = path.join(dir, 'msfs_perf_logger.py');      // dev fallback (system Python)
     const env    = Object.assign({}, process.env, { MSFS_PERF_ROOT: USER_DATA });
@@ -1385,6 +1461,20 @@ ipcMain.handle('perf-start-capture', () => {
 // surface "Set TLOD X for <aircraft>". 30s timeout guard so a stuck prep can never block the launch.
 ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
   try {
+    if (nativePerfEnabled()) {
+      // Native prep-next runs IN-PROCESS (quick: SimBrief fetch + coverage + UserCfg write, no Python).
+      (async () => {
+        try {
+          const { prepNext } = require(path.join(perfDir(), 'native', 'prep.js'));  // perfDir = resources/perf when packaged
+          let sessions = [];
+          try { sessions = (JSON.parse(fs.readFileSync(path.join(USER_DATA, 'Sessions', 'index.json'), 'utf8')).sessions) || []; } catch(_){}
+          const r = await prepNext(sessions, { username: simbriefUser(), usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA, 'usercfg_backups') });
+          LOG.info('[PERF] native prep-next: ' + (r.msg || ''));
+          resolve({ ok: !!r.ok, set: !!r.set, aircraft: r.aircraft, tlod: r.tlod, reason: r.reason });
+        } catch (e) { LOG.error('[PERF] native prep-next failed: ' + e.message); resolve({ ok:false, error:e.message }); }
+      })();
+      return;
+    }
     const dir    = perfDir();
     const exe    = path.join(dir, 'perf-engine.exe');
     const script = path.join(dir, 'msfs_perf_logger.py');
