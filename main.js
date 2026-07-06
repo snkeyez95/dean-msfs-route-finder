@@ -3,6 +3,7 @@ const path   = require('path');
 const fs     = require('fs');
 const os     = require('os');
 const https  = require('https');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 // ── USER DATA DIR ─────────────────────────────────────────────────────────────
@@ -271,19 +272,39 @@ ipcMain.handle('gsx-scan-bundled', (_, {sceneryFolder, icao})=>{
   }catch(e){ LOG.error('[GSX] scan-bundled failed:', e.message); return {ok:false, error:e.message, files:[]}; }
 });
 
+// Place one bundled profile file into the GSX folder, update-aware (Dean, 2026-07-06 — real case:
+// iniBuilds KJFK scenery shipped a newer kjfk-24-inibuilds.ini than the installed 2025 copy and the
+// old name-match logic silently kept the stale one). If a file with the same name already exists
+// ANYWHERE in the GSX tree (profiles sit in subfolders too — never create a flat duplicate):
+//   identical content        -> 'current'    (nothing to do)
+//   yours is newer than src  -> 'kept-local' (a locally-edited/replaced profile is never clobbered)
+//   scenery copy is newer    -> 'updated'    (old copy backed up as .bak-YYYY-MM-DD first)
+function gsxSha(p){ return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
+function gsxPlaceFile(src, dir){
+  const base=path.basename(src);
+  const existing=gsxWalkFiles(dir, 4, null).find(f=>f.base.toLowerCase()===base.toLowerCase());
+  if(!existing){ fs.copyFileSync(src, path.join(dir, base)); return {action:'installed', base}; }
+  const dest=existing.abs;
+  if(gsxSha(src)===gsxSha(dest)) return {action:'current', base};
+  if(fs.statSync(src).mtimeMs<=fs.statSync(dest).mtimeMs) return {action:'kept-local', base};
+  const d=new Date(), p2=n=>String(n).padStart(2,'0');
+  fs.copyFileSync(dest, dest+'.bak-'+d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()));
+  fs.copyFileSync(src, dest);
+  return {action:'updated', base};
+}
 ipcMain.handle('gsx-install-bundled', (_, {files, gsxFolder})=>{
   const dir=gsxResolveDir(gsxFolder);
-  const copied=[], errors=[];
+  const copied=[], updated=[], errors=[];
   try{ fs.mkdirSync(dir,{recursive:true}); }catch(e){}
   for(const src of (files||[])){
     try{
-      const dest=path.join(dir, path.basename(src));
-      fs.copyFileSync(src, dest);
-      copied.push(path.basename(src));
-      LOG.info('[GSX] installed', path.basename(src), '->', dir);
+      const r=gsxPlaceFile(src, dir);
+      if(r.action==='installed'){ copied.push(r.base); LOG.info('[GSX] installed', r.base, '->', dir); }
+      else if(r.action==='updated'){ updated.push(r.base); LOG.info('[GSX] UPDATED', r.base, '(newer copy bundled with scenery; old kept as .bak)'); }
+      else if(r.action==='kept-local'){ LOG.info('[GSX] kept local', r.base, '(installed copy is newer than the bundled one)'); }
     }catch(e){ errors.push(path.basename(src)+': '+e.message); LOG.error('[GSX] install failed:', e.message); }
   }
-  return {ok:errors.length===0, copied, errors};
+  return {ok:errors.length===0, copied, updated, errors};
 });
 
 const GSX_ARCHIVE_RE=/\.(zip|rar|7z)$/i;
