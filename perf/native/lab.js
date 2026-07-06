@@ -88,7 +88,16 @@ function snapshotBaseline(text) {
 }
 function countFlown(sessions, id) { return (sessions || []).filter(s => s.experiment === id).length; }
 function lastFlightTagged(sessions) { const l = (sessions || [])[(sessions || []).length - 1]; return !!(l && l.experiment); }
-function nextExperiment(sessions) { return EXPERIMENTS.find(e => !e.manual && countFlown(sessions, e.id) < N_PER_EXPERIMENT) || null; }
+// Phase 10: an experiment whose test value EQUALS the user's baseline has no delta to measure
+// (the queue's testValues were curated against Dean's settings) — mark it not-applicable and skip.
+function expApplicable(e, baseline) {
+  if (e.manual) return true;
+  if (!baseline || baseline[e.id] == null) return true;
+  return baseline[e.id] !== (e.format === 'lod' ? e.testValue : Math.trunc(e.testValue));
+}
+function nextExperiment(sessions, baseline) {
+  return EXPERIMENTS.find(e => !e.manual && expApplicable(e, baseline) && countFlown(sessions, e.id) < N_PER_EXPERIMENT) || null;
+}
 
 // Restore every auto key to its baseline-snapshot value. Only writes when a value differs.
 function restoreBaseline(usercfgPath, backupDir, st) {
@@ -122,8 +131,10 @@ function labNext(sessions, opts) {
   // a pending marker from an armed-but-never-flown launch must never leak into this flight
   try { fs.unlinkSync(pendingPath(dataRoot)); } catch (_) {}
 
-  // reference aircraft never runs an experiment (mirrors the benchmark's Citation exclusion)
-  const isRef = opts.aircraft && !/^(Fenix|PMDG)$/i.test(opts.aircraft);
+  // reference aircraft never runs an experiment: anything NOT in the user's benchmark aircraft
+  // list (config.benchmark; defaults to Fenix/PMDG = Dean's classic Citation exclusion)
+  const benchLabels = (opts.benchLabels && opts.benchLabels.length) ? opts.benchLabels : ['Fenix', 'PMDG'];
+  const isRef = opts.aircraft && !benchLabels.some(l => String(l).toLowerCase() === String(opts.aircraft).toLowerCase());
 
   if (lastFlightTagged(sessions) || isRef) {                       // CONTROL flight
     const r = restoreBaseline(usercfgPath, backupDir, st);
@@ -133,7 +144,7 @@ function labNext(sessions, opts) {
       msg: 'CONTROL flight — baseline config' + (r.restored ? ' (' + r.restored + ' setting(s) restored)' : '') };
   }
 
-  const exp = nextExperiment(sessions);
+  const exp = nextExperiment(sessions, st.baseline);
   if (!exp) {                                                      // queue complete
     const r = restoreBaseline(usercfgPath, backupDir, st);
     saveState(dataRoot, st);
@@ -185,15 +196,19 @@ function labDisable(dataRoot, usercfgPath, backupDir) {
   return { ok: true, restored: r.restored };
 }
 
-// UI status: queue with per-experiment counts + what the next launch would do.
-function labStatus(sessions, dataRoot) {
+// UI status: queue with per-experiment counts + what the next launch would do. usercfgPath is
+// optional — lets applicability show BEFORE first activation by reading current values live.
+function labStatus(sessions, dataRoot, usercfgPath) {
   const st = loadState(dataRoot);
+  let base = st.baseline;
+  if (!base && usercfgPath) { try { base = snapshotBaseline(fs.readFileSync(usercfgPath, 'utf8')); } catch (_) {} }
   const queue = EXPERIMENTS.map(e => ({ id: e.id, label: e.label, manual: !!e.manual, hypothesis: e.hypothesis,
-    done: countFlown(sessions, e.id), need: e.manual ? null : N_PER_EXPERIMENT }));
+    done: countFlown(sessions, e.id), need: e.manual ? null : N_PER_EXPERIMENT, na: !expApplicable(e, base) }));
   let next;
   try { next = JSON.parse(fs.readFileSync(pendingPath(dataRoot), 'utf8')); } catch (_) { next = null; }
+  const nxe = nextExperiment(sessions, base);
   const nx = lastFlightTagged(sessions) ? { mode: 'control' }
-    : (nextExperiment(sessions) ? { mode: 'experiment', id: nextExperiment(sessions).id, label: nextExperiment(sessions).label } : { mode: 'complete' });
+    : (nxe ? { mode: 'experiment', id: nxe.id, label: nxe.label } : { mode: 'complete' });
   return { ok: true, queue, next: nx, pending: next, hasBaseline: !!st.baseline, adoptions: st.adoptions || {} };
 }
 

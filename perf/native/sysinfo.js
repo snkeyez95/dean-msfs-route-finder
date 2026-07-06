@@ -42,9 +42,24 @@ function getSimVersion() {
 }
 
 // Normalize a SimConnect aircraft TITLE to a family label (match-by-airframe, per _normalize_aircraft).
-function normalizeAircraftTitle(title) {
+// Phase 10: user-defined benchmark aircraft (config.benchmark, passed to the detached capture via
+// the ABRP_BENCHMARK env JSON) match FIRST, then the legacy built-ins — Dean's seeded defaults
+// resolve identically; other users' fleets label correctly without code changes.
+let _benchEnv;
+function benchFromEnv() {
+  if (_benchEnv !== undefined) return _benchEnv;
+  try { _benchEnv = JSON.parse(process.env.ABRP_BENCHMARK || ''); } catch (_) { _benchEnv = null; }
+  return _benchEnv;
+}
+function normalizeAircraftTitle(title, benchmark) {
   if (!title) return title;
   const tl = String(title).toLowerCase();
+  const bench = benchmark !== undefined ? benchmark : benchFromEnv();
+  if (bench && Array.isArray(bench.aircraft)) {
+    for (const a of bench.aircraft) {
+      if (a && a.label && Array.isArray(a.match) && a.match.some(t => t && tl.includes(String(t).toLowerCase()))) return a.label;
+    }
+  }
   if (tl.includes('fenix') || ['a318', 'a319', 'a320', 'a321'].some(a => tl.includes(a))) return 'Fenix';
   if (tl.includes('pmdg') || ['737', '747', '777', 'dc-6', 'dc6'].some(b => tl.includes(b))) return 'PMDG';
   if (tl.includes('sovereign') || ['c68a', 'c680'].some(c => tl.includes(c))) return CITATION_LABEL;

@@ -27,7 +27,9 @@ runAutoCapture({
   dataRoot: DATA_ROOT,
   sessionsDir: process.env.ABRP_SESSIONS_DIR || path.join(DATA_ROOT, 'Sessions'),
   usercfgPath: process.env.ABRP_USERCFG || path.join(process.env.APPDATA, 'Microsoft Flight Simulator 2024', 'UserCfg.opt'),
-  username: process.env.ABRP_SIMBRIEF_USER || 'snkeyez95',
+  // No hardcoded fallback (Phase 10) — without a username the SimBrief route/aircraft lookups are
+  // simply skipped; another user's install must never silently fetch the developer's flight plans.
+  username: process.env.ABRP_SIMBRIEF_USER || null,
   appName: 'ABRP Native Perf',
   log: (m) => { console.log(m); logLine(m); },
   status: (s) => { writeStatus(s); logLine('[status] ' + s); },

@@ -13,7 +13,13 @@ const { pstdev, pickColumn } = require('./stats.js');
 const { chartFrametimeSeries, rollingMeanSeries, readTelemetry, fmt } = require('./report_charts.js');
 const lab = require('./lab.js');
 
-const GRID_AC = ['Fenix', 'PMDG'], GRID_TL = [100, 125, 150, 175];
+// Phase 10: grid follows config.benchmark (passed via ABRP_BENCHMARK env into this child process);
+// omitted = Dean's classic grid. Controls/noise pools must match the benchmark exactly.
+const _BENCH = (() => { try { return JSON.parse(process.env.ABRP_BENCHMARK || ''); } catch (_) { return null; } })();
+const GRID_AC = (_BENCH && Array.isArray(_BENCH.aircraft) && _BENCH.aircraft.length)
+  ? _BENCH.aircraft.map(a => (a && a.label) ? a.label : a).filter(Boolean) : ['Fenix', 'PMDG'];
+const GRID_TL = (_BENCH && Array.isArray(_BENCH.tlods) && _BENCH.tlods.length) ? _BENCH.tlods : [100, 125, 150, 175];
+const VRAM_FALLBACK = (_BENCH && _BENCH.vramCapMb > 0) ? _BENCH.vramCapMb : 12288;
 const CTRL_PER_EXP = 4;            // time-nearest same-aircraft baseline flights per experiment flight
 const TARGET_MS = 16.67, STUTTER_MS = 33.34;
 const FRAMETIME_COLUMNS = ['MsBetweenPresents', 'msBetweenPresents', 'FrameTime', 'ms_between_presents', 'MsBetweenDisplayChange'];
@@ -43,7 +49,7 @@ function metricsFromSummary(sj) {
     p99:            sm.p99_ft_ms != null ? sm.p99_ft_ms : null,
     spikes_hr:      (sm.spike_count != null && hrs) ? sm.spike_count / hrs : null,
     peak_vram:      v.peak_vram_mb != null ? v.peak_vram_mb : null,
-    total_vram:     v.total_vram_mb || 12288,
+    total_vram:     v.total_vram_mb || VRAM_FALLBACK,
   };
 }
 
@@ -200,7 +206,7 @@ function buildLabReport(sessionsDir) {
     if (pool.length < 4) pool = grid;
 
     const deltas = [];
-    let worse = null, better = null, vramTotal = 12288, expVramMean = null;
+    let worse = null, better = null, vramTotal = VRAM_FALLBACK, expVramMean = null;
     for (const m of METRICS) {
       const ev = exps.map(s => (M(s) || {})[m.k]).filter(v => v != null);
       const cv = ctrls.map(s => (M(s) || {})[m.k]).filter(v => v != null);

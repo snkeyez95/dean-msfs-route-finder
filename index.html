@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.2.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.2.2</div>
+    <div class="sb-ver">v6.3.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -650,6 +650,10 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 
 <!-- ── TAB 4: SETTINGS ── -->
 <div class="pane" id="pane-settings"><div class="scroll">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <button class="btn bg bsm" onclick="wizOpen()" title="Re-run the guided first-run setup: sim detection, scenery library, fleet, routes, SimBrief">&#129517; Run setup assistant</button>
+    <button class="btn bg bsm" onclick="bwizOpen()" title="Choose which aircraft define your graphics baseline and how many benchmark flights to run">&#127919; Edit benchmark plan</button>
+  </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Route Data Source</div>
   <div class="api-pan" style="margin-bottom:24px">
     <div class="api-t">Live Route Data &mdash; SayIntentions.AI</div>
@@ -1272,6 +1276,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
   if(S.cfg.communityFolder)scanAddons();  // re-ensure active aircraft/util junctions on launch
   renderQlAppList();
   renderFleetPanel();
+  // Phase 10: brand-new install (nothing configured, nothing scanned) → guided setup takes over.
+  if(!S.cfg.setupDone && !S.cfg.folder && !(S.cfg.savedRows&&S.cfg.savedRows.length) && !S.cfg.siCookie){
+    setTimeout(()=>{ try{ wizOpen(); }catch(e){} },400);
+  }
   buildChSB();renderCD(0);updateStats();renderRoutes();
   renderDashboard();
   updateSnapshotInfo();
@@ -2607,8 +2615,11 @@ function renderRoutes(){
   const regSize=Object.keys(S.routeRegistry).length;
   document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(regSize?'':' — paste cookie and click Refresh Routes');
   if(!cnt){
-    const msg=!regSize?'Paste your SayIntentions cookie above and click Refresh Routes.':'No routes match your current filters.';
-    document.getElementById('rt-body').innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div></div></td></tr>`;
+    const msg=!regSize
+      ?'Fastest start: download the free Community Routes database (10,000+ real routes, no account needed). Or paste your SayIntentions cookie in Settings and click Refresh Routes.'
+      :'No routes match your current filters.';
+    const act=!regSize?'<div style="margin-top:10px"><button class="btn bg bsm" onclick="downloadCommunityRoutes().then(()=>renderRoutes())">&#11015; Download Community Routes</button> <button class="btn bg bsm" onclick="wizOpen()">&#129517; Run setup assistant</button></div>':'';
+    document.getElementById('rt-body').innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">&#9992;</div><div class="et">No routes to show</div><div class="es">${msg}</div>${act}</div></td></tr>`;
     updateStats();return;
   }
   document.getElementById('rt-body').innerHTML=rs.flatMap((r,i)=>{
@@ -3625,6 +3636,7 @@ async function renderPerfPane(){
     const why=(res&&res.reason==='no-data')?'No flight data found in your performance folder yet.':'';
     el.innerHTML='<div class="card" style="padding:20px">'
       +'<div style="font-size:14px;color:var(--ink1);margin-bottom:6px">No flight logs yet</div>'
+      +'<div style="margin:10px 0"><button class="btn bg bsm" onclick="bwizOpen()" title="Pick your benchmark aircraft and let the app find your ideal graphics settings from real flights">&#127919; Set up my graphics baseline</button></div>'
       +'<div style="font-size:12px;color:var(--ink3);line-height:1.6">Once a flight is captured by the performance logger, your smoothness dashboard shows up here. '+esc(why)+'</div></div>';
     return;
   }
@@ -3758,10 +3770,22 @@ function cmpOnChange(){
 // in-grid TLOD, no reference aircraft, non-AutoFPS) — never all-vs-all (the confound trap). Combine =
 // worst-of-the-two per TLOD, so a passing TLOD is safe for both; lighter planes just do better.
 // Coverage cells mirror compute_coverage() in msfs_perf_logger.py — keep in sync.
-const _BL={AC:['Fenix','PMDG'],TL:[100,125,150,175],VRAM_CAP:12288,LIM:{cons:99,stut:0.1,vramPct:0.90},KNEE_MS:1.0,PER_CELL:3};
+// Phase 10: the grid follows config.benchmark (any fleet / TLOD steps / per-cell count) — the
+// literals below are only the pre-config fallback. VRAM ceiling auto-detects from the flights'
+// own total_vram_mb (whatever card is actually installed) unless the config pins a value.
+let _BL={AC:['Fenix','PMDG'],TL:[100,125,150,175],VRAM_CAP:12288,LIM:{cons:99,stut:0.1,vramPct:0.90},KNEE_MS:1.0,PER_CELL:3};
+function _blApplyCfg(flights){
+  const b=S.cfg&&S.cfg.benchmark;
+  if(b&&Array.isArray(b.aircraft)&&b.aircraft.length)_BL.AC=b.aircraft.map(a=>(a&&a.label)?a.label:a).filter(Boolean);
+  if(b&&Array.isArray(b.tlods)&&b.tlods.length)_BL.TL=b.tlods.slice();
+  if(b&&b.perCell>0)_BL.PER_CELL=Math.trunc(b.perCell);
+  const tv=(flights||[]).map(f=>f.total_vram_mb).filter(v=>v>0);
+  _BL.VRAM_CAP=(b&&b.vramCapMb>0)?b.vramCapMb:(tv.length?Math.max(...tv):_BL.VRAM_CAP);
+}
 let _blData=null,_blDetail=false;
 function _blCompute(all){
   const f=all||[];
+  _blApplyCfg(f);
   // Settings Lab flights (x.experiment) are quarantined from BOTH grid and clean — an experiment
   // run must never fill a benchmark cell nor sway the recommendation/a future re-baseline.
   const grid=f.filter(x=>_BL.AC.includes(x.aircraft)&&_BL.TL.includes(x.tlod)&&x.p99_ft_ms!=null&&!x.experiment);
@@ -3772,10 +3796,11 @@ function _blCompute(all){
   const VRAM_LIM=_BL.VRAM_CAP*_BL.LIM.vramPct;
   const perAc={}; for(const ac of _BL.AC){ perAc[ac]={}; for(const t of _BL.TL){ const c=cell(ac,t); perAc[ac][t]=c.length?{n:c.length,p99:_cmpMean(c,'p99_ft_ms'),stut:_cmpMean(c,'stutter_pct'),cons:_cmpMean(c,'consistency_pct'),pvram:_cmpMean(c,'peak_vram_mb')}:null; } }
   const prof={};
-  for(const t of _BL.TL){ const fc=perAc.Fenix[t],pc=perAc.PMDG[t];
-    if(!fc||!pc){ prof[t]={incomplete:true}; continue; }
-    const p99=Math.max(fc.p99,pc.p99),stut=Math.max(fc.stut,pc.stut),cons=Math.min(fc.cons,pc.cons),pv=Math.max(fc.pvram,pc.pvram);
-    prof[t]={p99,stut,cons,pvram:pv,minN:Math.min(fc.n,pc.n),pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
+  for(const t of _BL.TL){ const cells=_BL.AC.map(ac=>perAc[ac][t]);
+    if(cells.some(c=>!c)){ prof[t]={incomplete:true}; continue; }
+    // blend = worst-of-ALL benchmark aircraft (works for 1..N planes; a passing TLOD is safe for every one)
+    const p99=Math.max(...cells.map(c=>c.p99)),stut=Math.max(...cells.map(c=>c.stut)),cons=Math.min(...cells.map(c=>c.cons)),pv=Math.max(...cells.map(c=>c.pvram));
+    prof[t]={p99,stut,cons,pvram:pv,minN:Math.min(...cells.map(c=>c.n)),pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
   }
   const passT=_BL.TL.filter(t=>prof[t]&&prof[t].pass);
   const bestP99=passT.length?Math.min(...passT.map(t=>prof[t].p99)):null;
@@ -3789,7 +3814,7 @@ function _blCompute(all){
   let filled=0,short=[]; for(const ac of _BL.AC)for(const t of _BL.TL){ const n=Math.min(gridN(ac,t),_BL.PER_CELL); filled+=n; if(n<_BL.PER_CELL)short.push(ac+' '+t); }
   const sims=[...new Set(clean.map(x=>x.sim_version).filter(Boolean))];
   return {modalDrv,excluded:f.length-clean.length,cleanN:clean.length,benchN:grid.length,perAc,prof,smoothest,balanced,bestVis,VRAM_LIM,
-    knee:{Fenix:perAcKnee('Fenix'),PMDG:perAcKnee('PMDG')},
+    knee:Object.fromEntries(_BL.AC.map(ac=>[ac,perAcKnee(ac)])),
     coverage:{filled,total:_BL.AC.length*_BL.TL.length*_BL.PER_CELL,short,ready:short.length===0},sims};
 }
 async function perfShowBaseline(){
@@ -3807,14 +3832,15 @@ function renderBaseline(){
   const rec=d.balanced||d.smoothest||100;
   const recKnown=(d.balanced!=null||d.smoothest!=null);
   const cov=d.coverage, vlimPct=Math.round(_BL.LIM.vramPct*100);
-  let h='<div style="font-size:15px;font-weight:700;color:var(--ink1);margin-bottom:14px">&#127919; Baseline recommendation</div>';
+  let h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:var(--ink1)">&#127919; Baseline recommendation</span>'
+    +'<a href="#" onclick="bwizOpen();return false" style="margin-left:auto;font-size:11px;color:var(--ink3)" title="Change which aircraft define your baseline, the TLOD steps, or flights per step">&#9881; edit benchmark plan</a></div>';
   // headline card
   h+='<div style="background:var(--bg);border:1px solid '+(cov.ready?'#46c46a':'var(--acc)')+';border-radius:10px;padding:20px 22px;margin-bottom:14px">'
     +'<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">Recommended baseline &mdash; one setting for everything</div>'
     +'<div style="font-size:38px;font-weight:800;color:'+(cov.ready?'#46c46a':'var(--acc)')+';letter-spacing:-.02em;margin:4px 0 2px">'+(recKnown?('TLOD '+rec):'Need more data')+'</div>'
     +'<div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(recKnown
-        ?('Keeps your two heaviest planes &mdash; <b>PMDG</b> &amp; <b>Fenix</b> &mdash; smooth with VRAM headroom. Lighter aircraft only do better, so this is safe to set globally.')
-        :('No TLOD currently clears all limits for both planes &mdash; fly the remaining cells and re-open this.'))+'</div>'
+        ?('Keeps your benchmark plane'+(_BL.AC.length>1?'s':'')+' &mdash; '+_BL.AC.map(a=>'<b>'+esc(a)+'</b>').join(' &amp; ')+' &mdash; smooth with VRAM headroom. Lighter aircraft only do better, so this is safe to set globally.')
+        :('No TLOD currently clears all limits for '+(_BL.AC.length>1?'every benchmark plane':'your benchmark plane')+' &mdash; fly the remaining cells and re-open this.'))+'</div>'
     +'</div>';
   // readiness / progress
   if(!cov.ready){
@@ -3835,7 +3861,7 @@ function renderBaseline(){
         .map((s,i)=>{const[a,b,c]=s.split('|');return '<div style="flex:1;min-width:150px;background:var(--bg);border:1px solid '+(i===1?'var(--acc)':'var(--sep)')+';border-radius:8px;padding:11px 13px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)">'+a+'</div><div style="font-size:18px;font-weight:700;color:'+(i===1?'var(--acc)':'var(--ink1)')+'">'+b+'</div><div style="font-size:11px;color:var(--ink3)">'+c+'</div></div>';}).join('')
       +'</div>';
     // per-aircraft knees
-    h+='<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Per-plane best balance (before blending): <b>Fenix</b> '+md(d.knee.Fenix)+' &nbsp;&middot;&nbsp; <b>PMDG</b> '+md(d.knee.PMDG)+'. The blended pick takes the more constrained of the two at each step.</div>';
+    h+='<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Per-plane best balance (before blending): '+_BL.AC.map(ac=>'<b>'+esc(ac)+'</b> '+md(d.knee[ac])).join(' &nbsp;&middot;&nbsp; ')+(_BL.AC.length>1?'. The blended pick takes the most constrained plane at each step.':'.')+'</div>';
     // combined table
     h+='<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:\'JetBrains Mono\',monospace;margin-bottom:12px">'
       +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:4px 6px">TLOD (both planes, worst-case)</th><th style="padding:4px 6px">min n</th><th style="padding:4px 6px">p99 ms</th><th style="padding:4px 6px">stutter%</th><th style="padding:4px 6px">cons%</th><th style="padding:4px 6px">peak VRAM</th><th style="padding:4px 6px">verdict</th></tr>';
@@ -3852,7 +3878,7 @@ function renderBaseline(){
     h+='</table>';
     // caveats
     h+='<div style="font-size:11px;color:var(--ink3);line-height:1.7;border-top:1px solid var(--sep);padding-top:10px">'
-      +'<b>How this was built:</b> '+d.cleanN+' of your '+d.benchN+' benchmark flights'+((d.benchN-d.cleanN)>0?(' &mdash; '+(d.benchN-d.cleanN)+' ran on a different GPU driver (your baseline is '+(d.modalDrv||'?')+'), left out so it&rsquo;s apples-to-apples'):(' (all on driver '+(d.modalDrv||'?')+')'))+'. The Citation and the one-off sub-100 TLOD test aren&rsquo;t part of the 24-flight grid. '
+      +'<b>How this was built:</b> '+d.cleanN+' of your '+d.benchN+' benchmark flights'+((d.benchN-d.cleanN)>0?(' &mdash; '+(d.benchN-d.cleanN)+' ran on a different GPU driver (your baseline is '+(d.modalDrv||'?')+'), left out so it&rsquo;s apples-to-apples'):(' (all on driver '+(d.modalDrv||'?')+')'))+'. Reference aircraft and out-of-grid test flights aren&rsquo;t part of the '+cov.total+'-flight grid. '
       +'Limits: consistency &ge; '+_BL.LIM.cons+'%, stutter &le; '+_BL.LIM.stut+'%, peak VRAM &le; '+vlimPct+'% ('+Math.round(d.VRAM_LIM)+' MB of '+_BL.VRAM_CAP+'). '
       +'Sim version'+(d.sims.length>1?'s in this set: '+d.sims.join(' + ')+' (a seam — most flights predate the latest update)':': '+(d.sims[0]||'n/a'))+'. '
       +'Peak VRAM is route-dependent, so it steadies as each cell averages 3 flights.</div>';
@@ -3886,11 +3912,11 @@ async function renderLabPanel(){
   const cov=_blCompute(flights).coverage;
   const on=!!S.cfg.labMode, gated=!cov.ready;
   let inner='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:'+(gated?'var(--ink3)':'var(--ink1)')+';cursor:'+(gated?'not-allowed':'pointer')+'" title="'+(gated?('Unlocks when the 24-flight benchmark completes (currently '+cov.filled+'/'+cov.total+'). Until then auto-TLOD owns the pre-launch slot.'):'One curated settings experiment per Launch + Capture flight, alternating with baseline control flights. Lab flights never touch your baseline math; settings are restored automatically.')+'">'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:'+(gated?'var(--ink3)':'var(--ink1)')+';cursor:'+(gated?'not-allowed':'pointer')+'" title="'+(gated?('Unlocks when the '+cov.total+'-flight benchmark completes (currently '+cov.filled+'/'+cov.total+'). Until then auto-TLOD owns the pre-launch slot.'):'One curated settings experiment per Launch + Capture flight, alternating with baseline control flights. Lab flights never touch your baseline math; settings are restored automatically.')+'">'
     +'<input type="checkbox" '+(on?'checked':'')+(gated?' disabled':'')+' onchange="labToggle(this.checked)" style="accent-color:var(--acc);width:15px;height:15px">'
     +'🧪 Settings Lab</label>';
   if(gated){
-    inner+='<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">unlocks at 24/24 — currently '+cov.filled+'/'+cov.total+'</span>';
+    inner+='<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">unlocks at '+cov.total+'/'+cov.total+' — currently '+cov.filled+'/'+cov.total+'</span>';
   }else{
     if(on&&st&&st.ok){
       const nx=st.next||{};
@@ -3901,6 +3927,7 @@ async function renderLabPanel(){
       inner+='<span style="font-size:13px;letter-spacing:3px;line-height:1">'+st.queue.map(q=>{
         const full=q.need!=null&&q.done>=q.need;
         const c=full?'var(--grn)':(q.done>0?'var(--acc)':'var(--ink4)');
+        if(q.na&&!q.done)return '<span title="'+esc(q.label)+' — not applicable: your settings already match the test value" style="color:var(--ink4)">&#215;</span>';
         return '<span title="'+esc(q.label)+' — '+q.done+(q.need!=null?('/'+q.need):'')+' flight'+(q.done!==1?'s':'')+'" style="color:'+c+'">'+(full?'&#9679;':(q.done>0?'&#9684;':'&#9675;'))+'</span>';
       }).join('')+'</span>';
     }
@@ -3968,7 +3995,7 @@ function renderLabView(){
   h+='</div>';
   h+='<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Each card = one setting tested on real flights against your own baseline. Deltas are judged against the shaded band — your normal flight-to-flight variation — so a bar inside the band honestly means <b>no effect</b>, not a hidden win. Orange chart lines = experiment flights, grey = baseline flights, x-axis = % of flight so different routes overlay fairly.</div>';
   if(!cov.ready){
-    h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6"><b>Locked until the 24-flight benchmark completes ('+cov.filled+'/'+cov.total+').</b> The Lab needs your full baseline first — it&rsquo;s the yardstick every experiment is measured against. Keep flying benchmark flights; this unlocks by itself.</div>';
+    h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6"><b>Locked until the '+cov.total+'-flight benchmark completes ('+cov.filled+'/'+cov.total+').</b> The Lab needs your full baseline first — it&rsquo;s the yardstick every experiment is measured against. Keep flying benchmark flights; this unlocks by itself.</div>';
   }
   if(!_labReport||!_labReport.ok){
     h+='<div style="font-size:12px;color:var(--ink3)">'+(_labReport&&_labReport.error?('Could not build the report: '+esc(_labReport.error)):'No findings yet.')+'</div>';
@@ -3976,6 +4003,15 @@ function renderLabView(){
   }
   const svgVars='--grid:var(--sep);--border:var(--sep2);--text-faint:var(--ink3);--target:var(--ink3);--bad:#e0823c;--lab-exp:var(--acc);--lab-ctrl:var(--ink3)';
   for(const e of _labReport.experiments){
+    // not-applicable: this experiment's test value equals the user's own baseline (nothing to measure)
+    const naQ=st&&st.ok&&st.queue?(st.queue.find(q=>q.id===e.id)||{}):{};
+    if(naQ.na&&!e.done){
+      h+='<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;margin-bottom:14px;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        +'<span style="font-size:10px;font-weight:800;letter-spacing:.09em;font-family:\'JetBrains Mono\',monospace;color:var(--ink4);border:1px solid var(--ink4);border-radius:5px;padding:2px 8px">NOT APPLICABLE</span>'
+        +'<span style="font-size:13px;font-weight:700;color:var(--ink3)">'+esc(e.label)+'</span>'
+        +'<span style="font-size:11px;color:var(--ink3)">your settings already sit at the test value — nothing to measure; skipped automatically</span></div>';
+      continue;
+    }
     const v=_LABV[e.verdict]||_LABV.collecting;
     const ad=adopts[e.id];
     const hasData=e.deltas&&e.deltas.length;
@@ -4018,6 +4054,230 @@ async function labApply(id,undo){
   alert(r&&r.ok?('✓ '+r.msg+(undo?'':'\n\nFuture Lab control flights keep this value.')):('Could not apply: '+((r&&r.msg)||'unknown')));
   try{ _labStatus=await window.api.perfLabStatus(); }catch(e3){}
   renderLabView(); renderLabPanel();
+}
+
+// ── SETUP ASSISTANT (Phase 10) ───────────────────────────────────────────────
+// First-run guided setup: opens automatically on an empty config, re-runnable any time from
+// Settings. Every step is skippable; it only orchestrates EXISTING machinery (msfs-detect,
+// browseFolder, community-routes download, fleet config) — no new detection logic lives here.
+let _wiz=null;
+function _wizOverlay(id){
+  let ov=document.getElementById(id);
+  if(!ov){
+    ov=document.createElement('div'); ov.id=id;
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.innerHTML='<div id="'+id+'-card" style="background:var(--bg1);border:1px solid var(--sep2);border-radius:14px;padding:26px 28px;max-width:640px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 24px 80px rgba(0,0,0,.55)"></div>';
+    document.body.appendChild(ov);
+  }
+  ov.style.display='flex';
+  return document.getElementById(id+'-card');
+}
+function _wizHide(id){ const ov=document.getElementById(id); if(ov)ov.style.display='none'; }
+const _wizBtn=(label,fn,primary)=>'<button class="btn bsm'+(primary?'':' bg')+'" style="'+(primary?'background:var(--acc);color:#000;border-color:var(--acc);font-weight:700;':'')+'padding:8px 16px" onclick="'+fn+'">'+label+'</button>';
+const _wizFoot=(inner)=>'<div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:22px;border-top:1px solid var(--sep);padding-top:16px">'+inner+'</div>';
+const _wizHead=(step,total,title,sub)=>'<div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);font-family:\'JetBrains Mono\',monospace;margin-bottom:6px">Setup assistant · step '+step+' of '+total+'</div>'
+  +'<div style="font-size:19px;font-weight:800;color:var(--ink0);letter-spacing:-.02em;margin-bottom:4px">'+title+'</div>'
+  +(sub?'<div style="font-size:12.5px;color:var(--ink3);line-height:1.6;margin-bottom:16px">'+sub+'</div>':'');
+function wizOpen(step){ _wiz={step:step||0,det:null,scanN:null}; wizRender(); }
+function wizSkip(){ S.cfg.setupDone=true; window.api.saveConfig(S.cfg); _wizHide('wiz'); }
+function wizNext(d){ _wiz.step+=(d||1); wizRender(); }
+async function wizRender(){
+  const card=_wizOverlay('wiz'); if(!_wiz)_wiz={step:0};
+  const s=_wiz.step; let h='';
+  if(s===0){
+    h='<div style="font-size:24px;font-weight:800;color:var(--ink0);letter-spacing:-.02em;margin-bottom:6px">Welcome to A Better Route Planner ✈️</div>'
+      +'<div style="font-size:13px;color:var(--ink2);line-height:1.8;margin:14px 0">'
+      +'<div style="margin-bottom:10px">🗺️ &nbsp;<b>Find real airline routes</b> between the airports you actually own scenery for — with live weather and ATIS on every card.</div>'
+      +'<div style="margin-bottom:10px">🛫 &nbsp;<b>Plan and launch in one click</b> — SimBrief pre-filled, companion apps handled, sim started.</div>'
+      +'<div>📊 &nbsp;<b>Measure your sim\'s smoothness</b> on real flights and get a data-backed recommendation for your graphics settings.</div>'
+      +'</div>'
+      +'<div style="font-size:12px;color:var(--ink3)">Setup takes about 2 minutes. Everything can be changed later in Settings, and you can re-run this assistant any time.</div>'
+      +_wizFoot('<span style="margin-right:auto"></span>'+_wizBtn('Skip setup','wizSkip()')+_wizBtn('Let\'s go &#8594;','wizNext()',true));
+  }
+  if(s===1){
+    if(!_wiz.det){ try{ _wiz.det=await window.api.msfsDetect(); }catch(e){ _wiz.det={}; } if(_wiz.step!==1)return; }
+    const d=_wiz.det||{};
+    if(d.version&&!S.cfg.msfsVersion)S.cfg.msfsVersion=d.version;
+    if(d.communityFolder&&!S.cfg.communityFolder)S.cfg.communityFolder=d.communityFolder;
+    if(d.version==='steam'&&d.steamExe&&!S.cfg.steamExePath)S.cfg.steamExePath=d.steamExe;
+    h=_wizHead(1,5,'Your simulator','ABRP looks for Microsoft Flight Simulator 2024 automatically.')
+      +'<div style="background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px;font-size:12.5px;line-height:2">'
+      +(S.cfg.msfsVersion?('<div style="color:var(--grn)">&#10003; MSFS 2024 found ('+esc(S.cfg.msfsVersion==='steam'?'Steam':'Microsoft Store')+')</div>'):'<div style="color:var(--acc)">&#9888; MSFS 2024 not detected — you can still continue and set it later in Settings &#8594; Sim Integration.</div>')
+      +(S.cfg.communityFolder?('<div style="color:var(--grn)">&#10003; Community folder: <span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--ink2)">'+esc(S.cfg.communityFolder)+'</span></div>'):'<div style="color:var(--acc)">&#9888; Community folder not found <button class="btn bg bsm" onclick="wizPickCommunity()">Browse&hellip;</button></div>')
+      +'</div>'
+      +_wizFoot(_wizBtn('&#8592; Back','wizNext(-1)')+_wizBtn('Next &#8594;','wizNext()',true));
+  }
+  if(s===2){
+    h=_wizHead(2,5,'Your scenery library','The folder where you keep your 3rd-party airport sceneries (one subfolder per airport). ABRP reads folder names only — nothing inside is touched.')
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+      +'<button class="btn bg bsm" onclick="wizPickScenery()">Browse to my scenery folder&hellip;</button>'
+      +(S.cfg.folder?'<span style="font-size:11px;font-family:\'JetBrains Mono\',monospace;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(S.cfg.folder)+'</span>':'<span style="font-size:12px;color:var(--ink3)">no folder selected yet</span>')
+      +'</div>'
+      +(_wiz.scanN!=null?('<div style="font-size:13px;color:var(--grn);margin-bottom:4px">&#10003; Found '+_wiz.scanN+' folder'+(_wiz.scanN!==1?'s':'')+' — they\'ll be matched to airports when you finish setup.</div>'):'')
+      +'<div style="font-size:11px;color:var(--ink3)">Don\'t have one yet? Skip this — you can still browse routes with the "No library needed" mode.</div>'
+      +_wizFoot(_wizBtn('&#8592; Back','wizNext(-1)')+_wizBtn(S.cfg.folder?'Next &#8594;':'Skip for now &#8594;','wizNext()',S.cfg.folder?true:false));
+  }
+  if(s===3){
+    S.cfg.myFleet=S.cfg.myFleet||{};
+    h=_wizHead(3,5,'What do you fly?','Check the aircraft you own — routes are filtered to what your fleet can actually fly. Change any time in Settings &#8594; My Fleet.')
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px">'
+      +FLEET_DEF.map(f=>'<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink1);cursor:pointer"><input type="checkbox" '+(S.cfg.myFleet[f.code]?'checked':'')+' onchange="S.cfg.myFleet[\''+f.code+'\']=this.checked" style="accent-color:var(--acc)">'+esc(f.label)+'</label>').join('')
+      +'</div>'
+      +_wizFoot(_wizBtn('&#8592; Back','wizNext(-1)')+_wizBtn('Next &#8594;','window.api.saveConfig(S.cfg);renderFleetPanel();wizNext()',true));
+  }
+  if(s===4){
+    h=_wizHead(4,5,'Route data','Real scheduled airline routes power Plan a Flight. Two ways to get them:')
+      +'<div style="background:var(--bg2);border:1px solid var(--grn);border-radius:9px;padding:14px 16px;margin-bottom:10px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--grn);margin-bottom:4px">&#11015; Community Routes — recommended start</div>'
+      +'<div style="font-size:12px;color:var(--ink2);line-height:1.6;margin-bottom:8px">A shared database of 10,000+ real routes. Instant, no account needed.</div>'
+      +'<button class="btn bg bsm" id="wiz-cr-btn" onclick="wizCommunity()">Download Community Routes</button> <span id="wiz-cr-note" style="font-size:11px;color:var(--ink3)"></span>'
+      +'</div>'
+      +'<div style="background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px;margin-bottom:14px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--ink1);margin-bottom:4px">SayIntentions.AI account (optional, later)</div>'
+      +'<div style="font-size:12px;color:var(--ink3);line-height:1.6">If you fly with SayIntentions ATC, your own live route harvests replace the community data — paste your session cookie in Settings &#8594; Route Data Source whenever you\'re ready (the README walks you through it).</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:12.5px;color:var(--ink1);font-weight:600">SimBrief username</span>'
+      +'<input id="wiz-sb" value="'+esc(S.cfg.simbriefUser||'')+'" placeholder="optional" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-size:12px;width:180px">'
+      +'<span style="font-size:11px;color:var(--ink3)">powers one-click flight plans + the performance logger</span>'
+      +'</div>'
+      +_wizFoot(_wizBtn('&#8592; Back','wizNext(-1)')+_wizBtn('Next &#8594;','wizSaveSb();wizNext()',true));
+  }
+  if(s===5){
+    const ok=(v,yes,no)=>v?('<div style="color:var(--grn)">&#10003; '+yes+'</div>'):('<div style="color:var(--ink3)">&#9675; '+no+'</div>');
+    h=_wizHead(5,5,'You\'re flight-ready 🎉','Here\'s where you landed — anything skipped lives in Settings.')
+      +'<div style="background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px;font-size:12.5px;line-height:2.1;margin-bottom:6px">'
+      +ok(S.cfg.msfsVersion,'Simulator connected ('+esc(S.cfg.msfsVersion==='store'?'Microsoft Store':'Steam')+')','Simulator — set in Settings &#8594; Sim Integration')
+      +ok(S.cfg.folder,'Scenery library set','Scenery library — browse in My Airports')
+      +ok(Object.values(S.cfg.myFleet||{}).some(Boolean),'Fleet selected','Fleet — check aircraft in Settings &#8594; My Fleet')
+      +ok(Object.keys(S.routeRegistry||{}).length,'Routes loaded ('+Object.keys(S.routeRegistry||{}).length.toLocaleString()+')','Routes — download Community Routes in Settings')
+      +ok(S.cfg.simbriefUser,'SimBrief: '+esc(S.cfg.simbriefUser||''),'SimBrief username — optional, in Settings')
+      +'</div>'
+      +'<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:2px">One more thing worth knowing: the <b>Performance</b> tab can measure real flights and recommend your ideal graphics baseline. Want to set that up now?</div>'
+      +_wizFoot(_wizBtn('Finish','wizFinish(false)')+_wizBtn('Set up my graphics baseline &#8594;','wizFinish(true)',true));
+  }
+  card.innerHTML=h;
+}
+async function wizPickCommunity(){ const p=await window.api.browseFolder(); if(p){ S.cfg.communityFolder=p; window.api.saveConfig(S.cfg); } wizRender(); }
+async function wizPickScenery(){
+  const p=await window.api.browseFolder(); if(!p)return;
+  S.cfg.folder=p; S.folderPath=p; window.api.saveConfig(S.cfg);
+  try{ setFD(p); document.getElementById('scan-btn').disabled=false; }catch(e){}
+  _wiz.scanN=null; wizRender();
+  try{ const res=await window.api.scanFolder(p); _wiz.scanN=(res&&res.folders)?res.folders.length:0; }catch(e){ _wiz.scanN=0; }
+  wizRender();
+}
+async function wizCommunity(){
+  const n=document.getElementById('wiz-cr-note'); if(n)n.textContent='downloading…';
+  try{ await downloadCommunityRoutes(); const c=Object.keys(S.routeRegistry||{}).length; if(n)n.textContent='✓ '+c.toLocaleString()+' routes loaded'; }
+  catch(e){ if(n)n.textContent='download failed — try Settings later'; }
+}
+function wizSaveSb(){ const i=document.getElementById('wiz-sb'); if(i){ const v=i.value.trim(); if(v)S.cfg.simbriefUser=v; else delete S.cfg.simbriefUser; window.api.saveConfig(S.cfg); } }
+function wizFinish(baseline){
+  S.cfg.setupDone=true; window.api.saveConfig(S.cfg); _wizHide('wiz');
+  if(S.cfg.folder&&!(S.allRows&&S.allRows.length)){ try{ doScan(); }catch(e){} }
+  if(baseline)bwizOpen();
+}
+
+// ── BASELINE WALKTHROUGH — "find my ideal graphics settings" ─────────────────
+// Writes config.benchmark: the aircraft (with match terms), TLOD steps, and flights-per-step that
+// drive coverage, auto-TLOD, the Baseline recommendation, and the Settings Lab gate. Dean's classic
+// grid is the seeded default; this walkthrough exists so ANY fleet can run the same study.
+let _bwiz=null;
+function _benchCandidates(){
+  const fam={'737':'PMDG','A319':'Fenix','A320':'Fenix','A321':'Fenix'};
+  const match={PMDG:['pmdg','737','738','739'],Fenix:['fenix','a318','a319','a320','a321']};
+  const out=new Map();
+  for(const f of FLEET_DEF){
+    if(f.freeOnly)continue;
+    if(!(S.cfg.myFleet&&S.cfg.myFleet[f.code]))continue;
+    const label=fam[f.family]; if(!label||out.has(label))continue;
+    out.set(label,{label,match:match[label].slice()});
+  }
+  return [...out.values()];
+}
+function bwizOpen(){
+  const cur=(S.cfg.benchmark&&Array.isArray(S.cfg.benchmark.aircraft))?S.cfg.benchmark:null;
+  _bwiz={step:0,
+    sel:cur?cur.aircraft.map(a=>({label:a.label,match:(a.match||[]).slice()})):_benchCandidates(),
+    tlods:(cur&&cur.tlods?cur.tlods:[100,125,150,175]).join(', '),
+    perCell:(cur&&cur.perCell)||3,
+    vram:(cur&&cur.vramCapMb)||''};
+  bwizRender();
+}
+function bwizClose(){ _wizHide('bwiz'); _bwiz=null; }
+function bwizNext(d){ _bwiz.step+=(d||1); bwizRender(); }
+function bwizToggle(i){ const c=_benchCandidates()[i]; if(!c)return;
+  const at=_bwiz.sel.findIndex(x=>x.label===c.label);
+  if(at>=0)_bwiz.sel.splice(at,1); else if(_bwiz.sel.length<3)_bwiz.sel.push({label:c.label,match:c.match.slice()});
+  bwizRender();
+}
+function bwizAddCustom(){
+  const l=document.getElementById('bw-cl'),m=document.getElementById('bw-cm');
+  const label=(l&&l.value.trim())||'',terms=((m&&m.value)||'').split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
+  if(!label||!terms.length){ alert('Give the aircraft a short name and at least one match word (e.g. "iniA350" and "a350, ini").'); return; }
+  if(_bwiz.sel.length>=3){ alert('Up to 3 benchmark aircraft — each one adds '+_bwiz.tlods.split(',').length*_bwiz.perCell+' flights.'); return; }
+  _bwiz.sel.push({label,match:terms}); bwizRender();
+}
+function _bwizTlods(){ return _bwiz.tlods.split(',').map(t=>parseInt(t.trim(),10)).filter(n=>n>=10&&n<=400); }
+function bwizRender(){
+  const card=_wizOverlay('bwiz'); const s=_bwiz.step; let h='';
+  const total=()=>_bwiz.sel.length*_bwizTlods().length*_bwiz.perCell;
+  if(s===0){
+    h='<div style="font-size:19px;font-weight:800;color:var(--ink0);letter-spacing:-.02em;margin-bottom:8px">🎯 Find your ideal graphics settings</div>'
+      +'<div style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:14px">ABRP can measure your real flights and recommend the one Terrain-LOD setting that keeps your heaviest planes smooth with VRAM headroom — no guesswork, your own data.<br><br>'
+      +'<b>How it works:</b> you just fly normally with Launch + Capture. Before each flight, the app sets the next test value automatically; after enough flights it hands you the answer (and unlocks the Settings Lab for deeper experiments).</div>'
+      +_wizFoot(_wizBtn('Not now','bwizClose()')+_wizBtn('Set it up &#8594;','bwizNext()',true));
+  }
+  if(s===1){
+    const cands=_benchCandidates();
+    h=_wizHead(1,3,'Which planes should define your baseline?','Pick 1–3 — your HEAVIEST or most-flown. The recommendation is tuned so these stay smooth; everything lighter simply does better. Aircraft you don\'t pick are still logged, just not counted.')
+      +(cands.length?('<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">'
+        +cands.map((c,i)=>{ const on=_bwiz.sel.some(x=>x.label===c.label);
+          return '<label style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid '+(on?'var(--acc)':'var(--sep)')+';border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px;color:var(--ink1)"><input type="checkbox" '+(on?'checked':'')+' onchange="bwizToggle('+i+')" style="accent-color:var(--acc)"><b>'+esc(c.label)+'</b><span style="font-size:10px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">matches: '+esc(c.match.join(', '))+'</span></label>'; }).join('')
+        +'</div>'):'<div style="font-size:12px;color:var(--acc);margin-bottom:12px">No fleet aircraft selected yet — add one below, or set your fleet in Settings first.</div>')
+      +_bwiz.sel.filter(x=>!cands.some(c=>c.label===x.label)).map(x=>'<div style="font-size:12px;color:var(--ink2);margin-bottom:6px">&#10003; <b>'+esc(x.label)+'</b> <span style="font-size:10px;color:var(--ink3)">(custom · matches: '+esc(x.match.join(', '))+')</span></div>').join('')
+      +'<details style="margin-top:8px"><summary style="font-size:11px;color:var(--ink3);cursor:pointer">Add a different aircraft&hellip;</summary>'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">'
+      +'<input id="bw-cl" placeholder="short name, e.g. iniA350" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-size:12px;width:160px">'
+      +'<input id="bw-cm" placeholder="match words: a350, ini" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-size:12px;width:200px">'
+      +'<button class="btn bg bsm" onclick="bwizAddCustom()">Add</button>'
+      +'<span style="font-size:10px;color:var(--ink3)">match words are checked against the sim\'s aircraft name + your SimBrief plan</span></div></details>'
+      +_wizFoot(_wizBtn('&#8592; Back','bwizNext(-1)')+(_bwiz.sel.length?_wizBtn('Next &#8594;','bwizNext()',true):'<span style="font-size:11px;color:var(--ink3)">pick at least one aircraft</span>'));
+  }
+  if(s===2){
+    h=_wizHead(2,3,'Your test plan','The proven recipe: each plane flies each Terrain-LOD step a few times; averaging smooths out route-to-route noise.')
+      +'<div style="background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px;font-size:12.5px;line-height:2.2;margin-bottom:10px">'
+      +'<div>TLOD steps &nbsp;<input value="'+esc(_bwiz.tlods)+'" onchange="_bwiz.tlods=this.value;bwizRender()" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:5px 10px;font-size:12px;width:170px;font-family:\'JetBrains Mono\',monospace"> <span style="font-size:10px;color:var(--ink3)">the proven spread — edit only if you know why</span></div>'
+      +'<div>Flights per step &nbsp;<select onchange="_bwiz.perCell=parseInt(this.value);bwizRender()" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:5px 10px;font-size:12px">'+[2,3].map(n=>'<option '+(n===_bwiz.perCell?'selected':'')+'>'+n+'</option>').join('')+'</select> <span style="font-size:10px;color:var(--ink3)">3 = steadier verdicts · 2 = done sooner</span></div>'
+      +'<div>VRAM ceiling &nbsp;<input value="'+esc(String(_bwiz.vram||''))+'" onchange="_bwiz.vram=this.value" placeholder="auto-detect" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:5px 10px;font-size:12px;width:110px"> <span style="font-size:10px;color:var(--ink3)">MB — leave blank: your card\'s total is read from the flights themselves</span></div>'
+      +'</div>'
+      +'<div style="font-size:15px;font-weight:800;color:var(--acc)">'+_bwiz.sel.length+' aircraft × '+_bwizTlods().length+' TLOD steps × '+_bwiz.perCell+' = '+total()+' benchmark flights</div>'
+      +'<div style="font-size:11px;color:var(--ink3);margin-top:4px">They\'re just your normal flights — the app schedules the settings; progress shows on the Performance tab.</div>'
+      +_wizFoot(_wizBtn('&#8592; Back','bwizNext(-1)')+(_bwizTlods().length?_wizBtn('Next &#8594;','bwizNext()',true):'<span style="font-size:11px;color:var(--ink3)">enter valid TLOD numbers (10–400)</span>'));
+  }
+  if(s===3){
+    h=_wizHead(3,3,'Confirm your benchmark','This becomes the plan behind auto-TLOD, the progress tracker, the Baseline recommendation, and the Settings Lab unlock.')
+      +'<div style="background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px;font-size:12.5px;line-height:2;margin-bottom:8px">'
+      +'<div><b>Aircraft:</b> '+_bwiz.sel.map(x=>esc(x.label)).join(' &amp; ')+'</div>'
+      +'<div><b>TLOD steps:</b> '+_bwizTlods().join(' / ')+'</div>'
+      +'<div><b>Flights:</b> '+_bwiz.perCell+' per step &rarr; <b>'+total()+' total</b></div>'
+      +'<div><b>VRAM ceiling:</b> '+(_bwiz.vram?(esc(String(_bwiz.vram))+' MB'):'auto-detected from your GPU')+' (90% safety line)</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--ink3)">Fly with <b>Launch + Capture</b> from any route card and the app does the rest.</div>'
+      +_wizFoot(_wizBtn('&#8592; Back','bwizNext(-1)')+_wizBtn('Start my benchmark','bwizSave()',true));
+  }
+  card.innerHTML=h;
+}
+function bwizSave(){
+  const vram=parseInt(String(_bwiz.vram).trim(),10);
+  S.cfg.benchmark={ aircraft:_bwiz.sel.map(x=>({label:x.label,match:x.match})), tlods:_bwizTlods(),
+    perCell:_bwiz.perCell, vramCapMb:(vram>0?vram:null) };
+  window.api.saveConfig(S.cfg);
+  bwizClose();
+  alert('Benchmark plan saved — '+S.cfg.benchmark.aircraft.map(a=>a.label).join(' & ')+', '+
+    (S.cfg.benchmark.aircraft.length*S.cfg.benchmark.tlods.length*S.cfg.benchmark.perCell)+' flights.\n\nUse Launch + Capture on any route card; the Performance tab tracks progress.');
+  try{ if(document.getElementById('perf-baseline'))renderBaseline(); renderLabPanel(); }catch(e){}
 }
 
 async function perfExportCfx(){
@@ -5666,5 +5926,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.2.2</div>
+  pointer-events:none;">v6.3.0</div>
 </body></html>

@@ -11,6 +11,17 @@ const { readSettings, writeSettingsText } = require('./settings.js');
 const CITATION_LABEL = 'Citation Sovereign+';
 const p2 = n => String(n).padStart(2, '0');
 
+// Phase 10: user-defined benchmark aircraft (config.benchmark.aircraft = [{label, match:[terms]}])
+// are checked FIRST, then the legacy built-ins — so Dean's seeded default resolves identically and
+// any other user's fleet works without code changes.
+function matchBenchmarkAircraft(blob, benchmark) {
+  if (!benchmark || !Array.isArray(benchmark.aircraft)) return null;
+  const b = String(blob || '').toLowerCase();
+  for (const a of benchmark.aircraft) {
+    if (a && a.label && Array.isArray(a.match) && a.match.some(t => t && b.includes(String(t).toLowerCase()))) return a.label;
+  }
+  return null;
+}
 function normalizeSimbriefAircraft(...cands) {
   const blob = cands.filter(Boolean).map(String).join(' ').toLowerCase();
   if (blob.includes('fenix') || ['a318', 'a319', 'a320', 'a321'].some(a => blob.includes(a))) return 'Fenix';
@@ -29,7 +40,8 @@ function parseSimbriefAircraft(xml) {
   const code = tagIn(scope, 'icaocode') || tagIn(scope, 'icao_code') || tagIn(scope, 'base_type');
   const name = tagIn(scope, 'name');
   const reg  = tagIn(scope, 'reg');
-  return [code || name || reg || null, normalizeSimbriefAircraft(code, name, reg)];
+  const blob = [code, name, reg].filter(Boolean).join(' ');
+  return [code || name || reg || null, normalizeSimbriefAircraft(code, name, reg), blob];
 }
 
 function getSimbriefAircraft(username) {
@@ -78,12 +90,16 @@ function writeSettings(usercfgPath, backupDir, tlod, olod) {
   return { ok: true, msg: 'Set TLOD ' + tC + ' / OLOD ' + oC + ' (backup: ' + path.basename(backup) + ')' };
 }
 
-// Full prep-next. sessions = index.json sessions; opts = {username, usercfgPath, backupDir}.
+// Full prep-next. sessions = index.json sessions; opts = {username, usercfgPath, backupDir,
+// benchmark?} — benchmark carries the user grid + aircraft match terms (omitted = Dean's classic).
 async function prepNext(sessions, opts) {
-  const [raw, aircraft] = await getSimbriefAircraft(opts.username);
+  if (!opts.username) return { ok: false, set: false, reason: 'no-username',
+    msg: 'No SimBrief username configured - set it in Settings so auto-TLOD can read your flight plan. TLOD left unchanged.' };
+  const [raw, normalized, blob] = await getSimbriefAircraft(opts.username);
+  const aircraft = matchBenchmarkAircraft(blob || raw, opts.benchmark) || normalized;
   if (!aircraft) return { ok: false, set: false, reason: 'no-simbrief', raw,
     msg: 'SimBrief aircraft not recognized (' + JSON.stringify(raw) + ') - leaving TLOD unchanged.' };
-  const tlod = nextGapForAircraft(computeCoverage(sessions), aircraft);
+  const tlod = nextGapForAircraft(computeCoverage(sessions, opts.benchmark), aircraft);
   if (tlod == null) return { ok: true, set: false, reason: 'coverage-complete', aircraft,
     msg: aircraft + ': coverage already complete - leaving TLOD unchanged.' };
   const olod = readSettings(opts.usercfgPath).olod || 120;
@@ -91,4 +107,4 @@ async function prepNext(sessions, opts) {
   return { ok: w.ok, set: w.ok, aircraft, raw, tlod, olod, msg: w.msg };
 }
 
-module.exports = { prepNext, getSimbriefAircraft, normalizeSimbriefAircraft, parseSimbriefAircraft, writeSettings, backupUsercfg };
+module.exports = { prepNext, getSimbriefAircraft, normalizeSimbriefAircraft, matchBenchmarkAircraft, parseSimbriefAircraft, writeSettings, backupUsercfg };

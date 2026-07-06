@@ -434,6 +434,37 @@ const SNAP_FILE = path.join(USER_DATA, 'routeSnapshot.json');
     if (changed) { writeFileAtomic(CFG, JSON.stringify(c, null, 2)); LOG.info('[MIGRATE] config.json slimmed (route data split out)'); }
   } catch(e) { LOG.warn('[MIGRATE] route-data split failed (non-fatal):', e.message); }
 })();
+// ── BENCHMARK CONFIG (Phase 10) ───────────────────────────────────────────────
+// The 24-flight benchmark grid used to be hardcoded (Fenix/PMDG × TLOD 100-175 × 3 = Dean's rig).
+// It now lives in config.benchmark so any user's fleet works; the seed below IS Dean's classic
+// grid, so an existing install migrates with zero behavior change. vramCapMb null = auto-detect
+// from the flights' own total_vram_mb. The setup wizard / baseline walkthrough writes this block.
+const DEFAULT_BENCHMARK = {
+  aircraft: [
+    { label: 'Fenix', match: ['fenix', 'a318', 'a319', 'a320', 'a321'] },
+    { label: 'PMDG',  match: ['pmdg', '737', '738', '739'] },
+  ],
+  tlods: [100, 125, 150, 175],
+  perCell: 3,
+  vramCapMb: null,
+};
+function benchCfg(){
+  const b = _perfCfg().benchmark;
+  return (b && Array.isArray(b.aircraft) && b.aircraft.length && Array.isArray(b.tlods) && b.tlods.length)
+    ? b : DEFAULT_BENCHMARK;
+}
+function benchLabels(){ return benchCfg().aircraft.map(a => a.label); }
+(()=>{  // one-time seed for existing installs so the renderer always finds cfg.benchmark
+  try {
+    if (!fs.existsSync(CFG)) return;                       // brand-new install: the wizard writes it
+    const c = JSON.parse(fs.readFileSync(CFG,'utf8'));
+    let ch = false;
+    if (!c.benchmark) { c.benchmark = DEFAULT_BENCHMARK; ch = true; LOG.info('[MIGRATE] seeded config.benchmark (classic Fenix/PMDG grid)'); }
+    // an already-configured install is by definition "set up" — the wizard must never fire on it
+    if (!c.setupDone && (c.folder || (c.savedRows && c.savedRows.length) || c.siCookie)) { c.setupDone = true; ch = true; }
+    if (ch) writeFileAtomic(CFG, JSON.stringify(c, null, 2));
+  } catch(e) { LOG.warn('[MIGRATE] benchmark seed failed (non-fatal):', e.message); }
+})();
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
 ipcMain.handle('save-config',(_,cfg)=>{
   try{
@@ -1092,13 +1123,14 @@ ipcMain.handle('perf-compare-data', () => {
     if (!fs.existsSync(idxPath)) return { ok:false, reason:'no-data', flights:[] };
     const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
     const flights = (data.sessions || []).map(s => {
-      let avg_vram_mb = null, ground_stutter_pct = null, ground_p99 = null, spike_count = null;
+      let avg_vram_mb = null, ground_stutter_pct = null, ground_p99 = null, spike_count = null, total_vram_mb = null;
       try {
         const folder = (s.folder || '').replace(/\//g, '\\');
         const sp = path.join(sdir, folder, 'summary.json');
         if (folder && fs.existsSync(sp)) {
           const sj = JSON.parse(fs.readFileSync(sp, 'utf8'));
           if (sj && sj.vram && sj.vram.avg_vram_mb != null) avg_vram_mb = sj.vram.avg_vram_mb;
+          if (sj && sj.vram && sj.vram.total_vram_mb != null) total_vram_mb = sj.vram.total_vram_mb;
           // Settings Lab verdicts + future R4 insights read ground-phase stats
           const g = sj && sj.smoothness && sj.smoothness.phases && sj.smoothness.phases.ground;
           if (g) { ground_stutter_pct = g.stutter_pct ?? null; ground_p99 = g.p99_ft ?? null; }
@@ -1111,7 +1143,7 @@ ipcMain.handle('perf-compare-data', () => {
         sim_version: s.sim_version || null, driver_version: s.driver_version || null,
         p99_ft_ms: s.p99_ft_ms ?? null, stutter_pct: s.stutter_pct ?? null,
         consistency_pct: s.consistency_pct ?? null, peak_vram_mb: s.peak_vram_mb ?? null,
-        avg_vram_mb, ground_stutter_pct, ground_p99, spike_count,
+        avg_vram_mb, ground_stutter_pct, ground_p99, spike_count, total_vram_mb,
         experiment: s.experiment || null, autofps_active: s.autofps_active || null,
         route: s.route || null
       };
@@ -1545,7 +1577,9 @@ function _perfCfg(){ try { return JSON.parse(fs.readFileSync(CFG,'utf8')) || {};
 // baseline flight; packaging runtime-probed). Setting nativePerfEngine:false in config falls back to
 // the legacy Python paths — a DEV-ONLY escape hatch: the installer no longer ships perf-engine.exe.
 function nativePerfEnabled(){ return _perfCfg().nativePerfEngine !== false; }
-function simbriefUser(){ return _perfCfg().simbriefUser || 'snkeyez95'; }
+// Phase 10: NO hardcoded fallback username — a fresh install must never fetch the developer's
+// SimBrief plans. null = SimBrief-dependent features explain themselves instead of misbehaving.
+function simbriefUser(){ const u = String(_perfCfg().simbriefUser || '').trim(); return u || null; }
 // Steam UserCfg.opt (matches the Python engine). Store-vs-Steam detection is a cutover TODO.
 const USERCFG_PATH = path.join(app.getPath('appData'), 'Microsoft Flight Simulator 2024', 'UserCfg.opt');
 
@@ -1583,7 +1617,8 @@ ipcMain.handle('perf-start-capture', () => {
       const nenv = Object.assign({}, process.env, {
         ELECTRON_RUN_AS_NODE: '1', MSFS_PERF_ROOT: USER_DATA, ABRP_ASSET_DIR: dir,
         ABRP_SESSIONS_DIR: path.join(USER_DATA, 'Sessions'), ABRP_USERCFG: USERCFG_PATH,
-        ABRP_SIMBRIEF_USER: simbriefUser(),
+        ...(simbriefUser() ? { ABRP_SIMBRIEF_USER: simbriefUser() } : {}),
+        ABRP_BENCHMARK: JSON.stringify(benchCfg()),   // user grid + aircraft match terms (Phase 10)
         // node-simconnect (+ its 13 deps) is asarUnpack'd; point the detached process at it.
         NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
                                   : path.join(__dirname, 'node_modules'),
@@ -1623,9 +1658,9 @@ ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
           const { prepNext } = require(path.join(perfDir(), 'native', 'prep.js'));  // perfDir = resources/perf when packaged
           let sessions = [];
           try { sessions = (JSON.parse(fs.readFileSync(path.join(USER_DATA, 'Sessions', 'index.json'), 'utf8')).sessions) || []; } catch(_){}
-          const r = await prepNext(sessions, { username: simbriefUser(), usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA, 'usercfg_backups') });
+          const r = await prepNext(sessions, { username: simbriefUser(), usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA, 'usercfg_backups'), benchmark: benchCfg() });
           LOG.info('[PERF] native prep-next: ' + (r.msg || ''));
-          resolve({ ok: !!r.ok, set: !!r.set, aircraft: r.aircraft, tlod: r.tlod, reason: r.reason });
+          resolve({ ok: !!r.ok, set: !!r.set, aircraft: r.aircraft, tlod: r.tlod, reason: r.reason, msg: r.msg });
         } catch (e) { LOG.error('[PERF] native prep-next failed: ' + e.message); resolve({ ok:false, error:e.message }); }
       })();
       return;
@@ -1706,7 +1741,7 @@ ipcMain.handle('perf-export-capframex', (_, args) => new Promise(async (resolve)
 function _labMod(){ return require(path.join(perfDir(), 'native', 'lab.js')); }
 function _labSessions(){ try { return (JSON.parse(fs.readFileSync(path.join(USER_DATA,'Sessions','index.json'),'utf8')).sessions)||[]; } catch(_){ return []; } }
 ipcMain.handle('perf-lab-status', () => {
-  try { return _labMod().labStatus(_labSessions(), USER_DATA); }
+  try { return _labMod().labStatus(_labSessions(), USER_DATA, USERCFG_PATH); }
   catch (e) { return { ok:false, error:e.message }; }
 });
 ipcMain.handle('perf-lab-next', (_, args) => {
@@ -1714,7 +1749,7 @@ ipcMain.handle('perf-lab-next', (_, args) => {
     const lab = _labMod();
     if (args && args.disable) { const r = lab.labDisable(USER_DATA, USERCFG_PATH, path.join(USER_DATA,'usercfg_backups')); LOG.info('[LAB] disabled — restored '+r.restored+' setting(s)'); return r; }
     if (args && args.manual)  { const r = lab.labMarkManual(USER_DATA, args.manual); LOG.info('[LAB] manual mark: '+(r.msg||'')); return r; }
-    const r = lab.labNext(_labSessions(), { usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA,'usercfg_backups'), dataRoot: USER_DATA, aircraft: args && args.aircraft });
+    const r = lab.labNext(_labSessions(), { usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA,'usercfg_backups'), dataRoot: USER_DATA, aircraft: args && args.aircraft, benchLabels: benchLabels() });
     LOG.info('[LAB] ' + (r.msg || r.mode));
     return r;
   } catch (e) { LOG.error('[LAB] perf-lab-next failed: '+e.message); return { ok:false, mode:'error', msg:e.message }; }
@@ -1730,7 +1765,8 @@ ipcMain.handle('perf-lab-report', () => new Promise((resolve) => {
       'const m=require(process.env.LABR_MOD);' +
       'console.log(JSON.stringify(m.buildLabReport(process.env.LABR_SRC)));'],
       { windowsHide:true, env: Object.assign({}, process.env, {
-          ELECTRON_RUN_AS_NODE:'1', LABR_MOD: mod, LABR_SRC: path.join(USER_DATA,'Sessions') }) });
+          ELECTRON_RUN_AS_NODE:'1', LABR_MOD: mod, LABR_SRC: path.join(USER_DATA,'Sessions'),
+          ABRP_BENCHMARK: JSON.stringify(benchCfg()) }) });
     let out=''; child.stdout.on('data', d => out += d);
     let err=''; child.stderr.on('data', d => err += d);
     const timer = setTimeout(() => { try{ child.kill(); }catch(_){}; resolve({ ok:false, error:'lab report timed out' }); }, 120000);

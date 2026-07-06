@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.2.2
+# A Better Route Planner — v6.3.0
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -20,7 +20,7 @@ A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3
 - **SimBrief Integration** — One-click opens SimBrief pre-filled with airline, flight number, aircraft type, origin, destination, and callsign. When live D-ATIS is available, the active departure and arrival runways are pre-selected too.
 - **Community Routes** — Download a shared route database from GitHub when you don't have a SayIntentions cookie yet.
 - **Performance Logging** — A built-in engine captures real per-frame timing (via Intel PresentMon), VRAM, and system telemetry during a flight, then files a self-contained dashboard: frametime/FPS charts, stutter and variance breakdowns, phase-of-flight split, and VRAM headroom — all offline, no internet needed to view.
-- **Baseline Recommendation** — Analyzes your fixed-TLOD benchmark flights and recommends one balanced Terrain-LOD setting that keeps both heavy aircraft (PMDG + Fenix) smooth with VRAM headroom, with Smoothest / Balanced / Best-visuals modes.
+- **Baseline Recommendation** — Analyzes your fixed-TLOD benchmark flights and recommends one balanced Terrain-LOD setting that keeps your chosen benchmark aircraft (any fleet — pick 1–3 in the guided walkthrough) smooth with VRAM headroom, with Smoothest / Balanced / Best-visuals modes.
 - **Maintenance Tools** — Dedicated tab: MSFS shader-cache cleaner, per-aircraft WASM cache cleaners (PMDG/Fenix), and NVIDIA Control Panel backup/restore — surfaced automatically when a sim update, GPU driver update, or aircraft update is detected.
 - **GSX Pro Profiles** — Per-airport GSX profile detection with auto-install of bundled profiles and a flightsim.to fallback link.
 - **Aircraft & Utility Activation** — Junction-based activation for aircraft and utility add-ons, so you can keep your Community folder slim for performance.
@@ -29,16 +29,25 @@ A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3
 
 ---
 
-## Setup
+## Install & First Run
 
-**Requirements:** Windows 10/11, Node.js v18+
+**Recommended: the installer.** Download the latest `A Better Route Planner Setup x.x.x.exe` from
+[GitHub Releases](https://github.com/snkeyez95/dean-msfs-route-finder/releases), run it, and launch
+the app. On first launch a **Setup Assistant** walks you through everything in about 2 minutes:
 
-**First run:**
-1. Double-click `setup.bat` to install dependencies
-2. Double-click `start.bat` to launch the app
-3. Go to **Settings → My Fleet** and check the aircraft you own
-4. Set your scenery folder path in **My Airports**
-5. Follow the SayIntentions cookie setup below to enable live route data
+1. **Your simulator** — MSFS 2024 (Steam or Microsoft Store) and your Community folder are detected automatically; just confirm.
+2. **Your scenery library** — browse to the folder holding your 3rd-party airport sceneries (one subfolder per airport). Folder names are read, nothing inside is touched.
+3. **Your fleet** — check the aircraft you own so routes are filtered to what you can actually fly.
+4. **Route data** — one click downloads the free Community Routes database (10,000+ real routes, no account needed). SayIntentions users can paste their cookie later for live harvests. Add your SimBrief username here too.
+5. **Optional: your graphics baseline** — a guided walkthrough picks your benchmark aircraft (1–3, any fleet — not just PMDG/Fenix), confirms the test plan (e.g. 2 aircraft × 4 TLOD steps × 3 = 24 flights), and from then on the app schedules the settings before each Launch + Capture flight and hands you a data-backed TLOD recommendation.
+
+Every step is skippable, everything can be changed in Settings, and both assistants can be re-run
+any time (Settings → **Run setup assistant** / **Edit benchmark plan**).
+
+Updates install themselves — the app checks GitHub Releases and offers new versions automatically.
+Uninstalling asks whether to also remove your data, and defaults to keeping your flight logs.
+
+**Developer setup (running from source):** Windows 10/11 + Node.js v18+ — run `setup.bat` once, then `start.bat`.
 
 ---
 
@@ -213,6 +222,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.3.0   NEW-USER EXPERIENCE. (1) SETUP ASSISTANT: first launch on a fresh install opens a guided 6-step setup — welcome tour, automatic sim + Community-folder detection, scenery library with instant "Found N folders ✓" feedback, fleet picker, routes (one-click Community Routes download as the recommended no-account start, SayIntentions explained for later) and SimBrief username — every step skippable, re-runnable from Settings, never shown on an already-configured install. (2) BASELINE WALKTHROUGH: "Find your ideal graphics settings" — pick 1–3 benchmark aircraft from YOUR fleet (with an add-your-own option for any payware), confirm TLOD steps and flights-per-step with a live total (e.g. 2 × 4 × 3 = 24), VRAM ceiling auto-detected from your actual GPU; reachable from setup, the Performance tab's empty state, the Baseline view, and Settings. (3) THE BENCHMARK IS NO LONGER HARDCODED TO THE DEV RIG: the whole engine (coverage, auto-TLOD, aircraft recognition, Baseline recommendation, Settings Lab gate + reference-aircraft rule, Lab reports) now runs from config.benchmark — existing installs are seeded with the exact classic Fenix/PMDG grid, proven byte-identical on all real flights (19-check suite). Lab experiments whose test value already matches your settings are honestly marked "not applicable" and skipped. (4) Fresh-install hygiene: the developer's SimBrief username is no longer a hidden fallback (captures on other machines could fetch his flight plans); auto-TLOD now says plainly "set your SimBrief username" when it's missing; empty Plan-a-Flight and Performance tabs became guides with action buttons instead of dead ends; README gained a real Install & First Run section
 v6.2.2   GSX profile updates replace in place with no .bak copies (Dean request) — a newer bundled profile simply overwrites the installed one. The safety rules stay: identical files are left alone, and a profile that's newer than the scenery's copy is never overwritten
 v6.2.1   GSX PROFILE UPDATES. The bundled-profile auto-install is now update-aware. Before, an airport whose GSX profile name already existed in your GSX folder was skipped entirely — so a scenery update shipping a NEWER profile silently kept your stale copy (real case: iniBuilds KJFK bundled a July 2026 .ini while the installed copy was from May 2025). Now every never-scanned scenery folder is checked regardless of install status, and when a bundled profile name-matches an installed one anywhere in the GSX tree: identical content = left alone, your copy newer (e.g. you tuned it) = never clobbered, scenery copy newer = updated in place plus a toast telling you. No flat duplicates are ever created for profiles living in GSX subfolders. Proven by a 7-check desk-test incl. a replay of the exact KJFK case
 v6.2.0   LAB FINDINGS. The Settings Lab's data now becomes answers: a new 🧪 Lab view (fourth button next to Dashboard / Compare / Baseline) shows one Finding Card per experiment with a plain-English verdict banner — FREE UPGRADE (keep the prettier setting), REAL IMPROVEMENT (worth adopting), COSTS YOU (leave it), TRADE-OFF, or NO EFFECT. The honesty core: every metric delta (ground stutter, ground P99, overall P99, big spikes/hr, peak VRAM) is drawn as a diverging bar OVER a shaded band showing your normal flight-to-flight variation (±1 standard deviation of your own baseline flights) — a bar inside the band is honestly labeled "within noise", so "no measurable difference" is a real result, not spin. Each card overlays experiment vs baseline frametime lines in two auto-scaled fingerprint charts — "Ground phase only" (where stutter lives) and "Full flight" — with the x-axis normalized to % of flight so different routes compare fairly; chart data is cached per flight (~12 KB, built once from the raw capture, survives archiving, works on gzipped archives). Winning verdicts get an "Apply this setting" button: one click writes the value to UserCfg.opt (backed up + verified, sim must be closed) and makes it your new Lab baseline, with an adopted ribbon and un-apply. The old always-visible Lab panel shrinks to a one-line status strip (checkbox · next flight · progress dots · open Lab), and Compare's "Lab experiment" grouping now shows each experiment's verdict chip with a jump to the Lab. Proven by a 34-check suite: engineered SAVES/NO-EFFECT/COSTS/FREE verdicts, gzip-identical chart caches, byte-identical apply/un-apply round-trip, and a real-flight smoke (106-min KORD-KATL: cache in 0.8s, ground phase correctly isolated, flight logs untouched)
