@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld('api', {
   perfPrepNext:       ()    => ipcRenderer.invoke('perf-prep-next'),
   perfCaptureStatus:  ()    => ipcRenderer.invoke('perf-capture-status'),
   perfCompareData:    ()    => ipcRenderer.invoke('perf-compare-data'),
-  perfExportCapframex:()    => ipcRenderer.invoke('perf-export-capframex'),
+  perfExportCapframex:(a)   => ipcRenderer.invoke('perf-export-capframex', a||{}),
   listRunningApps:    ()    => ipcRenderer.invoke('list-running-apps'),
   flightCloseApps:    (a)   => ipcRenderer.invoke('flight-close-apps', a),
   flightWatchCompanions: () => ipcRenderer.invoke('flight-watch-companions'),

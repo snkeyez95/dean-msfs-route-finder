@@ -1635,23 +1635,34 @@ ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
 // Export all logged flights to CapFrameX-format CSVs (Sessions\CapFrameX\) via the native
 // converter (byte-parity proven vs the old Python --convert-path). Runs in a CHILD process —
 // it re-reads every raw frametimes.csv (can be GBs) and must never freeze the UI.
-ipcMain.handle('perf-export-capframex', () => new Promise((resolve) => {
+ipcMain.handle('perf-export-capframex', (_, args) => new Promise(async (resolve) => {
   try {
     const mod = path.join(perfDir(), 'native', 'capframex.js');
     if (!fs.existsSync(mod)) { resolve({ ok:false, error:'converter not found' }); return; }
+    const sessions = path.join(USER_DATA, 'Sessions');
+    // Dean (2026-07-06): convert ONE flight — the one being viewed — never the whole library.
+    // The renderer passes the viewed report's session dir when it can read it off the iframe;
+    // otherwise we ask via a folder picker defaulted to Sessions.
+    let srcDir = args && args.dir ? String(args.dir) : null;
+    if (srcDir && (!fs.existsSync(srcDir) || !path.resolve(srcDir).toLowerCase().startsWith(path.resolve(sessions).toLowerCase()))) srcDir = null;
+    if (!srcDir) {
+      const r = await dialog.showOpenDialog(win, { title:'Pick the flight to convert for CapFrameX',
+        defaultPath: sessions, properties:['openDirectory'] });
+      if (r.canceled || !r.filePaths.length) { resolve({ ok:false, canceled:true }); return; }
+      srcDir = r.filePaths[0];
+    }
     let gpu = '';
     try {
       const r = require('child_process').spawnSync('nvidia-smi', ['--query-gpu=name','--format=csv,noheader'],
         { encoding:'utf8', timeout:6000, windowsHide:true });
       gpu = ((r.stdout||'').split(/\r?\n/)[0]||'').trim();
     } catch(_){}
-    const sessions = path.join(USER_DATA, 'Sessions');
     const child = spawn(process.execPath, ['-e',
       'const c=require(process.env.CFX_MOD);' +
-      'const r=c.convertPaths([process.env.CFX_SRC], process.env.CFX_SRC, process.env.CFX_GPU||null);' +
+      'const r=c.convertPaths([process.env.CFX_SRC], process.env.CFX_OUTROOT, process.env.CFX_GPU||null);' +
       'console.log(JSON.stringify({outDir:r.outDir,count:r.count}));'],
       { windowsHide:true, env: Object.assign({}, process.env, {
-          ELECTRON_RUN_AS_NODE:'1', CFX_MOD: mod, CFX_SRC: sessions, CFX_GPU: gpu }) });
+          ELECTRON_RUN_AS_NODE:'1', CFX_MOD: mod, CFX_SRC: srcDir, CFX_OUTROOT: sessions, CFX_GPU: gpu }) });
     let out=''; child.stdout.on('data', d => out += d);
     let err=''; child.stderr.on('data', d => err += d);
     const timer = setTimeout(() => { try{ child.kill(); }catch(_){}; resolve({ ok:false, error:'export timed out' }); }, 180000);

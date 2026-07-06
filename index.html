@@ -3835,12 +3835,27 @@ function renderBaseline(){
   bl.innerHTML=h;
 }
 async function perfExportCfx(){
+  // Convert ONLY the flight currently open in the report view (Dean 2026-07-06 — never the whole
+  // library). The report iframe navigates internally (Prev/Next), so read its live location; if
+  // that's unreadable or the combined dashboard is showing, main falls back to a folder picker
+  // defaulted to Sessions.
+  let dir=null;
+  try{
+    const fr=document.getElementById('perf-frame');
+    const href=fr&&fr.contentWindow&&fr.contentWindow.location&&fr.contentWindow.location.href||'';
+    if(/report\.html/i.test(href)&&!/combined_report\.html/i.test(href)){
+      let p=decodeURIComponent(href.replace(/^file:\/\/\//,'').replace(/[?#].*$/,''));
+      p=p.replace(/\//g,'\\');
+      dir=p.replace(/\\[^\\]*$/,'');   // strip \report.html -> the session folder
+    }
+  }catch(e){}
   const btn=document.getElementById('cfx-export-btn');
   if(btn){btn.disabled=true;btn.innerHTML='&#8987; Converting&hellip;';}
-  let r; try{ r=await window.api.perfExportCapframex(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  let r; try{ r=await window.api.perfExportCapframex(dir?{dir}:{}); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
   if(btn){btn.disabled=false;btn.innerHTML='&#8687; CapFrameX';}
+  if(r&&r.canceled)return;
   if(r&&r.ok){
-    alert('Exported '+r.count+' flight'+(r.count!==1?'s':'')+' to CapFrameX format:\n'+r.outDir+'\n\nOpening the folder — load the CSVs in CapFrameX for deep frame analysis.');
+    alert('Exported '+r.count+' flight'+(r.count!==1?'s':'')+' to CapFrameX format:\n'+r.outDir+'\n\nOpening the folder — load the CSV in CapFrameX.');
     window.api.perfOpenPath(r.outDir);
   }else alert('CapFrameX export failed: '+((r&&r.error)||'unknown error'));
 }
