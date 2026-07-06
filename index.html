@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.0</div>
+    <div class="sb-ver">v6.3.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1804,7 +1804,7 @@ function updateAutoRefreshInfo(){
       const dt=new Date(ls);
       const ts=dt.toLocaleDateString([],{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
       const added=S.cfg.siLastFetchAdded;
-      lastEl.textContent='Last refresh: '+ts+(added!==undefined?' — '+added.toLocaleString()+' routes added':'');
+      lastEl.textContent='Last refresh: '+ts+(added!==undefined?' — '+added.toLocaleString()+' new route'+(added!==1?'s':''):'');
     }else lastEl.textContent='Last refresh: Never';
   }
   if(nextEl){
@@ -2192,6 +2192,7 @@ function renderFleetChips(){
     +chips.map(e=>`<div class="chip ${S.acft===e.code?'on':''}" data-acft="${e.code}" onclick="setAcft('${e.code}')">${e.label}</div>`).join('');
 }
 
+let _siNewSeen=0;   // genuinely-NEW route ids this refresh (net change is always ~0 at the 5,000 cap)
 function processPage(routes){
   const now=new Date().toISOString();
   const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
@@ -2217,6 +2218,7 @@ function processPage(routes){
         departure_country:r.departure_country,arrival_country:r.arrival_country,
         first_seen:now,last_seen:now,times_seen:1,
       };
+      _siNewSeen++;
     }
   }
 }
@@ -2396,6 +2398,7 @@ async function fetchSIRoutes({autoMode=false}={}){
   siShowFetchPanel(true);
   const cntBefore=Object.keys(S.routeRegistry).length;
   let rateLimitWaits=0,pagesFetched=0,totalPages=1;
+  _siNewSeen=0;
   siSetFetchProgress('Refreshing... fetching page 1',0);siSetFetchAdded(0);
   const mkH=(tot)=>({
     stopFn:()=>false,
@@ -2488,7 +2491,7 @@ async function fetchSIRoutes({autoMode=false}={}){
     }
     processPage(res.data?.data||res.data?.routes||[]);
     pagesFetched++;
-    siSetFetchAdded(Object.keys(S.routeRegistry).length-cntBefore);
+    siSetFetchAdded(_siNewSeen);
     // Incremental save every 20 pages: a full refresh spans ~140+ pages with 65s rate-limit waits
     // (30-60 min) — closing ABRP mid-refresh used to lose ALL fetched pages (only saved at the end).
     if(pagesFetched%20===0)window.api.siSaveRegistry(S.routeRegistry);
@@ -2497,15 +2500,19 @@ async function fetchSIRoutes({autoMode=false}={}){
   await window.api.siSaveRegistry(S.routeRegistry);
   S.cfg.siLastFetch=new Date().toISOString();
   const cnt=Object.keys(S.routeRegistry).length;
-  const newRoutes=cnt-cntBefore;
+  // "New" = route ids never seen before this refresh. At the 5,000 cap the NET change is always 0
+  // (new ones rotate in, least-recently-seen rotate out) — reporting net looked like a stalled
+  // system (Dean 2026-07-06). Report the churn honestly instead.
+  const newRoutes=_siNewSeen;
+  const rotated=Math.max(0,newRoutes-(cnt-cntBefore));
   S.cfg.siLastFetchAdded=newRoutes;
   await window.api.saveConfig(S.cfg);
   updateAutoRefreshInfo();  // repaint Last/Next refresh after any refresh (manual or auto)
   stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
   const wStr=rateLimitWaits>0?' — '+rateLimitWaits+' rate limit wait'+(rateLimitWaits!==1?'s':''):'';
-  setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' routes added'+wStr+'.','var(--grn)');
-  RLOG('fetchSIRoutes complete: registry='+cnt+' newRoutes='+newRoutes+' rateLimitWaits='+rateLimitWaits);
-  if(autoMode)RLOG('[SI] Auto-refresh complete: '+newRoutes+' new routes added');
+  setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' new route'+(newRoutes!==1?'s':'')+(rotated?' ('+rotated.toLocaleString()+' rotated out — registry at its 5,000 cap)':' added')+wStr+'.','var(--grn)');
+  RLOG('fetchSIRoutes complete: registry='+cnt+' new='+newRoutes+' rotatedOut='+rotated+' rateLimitWaits='+rateLimitWaits);
+  if(autoMode)RLOG('[SI] Auto-refresh complete: '+newRoutes+' new route(s)'+(rotated?', '+rotated+' rotated out at cap':''));
   const _snapBefore=Object.keys(S.routeRegistrySnapshot).length;
   mergeIntoSnapshot(S.routeRegistry);
   await window.api.siSaveSnapshot(S.routeRegistrySnapshot);
@@ -2514,7 +2521,8 @@ async function fetchSIRoutes({autoMode=false}={}){
     RLOG('[SI] community_routes.json: '+_newSnap+' new snapshot routes — writing to app folder');
     window.api.siWriteCommunityRoutes(S.routeRegistrySnapshot);
   }else{
-    RLOG('[SI] community_routes.json skipped: only '+_newSnap+' new routes added (threshold: 50)');
+    const snapFull=Object.keys(S.routeRegistrySnapshot).length>=20000;
+    RLOG('[SI] community_routes.json skipped: '+_newSnap+' new snapshot routes (threshold: 50)'+(snapFull?' — snapshot is at its 20,000 cap (by design), so auto-publish stays quiet; use publish.bat to push a refresh manually':''));
   }
   updateAutoRefreshInfo();
   renderRoutes();updateStats();updateSnapshotInfo();
@@ -5926,5 +5934,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.0</div>
+  pointer-events:none;">v6.3.1</div>
 </body></html>
