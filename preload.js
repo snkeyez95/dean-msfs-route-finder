@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('api', {
   nvcpBackup:         ()    => ipcRenderer.invoke('nvcp-backup'),
   nvcpRestore:        ()    => ipcRenderer.invoke('nvcp-restore'),
   isPackaged:         () => __dirname.includes('app.asar'),
+  msfsRunning:        ()    => ipcRenderer.invoke('msfs-running'),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available',   (_, ver) => cb(ver)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded',  (_, ver) => cb(ver)),
   installUpdate:      ()    => ipcRenderer.send('install-update'),

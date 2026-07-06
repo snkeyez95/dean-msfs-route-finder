@@ -1807,8 +1807,13 @@ ipcMain.on('install-update', () => {
   // the close-confirm dialog and the slow on-quit scenery cleanup. Junctions are left for the
   // freshly-installed copy to tidy on its next normal close.
   _perfAllowClose = true; _cleanupDone = true;
-  require('electron-updater').autoUpdater.quitAndInstall();
+  // (true, true) = SILENT NSIS install (/S — no wizard, no next-buttons) + auto-relaunch the app.
+  // Same assisted installer, just run non-interactively (Dean 2026-07-06: zero-click updates).
+  require('electron-updater').autoUpdater.quitAndInstall(true, true);
 });
+// Renderer-side safety check for the auto-restart countdown: never yank the app out from under a
+// running sim (an armed/recording capture is checked renderer-side via the capture badge).
+ipcMain.handle('msfs-running', () => { try { return isMsfsRunning(); } catch (_) { return false; } });
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
 ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());

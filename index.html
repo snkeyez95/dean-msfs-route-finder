@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.1</div>
+    <div class="sb-ver">v6.3.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1337,12 +1337,40 @@ window.addEventListener('DOMContentLoaded',async()=>{
       b.style.display='flex';
     }
   });
-  window.api.onUpdateDownloaded(ver=>{
+  window.api.onUpdateDownloaded(async ver=>{
     const b=document.getElementById('upd-banner');
     const m=document.getElementById('upd-msg');
     const btn=document.getElementById('upd-install-btn');
-    if(b&&m){m.textContent='⟳ v'+ver+' downloaded and ready to install.';b.style.display='flex';}
-    if(btn)btn.style.display='inline-block';
+    if(!b||!m)return;
+    b.style.display='flex';
+    // Silent auto-update on load (Dean 2026-07-06): count down and restart into the new version —
+    // zero clicks. SAFETY GUARDS: never auto-restart under a live capture, a running sim, or a
+    // route refresh; in those cases fall back to the classic button (and electron-updater still
+    // installs on the next app close via autoInstallOnAppQuit).
+    let busy=false;
+    try{ const cs=await window.api.perfCaptureStatus(); busy=!!(cs&&cs.active); }catch(e){}
+    if(!busy){ try{ busy=!!(await window.api.msfsRunning()); }catch(e){} }
+    if(!busy){ const fb=document.getElementById('fetch-btn'); busy=_arRunning||!!(fb&&fb.disabled&&S.siCookie); }
+    if(busy){
+      m.textContent='⟳ v'+ver+' downloaded — installs when you close the app, or click:';
+      if(btn)btn.style.display='inline-block';
+      return;
+    }
+    if(btn){btn.style.display='inline-block';btn.textContent='Update now';}
+    let later=document.getElementById('upd-later-btn');
+    if(!later){
+      later=document.createElement('button');
+      later.id='upd-later-btn'; later.className=btn?btn.className:'';
+      later.textContent='Later'; later.style.opacity='.7';
+      later.onclick=()=>{ clearInterval(window._updCd); later.style.display='none';
+        m.textContent='⟳ v'+ver+' ready — installs when you close the app, or click:'; if(btn)btn.textContent='Restart & Install'; };
+      (btn&&btn.parentElement?btn.parentElement:b).appendChild(later);
+    }
+    later.style.display='inline-block';
+    let left=8;
+    const tick=()=>{ m.textContent='⟳ v'+ver+' ready — restarting to update in '+left+'s…';
+      if(left<=0){ clearInterval(window._updCd); window.api.installUpdate(); } left--; };
+    tick(); clearInterval(window._updCd); window._updCd=setInterval(tick,1000);
   });
   // SI cookie expiry
   window.api.onSiCookieExpired(()=>{
@@ -4341,15 +4369,23 @@ async function launchAndCapture(){
     +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
     +(comps.length?('3. Launch your '+comps.length+' companion app'+(comps.length>1?'s':'')+'\n'):'')
     +'4. Launch MSFS and start the performance capture\n\n'
-    +'Make sure you’ve already generated your SimBrief plan and MSFS isn’t already running.';
+    +'Make sure you’ve already generated your SimBrief plan and MSFS isn’t already running.\n'
+    +'A summary note appears after OK — no more clicks needed.';
   if(!confirm(msg))return;
   // 1) Auto-TLOD — must finish BEFORE MSFS launches (it writes UserCfg.opt; engine backs it up).
   let prep; try{ prep=await window.api.perfPrepNext(); }catch(e){ prep={ok:false,error:(e&&e.message)||'error'}; }
   if(!(prep&&prep.set)){
-    const why = (prep&&prep.reason==='no-simbrief') ? 'No SimBrief plan detected — TLOD left unchanged. Generate your SimBrief flight plan first for auto-TLOD to work.'
-              : (prep&&prep.reason==='coverage-complete') ? 'This aircraft’s benchmark coverage is already complete — TLOD left unchanged.'
-              : 'Could not auto-set TLOD ('+((prep&&(prep.error||prep.reason))||'unknown')+') — TLOD left unchanged.';
-    if(!confirm(why+'\n\nContinue launching anyway with TLOD as-is?'))return;
+    // 'coverage-complete' is the NORMAL post-benchmark state (the Lab takes the slot, or you just
+    // fly at your baseline) — not a problem needing a second dialog. Only genuine setup problems
+    // still ask whether to continue (Dean 2026-07-06: one dialog on the happy path).
+    if(prep&&prep.reason==='coverage-complete'){
+      // fall through — noted in the summary toast
+    }else{
+      const why = (prep&&prep.reason==='no-simbrief') ? 'No SimBrief plan detected — TLOD left unchanged. Generate your SimBrief flight plan first for auto-TLOD to work.'
+                : (prep&&prep.reason==='no-username') ? (prep.msg||'No SimBrief username set — add it in Settings for auto-TLOD.')
+                : 'Could not auto-set TLOD ('+((prep&&(prep.error||prep.reason))||'unknown')+') — TLOD left unchanged.';
+      if(!confirm(why+'\n\nContinue launching anyway with TLOD as-is?'))return;
+    }
   }
   // 1b) SETTINGS LAB: once the benchmark is complete and the Lab box is checked, the Lab takes over
   // the pre-launch write slot auto-TLOD just vacated — applies the next experiment value or
@@ -4366,16 +4402,31 @@ async function launchAndCapture(){
   setTimeout(()=>{ window.api.launchMsfs({version:S.cfg.msfsVersion||'steam',steamExePath:S.cfg.steamExePath||''}); },5000);
   // 5) Arm the capture (waits for your takeoff roll).
   let cap; try{ cap=await window.api.perfStartCapture(); }catch(e){ cap={ok:false}; }
-  const setLine = (prep&&prep.set) ? ('✓ TLOD '+prep.tlod+' set for '+prep.aircraft+' — confirm this matches the tracker’s next-flight cell.')
-    : (lab&&lab.ok&&lab.mode==='experiment') ? ('🧪 LAB '+lab.msg+'\n   Hypothesis: '+(lab.hypothesis||''))
-    : (lab&&lab.ok) ? ('🧪 LAB: '+lab.msg)
-    : (lab&&!lab.ok) ? ('⚠ LAB error: '+(lab.msg||'unknown')+' — flying with settings as-is.')
-    : '• TLOD left unchanged.';
-  alert('Clean flight launching 🚀\n\n'+setLine+'\n'
-    +(closeApps.length?('• '+closeApps.length+' app'+(closeApps.length>1?'s':'')+' closed (reopen after the sim).\n'):'')
-    +(comps.length?('• '+comps.length+' companion app'+(comps.length>1?'s':'')+' launched.\n'):'')
-    +'• MSFS starting in ~5s; capture '+((cap&&cap.ok)?'armed':'could NOT arm — check the log')+'.\n\n'
-    +'Fly normally — it records on your takeoff roll, files when you close the sim, and your apps reopen automatically.');
+  const setLine = (prep&&prep.set) ? ('&#10003; TLOD '+prep.tlod+' set for '+esc(prep.aircraft||''))
+    : (lab&&lab.ok&&lab.mode==='experiment') ? ('🧪 '+esc(lab.msg||''))
+    : (lab&&lab.ok) ? ('🧪 '+esc(lab.msg||''))
+    : (lab&&!lab.ok) ? ('&#9888; Lab error: '+esc(lab.msg||'unknown')+' — flying as-is')
+    : (prep&&prep.reason==='coverage-complete') ? ('&#10003; Benchmark complete — TLOD left at your setting')
+    : ('&bull; TLOD left unchanged');
+  // Non-blocking summary (was a third alert to dismiss) — MSFS launch no longer waits on a click.
+  flightToast('<b>Clean flight launching 🚀</b><br>'+setLine
+    +(closeApps.length?('<br>&bull; '+closeApps.length+' app'+(closeApps.length>1?'s':'')+' closed — reopen after the sim'):'')
+    +(comps.length?('<br>&bull; '+comps.length+' companion app'+(comps.length>1?'s':'')+' launched'):'')
+    +'<br>&bull; MSFS starting; capture '+((cap&&cap.ok)?'<span style="color:var(--grn)">armed</span> — records on your takeoff roll, files when you close the sim':'<span style="color:#e23">could NOT arm — check the log</span>'),
+    14000);
+}
+// Bottom-center multi-line toast for flight-launch summaries (info that used to be blocking alerts).
+let _ftTimer=null;
+function flightToast(html,ms){
+  let el=document.getElementById('flight-toast');
+  if(!el){
+    el=document.createElement('div'); el.id='flight-toast';
+    el.style.cssText='position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:999;background:var(--bg1);border:1px solid var(--acc);border-radius:11px;padding:13px 18px;max-width:520px;font-size:12.5px;color:var(--ink1);line-height:1.75;box-shadow:0 12px 44px rgba(0,0,0,.5)';
+    el.onclick=()=>{ el.style.display='none'; };
+    document.body.appendChild(el);
+  }
+  el.innerHTML=html; el.style.display='block';
+  clearTimeout(_ftTimer); _ftTimer=setTimeout(()=>{ el.style.display='none'; },ms||12000);
 }
 
 // Global capture-status badge (title bar). v1: active vs idle by whether the engine is running.
@@ -5934,5 +5985,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.1</div>
+  pointer-events:none;">v6.3.2</div>
 </body></html>
