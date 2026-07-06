@@ -16,26 +16,26 @@ const N_PER_EXPERIMENT = 2;   // Dean 2026-07-06: 2 flights per setting, verdict
 // Dean's actual current values (verified 2026-07-06). 'lod' format = percent -> /100 float.
 const EXPERIMENTS = [
   { id: 'clouds-quality-up', label: 'Volumetric clouds Quality 1→2', section: 'VolumetricClouds', key: 'Quality',
-    format: 'int', testValue: 2, hypothesis: 'Free visuals: GPU has headroom, so smoothness should NOT change (watch VRAM + gpu-bound%)' },
+    format: 'int', testValue: 2, dir: 'up', hypothesis: 'Free visuals: GPU has headroom, so smoothness should NOT change (watch VRAM + gpu-bound%)' },
   // (airport-services experiment REJECTED by Dean's review 2026-07-06: his services are already at
   // minimum (-1/variety 0), and payware airports bake their own clutter outside this slider anyway)
   { id: 'precache-down', label: 'Off-screen terrain pre-caching Ultra→Low', section: 'OffscreenTerrainPreCaching', key: 'Quality',
-    format: 'int', testValue: 1, hypothesis: 'Dean runs this at MAX (3): the sim constantly pre-loads terrain for views you are not looking at — a known main-thread cost. Expect smoother frametimes; trade = brief scenery pop when swinging external cameras' },
+    format: 'int', testValue: 1, dir: 'down', hypothesis: 'Dean runs this at MAX (3): the sim constantly pre-loads terrain for views you are not looking at — a known main-thread cost. Expect smoother frametimes; trade = brief scenery pop when swinging external cameras' },
   { id: 'glass-refresh-down', label: 'Glass cockpit refresh 2→1', section: 'GlassCockpitsRefreshRate', key: 'Quality',
-    format: 'int', testValue: 1, hypothesis: 'Cheaper avionics refresh frees main thread on PMDG/Fenix (ground + overall p99 down)' },
+    format: 'int', testValue: 1, dir: 'down', hypothesis: 'Cheaper avionics refresh frees main thread on PMDG/Fenix (ground + overall p99 down)' },
   { id: 'olod-down', label: 'Objects LOD 120→100', section: 'ObjectsLoD', key: 'LoDFactor',
-    format: 'lod', testValue: 100, hypothesis: 'Fewer object LODs juggled over photogrammetry cities (ground/descent stutter down)' },
+    format: 'lod', testValue: 100, dir: 'down', hypothesis: 'Fewer object LODs juggled over photogrammetry cities (ground/descent stutter down)' },
   // UP-variants (Dean 2026-07-06: test both directions where both carry a real question). Downs run
   // first (stutter relief is the priority); ups answer "is raising this free on my idle GPU / what
   // does prettier cost?". Deliberately one-directional: clouds-down (CPU-bound rig — reducing GPU
   // work can't buy smoothness) and precache-up (already at max 3).
   { id: 'glass-refresh-up', label: 'Glass cockpit refresh 2→3 (max)', section: 'GlassCockpitsRefreshRate', key: 'Quality',
-    format: 'int', testValue: 3, hypothesis: 'Is maxing avionics fluidity FREE? If smoothness is unchanged, keep it maxed' },
+    format: 'int', testValue: 3, dir: 'up', hypothesis: 'Is maxing avionics fluidity FREE? If smoothness is unchanged, keep it maxed' },
   { id: 'olod-up', label: 'Objects LOD 120→150', section: 'ObjectsLoD', key: 'LoDFactor',
-    format: 'lod', testValue: 150, hypothesis: 'What does prettier objects COST? Quantifies the ground/VRAM price of +30 OLOD (sibling of the TLOD study)' },
+    format: 'lod', testValue: 150, dir: 'up', hypothesis: 'What does prettier objects COST? Quantifies the ground/VRAM price of +30 OLOD (sibling of the TLOD study)' },
   // Photogrammetry lives OUTSIDE UserCfg.opt (data settings) — manual: Dean toggles it in-sim and
   // marks the next flight from the Lab panel; tagging/verdicts work the same, no auto write/restore.
-  { id: 'photogrammetry-off', label: 'Photogrammetry OFF (manual toggle in sim)', manual: true,
+  { id: 'photogrammetry-off', label: 'Photogrammetry OFF (manual toggle in sim)', manual: true, dir: 'down',
     hypothesis: 'City-mesh streaming off = smoother departure/approach at PG cities (ground/descent stutter + VRAM down)' },
 ];
 
@@ -194,8 +194,47 @@ function labStatus(sessions, dataRoot) {
   try { next = JSON.parse(fs.readFileSync(pendingPath(dataRoot), 'utf8')); } catch (_) { next = null; }
   const nx = lastFlightTagged(sessions) ? { mode: 'control' }
     : (nextExperiment(sessions) ? { mode: 'experiment', id: nextExperiment(sessions).id, label: nextExperiment(sessions).label } : { mode: 'complete' });
-  return { ok: true, queue, next: nx, pending: next, hasBaseline: !!st.baseline };
+  return { ok: true, queue, next: nx, pending: next, hasBaseline: !!st.baseline, adoptions: st.adoptions || {} };
 }
 
-module.exports = { EXPERIMENTS, N_PER_EXPERIMENT, labNext, labStatus, labMarkManual, labDisable,
+// "Apply this setting" — adopt a winning finding permanently: write the test value AND make it the
+// new baseline (so control flights / disable keep it). The pre-adoption value is remembered in the
+// adoption record so Un-apply can put it back exactly. Same backup + readback discipline as labNext.
+function applyFinding(dataRoot, usercfgPath, backupDir, id, undo) {
+  const exp = EXPERIMENTS.find(e => e.id === id && !e.manual);
+  if (!exp) return { ok: false, msg: 'unknown or manual experiment — manual settings are toggled in the sim' };
+  const st = loadState(dataRoot);
+  st.adoptions = st.adoptions || {};
+  if (!fs.existsSync(usercfgPath)) return { ok: false, msg: 'UserCfg.opt not found' };
+  const text = fs.readFileSync(usercfgPath, 'utf8');
+  let target;
+  if (undo) {
+    const ad = st.adoptions[id];
+    if (!ad) return { ok: false, msg: 'nothing adopted for ' + id };
+    target = ad.prev;
+  } else {
+    target = exp.testValue;
+  }
+  if (target == null) return { ok: false, msg: 'no value to write' };
+  const w = writeKeyInBlock(text, exp.section, exp.key, target, exp.format);
+  if (!w.ok) return { ok: false, msg: 'write failed: ' + w.reason };
+  try { backupUsercfg(usercfgPath, backupDir); } catch (_) {}
+  fs.writeFileSync(usercfgPath, w.text);
+  const verify = _toRegistryUnits(readKeyInBlock(fs.readFileSync(usercfgPath, 'utf8'), exp.section, exp.key), exp.format);
+  if (verify !== Math.trunc(target)) return { ok: false, msg: 'readback verify failed' };
+  if (undo) {
+    st.baseline && (st.baseline[id] = st.adoptions[id].prev);
+    st.log.push({ t: Date.now(), a: 'unadopt', id, v: target });
+    delete st.adoptions[id];
+  } else {
+    const prev = st.baseline ? st.baseline[id] : _toRegistryUnits(readKeyInBlock(text, exp.section, exp.key), exp.format);
+    st.adoptions[id] = { value: target, prev, ts: Date.now() };
+    if (st.baseline) st.baseline[id] = target;
+    st.log.push({ t: Date.now(), a: 'adopt', id, v: target });
+  }
+  saveState(dataRoot, st);
+  return { ok: true, value: target, msg: (undo ? 'Restored ' : 'Applied ') + exp.label.split('→')[0].trim() + ' = ' + target };
+}
+
+module.exports = { EXPERIMENTS, N_PER_EXPERIMENT, labNext, labStatus, labMarkManual, labDisable, applyFinding,
   readKeyInBlock, writeKeyInBlock, snapshotBaseline, restoreBaseline, pendingPath };

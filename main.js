@@ -1700,6 +1700,41 @@ ipcMain.handle('perf-lab-next', (_, args) => {
     return r;
   } catch (e) { LOG.error('[LAB] perf-lab-next failed: '+e.message); return { ok:false, mode:'error', msg:e.message }; }
 });
+// Lab RESULTS (Phase 9b): verdicts vs baseline noise + overlay chart SVGs. Reads raw
+// frametimes.csv(.gz) on first run (then per-flight series.json caches make it cheap), so it runs
+// in a CHILD process like the archiver — never on the Electron main thread.
+ipcMain.handle('perf-lab-report', () => new Promise((resolve) => {
+  try {
+    const mod = path.join(perfDir(), 'native', 'lab_report.js');
+    if (!fs.existsSync(mod)) { resolve({ ok:false, error:'lab_report module not found' }); return; }
+    const child = spawn(process.execPath, ['-e',
+      'const m=require(process.env.LABR_MOD);' +
+      'console.log(JSON.stringify(m.buildLabReport(process.env.LABR_SRC)));'],
+      { windowsHide:true, env: Object.assign({}, process.env, {
+          ELECTRON_RUN_AS_NODE:'1', LABR_MOD: mod, LABR_SRC: path.join(USER_DATA,'Sessions') }) });
+    let out=''; child.stdout.on('data', d => out += d);
+    let err=''; child.stderr.on('data', d => err += d);
+    const timer = setTimeout(() => { try{ child.kill(); }catch(_){}; resolve({ ok:false, error:'lab report timed out' }); }, 120000);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      try { const j = JSON.parse(out.trim().split(/\r?\n/).pop()); j.sessionsDir = path.join(USER_DATA,'Sessions'); resolve(j); }
+      catch(_) { LOG.error('[LAB] report failed (code '+code+'): '+err.slice(0,300)); resolve({ ok:false, error: err.slice(0,200) || ('exit '+code) }); }
+    });
+    child.on('error', e => { clearTimeout(timer); resolve({ ok:false, error:e.message }); });
+  } catch (e) { resolve({ ok:false, error:e.message }); }
+}));
+// Adopt (or un-adopt) a winning Lab finding into UserCfg.opt. The sim only reads UserCfg at
+// launch, so this is refused while MSFS is running — the write would be silently overwritten
+// when the sim exits.
+ipcMain.handle('perf-lab-apply', (_, args) => {
+  try {
+    let simUp = false; try { simUp = isMsfsRunning(); } catch(_){}
+    if (simUp) return { ok:false, msg:'MSFS is running — close the sim first (it only reads settings at launch, and overwrites them on exit).' };
+    const r = _labMod().applyFinding(USER_DATA, USERCFG_PATH, path.join(USER_DATA,'usercfg_backups'), args && args.id, !!(args && args.undo));
+    LOG.info('[LAB] apply '+(args&&args.id)+(args&&args.undo?' (undo)':'')+' -> '+(r.ok?('OK '+r.msg):('FAIL '+r.msg)));
+    return r;
+  } catch (e) { LOG.error('[LAB] perf-lab-apply failed: '+e.message); return { ok:false, msg:e.message }; }
+});
 
 // Capture status for the title-bar badge. v1: active = engine process running. state (armed /
 // recording) is read from a status file the engine writes when present (engine pass adds it).

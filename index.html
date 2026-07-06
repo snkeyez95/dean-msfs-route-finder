@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.1.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.2.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.1.0</div>
+    <div class="sb-ver">v6.2.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3631,6 +3631,7 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" onclick="perfShowDashboard()" title="Back to the combined dashboard">&#128202; Dashboard</button>'
     +'<button class="btn bg bsm" onclick="perfShowCompare()" title="Compare your flights grouped by sim version, GPU driver, aircraft, or TLOD — see whether the numbers actually change">&#9878; Compare</button>'
     +'<button class="btn bg bsm" onclick="perfShowBaseline()" title="One blended TLOD that keeps both PMDG and Fenix smooth — your recommended global setting">&#127919; Baseline</button>'
+    +'<button class="btn bg bsm" onclick="perfShowLab()" title="Settings Lab findings — what each experiment actually did to your smoothness, judged against your normal flight-to-flight variation">&#129514; Lab</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
     +'<button class="btn bg bsm" id="cfx-export-btn" onclick="perfExportCfx()" title="Convert the flight you&#39;re viewing to a CapFrameX-format CSV (Sessions\\CapFrameX). From the dashboard you get a picker instead — choose one flight folder, a date, or Sessions for everything.">&#8687; CapFrameX</button>'
@@ -3639,13 +3640,15 @@ async function renderPerfPane(){
     +'<div id="lab-panel"></div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
     +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
-    +'<div id="perf-baseline" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
+    +'<div id="perf-baseline" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
+    +'<div id="perf-lab" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
   perfShowDashboard();
   renderLabPanel();   // Settings Lab (Phase 9) — async, fills #lab-panel
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
-function perfShowDashboard(){ const cmp=document.getElementById('perf-compare'); if(cmp)cmp.style.display='none'; const bl=document.getElementById('perf-baseline'); if(bl)bl.style.display='none'; const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
+function _perfHideViews(){ for(const id of ['perf-frame','perf-compare','perf-baseline','perf-lab']){ const el=document.getElementById(id); if(el)el.style.display='none'; } }
+function perfShowDashboard(){ _perfHideViews(); const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
 
 // ── COMPARE VIEW ─────────────────────────────────────────────────────────────
 // Group logged flights by one factor (sim version / driver / aircraft / TLOD) and show whether the
@@ -3662,8 +3665,7 @@ const _cmpMetrics=[
 ];
 const _cmpDimLabel={sim_version:'Sim version',driver_version:'GPU driver',aircraft:'Aircraft',tlod:'TLOD'};
 async function perfShowCompare(){
-  const fr=document.getElementById('perf-frame'); if(fr)fr.style.display='none';
-  const bl=document.getElementById('perf-baseline'); if(bl)bl.style.display='none';
+  _perfHideViews();
   const cmp=document.getElementById('perf-compare'); if(!cmp)return; cmp.style.display='block';
   cmp.innerHTML='<div style="font-size:13px;color:var(--ink3)">Loading flights&hellip;</div>';
   let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
@@ -3699,6 +3701,20 @@ function renderCompare(){
     +'<span style="font-size:12px;color:var(--ink3);margin-left:6px">holding</span>'+sel('cmp-fac',_cmpState.fAircraft,acOpts)+sel('cmp-ftl',_cmpState.fTlod,tlOpts)
     +'</div>'
     +'<div style="font-size:12px;color:var(--ink3);margin-bottom:14px">'+flights.length+' of '+all.length+' flights · '+groups.length+' group'+(groups.length!==1?'s':'')+' · averages per group. Hold aircraft + TLOD constant for a clean sim/driver comparison.</div>';
+  // Lab tie-in: grouping by experiment gets each experiment's verdict chip (judged vs baseline
+  // noise in the Lab, which raw group means here can't tell you) + a jump to the full finding.
+  if(dim==='experiment'){
+    if(_labReport&&_labReport.ok){
+      const chips=_labReport.experiments.filter(e=>e.done>0).map(e=>{ const v=_LABV[e.verdict]||_LABV.collecting;
+        return '<span title="'+esc(e.sentence||'')+'" style="font-size:10px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:2px 7px">'+v.t+' · '+esc(e.label)+'</span>'; }).join(' ');
+      if(chips) html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+chips
+        +'<a href="#" onclick="perfShowLab();return false" style="font-size:11px;color:var(--acc)">open Lab for charts &#8594;</a></div>';
+    }else if(!_labRptLoading){
+      _labRptLoading=true;
+      window.api.perfLabReport().then(r=>{ _labReport=r; _labRptLoading=false; if(_cmpState.dim==='experiment')renderCompare(); }).catch(()=>{ _labRptLoading=false; });
+      html+='<div style="font-size:11px;color:var(--ink3);margin-bottom:14px">Loading Lab verdicts&hellip;</div>';
+    }
+  }
   if(!groups.length){ html+='<div style="font-size:13px;color:var(--ink3)">No flights match those filters.</div>'; cmp.innerHTML=html; return; }
   // palette
   const colors=['var(--acc)','#4ea1ff','#46c46a','#e0823c','#b07cff','#e23','#3cc7c4'];
@@ -3771,8 +3787,7 @@ function _blCompute(all){
     coverage:{filled,total:_BL.AC.length*_BL.TL.length*_BL.PER_CELL,short,ready:short.length===0},sims};
 }
 async function perfShowBaseline(){
-  const fr=document.getElementById('perf-frame'); if(fr)fr.style.display='none';
-  const cmp=document.getElementById('perf-compare'); if(cmp)cmp.style.display='none';
+  _perfHideViews();
   const bl=document.getElementById('perf-baseline'); if(!bl)return; bl.style.display='block';
   bl.innerHTML='<div style="font-size:13px;color:var(--ink3)">Crunching your flights&hellip;</div>';
   let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
@@ -3842,65 +3857,50 @@ function renderBaseline(){
 // Checkbox is GREYED until the 24-flight benchmark completes (cov.ready). Checked = the Lab takes
 // the pre-launch slot on Launch + Capture (one experiment per flight, alternating with baseline
 // control flights). Unchecked = nothing runs, full manual control; un-checking restores settings.
-function _labVerdict(flights,id){
-  const exps=flights.filter(f=>f.experiment===id&&f.p99_ft_ms!=null);
-  if(!exps.length)return null;
-  const dnum=s=>parseInt(String(s).replace(/\D/g,'').slice(0,12))||0;   // session_id -> sortable number
-  const ctrlPool=flights.filter(f=>!f.experiment&&!f.autofps_active&&f.p99_ft_ms!=null&&_BL.AC.includes(f.aircraft)&&_BL.TL.includes(f.tlod));
-  const rows=[];
-  const met=[['ground_stutter_pct','Ground stutter','%',3],['ground_p99','Ground P99','ms',2],['p99_ft_ms','Overall P99','ms',2],['peak_vram_mb','Peak VRAM','MB',0],['spike_count','Spikes >100ms','',0]];
-  for(const[k,label,unit,dec]of met){
-    const ev=exps.map(f=>f[k]).filter(v=>v!=null); if(!ev.length)continue;
-    // controls: for each experiment flight, the 4 time-nearest same-aircraft baseline flights
-    const cv=[];
-    for(const e of exps){
-      ctrlPool.filter(c=>c.aircraft===e.aircraft&&c[k]!=null)
-        .sort((a,b)=>Math.abs(dnum(a.session_id)-dnum(e.session_id))-Math.abs(dnum(b.session_id)-dnum(e.session_id)))
-        .slice(0,4).forEach(c=>cv.push(c[k]));
-    }
-    if(!cv.length)continue;
-    const m=a=>a.reduce((x,y)=>x+y,0)/a.length;
-    const em=m(ev),cm=m(cv),d=em-cm,pct=cm?Math.round(d/cm*100):null;
-    rows.push(label+': '+em.toFixed(dec)+unit+' vs '+cm.toFixed(dec)+unit+' baseline ('+(d>=0?'+':'')+(pct!=null?pct+'%':d.toFixed(dec))+')');
-  }
-  return rows.length?{n:exps.length,rows}:null;
-}
+// Verdicts + charts are computed by perf/native/lab_report.js (child process) — deltas judged
+// against ±1 standard deviation of your baseline flights, so "no effect" is a real, honest result.
+let _labReport=null,_labStatus=null,_labFlights=null,_labRptLoading=false;
+const _LABV={
+  free:      {c:'var(--grn)', bg:'rgba(50,215,75,.10)',  t:'FREE UPGRADE'},
+  saves:     {c:'#4ea1ff',    bg:'rgba(10,132,255,.10)', t:'REAL IMPROVEMENT'},
+  costs:     {c:'#e0823c',    bg:'rgba(224,130,60,.10)', t:'COSTS YOU'},
+  mixed:     {c:'#e0823c',    bg:'rgba(224,130,60,.10)', t:'TRADE-OFF'},
+  noeffect:  {c:'var(--ink3)',bg:'var(--bg)',            t:'NO EFFECT'},
+  collecting:{c:'var(--ink3)',bg:'var(--bg)',            t:'COLLECTING'},
+  'awaiting-control':{c:'var(--ink3)',bg:'var(--bg)',    t:'AWAITING BASELINE'}
+};
+// One-line status strip on the Performance tab — the depth lives in the 🧪 Lab view.
 async function renderLabPanel(){
   const el=document.getElementById('lab-panel'); if(!el)return;
   let flights=[],st=null;
   try{ const r=await window.api.perfCompareData(); flights=(r&&r.ok&&r.flights)||[]; }catch(e){}
   try{ st=await window.api.perfLabStatus(); }catch(e){}
   if(!document.getElementById('lab-panel'))return;
+  _labStatus=st; _labFlights=flights;
   const cov=_blCompute(flights).coverage;
-  const on=!!S.cfg.labMode;
-  const gated=!cov.ready;
+  const on=!!S.cfg.labMode, gated=!cov.ready;
   let inner='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:'+(gated?'var(--ink3)':'var(--ink1)')+';cursor:'+(gated?'not-allowed':'pointer')+'" title="'+(gated?('Unlocks when the 24-flight benchmark completes (currently '+cov.filled+'/'+cov.total+'). Until then auto-TLOD owns the pre-launch slot.'):'One curated settings experiment per Launch + Capture flight, alternating with baseline control flights. Lab flights never touch your baseline math; settings are restored automatically.')+'">'
     +'<input type="checkbox" '+(on?'checked':'')+(gated?' disabled':'')+' onchange="labToggle(this.checked)" style="accent-color:var(--acc);width:15px;height:15px">'
-    +'🧪 Settings Lab</label>'
-    +(gated?'<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">unlocks at 24/24 — currently '+cov.filled+'/'+cov.total+'</span>':'');
-  if(on&&!gated&&st&&st.ok){
-    const nx=st.next||{};
-    inner+='<span style="font-size:11px;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">next flight: '
-      +(nx.mode==='experiment'?('EXPERIMENT — '+esc(nx.label||nx.id)):nx.mode==='control'?'CONTROL (baseline config)':'queue complete — review verdicts')+'</span>'
-    +'<select onchange="if(this.value){labManual(this.value);this.value=\'\'}" style="margin-left:auto;background:var(--bg);color:var(--ink2);border:1px solid var(--sep);border-radius:6px;padding:3px 6px;font-size:11px"><option value="">Manual tag&hellip;</option>'
-      +st.queue.filter(q=>q.manual).map(q=>'<option value="'+esc(q.id)+'">'+esc(q.label)+'</option>').join('')+'</select>';
-  }
-  inner+='</div>';
-  if(on&&!gated&&st&&st.ok){
-    inner+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">';
-    for(const q of st.queue){
-      const v=_labVerdict(flights,q.id);
-      const done=q.need!=null&&q.done>=q.need;
-      inner+='<div style="flex:1 1 260px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:8px 10px" title="'+esc(q.hypothesis||'')+'">'
-        +'<div style="font-size:12px;font-weight:600;color:'+(done?'var(--grn)':'var(--ink1)')+'">'+(done?'✓ ':'')+esc(q.label)+(q.manual?' <span style="color:var(--ink3);font-weight:400">(manual)</span>':'')+'</div>'
-        +'<div style="font-size:10px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+q.done+(q.need!=null?('/'+q.need):'')+' flight'+(q.done!==1?'s':'')+(v&&q.done<(q.need||2)?' · preliminary':'')+'</div>'
-        +(v?('<div style="font-size:10px;color:var(--ink2);font-family:\'JetBrains Mono\',monospace;margin-top:4px;line-height:1.5">'+v.rows.map(esc).join('<br>')+'</div>'):'')
-        +'</div>';
+    +'🧪 Settings Lab</label>';
+  if(gated){
+    inner+='<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">unlocks at 24/24 — currently '+cov.filled+'/'+cov.total+'</span>';
+  }else{
+    if(on&&st&&st.ok){
+      const nx=st.next||{};
+      inner+='<span style="font-size:11px;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">next flight: '
+        +(nx.mode==='experiment'?('EXPERIMENT — '+esc(nx.label||nx.id)):nx.mode==='control'?'CONTROL (baseline config)':'queue complete — review findings')+'</span>';
     }
-    inner+='</div>';
+    if(st&&st.ok){
+      inner+='<span style="font-size:13px;letter-spacing:3px;line-height:1">'+st.queue.map(q=>{
+        const full=q.need!=null&&q.done>=q.need;
+        const c=full?'var(--grn)':(q.done>0?'var(--acc)':'var(--ink4)');
+        return '<span title="'+esc(q.label)+' — '+q.done+(q.need!=null?('/'+q.need):'')+' flight'+(q.done!==1?'s':'')+'" style="color:'+c+'">'+(full?'&#9679;':(q.done>0?'&#9684;':'&#9675;'))+'</span>';
+      }).join('')+'</span>';
+    }
   }
-  el.innerHTML='<div class="api-pan" style="margin-bottom:10px;padding:10px 14px">'+inner+'</div>';
+  inner+='<button class="btn bg bsm" onclick="perfShowLab()" style="margin-left:auto" title="Findings: what each experiment did to your smoothness, with charts">open Lab &#8594;</button></div>';
+  el.innerHTML='<div class="api-pan" style="margin-bottom:10px;padding:8px 14px">'+inner+'</div>';
 }
 async function labToggle(on){
   if(!on){
@@ -3916,6 +3916,102 @@ async function labManual(id){
   let r=null; try{ r=await window.api.perfLabNext({manual:id}); }catch(e){ r={ok:false,msg:(e&&e.message)||'error'}; }
   alert(r&&r.ok?(r.msg+'\n\nRemember to actually toggle the setting in the sim before flying — this only tags the flight for analysis.'):('Could not tag: '+((r&&r.msg)||'unknown')));
   renderLabPanel();
+}
+// ── THE LAB VIEW — finding cards ─────────────────────────────────────────────
+async function perfShowLab(){
+  _perfHideViews();
+  const lb=document.getElementById('perf-lab'); if(!lb)return; lb.style.display='block';
+  lb.innerHTML='<div style="font-size:13px;color:var(--ink3)">Building findings&hellip; first open reads your raw flight logs to build chart caches (up to a minute) — instant after that.</div>';
+  try{ const r=await window.api.perfCompareData(); _labFlights=(r&&r.ok&&r.flights)||[]; }catch(e){ _labFlights=_labFlights||[]; }
+  try{ _labStatus=await window.api.perfLabStatus(); }catch(e){}
+  try{ _labReport=await window.api.perfLabReport(); }catch(e){ _labReport={ok:false,error:(e&&e.message)||'error'}; }
+  renderLabView();
+}
+function labOpen(encFolder){ if(_labReport&&_labReport.sessionsDir)window.api.perfOpenPath(_labReport.sessionsDir+'\\'+decodeURIComponent(encFolder)+'\\report.html'); }
+function _labNum(x,dec){ return (x==null||isNaN(x))?'—':Number(x).toFixed(dec); }
+// Diverging delta bar drawn OVER the shaded ±1σ "normal variation" band — the honesty device.
+function _labDeltaRow(d){
+  const sig=d.sigma!=null?d.sigma:Math.abs(d.delta)||1;
+  const scale=Math.max(Math.abs(d.delta),1.5*sig)||1;
+  const bandPct=Math.min(50,sig/scale*50), barPct=Math.min(50,Math.abs(d.delta)/scale*50);
+  const improved=d.delta<0;
+  const col=d.within!==false?'var(--ink4)':(improved?'var(--grn)':'#e0823c');
+  const txtCol=d.within!==false?'var(--ink3)':(improved?'var(--grn)':'#e0823c');
+  const sign=d.delta>0?'+':'';
+  const tag=d.within===true?' · within noise':(d.within===false?(d.pct!=null?' ('+(d.pct>0?'+':'')+d.pct+'%)':''):'');
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px" title="'+esc(d.label)+': experiment avg '+_labNum(d.expMean,d.dec)+(d.unit||'')+' vs baseline '+_labNum(d.ctrlMean,d.dec)+(d.unit||'')+'. Shaded band = your normal flight-to-flight variation (±1σ = '+_labNum(d.sigma,d.dec)+').">'
+    +'<span style="flex:0 0 108px;font-size:11px;color:var(--ink2);text-align:right">'+esc(d.label)+'</span>'
+    +'<div style="flex:1;height:16px;background:var(--bg);border-radius:4px;position:relative;overflow:hidden">'
+      +'<div style="position:absolute;top:0;bottom:0;left:'+(50-bandPct)+'%;width:'+(bandPct*2)+'%;background:var(--bg4);opacity:.55"></div>'
+      +'<div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--sep2)"></div>'
+      +'<div style="position:absolute;top:3px;bottom:3px;'+(improved?('left:'+(50-barPct)+'%'):'left:50%')+';width:'+Math.max(barPct,0.6)+'%;background:'+col+';border-radius:2px"></div>'
+    +'</div>'
+    +'<span style="flex:0 0 168px;font-size:11px;font-family:\'JetBrains Mono\',monospace;color:'+txtCol+'">'+sign+_labNum(d.delta,d.dec)+(d.unit?' '+d.unit:'')+tag+'</span>'
+    +'</div>';
+}
+function renderLabView(){
+  const lb=document.getElementById('perf-lab'); if(!lb)return;
+  const cov=_blCompute(_labFlights||[]).coverage;
+  const st=_labStatus, adopts=(st&&st.adoptions)||{};
+  let h='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<span style="font-size:15px;font-weight:700;color:var(--ink1)">🧪 Settings Lab — findings</span>';
+  if(st&&st.ok&&st.queue){
+    h+='<select onchange="if(this.value){labManual(this.value);this.value=\'\'}" style="margin-left:auto;background:var(--bg);color:var(--ink2);border:1px solid var(--sep);border-radius:6px;padding:3px 6px;font-size:11px"><option value="">Manual tag&hellip;</option>'
+      +st.queue.filter(q=>q.manual).map(q=>'<option value="'+esc(q.id)+'">'+esc(q.label)+'</option>').join('')+'</select>';
+  }
+  h+='</div>';
+  h+='<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Each card = one setting tested on real flights against your own baseline. Deltas are judged against the shaded band — your normal flight-to-flight variation — so a bar inside the band honestly means <b>no effect</b>, not a hidden win. Orange chart lines = experiment flights, grey = baseline flights, x-axis = % of flight so different routes overlay fairly.</div>';
+  if(!cov.ready){
+    h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6"><b>Locked until the 24-flight benchmark completes ('+cov.filled+'/'+cov.total+').</b> The Lab needs your full baseline first — it&rsquo;s the yardstick every experiment is measured against. Keep flying benchmark flights; this unlocks by itself.</div>';
+  }
+  if(!_labReport||!_labReport.ok){
+    h+='<div style="font-size:12px;color:var(--ink3)">'+(_labReport&&_labReport.error?('Could not build the report: '+esc(_labReport.error)):'No findings yet.')+'</div>';
+    lb.innerHTML=h; return;
+  }
+  const svgVars='--grid:var(--sep);--border:var(--sep2);--text-faint:var(--ink3);--target:var(--ink3);--bad:#e0823c;--lab-exp:var(--acc);--lab-ctrl:var(--ink3)';
+  for(const e of _labReport.experiments){
+    const v=_LABV[e.verdict]||_LABV.collecting;
+    const ad=adopts[e.id];
+    const hasData=e.deltas&&e.deltas.length;
+    h+='<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;margin-bottom:14px;overflow:hidden">';
+    // verdict banner
+    h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:'+v.bg+';border-bottom:1px solid var(--sep)">'
+      +'<span style="font-size:10px;font-weight:800;letter-spacing:.09em;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:2px 8px">'+v.t+'</span>'
+      +'<span style="font-size:13px;font-weight:700;color:var(--ink1)">'+esc(e.label)+'</span>'
+      +(e.manual?'<span style="font-size:10px;color:var(--ink3)">(manual toggle)</span>':'')
+      +(e.preliminary&&hasData?'<span style="font-size:10px;color:var(--acc);font-family:\'JetBrains Mono\',monospace">preliminary — '+e.done+'/'+e.need+' flights</span>':'')
+      +(ad?'<span style="margin-left:auto;font-size:11px;color:var(--grn);font-family:\'JetBrains Mono\',monospace">&#10003; adopted '+new Date(ad.ts).toLocaleDateString()+' <a href="#" onclick="labApply(\''+esc(e.id)+'\',true);return false" style="color:var(--ink3);margin-left:6px">un-apply</a></span>'
+        :((e.verdict==='free'||e.verdict==='saves')&&!e.manual?'<button class="btn bg bsm" style="margin-left:auto;border-color:'+v.c+';color:'+v.c+'" onclick="labApply(\''+esc(e.id)+'\',false)" title="Write this value to UserCfg.opt (backed up first) and keep it as your new baseline">Apply this setting</button>':''))
+      +'</div>';
+    h+='<div style="padding:12px 16px">';
+    h+='<div style="font-size:12.5px;color:var(--ink1);line-height:1.6;margin-bottom:8px">'+esc(e.sentence||'')+'</div>';
+    h+='<div style="font-size:11px;color:var(--ink3);line-height:1.6;margin-bottom:'+(hasData?'12':'2')+'px"><b>Why we tested:</b> '+esc(e.hypothesis||'')+'</div>';
+    if(hasData){
+      h+='<div style="margin-bottom:12px">'+e.deltas.map(_labDeltaRow).join('')+'</div>';
+      h+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;'+svgVars+'">'
+        +'<div style="flex:1;min-width:280px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:4px">Ground phase only — where stutter lives</div>'+(e.svgGround||'')+'</div>'
+        +'<div style="flex:1;min-width:280px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:4px">Full flight</div>'+(e.svgFull||'')+'</div>'
+        +'</div>';
+      const chip=(f,isExp)=>'<a href="#" onclick="labOpen(\''+encodeURIComponent(f.folder)+'\');return false" title="Open this flight&rsquo;s report" style="text-decoration:none;font-size:10px;font-family:\'JetBrains Mono\',monospace;color:'+(isExp?'var(--acc)':'var(--ink3)')+';border:1px solid '+(isExp?'var(--acc)':'var(--sep)')+';border-radius:5px;padding:1px 7px">'+esc(f.aircraft||'?')+' '+esc(String(f.session_id||'').replace(/^\d{4}-/,''))+'</a>';
+      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;color:var(--ink3)">'
+        +'<span style="color:var(--acc)">experiment:</span>'+e.flights.exp.map(f=>chip(f,true)).join('')
+        +'<span style="margin-left:8px">vs baseline:</span>'+e.flights.ctrl.map(f=>chip(f,false)).join('')
+        +'<span style="margin-left:8px">(noise band from '+(e.poolN||0)+' baseline flights)</span></div>';
+    }
+    h+='</div></div>';
+  }
+  h+='<div style="font-size:11px;color:var(--ink3);margin-top:4px">Verdicts firm up at 2 flights per experiment. &ldquo;Apply this setting&rdquo; backs up UserCfg.opt first and becomes your new Lab baseline — un-apply any time. For a narrative deep-dive, ask in chat.</div>';
+  lb.innerHTML=h;
+}
+async function labApply(id,undo){
+  const e=((_labReport&&_labReport.experiments)||[]).find(x=>x.id===id);
+  const what=e?e.label:id;
+  if(!confirm(undo?('Un-apply "'+what+'" and restore your previous value?\n\nMSFS must be closed.')
+    :('Apply this permanently?\n\n'+what+'\n\nWrites the value to UserCfg.opt (backed up first) and makes it your new baseline going forward. MSFS must be closed.')))return;
+  let r=null; try{ r=await window.api.perfLabApply({id:id,undo:!!undo}); }catch(e2){ r={ok:false,msg:(e2&&e2.message)||'error'}; }
+  alert(r&&r.ok?('✓ '+r.msg+(undo?'':'\n\nFuture Lab control flights keep this value.')):('Could not apply: '+((r&&r.msg)||'unknown')));
+  try{ _labStatus=await window.api.perfLabStatus(); }catch(e3){}
+  renderLabView(); renderLabPanel();
 }
 
 async function perfExportCfx(){
@@ -5564,5 +5660,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.1.0</div>
+  pointer-events:none;">v6.2.0</div>
 </body></html>

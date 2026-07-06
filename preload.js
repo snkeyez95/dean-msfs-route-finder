@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('api', {
   perfStorageStats:   ()    => ipcRenderer.invoke('perf-storage-stats'),
   perfLabStatus:      ()    => ipcRenderer.invoke('perf-lab-status'),
   perfLabNext:        (a)   => ipcRenderer.invoke('perf-lab-next', a||{}),
+  perfLabReport:      ()    => ipcRenderer.invoke('perf-lab-report'),
+  perfLabApply:       (a)   => ipcRenderer.invoke('perf-lab-apply', a||{}),
   perfArchiveRaw:     ()    => ipcRenderer.invoke('perf-archive-raw'),
   nvcpStatus:         ()    => ipcRenderer.invoke('nvcp-status'),
   nvcpBackup:         ()    => ipcRenderer.invoke('nvcp-backup'),
