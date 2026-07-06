@@ -17,8 +17,10 @@ const N_PER_EXPERIMENT = 2;   // Dean 2026-07-06: 2 flights per setting, verdict
 const EXPERIMENTS = [
   { id: 'clouds-quality-up', label: 'Volumetric clouds Quality 1→2', section: 'VolumetricClouds', key: 'Quality',
     format: 'int', testValue: 2, hypothesis: 'Free visuals: GPU has headroom, so smoothness should NOT change (watch VRAM + gpu-bound%)' },
-  { id: 'airport-services-min', label: 'Airport service vehicles → minimum', section: 'Traffic', key: 'AirportsServicesQuantity',
-    format: 'int', testValue: 0, hypothesis: 'Less ground-vehicle churn = smoother taxi (ground stutter/p99 down)' },
+  // (airport-services experiment REJECTED by Dean's review 2026-07-06: his services are already at
+  // minimum (-1/variety 0), and payware airports bake their own clutter outside this slider anyway)
+  { id: 'precache-down', label: 'Off-screen terrain pre-caching Ultra→Low', section: 'OffscreenTerrainPreCaching', key: 'Quality',
+    format: 'int', testValue: 1, hypothesis: 'Dean runs this at MAX (3): the sim constantly pre-loads terrain for views you are not looking at — a known main-thread cost. Expect smoother frametimes; trade = brief scenery pop when swinging external cameras' },
   { id: 'glass-refresh-down', label: 'Glass cockpit refresh 2→1', section: 'GlassCockpitsRefreshRate', key: 'Quality',
     format: 'int', testValue: 1, hypothesis: 'Cheaper avionics refresh frees main thread on PMDG/Fenix (ground + overall p99 down)' },
   { id: 'olod-down', label: 'Objects LOD 120→100', section: 'ObjectsLoD', key: 'LoDFactor',
