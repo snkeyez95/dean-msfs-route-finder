@@ -25,6 +25,14 @@ const EXPERIMENTS = [
     format: 'int', testValue: 1, hypothesis: 'Cheaper avionics refresh frees main thread on PMDG/Fenix (ground + overall p99 down)' },
   { id: 'olod-down', label: 'Objects LOD 120→100', section: 'ObjectsLoD', key: 'LoDFactor',
     format: 'lod', testValue: 100, hypothesis: 'Fewer object LODs juggled over photogrammetry cities (ground/descent stutter down)' },
+  // UP-variants (Dean 2026-07-06: test both directions where both carry a real question). Downs run
+  // first (stutter relief is the priority); ups answer "is raising this free on my idle GPU / what
+  // does prettier cost?". Deliberately one-directional: clouds-down (CPU-bound rig — reducing GPU
+  // work can't buy smoothness) and precache-up (already at max 3).
+  { id: 'glass-refresh-up', label: 'Glass cockpit refresh 2→3 (max)', section: 'GlassCockpitsRefreshRate', key: 'Quality',
+    format: 'int', testValue: 3, hypothesis: 'Is maxing avionics fluidity FREE? If smoothness is unchanged, keep it maxed' },
+  { id: 'olod-up', label: 'Objects LOD 120→150', section: 'ObjectsLoD', key: 'LoDFactor',
+    format: 'lod', testValue: 150, hypothesis: 'What does prettier objects COST? Quantifies the ground/VRAM price of +30 OLOD (sibling of the TLOD study)' },
   // Photogrammetry lives OUTSIDE UserCfg.opt (data settings) — manual: Dean toggles it in-sim and
   // marks the next flight from the Lab panel; tagging/verdicts work the same, no auto write/restore.
   { id: 'photogrammetry-off', label: 'Photogrammetry OFF (manual toggle in sim)', manual: true,
