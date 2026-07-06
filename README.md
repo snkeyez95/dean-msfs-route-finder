@@ -47,7 +47,7 @@ any time (Settings → **Run setup assistant** / **Edit benchmark plan**).
 Updates install themselves — the app checks GitHub Releases and offers new versions automatically.
 Uninstalling asks whether to also remove your data, and defaults to keeping your flight logs.
 
-**Developer setup (running from source):** Windows 10/11 + Node.js v18+ — run `setup.bat` once, then `start.bat`.
+**Developer setup (running from source):** Windows 10/11 + Node.js v18+ — clone the repo, `npm install` once, then `start.bat`.
 
 ---
 
@@ -179,14 +179,12 @@ DeanMSFS_v2/
   package.json          Electron app config and version
   CLAUDE.md             dev instructions (read automatically by Claude Code)
   README.md             this file
-  start.bat             launch the app
-  setup.bat             install Node dependencies (first run)
+  start.bat             launch the app from source (dev)
   publish.bat           push community_routes.json to GitHub
   release.bat           build installer + publish GitHub Release (auto-updater)
   community_routes.json shared route database (dev copy; published to GitHub)
-  perf/                 performance-logging engine (Python engine + bundled PresentMon + chart libs)
-    perf-engine.exe     the frozen capture engine (bundled into the installer)
-    native/             Node port of the engine (in progress; replaces Python at v6)
+  perf/                 performance-logging engine (native Node + bundled PresentMon)
+    native/             the capture + analysis engine (pure Node since v6.0.0)
     vendor/             bundled chart libraries (offline report rendering)
 ```
 
