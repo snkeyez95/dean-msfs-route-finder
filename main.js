@@ -86,7 +86,7 @@ function checkForUpdate() {
     autoUpdater.on('error', e => LOG.error('[AU] Error:', e.message));
     autoUpdater.checkForUpdates().catch(e => LOG.warn('[AU] Check failed:', e.message));
   } else {
-    // Dev mode — compare raw GitHub index.html version string, prompt to run update.bat
+    // Dev mode — compare raw GitHub index.html version string, prompt to git pull (dev copies only)
     try {
       const localHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
       const localMatch = localHtml.match(/A Better Route Planner[^v]*v(\d+\.\d+\.\d+)/);

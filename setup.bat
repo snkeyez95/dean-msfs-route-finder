@@ -18,14 +18,14 @@ cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "try { ^
     $baseUrl = 'https://raw.githubusercontent.com/snkeyez95/dean-msfs-route-finder/main'; ^
-    $files = @('index.html', 'main.js', 'preload.js', 'update.bat'); ^
+    $files = @('index.html', 'main.js', 'preload.js'); ^
     foreach ($f in $files) { ^
       Write-Host '  Downloading' $f '...'; ^
       $url = $baseUrl + '/' + $f; ^
       Invoke-WebRequest -Uri $url -OutFile $f -UseBasicParsing; ^
     } ^
     Write-Host ''; ^
-    Write-Host '  Setup complete! Use update.bat for future updates.' -ForegroundColor Green; ^
+    Write-Host '  Setup complete! The installed app updates itself from GitHub Releases.' -ForegroundColor Green; ^
   } catch { ^
     Write-Host '  ERROR:' $_.Exception.Message -ForegroundColor Red; ^
   }"

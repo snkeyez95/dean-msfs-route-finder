@@ -77,7 +77,9 @@ The app fetches real commercial route data from SayIntentions.AI. This requires 
 
 ## Updating the App
 
-Run `update.bat` to pull the latest version from GitHub and relaunch automatically. Verify by checking the version number in the bottom-right corner of the app.
+The installed app updates itself: when a new release is published it downloads in the background, then restarts into the new version automatically (a banner counts down with Update-now / Later buttons; it never auto-restarts during a flight capture or while MSFS is running). Verify by checking the version number in the bottom-right corner of the app.
+
+Developers running from source: `git pull`, then relaunch with `start.bat`.
 
 ---
 
@@ -179,10 +181,8 @@ DeanMSFS_v2/
   README.md             this file
   start.bat             launch the app
   setup.bat             install Node dependencies (first run)
-  update.bat            pull latest from GitHub and relaunch
   publish.bat           push community_routes.json to GitHub
   release.bat           build installer + publish GitHub Release (auto-updater)
-  _updater.ps1          PowerShell updater script
   community_routes.json shared route database (dev copy; published to GitHub)
   perf/                 performance-logging engine (Python engine + bundled PresentMon + chart libs)
     perf-engine.exe     the frozen capture engine (bundled into the installer)
