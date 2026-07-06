@@ -2,7 +2,94 @@
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
-**Workflow:** Find a real commercial route using airports you own scenery for → verify aircraft type → open pre-filled in SimBrief → fly with live ATC on SayIntentions.
+**The idea in one line:** find a real commercial route between airports you actually own scenery for → open it pre-filled in SimBrief → fly it with live ATC on SayIntentions — and, if you want, let the app measure your sim's smoothness and hand you your ideal graphics settings.
+
+---
+
+## Contents
+
+- [Quick Start](#quick-start)
+- [The Guide — every tab explained](#the-guide--every-tab-explained)
+- [Common Workflows](#common-workflows)
+- [Features](#features)
+- [Install & First Run](#install--first-run)
+- [SayIntentions.AI Cookie Setup](#sayintentionsai-cookie-setup)
+- [Updating the App](#updating-the-app)
+- [Route Registry](#route-registry)
+- [Community Routes & Manual Import](#community-routes--manual-import)
+- [Weather System](#weather-system)
+- [My Fleet — aircraft codes](#my-fleet--aircraft-codes)
+- [File Structure](#file-structure)
+- [Debug Log](#debug-log)
+- [Known Issues](#known-issues)
+- [Changelog](#changelog)
+
+---
+
+## Quick Start
+
+1. **Install** — download the latest `A Better Route Planner Setup x.x.x.exe` from [Releases](https://github.com/snkeyez95/dean-msfs-route-finder/releases) and run it.
+2. **Launch** — the **Setup Assistant** opens automatically and walks you through everything (~2 minutes): your sim is detected, you point it at your scenery folder, check your fleet, and download the free Community Routes database with one click. No accounts needed.
+3. **Find a flight** — open **Plan a Flight**. Every route shown is a real scheduled airline flight your fleet can fly. Click one to expand it: live weather in plain English, the active runway, digital ATIS.
+4. **Fly it** — click **✈ Open in SimBrief** (arrives pre-filled: airline, flight number, aircraft, route, even the active runways), then fly with SayIntentions, VATSIM, or offline — your choice.
+5. **Optional but great** — say yes when the app offers to **find your ideal graphics settings**. You just fly normally; it measures real flights and hands you a data-backed recommendation.
+
+---
+
+## The Guide — every tab explained
+
+### Dashboard
+Your library at a glance: a world map of every airport you own scenery for, stat cards (total airports, auto-matched, manual, unmatched), and a **Recent Routes** strip — click any recent flight to reopen its full route panel (weather, runways, D-ATIS, SimBrief) without hunting for it again.
+
+### My Airports
+Point the app at your 3rd-party scenery folder (**Browse… → Scan Now**). Folder *names* are matched to airports by ICAO code — nothing inside your folders is ever read or uploaded. The table shows each airport with how it matched (**Auto-Matched / Manual / Unmatched**), a live **GSX** column (profiles bundled inside your sceneries are found and installed automatically — see the toast when it happens), and a checkbox that activates/deactivates the scenery in your sim via link folders, so your Community folder stays lean. Unmatched folder? **+ Add ICAO** assigns one manually; junk folders can be ignored.
+
+### Plan a Flight
+The heart of the app. Three **Mode** chips control how routes are filtered against your library: **Both airports in library** (the purist default), **At least 1 airport in library**, or **No library needed** (every route — default MSFS airports are fine). Add **✱ Fresh routes** to hide city pairs you've flown recently, or flip on **✈ Free Route** to search any departure/arrival pair by ICAO, library or not. Filter by airline, duration, or search; sort by duration, distance, reliability — or **best/worst weather** when you feel like an easy day or a challenge.
+
+Click a route to expand it: live **METAR** for both airports translated into plain-English advisories (green GOOD / orange CAUTION / red ADVISORY), the **active runway**, and real **D-ATIS** where available (interpreted, with the raw text one click away). From the card: **✈ Open in SimBrief** (fully pre-filled), **✈ Activate** the scenery if it isn't already, or **⚡ Launch + Capture** to fly it as a measured performance flight (see Performance below).
+
+**Trip Planner** (collapsible, same tab): paste a multi-leg itinerary — ICAOs (`KATL to KBWI`) or plain city names, one leg per line. Ambiguous cities get a quick "which airport did you mean?" review, then your trip becomes a leg-by-leg card with checkboxes to track progress and a SimBrief button on every leg.
+
+### Challenging Approaches
+Twenty curated, technically demanding approaches worldwide (terrain, short runways, weird geometry) with live METAR, difficulty notes, and — where your library allows — real routes that end there. Filter by max flight time when you want a challenge that fits your evening.
+
+### My Fleet
+Check the aircraft you own. Everything route-related is filtered by this list — you'll never be shown a flight your hangar can't fly.
+
+### Aircraft & Util
+For add-ons you *don't* want permanently installed: point the app at library folders of aircraft and utilities, then toggle bundles on/off per session. Toggling creates/removes link folders in your Community folder (aircraft + liveries + sounds move together), keeping the sim lean without re-downloading anything.
+
+### Companion Apps
+Apps you like alongside the sim (charts, ATC clients, trackers). Add them once; **⚡ Quick Launch** on any route card starts MSFS and all of them together. Pair it with Settings → *Apps to close during flight* to also shut down background noise (media servers, downloaders) for the duration of a measured flight — they reopen automatically when the sim closes.
+
+### Performance
+The app's measurement lab, and it works in plain English:
+
+1. **Capture** — arm it (**Arm Capture**, or automatically via **⚡ Launch + Capture** on a route card) and fly normally. Recording starts on your takeoff roll and files itself when you close the sim: frame-by-frame timing, VRAM, and system telemetry, all offline.
+2. **Benchmark** — the guided **baseline walkthrough** ("find your ideal graphics settings") builds a test plan from *your* aircraft (e.g. 2 aircraft × 4 TLOD steps × 3 flights = 24). Before each flight the app sets the next test value itself; a progress tracker shows how far along you are.
+3. **Baseline** — once there's enough data, one number: the Terrain-LOD setting that keeps your heaviest aircraft smooth with VRAM headroom, with the supporting evidence one click away (Smoothest / Balanced / Best-visuals modes).
+4. **🧪 Lab** — after the benchmark completes, an optional checkbox lets the app run one curated settings experiment per flight (clouds quality, off-screen pre-caching, glass cockpit refresh…). Findings appear as verdict cards — FREE UPGRADE / REAL IMPROVEMENT / COSTS YOU / NO EFFECT — judged honestly against your normal flight-to-flight variation, with one-click **Apply this setting** for winners.
+
+Also here: **Compare** (group your flights by sim version, GPU driver, aircraft, or TLOD and see if the numbers actually moved) and **CapFrameX** export.
+
+### Settings
+Everything configurable, top to bottom: **Run setup assistant** / **Edit benchmark plan** buttons, Route Data Source (SayIntentions cookie + auto-refresh), Apps to close during flight, GSX Pro folder + auto-install toggle + a drag-and-drop profile installer (accepts .py/.ini/folders/archives), Aircraft & Utilities library folders, Sim Integration (auto-detected; overridable), and Route Backup (snapshot export/restore + the Community Routes download).
+
+### Maintenance
+Five practical tools: **Export/Import My Setup** (your whole configuration as one small .zip — perfect for a new PC), **Archive Older Raw Captures** (compresses old flight logs ~79% in place, nothing ever deleted), **Shader Cache Cleaner** (the post-update stutter fix, 7 cache locations), **PMDG/Fenix WASM cleaners** (the fix for aircraft gauge crashes after updates), and **NVIDIA Control Panel backup/restore**. The app watches your sim, driver, and aircraft versions and *offers* the right cleaner when one of them updates.
+
+---
+
+## Common Workflows
+
+**Fly your first route** — Plan a Flight → pick a mode chip → expand a route → check the weather advisories → ✈ Open in SimBrief → fly.
+
+**Find your ideal graphics settings** — Performance tab → "Set up my graphics baseline" → pick your 1–3 heaviest aircraft → fly your normal flights with ⚡ Launch + Capture until the tracker fills → read the Baseline recommendation. Then let the 🧪 Lab keep experimenting.
+
+**Added new scenery?** — My Airports → Scan Now. New airports are matched, GSX profiles bundled inside them install (or update) automatically, and routes for them appear in Plan a Flight immediately.
+
+**Moving to a new PC** — Maintenance → 📋 Export My Setup on the old machine; install ABRP on the new one; 📂 Import Setup. Flight logs are separate (they're big) — copy `%APPDATA%\A Better Route Planner\Sessions\` if you want the history along.
 
 ---
 
@@ -85,10 +172,10 @@ Developers running from source: `git pull`, then relaunch with `start.bat`.
 
 ## Route Registry
 
-The app maintains a local database of routes saved to `%USERPROFILE%\.dean_msfs_v4.json`
+The app maintains a local route database in `%APPDATA%\A Better Route Planner\` (`routeRegistry.json` + `routeSnapshot.json`):
 
-- **Primary registry:** up to 5,000 routes, pruned to 21 days of activity
-- **Snapshot registry:** permanent backup of all routes ever seen, never pruned, up to 20,000 routes
+- **Primary registry:** up to 5,000 routes — a revolving door of the most-recently-seen routes matching your library and fleet; routes not seen for 21 days age out, new ones rotate in on every refresh
+- **Snapshot registry:** permanent backup of routes ever seen, never pruned, up to 20,000 routes
 - Routes are deduplicated by SayIntentions route ID
 - Registry grows automatically via auto-refresh and manual Refresh Routes runs
 
@@ -96,41 +183,15 @@ The app maintains a local database of routes saved to `%USERPROFILE%\.dean_msfs_
 
 ---
 
-## Community Routes
+## Community Routes & Manual Import
 
-A Better Route Planner includes a community route database that allows users without a SayIntentions.AI cookie to get a full route database instantly.
+You do **not** need a SayIntentions account to use the app. The Setup Assistant offers the Community Routes download on first run; it's also always available in *Settings → Route Backup → Community Routes → **Download Community Routes***. It pulls a shared database of 10,000–20,000 real commercial routes (narrowbody-focused: 737 family, A320 family) straight from GitHub and merges it into your registry immediately — Plan a Flight populates on the spot.
 
-**For users without an SI cookie:**
-1. Go to **Settings → Manual Import**
-2. Expand the **Community Routes** section
-3. Click **Download Community Routes**
-4. Routes merge into your registry immediately
-5. Your **Plan a Flight** tab populates based on your installed scenery
+If you *do* have an SI cookie, your own live refreshes supplement and eventually supersede the community data through normal auto-refresh.
 
-The community database contains 10,000–20,000 real commercial routes covering major airports worldwide, with a focus on narrowbody operations (737 family, A320 family). It is updated automatically whenever the app owner runs a live route refresh and 50 or more new routes are captured.
+**Importing a snapshot from another install:** drag any `community_routes.json` or exported snapshot file onto the drop zone in *Settings → Route Backup → Manual Import*. Routes merge and the app reports how many were added.
 
-You do not need an SI cookie to use the app. The community routes provide a solid baseline that works immediately after install.
-
-If you have an SI cookie, your own live refreshes supplement and eventually supersede the community data through normal auto-refresh operation.
-
-**For the app owner:** After each successful route refresh, `community_routes.json` is written to the app folder automatically and pushed to GitHub silently. You can also export manually via *Settings → Route Backup → Export to community_routes.json*, then run `publish.bat` to push.
-
----
-
-## Manual Route Import
-
-**Getting routes without a SayIntentions cookie**
-
-1. Go to the **Settings** tab
-2. Scroll down to **Manual Import**
-3. Click the **▶ Community Routes** toggle to expand it
-4. Click **Download Community Routes**
-
-This pulls a shared database of 10,000–20,000 real commercial routes directly from GitHub and merges them into your registry immediately. No cookie required.
-
-**Importing a snapshot from another install**
-
-Drag and drop a `community_routes.json` or any exported snapshot file onto the drop zone in *Settings → Manual Import*. The app will merge routes and report how many were added.
+**For the app owner:** `community_routes.json` can be refreshed manually via *Settings → Route Backup → Export to community_routes.json*, then `publish.bat` to push it to GitHub.
 
 ---
 
@@ -150,9 +211,9 @@ Scoring factors include flight category, precipitation type, wind speed, gusts, 
 
 ---
 
-## My Fleet
+## My Fleet — aircraft codes
 
-In *Settings → My Fleet*, check the aircraft you own. This filters routes to only show flights operated by aircraft in your sim.
+In the **My Fleet** tab, check the aircraft you own. This filters routes to only show flights operated by aircraft in your sim.
 
 | Code | Aircraft            |
 |------|---------------------|
