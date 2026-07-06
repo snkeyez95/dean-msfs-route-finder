@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.1.0
+# A Better Route Planner — v6.2.2
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
