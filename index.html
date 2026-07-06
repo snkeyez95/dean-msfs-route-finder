@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.0.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.1.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.0.1</div>
+    <div class="sb-ver">v6.1.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3636,10 +3636,12 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" id="cfx-export-btn" onclick="perfExportCfx()" title="Convert the flight you&#39;re viewing to a CapFrameX-format CSV (Sessions\\CapFrameX). From the dashboard you get a picker instead — choose one flight folder, a date, or Sessions for everything.">&#8687; CapFrameX</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
+    +'<div id="lab-panel"></div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
     +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
     +'<div id="perf-baseline" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
   perfShowDashboard();
+  renderLabPanel();   // Settings Lab (Phase 9) — async, fills #lab-panel
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
@@ -3688,7 +3690,7 @@ function renderCompare(){
   // sort groups: numeric dims ascending, else by key
   groups.sort((a,b)=>{ const na=parseFloat(a.key),nb=parseFloat(b.key); if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.key.localeCompare(b.key); });
   const sel=(id,val,opts)=>'<select id="'+id+'" onchange="cmpOnChange()" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:4px 8px;font-size:12px;font-family:\'Inter\',sans-serif">'+opts.map(o=>'<option value="'+o.v+'"'+(String(o.v)===String(val)?' selected':'')+'>'+o.t+'</option>').join('')+'</select>';
-  const dimOpts=Object.keys(_cmpDimLabel).map(k=>({v:k,t:_cmpDimLabel[k]}));
+  const dimOpts=Object.keys(_cmpDimLabel).map(k=>({v:k,t:_cmpDimLabel[k]})).concat([{v:'experiment',t:'Lab experiment'}]);
   const acOpts=[{v:'',t:'All aircraft'}].concat(acs.map(a=>({v:a,t:a})));
   const tlOpts=[{v:'',t:'All TLOD'}].concat(tls.map(t=>({v:t,t:'TLOD '+t})));
   let html='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">'
@@ -3738,7 +3740,9 @@ const _BL={AC:['Fenix','PMDG'],TL:[100,125,150,175],VRAM_CAP:12288,LIM:{cons:99,
 let _blData=null,_blDetail=false;
 function _blCompute(all){
   const f=all||[];
-  const grid=f.filter(x=>_BL.AC.includes(x.aircraft)&&_BL.TL.includes(x.tlod)&&x.p99_ft_ms!=null);
+  // Settings Lab flights (x.experiment) are quarantined from BOTH grid and clean — an experiment
+  // run must never fill a benchmark cell nor sway the recommendation/a future re-baseline.
+  const grid=f.filter(x=>_BL.AC.includes(x.aircraft)&&_BL.TL.includes(x.tlod)&&x.p99_ft_ms!=null&&!x.experiment);
   const dc={}; grid.forEach(x=>{ if(x.driver_version)dc[x.driver_version]=(dc[x.driver_version]||0)+1; });
   const modalDrv=(Object.entries(dc).sort((a,b)=>b[1]-a[1])[0]||[null])[0];
   const clean=grid.filter(x=>x.driver_version===modalDrv&&!x.autofps_active);
@@ -3834,6 +3838,86 @@ function renderBaseline(){
   }
   bl.innerHTML=h;
 }
+// ── SETTINGS LAB (Phase 9) UI ────────────────────────────────────────────────
+// Checkbox is GREYED until the 24-flight benchmark completes (cov.ready). Checked = the Lab takes
+// the pre-launch slot on Launch + Capture (one experiment per flight, alternating with baseline
+// control flights). Unchecked = nothing runs, full manual control; un-checking restores settings.
+function _labVerdict(flights,id){
+  const exps=flights.filter(f=>f.experiment===id&&f.p99_ft_ms!=null);
+  if(!exps.length)return null;
+  const dnum=s=>parseInt(String(s).replace(/\D/g,'').slice(0,12))||0;   // session_id -> sortable number
+  const ctrlPool=flights.filter(f=>!f.experiment&&!f.autofps_active&&f.p99_ft_ms!=null&&_BL.AC.includes(f.aircraft)&&_BL.TL.includes(f.tlod));
+  const rows=[];
+  const met=[['ground_stutter_pct','Ground stutter','%',3],['ground_p99','Ground P99','ms',2],['p99_ft_ms','Overall P99','ms',2],['peak_vram_mb','Peak VRAM','MB',0],['spike_count','Spikes >100ms','',0]];
+  for(const[k,label,unit,dec]of met){
+    const ev=exps.map(f=>f[k]).filter(v=>v!=null); if(!ev.length)continue;
+    // controls: for each experiment flight, the 4 time-nearest same-aircraft baseline flights
+    const cv=[];
+    for(const e of exps){
+      ctrlPool.filter(c=>c.aircraft===e.aircraft&&c[k]!=null)
+        .sort((a,b)=>Math.abs(dnum(a.session_id)-dnum(e.session_id))-Math.abs(dnum(b.session_id)-dnum(e.session_id)))
+        .slice(0,4).forEach(c=>cv.push(c[k]));
+    }
+    if(!cv.length)continue;
+    const m=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    const em=m(ev),cm=m(cv),d=em-cm,pct=cm?Math.round(d/cm*100):null;
+    rows.push(label+': '+em.toFixed(dec)+unit+' vs '+cm.toFixed(dec)+unit+' baseline ('+(d>=0?'+':'')+(pct!=null?pct+'%':d.toFixed(dec))+')');
+  }
+  return rows.length?{n:exps.length,rows}:null;
+}
+async function renderLabPanel(){
+  const el=document.getElementById('lab-panel'); if(!el)return;
+  let flights=[],st=null;
+  try{ const r=await window.api.perfCompareData(); flights=(r&&r.ok&&r.flights)||[]; }catch(e){}
+  try{ st=await window.api.perfLabStatus(); }catch(e){}
+  if(!document.getElementById('lab-panel'))return;
+  const cov=_blCompute(flights).coverage;
+  const on=!!S.cfg.labMode;
+  const gated=!cov.ready;
+  let inner='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:'+(gated?'var(--ink3)':'var(--ink1)')+';cursor:'+(gated?'not-allowed':'pointer')+'" title="'+(gated?('Unlocks when the 24-flight benchmark completes (currently '+cov.filled+'/'+cov.total+'). Until then auto-TLOD owns the pre-launch slot.'):'One curated settings experiment per Launch + Capture flight, alternating with baseline control flights. Lab flights never touch your baseline math; settings are restored automatically.')+'">'
+    +'<input type="checkbox" '+(on?'checked':'')+(gated?' disabled':'')+' onchange="labToggle(this.checked)" style="accent-color:var(--acc);width:15px;height:15px">'
+    +'🧪 Settings Lab</label>'
+    +(gated?'<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">unlocks at 24/24 — currently '+cov.filled+'/'+cov.total+'</span>':'');
+  if(on&&!gated&&st&&st.ok){
+    const nx=st.next||{};
+    inner+='<span style="font-size:11px;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">next flight: '
+      +(nx.mode==='experiment'?('EXPERIMENT — '+esc(nx.label||nx.id)):nx.mode==='control'?'CONTROL (baseline config)':'queue complete — review verdicts')+'</span>'
+    +'<select onchange="if(this.value){labManual(this.value);this.value=\'\'}" style="margin-left:auto;background:var(--bg);color:var(--ink2);border:1px solid var(--sep);border-radius:6px;padding:3px 6px;font-size:11px"><option value="">Manual tag&hellip;</option>'
+      +st.queue.filter(q=>q.manual).map(q=>'<option value="'+esc(q.id)+'">'+esc(q.label)+'</option>').join('')+'</select>';
+  }
+  inner+='</div>';
+  if(on&&!gated&&st&&st.ok){
+    inner+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">';
+    for(const q of st.queue){
+      const v=_labVerdict(flights,q.id);
+      const done=q.need!=null&&q.done>=q.need;
+      inner+='<div style="flex:1 1 260px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);padding:8px 10px" title="'+esc(q.hypothesis||'')+'">'
+        +'<div style="font-size:12px;font-weight:600;color:'+(done?'var(--grn)':'var(--ink1)')+'">'+(done?'✓ ':'')+esc(q.label)+(q.manual?' <span style="color:var(--ink3);font-weight:400">(manual)</span>':'')+'</div>'
+        +'<div style="font-size:10px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+q.done+(q.need!=null?('/'+q.need):'')+' flight'+(q.done!==1?'s':'')+(v&&q.done<(q.need||2)?' · preliminary':'')+'</div>'
+        +(v?('<div style="font-size:10px;color:var(--ink2);font-family:\'JetBrains Mono\',monospace;margin-top:4px;line-height:1.5">'+v.rows.map(esc).join('<br>')+'</div>'):'')
+        +'</div>';
+    }
+    inner+='</div>';
+  }
+  el.innerHTML='<div class="api-pan" style="margin-bottom:10px;padding:10px 14px">'+inner+'</div>';
+}
+async function labToggle(on){
+  if(!on){
+    let r=null; try{ r=await window.api.perfLabNext({disable:true}); }catch(e){}
+    S.cfg.labMode=false; window.api.saveConfig(S.cfg);
+    alert('Settings Lab off — you have full manual control.'+(r&&r.restored?('\n'+r.restored+' setting(s) restored to your baseline values.'):''));
+  }else{
+    S.cfg.labMode=true; window.api.saveConfig(S.cfg);
+  }
+  renderLabPanel();
+}
+async function labManual(id){
+  let r=null; try{ r=await window.api.perfLabNext({manual:id}); }catch(e){ r={ok:false,msg:(e&&e.message)||'error'}; }
+  alert(r&&r.ok?(r.msg+'\n\nRemember to actually toggle the setting in the sim before flying — this only tags the flight for analysis.'):('Could not tag: '+((r&&r.msg)||'unknown')));
+  renderLabPanel();
+}
+
 async function perfExportCfx(){
   // Convert ONLY the flight currently open in the report view (Dean 2026-07-06 — never the whole
   // library). The report iframe navigates internally (Prev/Next), so read its live location; if
@@ -3897,6 +3981,13 @@ async function launchAndCapture(){
               : 'Could not auto-set TLOD ('+((prep&&(prep.error||prep.reason))||'unknown')+') — TLOD left unchanged.';
     if(!confirm(why+'\n\nContinue launching anyway with TLOD as-is?'))return;
   }
+  // 1b) SETTINGS LAB: once the benchmark is complete and the Lab box is checked, the Lab takes over
+  // the pre-launch write slot auto-TLOD just vacated — applies the next experiment value or
+  // restores baseline for a control flight (all backup+readback verified in lab.js).
+  let lab=null;
+  if(S.cfg.labMode&&prep&&!prep.set){
+    try{ lab=await window.api.perfLabNext({aircraft:prep.aircraft}); }catch(e){ lab={ok:false,msg:(e&&e.message)||'error'}; }
+  }
   // 2) Close the checked background apps (reopen on sim-close via the watcher).
   if(closeApps.length){ try{ await window.api.flightCloseApps(closeApps); }catch(e){} }
   // 3) Launch companion apps.
@@ -3905,7 +3996,11 @@ async function launchAndCapture(){
   setTimeout(()=>{ window.api.launchMsfs({version:S.cfg.msfsVersion||'steam',steamExePath:S.cfg.steamExePath||''}); },5000);
   // 5) Arm the capture (waits for your takeoff roll).
   let cap; try{ cap=await window.api.perfStartCapture(); }catch(e){ cap={ok:false}; }
-  const setLine = (prep&&prep.set) ? ('✓ TLOD '+prep.tlod+' set for '+prep.aircraft+' — confirm this matches the tracker’s next-flight cell.') : '• TLOD left unchanged.';
+  const setLine = (prep&&prep.set) ? ('✓ TLOD '+prep.tlod+' set for '+prep.aircraft+' — confirm this matches the tracker’s next-flight cell.')
+    : (lab&&lab.ok&&lab.mode==='experiment') ? ('🧪 LAB '+lab.msg+'\n   Hypothesis: '+(lab.hypothesis||''))
+    : (lab&&lab.ok) ? ('🧪 LAB: '+lab.msg)
+    : (lab&&!lab.ok) ? ('⚠ LAB error: '+(lab.msg||'unknown')+' — flying with settings as-is.')
+    : '• TLOD left unchanged.';
   alert('Clean flight launching 🚀\n\n'+setLine+'\n'
     +(closeApps.length?('• '+closeApps.length+' app'+(closeApps.length>1?'s':'')+' closed (reopen after the sim).\n'):'')
     +(comps.length?('• '+comps.length+' companion app'+(comps.length>1?'s':'')+' launched.\n'):'')
@@ -5469,5 +5564,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.0.1</div>
+  pointer-events:none;">v6.1.0</div>
 </body></html>

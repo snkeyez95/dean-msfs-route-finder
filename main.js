@@ -1073,13 +1073,17 @@ ipcMain.handle('perf-compare-data', () => {
     if (!fs.existsSync(idxPath)) return { ok:false, reason:'no-data', flights:[] };
     const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
     const flights = (data.sessions || []).map(s => {
-      let avg_vram_mb = null;
+      let avg_vram_mb = null, ground_stutter_pct = null, ground_p99 = null, spike_count = null;
       try {
         const folder = (s.folder || '').replace(/\//g, '\\');
         const sp = path.join(sdir, folder, 'summary.json');
         if (folder && fs.existsSync(sp)) {
           const sj = JSON.parse(fs.readFileSync(sp, 'utf8'));
           if (sj && sj.vram && sj.vram.avg_vram_mb != null) avg_vram_mb = sj.vram.avg_vram_mb;
+          // Settings Lab verdicts + future R4 insights read ground-phase stats
+          const g = sj && sj.smoothness && sj.smoothness.phases && sj.smoothness.phases.ground;
+          if (g) { ground_stutter_pct = g.stutter_pct ?? null; ground_p99 = g.p99_ft ?? null; }
+          if (sj && sj.smoothness && sj.smoothness.spike_count != null) spike_count = sj.smoothness.spike_count;
         }
       } catch(_){}
       return {
@@ -1088,7 +1092,9 @@ ipcMain.handle('perf-compare-data', () => {
         sim_version: s.sim_version || null, driver_version: s.driver_version || null,
         p99_ft_ms: s.p99_ft_ms ?? null, stutter_pct: s.stutter_pct ?? null,
         consistency_pct: s.consistency_pct ?? null, peak_vram_mb: s.peak_vram_mb ?? null,
-        avg_vram_mb, route: s.route || null
+        avg_vram_mb, ground_stutter_pct, ground_p99, spike_count,
+        experiment: s.experiment || null, autofps_active: s.autofps_active || null,
+        route: s.route || null
       };
     });
     return { ok:true, flights };
@@ -1346,7 +1352,7 @@ ipcMain.handle('get-maintenance-versions', (_, aircraftRoot) => {
 // One .zip of the three files that define an ABRP install: config.json (all settings) +
 // routeRegistry.json + routeSnapshot.json. Flight logs (Sessions, GBs) are deliberately excluded.
 // Import validates first, backs up the current files, then swaps in — reload finishes it.
-const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json'];
+const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json','lab_state.json'];
 function psq(s){ return `'${String(s).replace(/'/g,"''")}'`; }
 ipcMain.handle('setup-export', async () => {
   try {
@@ -1674,6 +1680,27 @@ ipcMain.handle('perf-export-capframex', (_, args) => new Promise(async (resolve)
     child.on('error', e => { clearTimeout(timer); resolve({ ok:false, error:e.message }); });
   } catch (e) { resolve({ ok:false, error:e.message }); }
 }));
+// ── SETTINGS LAB (Phase 9) ────────────────────────────────────────────────────
+// Post-benchmark auto-experiment scheduler. All logic lives in perf/native/lab.js; these IPCs run
+// it in-process like perf-prep-next does. Sessions (index.json) are the source of truth for
+// alternation/counts. UserCfg writes reuse the proven backup+readback discipline.
+function _labMod(){ return require(path.join(perfDir(), 'native', 'lab.js')); }
+function _labSessions(){ try { return (JSON.parse(fs.readFileSync(path.join(USER_DATA,'Sessions','index.json'),'utf8')).sessions)||[]; } catch(_){ return []; } }
+ipcMain.handle('perf-lab-status', () => {
+  try { return _labMod().labStatus(_labSessions(), USER_DATA); }
+  catch (e) { return { ok:false, error:e.message }; }
+});
+ipcMain.handle('perf-lab-next', (_, args) => {
+  try {
+    const lab = _labMod();
+    if (args && args.disable) { const r = lab.labDisable(USER_DATA, USERCFG_PATH, path.join(USER_DATA,'usercfg_backups')); LOG.info('[LAB] disabled — restored '+r.restored+' setting(s)'); return r; }
+    if (args && args.manual)  { const r = lab.labMarkManual(USER_DATA, args.manual); LOG.info('[LAB] manual mark: '+(r.msg||'')); return r; }
+    const r = lab.labNext(_labSessions(), { usercfgPath: USERCFG_PATH, backupDir: path.join(USER_DATA,'usercfg_backups'), dataRoot: USER_DATA, aircraft: args && args.aircraft });
+    LOG.info('[LAB] ' + (r.msg || r.mode));
+    return r;
+  } catch (e) { LOG.error('[LAB] perf-lab-next failed: '+e.message); return { ok:false, mode:'error', msg:e.message }; }
+});
+
 // Capture status for the title-bar badge. v1: active = engine process running. state (armed /
 // recording) is read from a status file the engine writes when present (engine pass adds it).
 ipcMain.handle('perf-capture-status', () => {

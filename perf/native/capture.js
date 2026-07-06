@@ -82,6 +82,17 @@ async function runAutoCapture(opts) {
     texture_quality: fresh.texture_quality, usercfg_found: fresh.usercfg_found,
   };
   settings.aircraft = await resolveAircraft(armed.handle, opts);
+  // SETTINGS LAB tag: consume the pending marker written by labNext at launch time. Consumed HERE
+  // (at actual capture start) so an armed-but-never-flown launch can never tag a later flight.
+  try {
+    const lp = path.join(opts.dataRoot, '_lab_pending.json');
+    if (fs.existsSync(lp)) {
+      const marker = JSON.parse(fs.readFileSync(lp, 'utf8'));
+      if (marker && marker.id) { settings.experiment = marker.id; settings.experiment_detail = marker; }
+      fs.unlinkSync(lp);
+      say('  LAB: this flight is tagged experiment "' + settings.experiment + '"');
+    }
+  } catch (_) {}
   settings.simbrief_route = await getSimbriefRoute(opts.username);
   settings.sim_version = getSimVersion();
   const driverVersion = getDriverVersion();

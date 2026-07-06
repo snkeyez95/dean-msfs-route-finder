@@ -144,6 +144,7 @@ function fileSession(opts) {
     consistency_pct: smoothness.consistency_pct, avg_fps: smoothness.avg_fps,
     peak_vram_mb: vram ? vram.peak_vram_mb : null, frame_count: smoothness.frame_count,
     aircraft: settings.aircraft, route: settings.simbrief_route || '',
+    ...(settings.experiment ? { experiment: settings.experiment } : {}),   // Settings Lab tag (absent = normal flight)
     timestamp_display: displayStr(now),
     folder: path.join(dateDir(now), folderName),   // relative to Sessions (matches Python os.path.relpath)
   };
