@@ -12,7 +12,11 @@ const isPrimary = ac => COVERAGE_AIRCRAFT.includes(ac);
 function gradeP99(p99){ if(p99 == null) return 'na'; if(p99 <= 20) return 'good'; if(p99 <= 33.3) return 'ok'; return 'bad'; }
 
 function buildCombinedReport(sessions){
-  sessions = sessions || [];
+  const allSessions = sessions || [];
+  // Excluded flights (confounded runs, e.g. flown with BATC unlike the rest of the benchmark) stay
+  // in the flight TABLE (data is never hidden) but leave every average, chart, card, and the
+  // coverage panel — same rule the app's tracker and auto-TLOD follow.
+  sessions = allSessions.filter(s => !s.excluded);
   const by = new Map();              // key "ac|tl" -> {ac, tl, p99:[], vram:[]}
   const tlodSet = new Set();
   for(const s of sessions){
@@ -82,8 +86,8 @@ function buildCombinedReport(sessions){
     refToggleHtml = '<label class="tchip" id="refRowChip" style="margin-right:6px"><input type="checkbox" id="refRows" checked onchange="toggleRefRows(this.checked)"/> Include reference</label>';
   }
 
-  // flight table (sorted by timestamp desc, stable)
-  const ordered = sessions.map((s, i) => [s, i]).sort((a, b) => { const x = a[0].timestamp || '', y = b[0].timestamp || ''; if(x < y) return 1; if(x > y) return -1; return a[1] - b[1]; }).map(p => p[0]);
+  // flight table (sorted by timestamp desc, stable) — includes excluded flights, marked
+  const ordered = allSessions.map((s, i) => [s, i]).sort((a, b) => { const x = a[0].timestamp || '', y = b[0].timestamp || ''; if(x < y) return 1; if(x > y) return -1; return a[1] - b[1]; }).map(p => p[0]);
   let rows = '';
   for(const s of ordered){
     const p = s.p99_ft_ms, gr = gradeP99(p), vmb = s.peak_vram_mb;
@@ -96,7 +100,7 @@ function buildCombinedReport(sessions){
     const prim = isPrimary(s.aircraft) ? '1' : '0';
     rows += '<tr data-tlod="' + tld + '" data-primary="' + prim + '">' +
       '<td>' + (s.timestamp_display || '') + '</td>' +
-      '<td>' + htmlEscape(ac) + '</td><td class="mono">' + rdisp + '</td>' +
+      '<td>' + htmlEscape(ac) + (s.excluded ? ' <span style="color:var(--text-faint);font-size:9px" title="Confounded run — kept for reference, not counted in any average, chart, or the coverage grid">excluded</span>' : '') + '</td><td class="mono">' + rdisp + '</td>' +
       '<td class="mono">' + (s.driver_version || 'n/a') + '</td>' +
       '<td class="mono">' + tld + '</td>' +
       '<td class="mono g-' + gr + '">' + floatRepr(p) + ' ms</td>' +

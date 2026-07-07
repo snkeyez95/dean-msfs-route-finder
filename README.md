@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.3.6
+# A Better Route Planner — v6.3.7
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -281,6 +281,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.3.7   Excluded flights also leave the embedded dashboard: the combined report now filters them from every chart, average, aircraft card, and the coverage grid (the flight stays in the table with an excluded tag). The dashboard is a generated file, so it was also regenerated in place for the already-tagged flight
 v6.3.6   Excluded-flight support. A flight can now carry an "excluded" marker (set for confounded runs — first real case: a benchmark flight flown with BeyondATC running, unlike every other baseline flight). Excluded flights keep ALL their data and reports, but never fill a benchmark cell, never sway the Baseline recommendation, and never enter the Lab's control/noise pools — the engine's coverage model and the app's tracker honor the flag identically, so auto-TLOD and the progress display stay in lockstep (that flight's cell correctly reopened as needing one more run)
 v6.3.5   Durations are now block time, not air time (Dean's MYNN-KMIA observation). The Duration column always showed SayIntentions' flight_length verbatim — which measurement across the whole registry proves is ENROUTE time (implied groundspeeds ~290kt short-hop to ~470kt long-haul, no taxi in it; Dean's case: SI said 54m where SimBrief planned 38m air / 1:06 block). All durations now display an estimated gate-to-gate block time: enroute + a 25-minute taxi allowance. Uniform pad, so sorting is unchanged, and the "Duration: Under Xh" filter uses the same padded number so it matches what the column shows. Challenging Approaches' distance-based time estimate got the same pad for consistency. Slightly generous by design — better to land early than plan short
 v6.3.4   Recent Routes polish (Dean's MYNN-KMIA findings). (1) Clicking a Recent Routes pill now re-selects the aircraft the route was originally planned with before searching — previously the Free Route dropdown kept whatever was last selected, so a leftover Citation could make the pill "find no routes" for an airline pair on first click. (2) Each pill gains an × remove button for plans you SimBriefed but never actually flew — removing also un-hides the pair from the ✱ Fresh routes filter and lifts its registry-cleanup protection. (The strip tracks "opened in SimBrief", not "flown" — the app can't know you skipped the flight, but now you can tell it)
