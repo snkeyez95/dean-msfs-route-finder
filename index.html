@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.4</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.5</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.4</div>
+    <div class="sb-ver">v6.3.5</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2565,11 +2565,19 @@ async function fetchSIRoutes({autoMode=false}={}){
   renderRoutes();updateStats();updateSnapshotInfo();
 }
 
+// SI's flight_length is ENROUTE (air) time — measured across the registry the implied groundspeeds
+// run ~290kt short-hop to ~470kt long-haul, i.e. no taxi in it (Dean's MYNN-KMIA: SI 54m vs
+// SimBrief 38m air / 1:06 block). For planning, show estimated BLOCK time instead: air + a
+// 25-min gate-to-gate taxi allowance. Uniform pad = sort order unchanged; the duration filter
+// uses the same padded number so "Under 1h" matches what the column shows.
+const BLOCK_PAD_MIN=25;
+function blockLen(fl){ const m=parseInt(fl); return isNaN(m)||m<=0?0:m+BLOCK_PAD_MIN; }
 function fmtFlightLen(fl){
   if(fl===null||fl===undefined||fl==='')return'—';
   const m=parseInt(fl);
   if(isNaN(m))return String(fl);
-  const hrs=Math.floor(m/60),mins=m%60;
+  const b=m>0?m+BLOCK_PAD_MIN:m;
+  const hrs=Math.floor(b/60),mins=b%60;
   if(hrs===0)return mins+'m';
   return hrs+'h '+String(mins).padStart(2,'0')+'m';
 }
@@ -2611,7 +2619,7 @@ function getRoutes(){
     if(S.dirFilter==='dep'&&!di)return false;
     if(S.dirFilter==='arr'&&!ai)return false;
     if(S.acft!=='all'&&r.aircraft_type!==S.acft)return false;
-    const fl=parseInt(r.flight_length)||0;
+    const fl=blockLen(r.flight_length);
     if(durMaxHrs&&fl>durMaxHrs*60)return false;
     if(S.regionFilter!=='all'){
       const pfx=REGION_PREFIXES[S.regionFilter];
@@ -5042,7 +5050,7 @@ function saveSimbriefUser(){
   if(n){ n.textContent=v?('✓ saved — auto-TLOD and pre-filled plans will use "'+v+'"'):'cleared'; n.style.color='var(--grn)'; }
 }
 async function populateSimIntegration(){
-  // SimBrief username field (v6.3.4 — the only place to set it used to be the setup wizard,
+  // SimBrief username field (v6.3.5 — the only place to set it used to be the setup wizard,
   // while the launch dialog pointed at Settings; now Settings actually has it)
   const sbi=document.getElementById('sb-user-inp');
   if(sbi)sbi.value=S.cfg.simbriefUser||'';
@@ -5597,7 +5605,7 @@ function gcDist(lat1,lon1,lat2,lon2){
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLon/2)**2;
   return R*2*Math.asin(Math.sqrt(a));
 }
-function flightMins(nm){return Math.round((nm/450)*60*1.10);}
+function flightMins(nm){return Math.round((nm/450)*60*1.10)+BLOCK_PAD_MIN;}   // block estimate, same taxi pad as route durations
 
 function buildChDepSelect(){
   const sel=document.getElementById('ch-dep');
@@ -6022,5 +6030,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.4</div>
+  pointer-events:none;">v6.3.5</div>
 </body></html>
