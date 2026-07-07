@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.2</div>
+    <div class="sb-ver">v6.3.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -733,6 +733,15 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     </div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin-bottom:14px;margin-top:24px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Sim Integration</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">SimBrief</div>
+    <div class="api-s">Your SimBrief username powers one-click pre-filled flight plans and lets the performance logger's auto-TLOD read the aircraft on your active plan.</div>
+    <div class="api-row">
+      <input class="api-inp" type="text" id="sb-user-inp" placeholder="SimBrief username" style="max-width:260px">
+      <button class="btn bp bsm" onclick="saveSimbriefUser()">Save</button>
+      <span id="sb-user-note" style="font-size:11px;color:var(--ink3)"></span>
+    </div>
+  </div>
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-t">MSFS 2024 Detection</div>
     <div id="sim-detect-status" style="font-size:13px;color:var(--ink3);margin:8px 0 4px;font-family:'JetBrains Mono',monospace;line-height:1.7">Detecting&hellip;</div>
@@ -5008,7 +5017,19 @@ function updateSimDetectStatus(){
   const seLine=ver==='steam'?`<div>&#10003; Launch: <span style="color:var(--ink2)">${se||'C:\\Program Files (x86)\\Steam\\steam.exe (default)'}</span></div>`:'<div>&#10003; Launch: <span style="color:var(--ink2)">Microsoft Store (shell launch)</span></div>';
   el.innerHTML=`<div style="color:var(--grn);margin-bottom:4px">&#10003; MSFS 2024 &mdash; ${verLabel}</div>${cfLine}${seLine}`;
 }
+function saveSimbriefUser(){
+  const i=document.getElementById('sb-user-inp'), n=document.getElementById('sb-user-note');
+  if(!i)return;
+  const v=i.value.trim();
+  if(v)S.cfg.simbriefUser=v; else delete S.cfg.simbriefUser;
+  window.api.saveConfig(S.cfg);
+  if(n){ n.textContent=v?('✓ saved — auto-TLOD and pre-filled plans will use "'+v+'"'):'cleared'; n.style.color='var(--grn)'; }
+}
 async function populateSimIntegration(){
+  // SimBrief username field (v6.3.3 — the only place to set it used to be the setup wizard,
+  // while the launch dialog pointed at Settings; now Settings actually has it)
+  const sbi=document.getElementById('sb-user-inp');
+  if(sbi)sbi.value=S.cfg.simbriefUser||'';
   // Always detect — silently fill in anything missing, then show status
   const det=await window.api.msfsDetect();
   let changed=false;
@@ -5985,5 +6006,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.2</div>
+  pointer-events:none;">v6.3.3</div>
 </body></html>
