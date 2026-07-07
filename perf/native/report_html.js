@@ -94,7 +94,9 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const chartJson = pyJson({ ft: ftPoints, mavg: mavgPoints, alt: altJson, target: TARGET_FRAMETIME_MS,
     stutter: pyRound(STUTTER_FRAMETIME_MS, 1), avg_fps: g(stats, 'avg_fps') ?? null, q1, q3,
     over_count: PInt(overCount), over_max: pyRound(overMax, 2) });
-  const phaseHtml = RC.phaseBarsHtml(g(stats, 'phases'));
+  const phaseHtml = RC.phaseBarsHtml(g(stats, 'phases'), {
+    dep_icao: g(settings, 'dep_icao'), arr_icao: g(settings, 'arr_icao'),
+    dep_scenery: g(settings, 'dep_scenery'), arr_scenery: g(settings, 'arr_scenery') });
 
   let vramHtml;
   if(g(vram, 'available')){

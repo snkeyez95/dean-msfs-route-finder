@@ -94,6 +94,18 @@ async function runAutoCapture(opts) {
     }
   } catch (_) {}
   settings.simbrief_route = await getSimbriefRoute(opts.username);
+  // Scenery attribution (v6.3.8): split the route into dep/arr ICAO and flag each against the user's
+  // 3rd-party library (ABRP_THIRDPARTY_ICAOS, passed by main.js the same way as ABRP_BENCHMARK).
+  try {
+    const m = /([A-Z]{3,4})-([A-Z]{3,4})/.exec(String(settings.simbrief_route || '').toUpperCase());
+    if (m) { settings.dep_icao = m[1]; settings.arr_icao = m[2]; }
+    let tp = null; try { tp = JSON.parse(process.env.ABRP_THIRDPARTY_ICAOS || ''); } catch (_) {}
+    if (Array.isArray(tp) && (settings.dep_icao || settings.arr_icao)) {
+      const set = new Set(tp.map(x => String(x).toUpperCase()));
+      settings.dep_scenery = settings.dep_icao ? set.has(settings.dep_icao) : false;
+      settings.arr_scenery = settings.arr_icao ? set.has(settings.arr_icao) : false;
+    }
+  } catch (_) {}
   settings.sim_version = getSimVersion();
   const driverVersion = getDriverVersion();
   const startedAt = new Date();

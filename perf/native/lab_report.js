@@ -26,12 +26,17 @@ const FRAMETIME_COLUMNS = ['MsBetweenPresents', 'msBetweenPresents', 'FrameTime'
 
 // The judged metrics. 'sm' = a smoothness metric (drives SAVES/COSTS); VRAM is judged separately
 // against the 90%-of-card ceiling the Baseline view already uses.
+// v6.3.8: departing-taxi and arrival-taxi tracked INDEPENDENTLY (Dean) — a scenery-sensitive setting
+// shows its effect at each end. Both on the two culprit metrics (stutter + p99). Overall p99, big
+// spikes/hr, and peak VRAM round it out. VRAM judged separately vs the 90%-of-card ceiling.
 const METRICS = [
-  { k: 'ground_stutter', label: 'Ground stutter',  unit: 'pp', dec: 3, sm: true },
-  { k: 'ground_p99',     label: 'Ground P99',      unit: 'ms', dec: 2, sm: true },
-  { k: 'p99',            label: 'Overall P99',     unit: 'ms', dec: 2, sm: true },
-  { k: 'spikes_hr',      label: 'Big spikes / hr', unit: '',   dec: 1, sm: true },
-  { k: 'peak_vram',      label: 'Peak VRAM',       unit: 'MB', dec: 0, sm: false },
+  { k: 'dep_taxi_stutter', label: 'Departing-taxi stutter', unit: 'pp', dec: 3, sm: true },
+  { k: 'dep_taxi_p99',     label: 'Departing-taxi P99',     unit: 'ms', dec: 2, sm: true },
+  { k: 'arr_taxi_stutter', label: 'Arrival-taxi stutter',   unit: 'pp', dec: 3, sm: true },
+  { k: 'arr_taxi_p99',     label: 'Arrival-taxi P99',       unit: 'ms', dec: 2, sm: true },
+  { k: 'p99',              label: 'Overall P99',            unit: 'ms', dec: 2, sm: true },
+  { k: 'spikes_hr',        label: 'Big spikes / hr',        unit: '',   dec: 1, sm: true },
+  { k: 'peak_vram',        label: 'Peak VRAM',              unit: 'MB', dec: 0, sm: false },
 ];
 
 // ── per-flight inputs ────────────────────────────────────────────────────────
@@ -39,18 +44,35 @@ function readSummary(sessionsDir, folder) {
   try { return JSON.parse(fs.readFileSync(path.join(sessionsDir, folder, 'summary.json'), 'utf8')); }
   catch (_) { return null; }
 }
-function metricsFromSummary(sj) {
-  if (!sj || !sj.smoothness) return null;
-  const sm = sj.smoothness, g = (sm.phases || {}).ground || {}, v = sj.vram || {};
+function readPhasesExt(sessionsDir, folder) {   // v6.3.8 sidecar (pre-v6.3.8 flights, originals untouched)
+  try { return JSON.parse(fs.readFileSync(path.join(sessionsDir, folder, 'phases_ext.json'), 'utf8')); }
+  catch (_) { return null; }
+}
+function metricsFromPhases(sm, ph, v) {
+  const dep = ph.dep_taxi || {}, arr = ph.arr_taxi || {};
   const hrs = sm.duration_seconds ? sm.duration_seconds / 3600 : null;
   return {
-    ground_stutter: g.stutter_pct != null ? g.stutter_pct : null,
-    ground_p99:     g.p99_ft != null ? g.p99_ft : null,
-    p99:            sm.p99_ft_ms != null ? sm.p99_ft_ms : null,
-    spikes_hr:      (sm.spike_count != null && hrs) ? sm.spike_count / hrs : null,
-    peak_vram:      v.peak_vram_mb != null ? v.peak_vram_mb : null,
-    total_vram:     v.total_vram_mb || VRAM_FALLBACK,
+    dep_taxi_stutter: dep.stutter_pct != null ? dep.stutter_pct : null,
+    dep_taxi_p99:     dep.p99_ft != null ? dep.p99_ft : null,
+    arr_taxi_stutter: arr.stutter_pct != null ? arr.stutter_pct : null,
+    arr_taxi_p99:     arr.p99_ft != null ? arr.p99_ft : null,
+    p99:              sm.p99_ft_ms != null ? sm.p99_ft_ms : null,
+    spikes_hr:        (sm.spike_count != null && hrs) ? sm.spike_count / hrs : null,
+    peak_vram:        v.peak_vram_mb != null ? v.peak_vram_mb : null,
+    total_vram:       v.total_vram_mb || VRAM_FALLBACK,
   };
+}
+function metricsFromSummary(sj) {   // new flights carry the 5-phase model in the summary
+  if (!sj || !sj.smoothness) return null;
+  return metricsFromPhases(sj.smoothness, sj.smoothness.phases || {}, sj.vram || {});
+}
+// Read metrics for a flight, normalizing old (sidecar) + new (summary) into the same shape.
+function metricsFor(sessionsDir, folder) {
+  const sj = readSummary(sessionsDir, folder);
+  if (!sj || !sj.smoothness) return null;
+  let ph = sj.smoothness.phases || {};
+  if (!ph.dep_taxi && !ph.arr_taxi) { const ext = readPhasesExt(sessionsDir, folder); if (ext && ext.phases) ph = ext.phases; }
+  return metricsFromPhases(sj.smoothness, ph, sj.vram || {});
 }
 
 // Raw frametimes reader — frametime column only, transparent .gz (same rule as capframex.js).
@@ -89,7 +111,7 @@ function trimFt(ft, headS, tailS) {
 function seriesFor(sessionsDir, folder) {
   const dir = path.join(sessionsDir, folder);
   const cache = path.join(dir, 'series.json');
-  try { const c = JSON.parse(fs.readFileSync(cache, 'utf8')); if (c && c.v === 1) return c; } catch (_) {}
+  try { const c = JSON.parse(fs.readFileSync(cache, 'utf8')); if (c && c.v === 2) return c; } catch (_) {}
   const sj = readSummary(sessionsDir, folder);
   const sm = (sj && sj.smoothness) || {};
   const raw = readFt(dir);
@@ -103,13 +125,14 @@ function seriesFor(sessionsDir, folder) {
     return { pts: rm.map(p => [Math.round(p[0] / totalMin * 10000) / 100, p[1]]), totalMin };
   };
   const full = smooth(ft, 600);
-  // ground-only: keep frames whose cumulative time falls inside a telemetry 'ground' window,
-  // concatenated (departure taxi + arrival taxi), x = % of total ground time.
+  // v6.3.8: the "ground" fingerprint is now the ARRIVAL taxi only (the final ground run) — that's
+  // where the stutters live (heavy scenery + FenixDisplay on taxi-in); the departure taxi is usually
+  // clean and would just dilute the picture. x = % of the arrival-taxi window.
   let ground = null;
   const tel = readTelemetry(dir);
   if (tel) {
     const head = (sm.start_trim_s != null ? sm.start_trim_s : 5) * 1000;
-    const win = [];                                  // [startMs, endMs] on the trimmed timeline
+    const win = [];                                  // [startMs, endMs] ground runs on the trimmed timeline
     let cur = null;
     for (const r of tel) {
       const t = r.wall_ms - head;
@@ -117,18 +140,15 @@ function seriesFor(sessionsDir, folder) {
       else if (cur) { win.push(cur); cur = null; }
     }
     if (cur) win.push(cur);
-    if (win.length) {
-      const gf = []; let cum = 0, wi = 0;
-      for (const v of ft) {
-        cum += v;
-        while (wi < win.length && cum > win[wi][1] + 1500) wi++;
-        if (wi >= win.length) break;
-        if (cum >= win[wi][0] - 1500) gf.push(v);
-      }
+    // arrival taxi = the LAST ground run, and only if there was a flight before it (win.length > 1)
+    const arrWin = (win.length > 1) ? win[win.length - 1] : null;
+    if (arrWin) {
+      const gf = []; let cum = 0;
+      for (const v of ft) { cum += v; if (cum >= arrWin[0] - 1500 && cum <= arrWin[1] + 1500) gf.push(v); if (cum > arrWin[1] + 1500) break; }
       if (gf.length >= 100) ground = smooth(gf, 300).pts;
     }
   }
-  const out = { v: 1, dur_min: Math.round(full.totalMin * 10) / 10, full: full.pts, ground };
+  const out = { v: 2, dur_min: Math.round(full.totalMin * 10) / 10, full: full.pts, ground };
   try { fs.writeFileSync(cache, JSON.stringify(out)); } catch (_) {}
   return out;
 }
@@ -178,8 +198,8 @@ function buildLabReport(sessionsDir) {
   catch (e) { return { ok: false, error: 'index.json unreadable: ' + e.message }; }
   const sessions = (idx.sessions || []).filter(s => s && s.folder);
   const grid = sessions.filter(s => !s.experiment && !s.autofps_active && !s.excluded && GRID_AC.includes(s.aircraft) && GRID_TL.includes(s.tlod) && s.p99_ft_ms != null);
-  const mcache = {};   // folder -> metrics
-  const M = s => (mcache[s.folder] !== undefined ? mcache[s.folder] : (mcache[s.folder] = metricsFromSummary(readSummary(sessionsDir, s.folder))));
+  const mcache = {};   // folder -> metrics (summary for new flights, sidecar for pre-v6.3.8)
+  const M = s => (mcache[s.folder] !== undefined ? mcache[s.folder] : (mcache[s.folder] = metricsFor(sessionsDir, s.folder)));
 
   const experiments = [];
   for (const exp of lab.EXPERIMENTS) {
@@ -252,4 +272,4 @@ function buildLabReport(sessionsDir) {
 }
 function fRef(s) { return { session_id: s.session_id, folder: s.folder, aircraft: s.aircraft, tlod: s.tlod }; }
 
-module.exports = { buildLabReport, seriesFor, svgOverlay, readFt, trimFt, metricsFromSummary };
+module.exports = { buildLabReport, seriesFor, svgOverlay, readFt, trimFt, metricsFromSummary, metricsFor };

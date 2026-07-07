@@ -186,6 +186,20 @@ if(!app.requestSingleInstanceLock()){
     if(win){ if(win.isMinimized()) win.restore(); win.focus(); }
   });
   app.whenReady().then(createWindow);
+  // v6.3.8: one-time sidecar backfill of the 5-phase split for pre-v6.3.8 flights (idempotent, skips
+  // done + native-5-phase). DETACHED (parses frametimes) — never blocks the UI; originals untouched.
+  app.whenReady().then(() => {
+    try {
+      const mod = path.join(perfDir(), 'native', 'backfill_phases.js');
+      if (!fs.existsSync(mod)) return;
+      const ch = spawn(process.execPath, [mod, path.join(USER_DATA, 'Sessions')], {
+        detached: true, stdio: 'ignore', windowsHide: true,
+        env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1',
+          NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules') : path.join(__dirname, 'node_modules') }) });
+      ch.on('error', e => LOG.warn('[MIGRATE] phases_ext backfill spawn failed: ' + e.message));
+      ch.unref();
+    } catch (e) { LOG.warn('[MIGRATE] phases_ext backfill failed (non-fatal): ' + e.message); }
+  });
 }
 app.on('window-all-closed',()=>{ if(process.platform!=='darwin') app.quit(); });
 app.on('web-contents-created',(_,c)=>{
@@ -454,6 +468,13 @@ function benchCfg(){
     ? b : DEFAULT_BENCHMARK;
 }
 function benchLabels(){ return benchCfg().aircraft.map(a => a.label); }
+// The set of ICAOs the user owns 3rd-party scenery for (from the My Airports scan). A real match
+// only — has an ICAO, still selected, not a 'noise'-word false match. Used to flag dep/arr scenery.
+function thirdPartyIcaos(){
+  try { const rows = (_perfCfg().savedRows) || [];
+    return [...new Set(rows.filter(r => r && r.icao && r.selected !== false && r.method !== 'noise').map(r => String(r.icao).toUpperCase()))]; }
+  catch(_){ return []; }
+}
 (()=>{  // one-time seed for existing installs so the renderer always finds cfg.benchmark
   try {
     if (!fs.existsSync(CFG)) return;                       // brand-new install: the wizard writes it
@@ -464,6 +485,28 @@ function benchLabels(){ return benchCfg().aircraft.map(a => a.label); }
     if (!c.setupDone && (c.folder || (c.savedRows && c.savedRows.length) || c.siCookie)) { c.setupDone = true; ch = true; }
     if (ch) writeFileAtomic(CFG, JSON.stringify(c, null, 2));
   } catch(e) { LOG.warn('[MIGRATE] benchmark seed failed (non-fatal):', e.message); }
+})();
+// v6.3.8 scenery attribution: keep each flight's dep/arr ICAO + 3rd-party flags current in index.json
+// (the dashboard reads these for the ✳). index.json is derived metadata (regenerable) — the raw
+// summary/frametimes/telemetry are never touched here. Recomputed every launch so the flags follow
+// the CURRENT library (adding/removing scenery updates them). Cheap: split route + set membership.
+(()=>{
+  try {
+    const idxPath = path.join(USER_DATA, 'Sessions', 'index.json');
+    if (!fs.existsSync(idxPath)) return;
+    const tp = new Set(thirdPartyIcaos());
+    const idx = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
+    let ch = false;
+    for (const s of (idx.sessions || [])) {
+      const m = /([A-Z]{3,4})-([A-Z]{3,4})/.exec(String(s.route || '').toUpperCase());
+      const dep = m ? m[1] : null, arr = m ? m[2] : null;
+      const dS = dep ? tp.has(dep) : false, aS = arr ? tp.has(arr) : false;
+      if (s.dep_icao !== (dep||undefined) || s.arr_icao !== (arr||undefined) || !!s.dep_scenery !== dS || !!s.arr_scenery !== aS) {
+        if (dep) s.dep_icao = dep; if (arr) s.arr_icao = arr; s.dep_scenery = dS; s.arr_scenery = aS; ch = true;
+      }
+    }
+    if (ch) { writeFileAtomic(idxPath, JSON.stringify(idx, null, 2)); LOG.info('[MIGRATE] scenery flags refreshed on index.json'); }
+  } catch(e) { LOG.warn('[MIGRATE] scenery-flag backfill failed (non-fatal):', e.message); }
 })();
 ipcMain.handle('load-config',()=>{try{const c=JSON.parse(fs.readFileSync(CFG,'utf8'));LOG.info('load-config: loaded, savedRows='+((c.savedRows||[]).length));return c;}catch(e){LOG.warn('load-config: no config found, starting fresh');return {};}});
 ipcMain.handle('save-config',(_,cfg)=>{
@@ -1123,27 +1166,46 @@ ipcMain.handle('perf-compare-data', () => {
     if (!fs.existsSync(idxPath)) return { ok:false, reason:'no-data', flights:[] };
     const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
     const flights = (data.sessions || []).map(s => {
-      let avg_vram_mb = null, ground_stutter_pct = null, ground_p99 = null, spike_count = null, total_vram_mb = null;
+      let avg_vram_mb = null, spike_count = null, total_vram_mb = null;
+      // v6.3.8 5-phase model: departing + arrival taxi (each p99/stutter/peak-VRAM). New flights carry
+      // it in summary.smoothness.phases; the 24 pre-v6.3.8 flights carry it in the phases_ext.json
+      // sidecar (originals untouched). Also dep/arr ICAO + 3rd-party scenery flags.
+      let dep_taxi = null, arr_taxi = null, dep_icao = s.dep_icao || null, arr_icao = s.arr_icao || null,
+          dep_scenery = s.dep_scenery ?? null, arr_scenery = s.arr_scenery ?? null;
       try {
         const folder = (s.folder || '').replace(/\//g, '\\');
-        const sp = path.join(sdir, folder, 'summary.json');
-        if (folder && fs.existsSync(sp)) {
+        const fdir = folder ? path.join(sdir, folder) : null;
+        const sp = fdir ? path.join(fdir, 'summary.json') : null;
+        if (sp && fs.existsSync(sp)) {
           const sj = JSON.parse(fs.readFileSync(sp, 'utf8'));
           if (sj && sj.vram && sj.vram.avg_vram_mb != null) avg_vram_mb = sj.vram.avg_vram_mb;
           if (sj && sj.vram && sj.vram.total_vram_mb != null) total_vram_mb = sj.vram.total_vram_mb;
-          // Settings Lab verdicts + future R4 insights read ground-phase stats
-          const g = sj && sj.smoothness && sj.smoothness.phases && sj.smoothness.phases.ground;
-          if (g) { ground_stutter_pct = g.stutter_pct ?? null; ground_p99 = g.p99_ft ?? null; }
           if (sj && sj.smoothness && sj.smoothness.spike_count != null) spike_count = sj.smoothness.spike_count;
+          const ph = sj && sj.smoothness && sj.smoothness.phases;
+          if (ph && (ph.dep_taxi || ph.arr_taxi)) { dep_taxi = ph.dep_taxi || null; arr_taxi = ph.arr_taxi || null; }
+        }
+        if (!dep_taxi && !arr_taxi && fdir) {   // fall back to the sidecar for pre-v6.3.8 flights
+          const ext = path.join(fdir, 'phases_ext.json');
+          if (fs.existsSync(ext)) { const e = JSON.parse(fs.readFileSync(ext, 'utf8')); const p = e.phases || {};
+            dep_taxi = p.dep_taxi || null; arr_taxi = p.arr_taxi || null;
+            if (dep_icao == null) dep_icao = e.dep_icao || null;
+            if (arr_icao == null) arr_icao = e.arr_icao || null;
+            if (dep_scenery == null) dep_scenery = e.dep_scenery ?? null;
+            if (arr_scenery == null) arr_scenery = e.arr_scenery ?? null;
+          }
         }
       } catch(_){}
+      const pv = (o, k) => (o && o[k] != null) ? o[k] : null;
       return {
         session_id: s.session_id || null, aircraft: s.aircraft || null,
         tlod: s.tlod ?? null, olod: s.olod ?? null,
         sim_version: s.sim_version || null, driver_version: s.driver_version || null,
         p99_ft_ms: s.p99_ft_ms ?? null, stutter_pct: s.stutter_pct ?? null,
         consistency_pct: s.consistency_pct ?? null, peak_vram_mb: s.peak_vram_mb ?? null,
-        avg_vram_mb, ground_stutter_pct, ground_p99, spike_count, total_vram_mb,
+        avg_vram_mb, spike_count, total_vram_mb,
+        dep_taxi_p99: pv(dep_taxi,'p99_ft'), dep_taxi_stutter: pv(dep_taxi,'stutter_pct'), dep_taxi_vram: pv(dep_taxi,'vram_peak'),
+        arr_taxi_p99: pv(arr_taxi,'p99_ft'), arr_taxi_stutter: pv(arr_taxi,'stutter_pct'), arr_taxi_vram: pv(arr_taxi,'vram_peak'),
+        dep_icao, arr_icao, dep_scenery, arr_scenery,
         experiment: s.experiment || null, autofps_active: s.autofps_active || null,
         excluded: s.excluded || null,
         route: s.route || null
@@ -1620,6 +1682,7 @@ ipcMain.handle('perf-start-capture', () => {
         ABRP_SESSIONS_DIR: path.join(USER_DATA, 'Sessions'), ABRP_USERCFG: USERCFG_PATH,
         ...(simbriefUser() ? { ABRP_SIMBRIEF_USER: simbriefUser() } : {}),
         ABRP_BENCHMARK: JSON.stringify(benchCfg()),   // user grid + aircraft match terms (Phase 10)
+        ABRP_THIRDPARTY_ICAOS: JSON.stringify(thirdPartyIcaos()),   // scenery attribution (v6.3.8)
         // node-simconnect (+ its 13 deps) is asarUnpack'd; point the detached process at it.
         NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
                                   : path.join(__dirname, 'node_modules'),

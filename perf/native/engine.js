@@ -10,8 +10,8 @@
 // (stats, phases, report, combined, index rows) are already byte-proven individually.
 const fs = require('fs'), path = require('path');
 const { computeStats } = require('./stats.js');
-const { trimHead, trimTail, splitFrametimesByPhase, computePhaseStats } = require('./phases.js');
-const { readChronological } = require('./report_charts.js');
+const { trimHead, trimTail, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
+const { readChronological, readTelemetry } = require('./report_charts.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { buildSessionsNavJs, INDEX_CSV_FIELDS } = require('./index_writer.js');
@@ -111,6 +111,17 @@ function fileSession(opts) {
   [ft, cpu, gpu] = trimHead(ft, cpu, gpu, HEAD_TRIM_S);
   [ft, cpu, gpu] = trimTail(ft, cpu, gpu, stopTrimS || 0);
   const smoothness = computeSmoothness(ft, cpu, gpu, stopTrimS, phaseLog, recordingWallStart);
+  // per-phase VRAM (peak/avg) from the just-written telemetry, merged into the frametime phase stats
+  // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
+  try {
+    const tel = readTelemetry(sessionDir);
+    if (tel && smoothness.phases) {
+      const pv = computePhaseVram(tel);
+      for (const ph of Object.keys(smoothness.phases)) {
+        if (pv[ph]) { smoothness.phases[ph].vram_peak = pv[ph].vram_peak; smoothness.phases[ph].vram_avg = pv[ph].vram_avg; }
+      }
+    }
+  } catch (_) {}
   const sortedFt = ft.slice().sort((a, b) => a - b);
 
   // 2. summary.json
@@ -145,6 +156,11 @@ function fileSession(opts) {
     peak_vram_mb: vram ? vram.peak_vram_mb : null, frame_count: smoothness.frame_count,
     aircraft: settings.aircraft, route: settings.simbrief_route || '',
     ...(settings.experiment ? { experiment: settings.experiment } : {}),   // Settings Lab tag (absent = normal flight)
+    // scenery attribution (v6.3.8): dep/arr ICAO + whether each is a 3rd-party scenery the user owns
+    ...(settings.dep_icao ? { dep_icao: settings.dep_icao } : {}),
+    ...(settings.arr_icao ? { arr_icao: settings.arr_icao } : {}),
+    ...(settings.dep_scenery != null ? { dep_scenery: settings.dep_scenery } : {}),
+    ...(settings.arr_scenery != null ? { arr_scenery: settings.arr_scenery } : {}),
     timestamp_display: displayStr(now),
     folder: path.join(dateDir(now), folderName),   // relative to Sessions (matches Python os.path.relpath)
   };

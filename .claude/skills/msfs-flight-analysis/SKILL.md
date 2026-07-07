@@ -21,6 +21,24 @@ analyzing that data well - comparative, quantitative, and to the point.
   duration_seconds, frame_count), `vram` block (avg/peak/pct/total), and a `notes` field Dean
   sometimes fills in (e.g. "forgot GSX") - **always check `notes`** before comparing two flights,
   since a missing addon or different scenery load invalidates an apples-to-apples VRAM comparison.
+- **SCENERY / 5-PHASE MODEL (v6.3.8+):** `smoothness.phases` now splits into **five** phases —
+  `dep_taxi` (departing taxi + takeoff roll), `climb`, `cruise`, `descent`, `arr_taxi` (landing
+  rollout + taxi-in). There is NO combined "ground" phase anymore. **Each phase carries BOTH
+  metrics**: frametime (`p99_ft`, `stutter_pct`, `avg_ft`, `frame_count`, `pct_of_total`) AND VRAM
+  (`vram_peak`, `vram_avg` in MB). This is what lets you attribute ground performance to the
+  DEPARTURE vs ARRIVAL airport separately — arrival taxi is almost always the worse/heavier end
+  (payware + aircraft avionics on approach), and arrival-taxi `vram_peak` is usually the flight's
+  VRAM peak. Each flight also carries `settings.dep_icao`/`arr_icao` and `dep_scenery`/`arr_scenery`
+  (booleans: is that airport a 3rd-party scenery the user owns). The `index.json` entries and the
+  `perf-compare-data` payload carry `dep_icao/arr_icao/dep_scenery/arr_scenery` +
+  `dep_taxi_p99/stutter/vram` + `arr_taxi_p99/stutter/vram` per flight — so you can answer "which of
+  my payware airports has the worst arrival-taxi VRAM/frametime" directly. **Pre-v6.3.8 flights**
+  (before this) keep the old combined `ground` in their untouched summary.json but gain a
+  `phases_ext.json` SIDECAR in the folder with the 5-phase split (same shape) — read the sidecar for
+  the taxi split on those; new flights have it inline in summary.json. Only flights WITH telemetry
+  (2026-06-22 onward) can be split; older ones have neither. When ranking airports by ground cost,
+  normalize per-aircraft (Fenix's avionics make its taxi heavier than PMDG's) and gate on sample
+  size - one taxi at one airport is not a verdict (a fresh reboot alone swings ground numbers).
 - `Sessions\<date>\<time...>\frametimes.csv` - raw per-frame PresentMon data. Beyond frametime it
   carries a full forensic stack (`TimeInMs`, `MsCPUBusy`, `MsCPUWait`, `MsGPUBusy`, `MsGPUWait`,
   `MsGPULatency`, `MsRenderPresentLatency`, `MsAnimationError`, `PresentMode`) - the basis for spike

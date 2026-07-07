@@ -112,10 +112,19 @@ function varianceBins(ft){
   return counts.map(c => pyRound(c / tot * 100, 2));
 }
 
-function phaseBarsHtml(phases){
-  const order = [["ground", "Ground"], ["climb", "Climb"], ["cruise", "Cruise"], ["descent", "Descent"]];
+// v6.3.8: 5-phase model (departing/arrival taxi split), per-phase VRAM in the tooltip, and the two
+// taxi rows label their airport with a ✳ when it's a 3rd-party scenery the user owns. meta =
+// {dep_icao, arr_icao, dep_scenery, arr_scenery} (optional).
+function phaseBarsHtml(phases, meta){
+  meta = meta || {};
+  const taxiLbl = (base, icao, is3p) => base + (icao ? ' · ' + icao + (is3p ? '✳' : '') : '');
+  const order = [
+    ["dep_taxi", taxiLbl("Departing taxi", meta.dep_icao, meta.dep_scenery)],
+    ["climb", "Climb"], ["cruise", "Cruise"], ["descent", "Descent"],
+    ["arr_taxi", taxiLbl("Arrival taxi", meta.arr_icao, meta.arr_scenery)],
+  ];
   const active = order.filter(([k]) => phases && k in phases && (phases[k].frame_count || 0) > 0);
-  if(!active.length) return '<div class="note">Flight phase data unavailable — SimConnect wasn\'t active for this flight. New flights populate Ground / Climb / Cruise / Descent by vertical speed.</div>';
+  if(!active.length) return '<div class="note">Flight phase data unavailable — SimConnect wasn\'t active for this flight. New flights populate Departing taxi / Climb / Cruise / Descent / Arrival taxi.</div>';
   let mx = Math.max(...active.map(([k]) => phases[k].p99_ft)); mx = Math.max(mx * 1.1, 25.0);
   let rows = '';
   for(const [k, l] of order){
@@ -127,7 +136,8 @@ function phaseBarsHtml(phases){
     const p99 = ph.p99_ft;
     const w = Math.min(p99 / mx * 100, 100);
     const col = p99 <= 20 ? 'var(--good)' : (p99 <= 33.3 ? 'var(--ok)' : 'var(--bad)');
-    const tip = l + ' — ' + (ph.frame_count != null ? ph.frame_count.toLocaleString() : '?') + ' frames · avg ' + ph.avg_ft + ' ms · P99 ' + ph.p99_ft + ' ms · stutter ' + ph.stutter_pct + '% · ' + ph.pct_of_total + '% of the flight';
+    const vramTip = ph.vram_peak != null ? ' · peak VRAM ' + ph.vram_peak + ' MB' : '';
+    const tip = l + ' — ' + (ph.frame_count != null ? ph.frame_count.toLocaleString() : '?') + ' frames · avg ' + ph.avg_ft + ' ms · P99 ' + ph.p99_ft + ' ms · stutter ' + ph.stutter_pct + '%' + vramTip + ' · ' + ph.pct_of_total + '% of the flight';
     rows += '<div class="phase-row" title="' + tip + '" style="cursor:help"><span class="lbl">' + l + '</span><div class="ph-track"><div class="ph-fill" style="width:' + fmt(w, 0) + '%;background:' + col + '"></div></div><span class="num" style="color:' + col + '">' + fmt(p99, 1) + ' ms</span></div>';
   }
   return '<div class="phase">' + rows + '</div>';

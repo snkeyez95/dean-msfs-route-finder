@@ -95,7 +95,13 @@ function buildCombinedReport(sessions){
     const ac = s.aircraft || 'n/a', tl = s.tlod, tld = tl != null ? String(tl) : 'n/a';
     const folder = (s.folder || '').replace(/\\/g, '/');
     const href = folder ? folder + '/report.html' : '';
-    const route = RC.displayRoute(s.route || ''), rdisp = route ? htmlEscape(route) : '—';
+    // v6.3.8: ✳ next to an airport in the route when it's a 3rd-party scenery the user owns.
+    const route = RC.displayRoute(s.route || '');
+    let rdisp = route ? htmlEscape(route) : '—';
+    if (route && (s.dep_scenery || s.arr_scenery)) {
+      const m = /^([A-Z]{3,4})-([A-Z]{3,4})$/.exec(route.toUpperCase());
+      if (m) rdisp = htmlEscape(m[1]) + (s.dep_scenery ? '✳' : '') + '-' + htmlEscape(m[2]) + (s.arr_scenery ? '✳' : '');
+    }
     const link = href ? '<a href="' + href + '" style="color:var(--accent);text-decoration:none">open</a>' : '';
     const prim = isPrimary(s.aircraft) ? '1' : '0';
     rows += '<tr data-tlod="' + tld + '" data-primary="' + prim + '">' +
