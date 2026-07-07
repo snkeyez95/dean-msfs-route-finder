@@ -23,6 +23,9 @@ function computeCoverage(sessions, grid){
   for(const ac of ACL) for(const t of TLL) counts[ac + '|' + t] = 0;
   for(const s of (sessions || [])){
     const ac = s.aircraft, t = s.tlod;
+    // s.excluded = confounded flight (e.g. flown with BATC unlike the rest of the benchmark) —
+    // logged and viewable forever, but never fills a cell nor sways any recommendation.
+    if(s.excluded) continue;
     if(ACL.includes(ac) && TLL.includes(t) && s.p99_ft_ms != null) counts[ac + '|' + t]++;
   }
   const acTotals = {};

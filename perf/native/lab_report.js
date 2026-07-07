@@ -177,7 +177,7 @@ function buildLabReport(sessionsDir) {
   try { idx = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'index.json'), 'utf8')); }
   catch (e) { return { ok: false, error: 'index.json unreadable: ' + e.message }; }
   const sessions = (idx.sessions || []).filter(s => s && s.folder);
-  const grid = sessions.filter(s => !s.experiment && !s.autofps_active && GRID_AC.includes(s.aircraft) && GRID_TL.includes(s.tlod) && s.p99_ft_ms != null);
+  const grid = sessions.filter(s => !s.experiment && !s.autofps_active && !s.excluded && GRID_AC.includes(s.aircraft) && GRID_TL.includes(s.tlod) && s.p99_ft_ms != null);
   const mcache = {};   // folder -> metrics
   const M = s => (mcache[s.folder] !== undefined ? mcache[s.folder] : (mcache[s.folder] = metricsFromSummary(readSummary(sessionsDir, s.folder))));
 

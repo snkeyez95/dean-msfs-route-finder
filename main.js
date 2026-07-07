@@ -1145,6 +1145,7 @@ ipcMain.handle('perf-compare-data', () => {
         consistency_pct: s.consistency_pct ?? null, peak_vram_mb: s.peak_vram_mb ?? null,
         avg_vram_mb, ground_stutter_pct, ground_p99, spike_count, total_vram_mb,
         experiment: s.experiment || null, autofps_active: s.autofps_active || null,
+        excluded: s.excluded || null,
         route: s.route || null
       };
     });
