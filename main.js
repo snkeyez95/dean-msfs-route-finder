@@ -195,6 +195,7 @@ if(!app.requestSingleInstanceLock()){
       const ch = spawn(process.execPath, [mod, path.join(USER_DATA, 'Sessions')], {
         detached: true, stdio: 'ignore', windowsHide: true,
         env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1',
+          ABRP_THIRDPARTY_ICAOS: JSON.stringify(thirdPartyIcaos()),   // for the report ✳ + flags on regen
           NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules') : path.join(__dirname, 'node_modules') }) });
       ch.on('error', e => LOG.warn('[MIGRATE] phases_ext backfill spawn failed: ' + e.message));
       ch.unref();

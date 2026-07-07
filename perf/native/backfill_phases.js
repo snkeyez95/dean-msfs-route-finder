@@ -8,8 +8,35 @@
 const fs = require('fs'), path = require('path');
 const { readChronological, readTelemetry } = require('./report_charts.js');
 const { trimHead, trimTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram } = require('./phases.js');
+const { buildReport } = require('./report_html.js');
 
 const HEAD = 5;
+// pre-v6.3.8 report.html files show the old 4-phase model — regenerate them from summary + the
+// sidecar so the phase breakdown + payware ✳ reflect the new 5-phase model. Detected by the absence
+// of "Departing taxi" in the existing report. report.html is derived (regenerable) — raw logs stay put.
+function regenReportIfStale(dir, summary, ext, tpSet) {
+  try {
+    const rp = path.join(dir, 'report.html');
+    if (!fs.existsSync(rp)) return;
+    if (fs.readFileSync(rp, 'utf8').includes('Departing taxi')) return;   // already new-model
+    const raw = path.join(dir, 'frametimes.csv');
+    if (!fs.existsSync(raw)) return;
+    let { ft } = readChronological(raw);
+    const sm = summary.smoothness || {};
+    [ft] = trimHead(ft, [], [], HEAD);
+    [ft] = trimTail(ft, [], [], sm.stop_trim_s || 0);
+    const sortedFt = ft.slice().sort((a, b) => a - b);
+    const stats = Object.assign({}, sm, { phases: ext.phases });   // 5-phase (does not touch summary.json)
+    const settings = Object.assign({}, summary.settings, {
+      dep_icao: ext.dep_icao, arr_icao: ext.arr_icao,
+      dep_scenery: ext.dep_icao ? tpSet.has(ext.dep_icao) : false,
+      arr_scenery: ext.arr_icao ? tpSet.has(ext.arr_icao) : false });
+    const html = buildReport(summary.session_id, settings, stats, summary.vram, ft, sortedFt, dir,
+      summary.driver_version, summary.sim_version);
+    fs.writeFileSync(rp, html);
+    return true;
+  } catch (_) { return false; }
+}
 
 function computeExt(dir, summary) {
   const raw = path.join(dir, 'frametimes.csv');
@@ -30,28 +57,30 @@ function computeExt(dir, summary) {
   return { v: 1, phases, dep_icao: m ? m[1] : null, arr_icao: m ? m[2] : null };
 }
 
-function runBackfill(sessionsDir) {
-  let idx; try { idx = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'index.json'), 'utf8')); } catch (_) { return { wrote: 0, skipped: 0, noData: 0 }; }
-  let wrote = 0, skipped = 0, noData = 0;
+function runBackfill(sessionsDir, tpIcaos) {
+  let idx; try { idx = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'index.json'), 'utf8')); } catch (_) { return { wrote: 0, skipped: 0, noData: 0, reports: 0 }; }
+  let tpSet; try { tpSet = new Set((tpIcaos || JSON.parse(process.env.ABRP_THIRDPARTY_ICAOS || '[]')).map(x => String(x).toUpperCase())); } catch (_) { tpSet = new Set(); }
+  let wrote = 0, skipped = 0, noData = 0, reports = 0;
   for (const s of (idx.sessions || [])) {
     if (!s.folder) continue;
     const dir = path.join(sessionsDir, s.folder.replace(/\//g, '\\'));
     const extPath = path.join(dir, 'phases_ext.json');
-    if (fs.existsSync(extPath)) { skipped++; continue; }
     let summary = null; try { summary = JSON.parse(fs.readFileSync(path.join(dir, 'summary.json'), 'utf8')); } catch (_) {}
-    // a summary already carrying the 5-phase model needs no sidecar (natively written)
+    // a summary already carrying the 5-phase model is native — nothing to sidecar or regenerate
     if (summary && summary.smoothness && summary.smoothness.phases && (summary.smoothness.phases.dep_taxi || summary.smoothness.phases.arr_taxi)) { skipped++; continue; }
-    const ext = summary ? computeExt(dir, summary) : null;
-    if (!ext) { noData++; continue; }
-    try { fs.writeFileSync(extPath, JSON.stringify(ext)); wrote++; } catch (_) {}
+    let ext = null;
+    if (fs.existsSync(extPath)) { try { ext = JSON.parse(fs.readFileSync(extPath, 'utf8')); } catch (_) {} skipped++; }
+    else { ext = summary ? computeExt(dir, summary) : null; if (ext) { try { fs.writeFileSync(extPath, JSON.stringify(ext)); wrote++; } catch (_) {} } else { noData++; } }
+    // regenerate a stale (old 4-phase) report.html from the sidecar so it shows the new model + ✳
+    if (ext && summary && regenReportIfStale(dir, summary, ext, tpSet)) reports++;
   }
-  return { wrote, skipped, noData };
+  return { wrote, skipped, noData, reports };
 }
 
 module.exports = { runBackfill, computeExt };
 
 if (require.main === module) {
   const dir = process.argv[2] || path.join(process.env.APPDATA, 'A Better Route Planner', 'Sessions');
-  const r = runBackfill(dir);
-  console.log('phases_ext backfill: wrote ' + r.wrote + ' · skipped ' + r.skipped + ' · no-data(no telemetry) ' + r.noData);
+  const r = runBackfill(dir, process.argv[3] ? JSON.parse(process.argv[3]) : null);
+  console.log('phases_ext backfill: wrote ' + r.wrote + ' · skipped ' + r.skipped + ' · no-data(no telemetry) ' + r.noData + ' · reports regenerated ' + r.reports);
 }
