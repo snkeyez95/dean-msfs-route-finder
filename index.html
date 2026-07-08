@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.9</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.10</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.9</div>
+    <div class="sb-ver">v6.3.10</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -5153,6 +5153,8 @@ function metarObsAgeMin(m){
   return age>=0?age:null;
 }
 const METAR_STALE_MIN=180;   // >3h old = don't trust it for ranking; flag it in the UI
+const DATIS_STALE_MIN=180;   // >3h old D-ATIS → cross-check its runway against the live wind
+const TAILWIND_MAX_KT=5;     // a tower switches the active runway only past ~5kt tailwind — the same tolerance we use before distrusting a stale D-ATIS runway
 function scoreMETAR(m){
   if(!m)return 0;
   let s={LIFR:8,IFR:6,MVFR:3,VFR:1}[(m.fltCat||'').toUpperCase()]||0;
@@ -5403,6 +5405,15 @@ function xwind(icao,rwyId,dir,spd){
   return Math.round(spd*Math.sin(angle*Math.PI/180));
 }
 
+// tailwind component (kt) on a specific runway; positive = tailwind, negative = headwind.
+// null when the wind is variable or we have no heading for that runway (can't judge).
+function tailwindComp(icao,rwyId,dir,spd){
+  const rwys=getRunways(icao);if(!rwys||dir==='VRB')return null;
+  const r=rwys.find(x=>x.r===rwyId);if(!r)return null;
+  const diff=((parseInt(dir)-r.h+360)%360),angle=diff>180?360-diff:diff;
+  return -Math.round(spd*Math.cos(angle*Math.PI/180));
+}
+
 async function fetchRwyData(icao){
   if(getRunways(icao))return;
   try{
@@ -5577,14 +5588,47 @@ async function fetchDatis(icao,idx,side,prefix){
   }
   const isArr=side==='arr';
   const rwyTxt=info.runways.length?info.runways.join('/'):null;
-  // override the Active Runway field with the authoritative value
+  const dAge=info.time?zuluAgeMin(info.time):null;
+  // STALE-D-ATIS WIND CROSS-CHECK (2026-07-08): a D-ATIS runway older than 3h may no longer match
+  // the wind. Keep trusting it (it uniquely encodes the dep/arr split, preferential/noise config,
+  // multiple runways, and the runway commercial traffic favors) UNLESS the wind has genuinely swung
+  // behind it — a real tailwind >5kt, the same tolerance a tower uses to switch the active runway.
+  // Only then default to the live-wind runway. Calm/variable wind or no heading data → keep D-ATIS.
+  let staleNote='';
   if(rwyEl&&rwyTxt){
-    rwyEl.innerHTML='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+
-      ' <span class="datis-tag">D-ATIS</span>';
+    let rwyHtml=null;
+    const stale=dAge!=null&&dAge>DATIS_STALE_MIN;
+    const m=stale?await fetchMetarObj(icao):null;
+    if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+    const w=m?parseWind(m.rawOb||''):null;
+    if(stale&&w&&w.dir!=='VRB'&&w.spd>=3){
+      // judge each listed runway; contradiction only if EVERY judgeable runway has >5kt tailwind
+      let judged=0, allBad=true;
+      for(const tok of info.runways){
+        const tw=tailwindComp(icao,tok,w.dir,w.spd);
+        if(tw==null)continue;                  // no heading → can't judge this token
+        judged++;
+        if(tw<=TAILWIND_MAX_KT)allBad=false;   // still an acceptable runway
+      }
+      if(judged>0&&allBad){
+        const best=bestRwy(icao,w.dir,w.spd);
+        if(best&&best!=='Check ATIS'){
+          const wz=(m.rawOb||'').match(/\b\d{2}(\d{4})Z\b/);   // HHMM of the METAR
+          const wLbl=wz?' '+wz[1]+'Z':'';
+          rwyHtml='RWY '+esc(best)+' <span class="datis-tag" title="Stale D-ATIS no longer matches the wind — this runway is estimated from the current METAR. Verify on ATIS.">&#9889; est. wind'+wLbl+'</span>';
+          staleNote='<div class="datis-note" style="margin-top:3px;color:var(--acc)">D-ATIS '+ageLabel(dAge)+' shows RWY '+esc(rwyTxt)+' &mdash; wind now favors RWY '+esc(best)+'; verify on ATIS.</div>';
+        }
+      }else if(judged>0){
+        staleNote='<div class="datis-note" style="margin-top:3px;color:var(--ink3)">D-ATIS '+ageLabel(dAge)+' &mdash; still fits the current wind.</div>';
+      }
+    }
+    if(rwyHtml==null){
+      rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag">D-ATIS</span>';
+    }
+    rwyEl.innerHTML=rwyHtml;
   }
   const icon=isArr?'&#128757;':'&#128745;'; // 🛬 / 🛫
   const verb=isArr?'Landing':'Departure';
-  const dAge=info.time?zuluAgeMin(info.time):null;
   const ageTag=dAge!=null?` &middot; <span style="color:${dAge>90?'var(--acc)':'var(--ink3)'}">${ageLabel(dAge)}</span>`:'';
   const head=icon+' '+verb+(rwyTxt?' RWY '+rwyTxt:'')+
     (info.approach?' &middot; '+info.approach:'')+
@@ -5596,7 +5640,7 @@ async function fetchDatis(icao,idx,side,prefix){
     : '';
   const raw='<details class="datis-exp"><summary>Raw D-ATIS</summary><pre class="datis-raw">'+
     esc(info.raw)+'</pre></details>';
-  box.innerHTML='<div class="datis-head">'+head+'</div>'+bullets+raw;
+  box.innerHTML='<div class="datis-head">'+head+'</div>'+staleNote+bullets+raw;
 }
 
 // ── CHALLENGES ───────────────────────────────────────────────────────────────
@@ -6031,5 +6075,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.9</div>
+  pointer-events:none;">v6.3.10</div>
 </body></html>
