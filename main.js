@@ -641,9 +641,14 @@ ipcMain.handle('si-write-community-routes', (_, snapshot) => {
   }
 });
 
-ipcMain.handle('activate-scenery', (_, {dep, arr, depFolder, arrFolder, libraryFolder, communityFolder}) => {
+ipcMain.handle('activate-scenery', (_, {dep, arr, depFolder, arrFolder, folders, libraryFolder, communityFolder}) => {
   const created = [], skipped = [], errors = [];
-  for (const [icao, folder] of [[dep, depFolder], [arr, arrFolder]]) {
+  // Prefer an explicit folder list (an ICAO can own more than one scenery folder, e.g. KLAS =
+  // airport + city). Fall back to the legacy dep/arr pair for any older caller.
+  const pairs = Array.isArray(folders) && folders.length
+    ? folders.map(f => [null, f])
+    : [[dep, depFolder], [arr, arrFolder]];
+  for (const [icao, folder] of pairs) {
     if (!folder) continue;
     const src = path.join(libraryFolder, folder);
     const dest = path.join(communityFolder, folder);

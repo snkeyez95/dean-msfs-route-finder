@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.12</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.13</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.12</div>
+    <div class="sb-ver">v6.3.13</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1742,18 +1742,20 @@ async function gsxInstallProfile(icao){
 
 async function togA(icao,checked){
   if(!S.cfg.communityFolder){alert('Set your Community folder in Settings → Sim Integration first.');renderApts();return;}
-  const row=S.allRows.find(r=>r.icao===icao);
-  if(!row)return;
+  // An ICAO can own more than one scenery folder (e.g. KLAS = airport + city) — link/unlink ALL of them.
+  const rows=S.allRows.filter(r=>r.icao===icao&&r.selected!==false);
+  if(!rows.length)return;
+  const folders=rows.map(r=>r.folder);
   if(checked){
-    const res=await window.api.activateScenery({dep:icao,arr:null,depFolder:row.folder,arrFolder:null,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
+    const res=await window.api.activateScenery({folders,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
     if(!res||!res.ok){alert('Activation failed: '+(res&&res.error||'unknown error'));renderApts();return;}
     const j=new Set(S.cfg.activeJunctions||[]);
-    res.created.forEach(f=>j.add(f));
+    res.created.forEach(f=>j.add(f));res.skipped.forEach(f=>j.add(f));   // track already-linked folders too so every checkbox for this ICAO converges
     S.cfg.activeJunctions=Array.from(j);
   }else{
-    const res=await window.api.deactivateScenery({folders:[row.folder],communityFolder:S.cfg.communityFolder});
+    const res=await window.api.deactivateScenery({folders,communityFolder:S.cfg.communityFolder});
     if(!res||!res.ok){alert('Deactivation failed: '+(res&&res.error||'unknown error'));renderApts();return;}
-    S.cfg.activeJunctions=(S.cfg.activeJunctions||[]).filter(f=>f!==row.folder);
+    S.cfg.activeJunctions=(S.cfg.activeJunctions||[]).filter(f=>!folders.includes(f));
   }
   window.api.saveConfig(S.cfg);
   renderApts();
@@ -3575,41 +3577,44 @@ function restoreTripPlan(){
 // ── SCENERY ACTIVATION ───────────────────────────────────────────────────────
 function sceneryBtnHtml(dep,arr,ns,idx,acType){
   if(!S.cfg.communityFolder)return'';
-  const depRow=S.allRows.find(r=>r.icao===dep&&r.selected!==false);
-  const arrRow=S.allRows.find(r=>r.icao===arr&&r.selected!==false);
-  if(!depRow&&!arrRow)return'';
+  const depRows=S.allRows.filter(r=>r.icao===dep&&r.selected!==false);
+  const arrRows=S.allRows.filter(r=>r.icao===arr&&r.selected!==false);
+  if(!depRows.length&&!arrRows.length)return'';
   const acGroup=acType?aircraftGroupForType(acType):null;
   const acActive=acGroup?(S.cfg.aircraftActive||[]).includes(acGroup.id):true;
   const junctions=S.cfg.activeJunctions||[];
-  function statusIcon(row,icao){
-    if(!row)return`<span style="color:var(--ink4);font-size:12px" title="Not in library">—</span>`;
-    if(junctions.includes(row.folder))return`<span style="color:var(--grn);font-size:13px" title="Active in Community folder">✓</span>`;
+  const allLinked=rows=>rows.length>0&&rows.every(r=>junctions.includes(r.folder));   // every folder for this ICAO is active
+  const anyLinked=rows=>rows.some(r=>junctions.includes(r.folder));
+  function statusIcon(rows){
+    if(!rows.length)return`<span style="color:var(--ink4);font-size:12px" title="Not in library">—</span>`;
+    if(allLinked(rows))return`<span style="color:var(--grn);font-size:13px" title="Active in Community folder">✓</span>`;
     return`<span style="color:var(--acc);font-size:13px" title="In library, not activated">◎</span>`;
   }
-  const depF=depRow?`'${depRow.folder}'`:'null';
-  const arrF=arrRow?`'${arrRow.folder}'`:'null';
-  const depActive=depRow&&junctions.includes(depRow.folder);
-  const arrActive=arrRow&&junctions.includes(arrRow.folder);
-  const anyActive=depActive||arrActive;
-  const allActive=(!depRow||depActive)&&(!arrRow||arrActive)&&acActive;
+  const depActive=allLinked(depRows);
+  const arrActive=allLinked(arrRows);
+  const anyActive=anyLinked(depRows)||anyLinked(arrRows);
+  const allActive=(!depRows.length||depActive)&&(!arrRows.length||arrActive)&&acActive;
   const acTypeEsc=(acType||'').replace(/'/g,"\\'");
-  const activateBtn=!allActive?`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}',${depF},${arrF},'${acTypeEsc}')">&#9654; Activate</button>`:'';
-  const removeBtn=anyActive?`<button class="btn bg bsm" style="border-color:rgba(50,215,75,.3);color:var(--grn)" onclick="doDeactivateScenery(${depF},${arrF})">&#10006; Remove</button>`:'';
+  const activateBtn=!allActive?`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}','${acTypeEsc}')">&#9654; Activate</button>`:'';
+  const removeBtn=anyActive?`<button class="btn bg bsm" style="border-color:rgba(50,215,75,.3);color:var(--grn)" onclick="doDeactivateScenery('${dep}','${arr}')">&#10006; Remove</button>`:'';
   const acLine=acGroup?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${acActive?'<span style="color:var(--grn);font-size:13px" title="Aircraft linked into Community">✓</span>':'<span style="color:var(--acc);font-size:13px" title="Aircraft available to link">◎</span>'}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${acType}</span><span style="color:var(--ink3)">${acGroup.label} (${acGroup.packages.length} pkg)</span></div>`:'';
+  const folderTxt=rows=>rows.length?rows.map(r=>r.folder).join(', '):'not in library';
   return`<div style="display:flex;flex-direction:column;gap:4px;margin-left:4px;align-self:center">
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(depRow,dep)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${dep}</span><span style="color:var(--ink3)">${depRow?depRow.folder:'not in library'}</span></div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(arrRow,arr)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${arr}</span><span style="color:var(--ink3)">${arrRow?arrRow.folder:'not in library'}</span></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(depRows)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${dep}</span><span style="color:var(--ink3)">${folderTxt(depRows)}</span></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(arrRows)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${arr}</span><span style="color:var(--ink3)">${folderTxt(arrRows)}</span></div>
     ${acLine}
     <div style="display:flex;gap:6px;margin-top:2px">${activateBtn}${removeBtn}</div>
   </div>`;
 }
 
-async function doActivateScenery(dep,arr,depFolder,arrFolder,acType){
+async function doActivateScenery(dep,arr,acType){
   if(!S.cfg.communityFolder){alert('Set your Community folder in Settings → Sim Integration first.');return;}
-  const res=await window.api.activateScenery({dep,arr,depFolder:depFolder||null,arrFolder:arrFolder||null,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
+  // Link EVERY folder owned by dep and by arr (an ICAO can have more than one, e.g. KLAS).
+  const folders=S.allRows.filter(r=>(r.icao===dep||r.icao===arr)&&r.selected!==false).map(r=>r.folder);
+  const res=await window.api.activateScenery({folders,libraryFolder:S.folderPath,communityFolder:S.cfg.communityFolder});
   if(!res||!res.ok){alert('Activation failed: '+(res&&res.error||'unknown error'));return;}
   const junctions=new Set(S.cfg.activeJunctions||[]);
-  res.created.forEach(f=>junctions.add(f));
+  res.created.forEach(f=>junctions.add(f));res.skipped.forEach(f=>junctions.add(f));
   S.cfg.activeJunctions=Array.from(junctions);
   // Also link the aircraft bundle for this route (aircraft + liveries + sound).
   let acMsg='';
@@ -3630,9 +3635,10 @@ async function doActivateScenery(dep,arr,depFolder,arrFolder,acType){
   renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();renderApts();
 }
 
-async function doDeactivateScenery(depFolder,arrFolder){
+async function doDeactivateScenery(dep,arr){
   if(!S.cfg.communityFolder)return;
-  const folders=[depFolder,arrFolder].filter(Boolean);
+  // Remove EVERY folder owned by dep and by arr (mirror the activation grouping).
+  const folders=S.allRows.filter(r=>(r.icao===dep||r.icao===arr)&&r.selected!==false).map(r=>r.folder);
   const res=await window.api.deactivateScenery({folders,communityFolder:S.cfg.communityFolder});
   if(!res||!res.ok){alert('Deactivation failed: '+(res&&res.error||'unknown error'));return;}
   const junctions=new Set(S.cfg.activeJunctions||[]);
@@ -6089,5 +6095,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.12</div>
+  pointer-events:none;">v6.3.13</div>
 </body></html>
