@@ -39,6 +39,12 @@ analyzing that data well - comparative, quantitative, and to the point.
   (2026-06-22 onward) can be split; older ones have neither. When ranking airports by ground cost,
   normalize per-aircraft (Fenix's avionics make its taxi heavier than PMDG's) and gate on sample
   size - one taxi at one airport is not a verdict (a fresh reboot alone swings ground numbers).
+  **The app's 🛬 Scenery view (v6.4.1) does exactly this** - it z-scores each airport's per-end taxi
+  metric against that SAME (aircraft, end)'s baseline at every OTHER airport (leave-one-out), so the
+  aircraft AND the arrival-vs-departure difference both cancel and only genuine scenery cost ranks.
+  Impact chip HIGH/MEDIUM/LOW by z (worst of taxi stutter / taxi VRAM), COLLECTING under 3 samples.
+  Match this method in chat: never rank a payware airport as "the problem" on raw taxi numbers -
+  compare it to your typical ground for the same plane, and say "collecting" when the sample is thin.
 - `Sessions\<date>\<time...>\frametimes.csv` - raw per-frame PresentMon data. Beyond frametime it
   carries a full forensic stack (`TimeInMs`, `MsCPUBusy`, `MsCPUWait`, `MsGPUBusy`, `MsGPUWait`,
   `MsGPULatency`, `MsRenderPresentLatency`, `MsAnimationError`, `PresentMode`) - the basis for spike

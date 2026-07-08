@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.4.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.4.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -385,7 +385,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.4.0</div>
+    <div class="sb-ver">v6.4.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3762,6 +3762,7 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" onclick="perfShowCompare()" title="Compare your flights grouped by sim version, GPU driver, aircraft, or TLOD — see whether the numbers actually change">&#9878; Compare</button>'
     +'<button class="btn bg bsm" onclick="perfShowBaseline()" title="One blended TLOD that keeps both PMDG and Fenix smooth — your recommended global setting">&#127919; Baseline</button>'
     +'<button class="btn bg bsm" onclick="perfShowLab()" title="Settings Lab findings — what each experiment actually did to your smoothness, judged against your normal flight-to-flight variation">&#129514; Lab</button>'
+    +'<button class="btn bg bsm" onclick="perfShowScenery()" title="Rank which airports cost the most ground (taxi) performance — measured against your typical ground for the same plane, so the aircraft isn&#39;t blamed for the scenery">&#128748; Scenery</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
     +'<button class="btn bg bsm" id="cfx-export-btn" onclick="perfExportCfx()" title="Convert the flight you&#39;re viewing to a CapFrameX-format CSV (Sessions\\CapFrameX). From the dashboard you get a picker instead — choose one flight folder, a date, or Sessions for everything.">&#8687; CapFrameX</button>'
@@ -3771,14 +3772,99 @@ async function renderPerfPane(){
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
     +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
     +'<div id="perf-baseline" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
-    +'<div id="perf-lab" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
+    +'<div id="perf-lab" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
+    +'<div id="perf-scenery" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
   perfShowDashboard();
   renderLabPanel();   // Settings Lab (Phase 9) — async, fills #lab-panel
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
-function _perfHideViews(){ for(const id of ['perf-frame','perf-compare','perf-baseline','perf-lab']){ const el=document.getElementById(id); if(el)el.style.display='none'; } }
+function _perfHideViews(){ for(const id of ['perf-frame','perf-compare','perf-baseline','perf-lab','perf-scenery']){ const el=document.getElementById(id); if(el)el.style.display='none'; } }
 function perfShowDashboard(){ _perfHideViews(); const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
+
+// ── SCENERY IMPACT VIEW ──────────────────────────────────────────────────────
+// Ranks which airports cost the most ground (taxi) performance. The confound: taxi metrics are driven by
+// the AIRCRAFT (FenixDisplay/PMDG WASM) and arrivals are heavier than departures. Killed by scoring each
+// airport's per-(aircraft,end) taxi metric against that SAME (aircraft,end)'s baseline at every OTHER
+// airport (leave-one-out) — so only genuine scenery cost ranks, not the plane, and a dominant payware
+// airport can't hide inside its own baseline.
+let _scnData=null;
+const _scnState={paywareOnly:false};
+const _SCN_M=[{k:'stut',label:'Taxi stutter'},{k:'vram',label:'Taxi VRAM'}];   // ranked (lower=better)
+const _SCNV={high:{c:'#e0823c',bg:'rgba(224,130,60,.12)',t:'HIGH IMPACT'},medium:{c:'#d4a017',bg:'rgba(212,160,23,.12)',t:'MEDIUM'},low:{c:'var(--grn)',bg:'rgba(70,196,106,.10)',t:'LOW'},collecting:{c:'var(--ink3)',bg:'var(--bg)',t:'COLLECTING'}};
+async function perfShowScenery(){
+  _perfHideViews();
+  const sc=document.getElementById('perf-scenery'); if(!sc)return; sc.style.display='block';
+  sc.innerHTML='<div style="font-size:13px;color:var(--ink3)">Crunching your ground performance&hellip;</div>';
+  let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
+  _scnData=(r&&r.ok&&Array.isArray(r.flights))?r.flights:[];
+  renderScenery();
+}
+function _scnAgg(flights){
+  const clean=(flights||[]).filter(f=>!f.experiment&&!f.excluded&&!f.autofps_active);
+  const S_=[];   // one sample per airport-END per flight
+  for(const f of clean){
+    if(f.dep_icao&&(f.dep_taxi_stutter!=null||f.dep_taxi_vram!=null)) S_.push({icao:f.dep_icao,end:'dep',ac:f.aircraft||'?',payware:!!f.dep_scenery,stut:f.dep_taxi_stutter,p99:f.dep_taxi_p99,vram:f.dep_taxi_vram});
+    if(f.arr_icao&&(f.arr_taxi_stutter!=null||f.arr_taxi_vram!=null)) S_.push({icao:f.arr_icao,end:'arr',ac:f.aircraft||'?',payware:!!f.arr_scenery,stut:f.arr_taxi_stutter,p99:f.arr_taxi_p99,vram:f.arr_taxi_vram});
+  }
+  const vals=(arr,k)=>arr.map(s=>s[k]).filter(x=>x!=null&&!isNaN(x));
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  const rows=[];
+  for(const icao of [...new Set(S_.map(s=>s.icao))]){
+    const mine=S_.filter(s=>s.icao===icao);
+    const per={};
+    for(const m of _SCN_M){
+      const zParts=[];
+      for(const combo of [...new Set(mine.map(s=>s.ac+'|'+s.end))]){
+        const [ac,end]=combo.split('|');
+        const here=vals(mine.filter(s=>s.ac===ac&&s.end===end),m.k); if(!here.length)continue;
+        const pool=vals(S_.filter(s=>s.ac===ac&&s.end===end&&s.icao!==icao),m.k);   // leave-one-out
+        if(pool.length<3)continue;
+        const sd=_pstdev(pool); if(!(sd>0))continue;
+        zParts.push((mean(here)-mean(pool))/sd);
+      }
+      per[m.k]={mean:mean(vals(mine,m.k)),z:zParts.length?mean(zParts):null,nz:zParts.length};
+    }
+    const zs=_SCN_M.map(m=>per[m.k].z).filter(z=>z!=null);
+    const impactZ=zs.length?Math.max(...zs):null;     // worst dimension defines the pain
+    const n=mine.length;
+    let chip; if(n<3||impactZ==null)chip='collecting'; else if(impactZ<1)chip='low'; else if(impactZ<2)chip='medium'; else chip='high';
+    rows.push({icao,name:frAptName(icao)||icao,payware:mine.some(s=>s.payware)||(S.selICAOs&&S.selICAOs.has(icao)),
+      acs:[...new Set(mine.map(s=>s.ac))],n,per,impactZ,p99mean:mean(vals(mine,'p99')),chip});
+  }
+  const order={high:0,medium:1,low:2,collecting:3};
+  rows.sort((a,b)=>order[a.chip]!==order[b.chip]?order[a.chip]-order[b.chip]:(b.impactZ||-99)-(a.impactZ||-99));
+  return rows;
+}
+function scnTogglePayware(){ _scnState.paywareOnly=!_scnState.paywareOnly; renderScenery(); }
+function renderScenery(){
+  const sc=document.getElementById('perf-scenery'); if(!sc)return;
+  const star=ic=>(S.selICAOs&&S.selICAOs.has(ic))?'<span title="You own 3rd-party scenery for this airport" style="color:var(--acc)">&#10035;</span>':'';
+  let rows=_scnAgg(_scnData||[]);
+  if(!rows.length){ sc.innerHTML='<div style="font-size:15px;font-weight:700;color:var(--ink1);margin-bottom:8px">&#128748; Scenery impact</div><div style="font-size:13px;color:var(--ink3)">No ground-phase data yet — fly a few flights and this ranks which airports cost you the most on the taxi.</div>'; return; }
+  if(_scnState.paywareOnly) rows=rows.filter(r=>r.payware);
+  let h='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:15px;font-weight:700;color:var(--ink1)">&#128748; Scenery impact</span>'
+    +'<label style="font-size:12px;color:var(--ink3);display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" '+(_scnState.paywareOnly?'checked':'')+' onchange="scnTogglePayware()" style="accent-color:var(--acc)"> payware only (&#10035;)</label></div>'
+    +'<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Ranked by how much heavier your ground (taxi) performance is at each airport vs your typical ground for the <b>same plane and same end</b> (arrival/departure) — this cancels the aircraft, so a heavy jet isn&rsquo;t blamed on the scenery. &#10035; = you own payware here (addressable). Fresh-boot VRAM, live traffic, and weather also move these numbers, so treat anything under 3 samples as preliminary and ignore tiny gaps. (Felt stutters/hr is a whole-flight number, so it can&rsquo;t be pinned to one airport — see Compare.)</div>';
+  if(!rows.length){ h+='<div style="font-size:13px;color:var(--ink3)">No payware airports in your flights yet.</div>'; sc.innerHTML=h; return; }
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:5px 6px">Airport</th><th style="padding:5px 6px">samples</th><th style="text-align:left;padding:5px 6px">planes</th><th style="padding:5px 6px">taxi stutter</th><th style="padding:5px 6px">taxi VRAM</th><th style="padding:5px 6px">taxi p99</th><th style="text-align:center;padding:5px 6px">impact</th></tr>';
+  const dz=z=>z==null?'':(' <span style="color:var(--ink3)">('+(z>0?'+':'')+z.toFixed(1)+'&sigma;)</span>');
+  for(const r of rows){
+    const v=_SCNV[r.chip], st=r.per.stut, vr=r.per.vram, coll=r.chip==='collecting';
+    h+='<tr style="border-top:1px solid var(--sep);text-align:right;color:var(--ink1)">'
+      +'<td style="text-align:left;padding:6px"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+r.icao+'</span> '+star(r.icao)+' <span style="color:var(--ink3)">'+esc(r.name)+'</span></td>'
+      +'<td style="padding:6px">'+r.n+'</td>'
+      +'<td style="text-align:left;padding:6px;color:var(--ink3)">'+r.acs.map(a=>esc(a)).join(', ')+'</td>'
+      +'<td style="padding:6px">'+(st.mean!=null?st.mean.toFixed(3)+'%':'&mdash;')+(coll?'':dz(st.z))+'</td>'
+      +'<td style="padding:6px">'+(vr.mean!=null?Math.round(vr.mean):'&mdash;')+(coll?'':dz(vr.z))+'</td>'
+      +'<td style="padding:6px;color:var(--ink3)">'+(r.p99mean!=null?r.p99mean.toFixed(1):'&mdash;')+'</td>'
+      +'<td style="text-align:center;padding:6px"><span style="font-size:10px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';background:'+v.bg+';border:1px solid '+v.c+';border-radius:5px;padding:2px 7px">'+v.t+(coll?' '+r.n+'/3':'')+'</span></td>'
+      +'</tr>';
+  }
+  h+='</table>';
+  sc.innerHTML=h;
+}
 
 // ── COMPARE VIEW ─────────────────────────────────────────────────────────────
 // Group logged flights by one factor (sim version / driver / aircraft / TLOD) and show whether the
@@ -6266,5 +6352,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.4.0</div>
+  pointer-events:none;">v6.4.1</div>
 </body></html>
