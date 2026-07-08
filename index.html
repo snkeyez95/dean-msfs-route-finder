@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.11</div>
+  <div class="tname">A Better Route Planner &mdash; v6.3.12</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -380,7 +380,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.11</div>
+    <div class="sb-ver">v6.3.12</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -5154,6 +5154,7 @@ function metarObsAgeMin(m){
 }
 const METAR_STALE_MIN=180;   // >3h old = don't trust it for ranking; flag it in the UI
 const DATIS_STALE_MIN=180;   // >3h old D-ATIS → cross-check its runway against the live wind
+const DATIS_VERYSTALE_MIN=720; // >12h old → too stale to trust the runway even if the wind fits; suggest from wind instead (like a no-D-ATIS airport)
 const TAILWIND_MAX_KT=5;     // a tower switches the active runway only past ~5kt tailwind — the same tolerance we use before distrusting a stale D-ATIS runway
 function scoreMETAR(m){
   if(!m)return 0;
@@ -5598,6 +5599,7 @@ async function fetchDatis(icao,idx,side,prefix){
   if(rwyEl&&rwyTxt){
     let rwyHtml=null;
     const stale=dAge!=null&&dAge>DATIS_STALE_MIN;
+    const veryStale=dAge!=null&&dAge>DATIS_VERYSTALE_MIN;
     const m=stale?await fetchMetarObj(icao):null;
     if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
     const w=m?parseWind(m.rawOb||''):null;
@@ -5610,17 +5612,29 @@ async function fetchDatis(icao,idx,side,prefix){
         judged++;
         if(tw<=TAILWIND_MAX_KT)allBad=false;   // still an acceptable runway
       }
-      if(judged>0&&allBad){
+      const contradicted=judged>0&&allBad;
+      if(veryStale||contradicted){
+        // >12h old (too stale to trust at all), OR the wind has clearly turned against it →
+        // suggest the runway from live wind, exactly like a no-D-ATIS airport's METAR briefing
         const best=bestRwy(icao,w.dir,w.spd);
         if(best&&best!=='Check ATIS'){
           const wz=(m.rawOb||'').match(/\b\d{2}(\d{4})Z\b/);   // HHMM of the METAR
           const wLbl=wz?' '+wz[1]+'Z':'';
-          rwyHtml='RWY '+esc(best)+' <span class="datis-tag" title="Stale D-ATIS no longer matches the wind — this runway is estimated from the current METAR. Verify on ATIS.">&#9889; est. wind'+wLbl+'</span>';
-          staleNote='<div class="datis-note" style="margin-top:3px;color:var(--acc)">D-ATIS '+ageLabel(dAge)+' shows RWY '+esc(rwyTxt)+' &mdash; wind now favors RWY '+esc(best)+'; verify on ATIS.</div>';
+          rwyHtml='RWY '+esc(best)+' <span class="datis-tag" title="Estimated from the current METAR wind, not the stale D-ATIS. Verify on ATIS.">&#9889; est. wind'+wLbl+'</span>';
+          staleNote='<div class="datis-note" style="margin-top:3px;color:var(--acc)">'+
+            (veryStale
+              ? 'D-ATIS '+ageLabel(dAge)+' &mdash; too old to rely on; suggesting RWY '+esc(best)+' from current wind. Verify on ATIS.'
+              : 'D-ATIS '+ageLabel(dAge)+' shows RWY '+esc(rwyTxt)+' &mdash; wind now favors RWY '+esc(best)+'; verify on ATIS.')+
+            '</div>';
         }
       }else if(judged>0){
         staleNote='<div class="datis-note" style="margin-top:3px;color:var(--ink3)">D-ATIS '+ageLabel(dAge)+' &mdash; still fits the current wind.</div>';
       }
+    }
+    // very old but we couldn't derive a wind runway (calm/variable, or no runway data) → at least
+    // drop any "fits" reassurance and flag it plainly; keep showing the old runway (best we have)
+    if(veryStale&&!staleNote){
+      staleNote='<div class="datis-note" style="margin-top:3px;color:var(--acc)">D-ATIS '+ageLabel(dAge)+' &mdash; very old; verify the active runway on ATIS.</div>';
     }
     if(rwyHtml==null){
       rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag">D-ATIS</span>';
@@ -6075,5 +6089,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.11</div>
+  pointer-events:none;">v6.3.12</div>
 </body></html>
