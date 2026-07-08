@@ -1191,7 +1191,7 @@ ipcMain.handle('perf-compare-data', () => {
     if (!fs.existsSync(idxPath)) return { ok:false, reason:'no-data', flights:[] };
     const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
     const flights = (data.sessions || []).map(s => {
-      let avg_vram_mb = null, spike_count = null, total_vram_mb = null;
+      let avg_vram_mb = null, spike_count = null, total_vram_mb = null, perceptible_count = null, duration_seconds = null;
       // v6.3.8 5-phase model: departing + arrival taxi (each p99/stutter/peak-VRAM). New flights carry
       // it in summary.smoothness.phases; the 24 pre-v6.3.8 flights carry it in the phases_ext.json
       // sidecar (originals untouched). Also dep/arr ICAO + 3rd-party scenery flags.
@@ -1206,6 +1206,8 @@ ipcMain.handle('perf-compare-data', () => {
           if (sj && sj.vram && sj.vram.avg_vram_mb != null) avg_vram_mb = sj.vram.avg_vram_mb;
           if (sj && sj.vram && sj.vram.total_vram_mb != null) total_vram_mb = sj.vram.total_vram_mb;
           if (sj && sj.smoothness && sj.smoothness.spike_count != null) spike_count = sj.smoothness.spike_count;
+          if (sj && sj.smoothness && sj.smoothness.perceptible_count != null) perceptible_count = sj.smoothness.perceptible_count;
+          if (sj && sj.smoothness && sj.smoothness.duration_seconds != null) duration_seconds = sj.smoothness.duration_seconds;
           const ph = sj && sj.smoothness && sj.smoothness.phases;
           if (ph && (ph.dep_taxi || ph.arr_taxi)) { dep_taxi = ph.dep_taxi || null; arr_taxi = ph.arr_taxi || null; }
         }
@@ -1219,15 +1221,23 @@ ipcMain.handle('perf-compare-data', () => {
             if (arr_scenery == null) arr_scenery = e.arr_scenery ?? null;
           }
         }
+        // perceptible_count may live in the sidecar even when the 5-phase split does not (native
+        // flights captured before v6.4.0, or old flights) — pick it up independently.
+        if (perceptible_count == null && fdir) {
+          const ext = path.join(fdir, 'phases_ext.json');
+          if (fs.existsSync(ext)) { try { const e = JSON.parse(fs.readFileSync(ext, 'utf8')); if (e.perceptible_count != null) perceptible_count = e.perceptible_count; } catch(_){} }
+        }
       } catch(_){}
       const pv = (o, k) => (o && o[k] != null) ? o[k] : null;
+      // "felt stutter" rate: big (>100ms) hitches per rendered hour — the ones Dean actually notices
+      const felt_stutter_hr = (perceptible_count != null && duration_seconds) ? perceptible_count / (duration_seconds / 3600) : null;
       return {
-        session_id: s.session_id || null, aircraft: s.aircraft || null,
+        session_id: s.session_id || null, aircraft: s.aircraft || null, timestamp: s.timestamp || null,
         tlod: s.tlod ?? null, olod: s.olod ?? null,
         sim_version: s.sim_version || null, driver_version: s.driver_version || null,
         p99_ft_ms: s.p99_ft_ms ?? null, stutter_pct: s.stutter_pct ?? null,
         consistency_pct: s.consistency_pct ?? null, peak_vram_mb: s.peak_vram_mb ?? null,
-        avg_vram_mb, spike_count, total_vram_mb,
+        avg_vram_mb, spike_count, total_vram_mb, perceptible_count, felt_stutter_hr,
         dep_taxi_p99: pv(dep_taxi,'p99_ft'), dep_taxi_stutter: pv(dep_taxi,'stutter_pct'), dep_taxi_vram: pv(dep_taxi,'vram_peak'),
         arr_taxi_p99: pv(arr_taxi,'p99_ft'), arr_taxi_stutter: pv(arr_taxi,'stutter_pct'), arr_taxi_vram: pv(arr_taxi,'vram_peak'),
         dep_icao, arr_icao, dep_scenery, arr_scenery,

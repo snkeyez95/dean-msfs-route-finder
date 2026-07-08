@@ -345,7 +345,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.3.14</div>
+  <div class="tname">A Better Route Planner &mdash; v6.4.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -372,6 +372,11 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
   <button onclick="openMaintenance()" style="margin-left:12px;background:rgba(70,196,106,0.22);border:1px solid rgba(70,196,106,0.5);border-radius:4px;color:#46c46a;cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 10px">Open Maintenance</button>
   <button onclick="maintAck()" title="Dismiss" style="margin-left:auto;background:none;border:none;color:#46c46a;cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
+<div id="drift-banner" style="display:none;background:rgba(245,166,35,0.13);border-bottom:1px solid rgba(245,166,35,0.4);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
+  <span id="drift-msg"></span>
+  <button onclick="driftOpen()" style="margin-left:12px;background:rgba(245,166,35,0.22);border:1px solid rgba(245,166,35,0.5);border-radius:4px;color:var(--acc);cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 10px">See details</button>
+  <button onclick="driftDismiss()" title="Dismiss" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
+</div>
 <div id="si-banner" style="display:none;background:rgba(245,166,35,0.15);border-bottom:1px solid rgba(245,166,35,0.35);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="si-banner-msg">SayIntentions cookie expired &mdash; paste new cookie in the Settings tab</span>
   <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
@@ -380,7 +385,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.3.14</div>
+    <div class="sb-ver">v6.4.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1301,6 +1306,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   setInterval(updateCaptureBadge,7000);
   // Maintenance watcher: prompt to clear caches if the sim or GPU driver changed since last launch.
   checkMaintenanceVersions();
+  // Drift monitor: alert if the newest-flown driver/sim is measurably worse than your baseline.
+  checkDrift();
   // NVCP backup stamp.
   nvcpRefreshStatus();
   // Auto-refresh routes
@@ -3783,10 +3790,98 @@ const _cmpMetrics=[
   {k:'p99_ft_ms',     label:'P99 frametime', unit:'ms', low:true,  dec:2},
   {k:'stutter_pct',   label:'Stutter',       unit:'%',  low:true,  dec:2},
   {k:'consistency_pct',label:'Consistency',  unit:'%',  low:false, dec:1},
+  {k:'dep_taxi_stutter',label:'Dep-taxi stutter',unit:'%', low:true, dec:3},
+  {k:'arr_taxi_stutter',label:'Arr-taxi stutter',unit:'%', low:true, dec:3},
+  {k:'felt_stutter_hr', label:'Felt stutters / hr', unit:'/hr', low:true, dec:1},
   {k:'avg_vram_mb',   label:'Avg VRAM',      unit:'MB', low:true,  dec:0},
   {k:'peak_vram_mb',  label:'Peak VRAM',     unit:'MB', low:true,  dec:0},
 ];
 const _cmpDimLabel={sim_version:'Sim version',driver_version:'GPU driver',aircraft:'Aircraft',tlod:'TLOD'};
+
+// ── VERSION-COMPARISON VERDICT (R4) — honest + confound-aware: matched (aircraft,TLOD) cells only,
+// judged against a ±1σ noise band (never pooled all-vs-all means — the "fake 2 ms" trap). ──────────
+function _pstdev(vals){ const n=vals.length; if(n<2)return 0; const m=vals.reduce((a,b)=>a+b,0)/n; return Math.sqrt(vals.reduce((s,v)=>s+(v-m)*(v-m),0)/n); }
+const _VERV={better:{c:'#46c46a',t:'FASTER'},worse:{c:'#e0823c',t:'SLOWER'},mixed:{c:'#b07cff',t:'MIXED'},noeffect:{c:'var(--ink3)',t:'NO REAL DIFFERENCE'},collecting:{c:'var(--ink3)',t:'COLLECTING DATA'},nooverlap:{c:'var(--ink3)',t:'NO MATCHED FLIGHTS'}};
+// smoothness metrics that decide a version verdict (lower = better for every one)
+const _VER_METRICS=[{k:'p99_ft_ms',label:'P99 frametime',unit:'ms',dec:2},{k:'stutter_pct',label:'stutter',unit:'%',dec:2},{k:'dep_taxi_stutter',label:'dep-taxi stutter',unit:'pp',dec:3},{k:'arr_taxi_stutter',label:'arr-taxi stutter',unit:'pp',dec:3},{k:'felt_stutter_hr',label:'felt stutters/hr',unit:'/hr',dec:1}];
+// Compare version `cand` vs `base` on flights sharing the same (aircraft,TLOD). Per matched cell we take
+// mean(cand)-mean(base), then average those cell-deltas (equal weight) so aircraft/TLOD mix can't skew it.
+function _verdictPair(flights,dim,base,cand){
+  const A=flights.filter(f=>f[dim]===base), B=flights.filter(f=>f[dim]===cand);
+  const cellKey=f=>f.aircraft+'|'+f.tlod;
+  const aCells=new Set(A.map(cellKey)), bCells=new Set(B.map(cellKey));
+  const matched=[...aCells].filter(k=>bCells.has(k));
+  if(!matched.length)return{state:'ok',verdict:'nooverlap',dim,base,cand,nA:A.length,nB:B.length,matched:0,deltas:[]};
+  const inM=f=>matched.includes(cellKey(f));
+  const Am=A.filter(inM), Bm=B.filter(inM);
+  const deltas=[]; let worse=false,better=false,enough=true;
+  for(const m of _VER_METRICS){
+    const cd=[],pool=[];
+    for(const k of matched){
+      const av=Am.filter(f=>cellKey(f)===k).map(f=>f[m.k]).filter(x=>x!=null&&!isNaN(x));
+      const bv=Bm.filter(f=>cellKey(f)===k).map(f=>f[m.k]).filter(x=>x!=null&&!isNaN(x));
+      if(!av.length||!bv.length)continue;
+      cd.push(bv.reduce((a,b)=>a+b,0)/bv.length - av.reduce((a,b)=>a+b,0)/av.length); pool.push(...av,...bv);
+    }
+    if(!cd.length)continue;
+    const delta=cd.reduce((a,b)=>a+b,0)/cd.length;
+    const sigma=pool.length>=3?_pstdev(pool):null;
+    const within=sigma!=null?Math.abs(delta)<=sigma:null;
+    if(sigma==null)enough=false;
+    if(within===false){ if(delta>0)worse=true; else better=true; }
+    deltas.push({key:m.k,label:m.label,unit:m.unit,dec:m.dec,delta,sigma,within});
+  }
+  let verdict; if(!enough&&!worse&&!better)verdict='collecting'; else if(worse&&better)verdict='mixed'; else if(worse)verdict='worse'; else if(better)verdict='better'; else verdict='noeffect';
+  return{state:'ok',verdict,dim,base,cand,nA:A.length,nB:B.length,matched:matched.length,deltas};
+}
+// Auto pick: baseline = most-flown version, candidate = next most-flown (for the Compare/Baseline cards).
+function _versionVerdict(flights,dim){
+  const cnt={}; flights.forEach(f=>{if(f[dim])cnt[f[dim]]=(cnt[f[dim]]||0)+1;});
+  const vers=Object.keys(cnt); if(vers.length<2)return{state:'single'};
+  const ranked=vers.sort((a,b)=>cnt[b]-cnt[a]);
+  return _verdictPair(flights,dim,ranked[0],ranked[1]);
+}
+function _verCardHtml(v,dimLabel){
+  if(!v||v.state!=='ok')return'';
+  const p=_VERV[v.verdict]||_VERV.collecting; let sentence;
+  if(v.verdict==='nooverlap')sentence='No flights share the same aircraft + TLOD across '+esc(v.base)+' and '+esc(v.cand)+' yet — fly a matching pair to compare them cleanly.';
+  else if(v.verdict==='collecting')sentence='Not enough matched flights yet (about 3 per side needed) — this firms up as you fly more on each version.';
+  else if(v.verdict==='noeffect')sentence=esc(v.cand)+' vs '+esc(v.base)+': every difference is within normal flight-to-flight variation — no real change.';
+  else{ const sig=v.deltas.filter(d=>d.within===false).map(d=>d.label+' '+(d.delta>0?'+':'')+d.delta.toFixed(d.dec)+d.unit+(d.delta>0?' (worse)':' (better)')); sentence=esc(v.cand)+' vs '+esc(v.base)+', same aircraft + TLOD: '+sig.join(', ')+'. Everything else is within noise.'; }
+  return '<div style="background:var(--bg);border:1px solid '+p.c+';border-radius:9px;padding:12px 15px;margin-bottom:14px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span style="font-size:10px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:'+p.c+';border:1px solid '+p.c+';border-radius:5px;padding:2px 7px">'+p.t+'</span>'
+    +'<span style="font-size:12px;color:var(--ink3)">'+dimLabel+' &middot; '+v.matched+' matched cell'+(v.matched!==1?'s':'')+' &middot; '+v.nB+' vs '+v.nA+' flights</span></div>'
+    +'<div style="font-size:13px;color:var(--ink1);line-height:1.55">'+sentence+'</div></div>';
+}
+// Drift monitor: is the NEWEST-flown driver/sim measurably worse than the established baseline?
+function driftCheck(flights){
+  for(const dim of ['driver_version','sim_version']){
+    const vers=[...new Set(flights.filter(f=>f[dim]).map(f=>f[dim]))]; if(vers.length<2)continue;
+    const newestTs={}; flights.forEach(f=>{ if(f[dim]&&f.timestamp){ const t=Date.parse(f.timestamp)||0; if(t>(newestTs[f[dim]]||0))newestTs[f[dim]]=t; } });
+    const newest=vers.slice().sort((a,b)=>(newestTs[b]||0)-(newestTs[a]||0))[0];
+    const others=vers.filter(x=>x!==newest); const cnt={}; flights.forEach(f=>{ if(others.includes(f[dim]))cnt[f[dim]]=(cnt[f[dim]]||0)+1; });
+    const base=others.slice().sort((a,b)=>(cnt[b]||0)-(cnt[a]||0))[0]; if(!base)continue;
+    const v=_verdictPair(flights,dim,base,newest);
+    if(v.verdict==='worse'||v.verdict==='mixed')return v;
+  }
+  return null;
+}
+let _driftV=null;
+async function checkDrift(){
+  let r; try{ r=await window.api.perfCompareData(); }catch(e){ return; }
+  const flights=(r&&r.ok&&Array.isArray(r.flights))?r.flights:[];
+  const v=driftCheck(flights); if(!v)return;
+  const key=v.dim+':'+v.base+'>'+v.cand;
+  if((S.cfg.driftDismissed||[]).includes(key))return;
+  _driftV=v;
+  const worst=v.deltas.filter(d=>d.within===false&&d.delta>0).sort((a,b)=>(b.delta/(b.sigma||1))-(a.delta/(a.sigma||1)))[0];
+  const dl=(v.dim==='sim_version'?'Sim ':'GPU driver ')+v.cand;
+  const msg=document.getElementById('drift-msg');
+  if(msg)msg.textContent='⚠ '+dl+' looks '+(v.verdict==='mixed'?'mixed':'~'+(worst?worst.delta.toFixed(worst.dec)+worst.unit+' worse ('+worst.label+')':'worse'))+' vs your baseline '+v.base+' — consider rollback or re-baseline.';
+  const b=document.getElementById('drift-banner'); if(b)b.style.display='flex';
+}
+function driftOpen(){ if(_driftV)_cmpState.dim=_driftV.dim; sw('perf'); if(typeof perfShowCompare==='function')perfShowCompare(); }
+function driftDismiss(){ const b=document.getElementById('drift-banner'); if(b)b.style.display='none'; if(_driftV){ const key=_driftV.dim+':'+_driftV.base+'>'+_driftV.cand; const arr=S.cfg.driftDismissed||[]; if(!arr.includes(key)){ arr.push(key); S.cfg.driftDismissed=arr; window.api.saveConfig(S.cfg); } } }
 async function perfShowCompare(){
   _perfHideViews();
   const cmp=document.getElementById('perf-compare'); if(!cmp)return; cmp.style.display='block';
@@ -3796,6 +3891,7 @@ async function perfShowCompare(){
   renderCompare();
 }
 function _cmpMean(rows,k){ const v=rows.map(x=>x[k]).filter(x=>x!=null&&!isNaN(x)); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; }
+function _maxN(...xs){ const v=xs.filter(x=>x!=null&&!isNaN(x)); return v.length?Math.max(...v):null; }
 function renderCompare(){
   const cmp=document.getElementById('perf-compare'); if(!cmp)return;
   const all=_cmpData||[];
@@ -3837,6 +3933,11 @@ function renderCompare(){
       window.api.perfLabReport().then(r=>{ _labReport=r; _labRptLoading=false; if(_cmpState.dim==='experiment')renderCompare(); }).catch(()=>{ _labRptLoading=false; });
       html+='<div style="font-size:11px;color:var(--ink3);margin-bottom:14px">Loading Lab verdicts&hellip;</div>';
     }
+  }
+  // R4 version verdict card: when grouping by driver/sim, judge the two versions on MATCHED cells vs
+  // the noise band (honest — raw group means above can't tell a real change from flight-to-flight noise).
+  if(dim==='sim_version'||dim==='driver_version'){
+    html+=_verCardHtml(_versionVerdict(flights,dim),_cmpDimLabel[dim]);
   }
   if(!groups.length){ html+='<div style="font-size:13px;color:var(--ink3)">No flights match those filters.</div>'; cmp.innerHTML=html; return; }
   // palette
@@ -3899,13 +4000,16 @@ function _blCompute(all){
   const clean=grid.filter(x=>x.driver_version===modalDrv&&!x.autofps_active);
   const cell=(ac,t)=>clean.filter(x=>x.aircraft===ac&&x.tlod===t);
   const VRAM_LIM=_BL.VRAM_CAP*_BL.LIM.vramPct;
-  const perAc={}; for(const ac of _BL.AC){ perAc[ac]={}; for(const t of _BL.TL){ const c=cell(ac,t); perAc[ac][t]=c.length?{n:c.length,p99:_cmpMean(c,'p99_ft_ms'),stut:_cmpMean(c,'stutter_pct'),cons:_cmpMean(c,'consistency_pct'),pvram:_cmpMean(c,'peak_vram_mb')}:null; } }
+  const perAc={}; for(const ac of _BL.AC){ perAc[ac]={}; for(const t of _BL.TL){ const c=cell(ac,t); perAc[ac][t]=c.length?{n:c.length,p99:_cmpMean(c,'p99_ft_ms'),stut:_cmpMean(c,'stutter_pct'),cons:_cmpMean(c,'consistency_pct'),pvram:_cmpMean(c,'peak_vram_mb'),taxiStut:_maxN(_cmpMean(c,'dep_taxi_stutter'),_cmpMean(c,'arr_taxi_stutter')),feltHr:_cmpMean(c,'felt_stutter_hr')}:null; } }
   const prof={};
   for(const t of _BL.TL){ const cells=_BL.AC.map(ac=>perAc[ac][t]);
     if(cells.some(c=>!c)){ prof[t]={incomplete:true}; continue; }
     // blend = worst-of-ALL benchmark aircraft (works for 1..N planes; a passing TLOD is safe for every one)
     const p99=Math.max(...cells.map(c=>c.p99)),stut=Math.max(...cells.map(c=>c.stut)),cons=Math.min(...cells.map(c=>c.cons)),pv=Math.max(...cells.map(c=>c.pvram));
-    prof[t]={p99,stut,cons,pvram:pv,minN:Math.min(...cells.map(c=>c.n)),pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
+    // taxi-phase stutter + "felt" (>100ms/hr) are the discriminators Dean actually notices on a CPU-bound
+    // rig where overall p99 is flat — surfaced (not hard-gated) so the pick stays stable on sparse data.
+    const taxi=_maxN(...cells.map(c=>c.taxiStut)),felt=_maxN(...cells.map(c=>c.feltHr));
+    prof[t]={p99,stut,cons,pvram:pv,taxiStut:taxi,feltHr:felt,minN:Math.min(...cells.map(c=>c.n)),pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
   }
   const passT=_BL.TL.filter(t=>prof[t]&&prof[t].pass);
   const bestP99=passT.length?Math.min(...passT.map(t=>prof[t].p99)):null;
@@ -3947,6 +4051,10 @@ function renderBaseline(){
         ?('Keeps your benchmark plane'+(_BL.AC.length>1?'s':'')+' &mdash; '+_BL.AC.map(a=>'<b>'+esc(a)+'</b>').join(' &amp; ')+' &mdash; smooth with VRAM headroom. Lighter aircraft only do better, so this is safe to set globally.')
         :('No TLOD currently clears all limits for '+(_BL.AC.length>1?'every benchmark plane':'your benchmark plane')+' &mdash; fly the remaining cells and re-open this.'))+'</div>'
     +'</div>';
+  // version insight (driver/sim seam) — same matched-cell verdict, shown only when there's a real signal
+  { const cand=[_versionVerdict(_blData||[],'driver_version'),_versionVerdict(_blData||[],'sim_version')]
+      .find(x=>x&&x.state==='ok'&&['better','worse','mixed','noeffect'].includes(x.verdict));
+    if(cand)h+=_verCardHtml(cand,cand.dim==='sim_version'?'Sim version':'GPU driver'); }
   // readiness / progress
   if(!cov.ready){
     h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6">'
@@ -3954,6 +4062,21 @@ function renderBaseline(){
       +'With only 1&ndash;2 flights per cell a single rough flight can sway the pick &mdash; it firms up as you finish the last few.</div>';
   } else {
     h+='<div style="font-size:12px;color:#46c46a;margin-bottom:14px">&#10003; Full benchmark complete ('+cov.filled+'/'+cov.total+') &mdash; this recommendation is on solid data.</div>';
+  }
+  // felt/taxi discriminator nudge: if a LOWER passing TLOD is clearly calmer on the ground, say so
+  if(recKnown&&d.balanced!=null&&d.prof[d.balanced]){
+    const pk=d.prof[d.balanced];
+    for(const t of _BL.TL.filter(x=>x<d.balanced&&d.prof[x]&&d.prof[x].pass).sort((a,b)=>b-a)){
+      const lp=d.prof[t];
+      const feltBetter=pk.feltHr!=null&&lp.feltHr!=null&&lp.feltHr<pk.feltHr-1;      // >1/hr fewer felt hitches
+      const taxiBetter=pk.taxiStut!=null&&lp.taxiStut!=null&&lp.taxiStut<pk.taxiStut*0.7;
+      if(feltBetter||taxiBetter){
+        h+='<div style="font-size:12px;color:var(--ink2);background:rgba(78,161,255,.08);border:1px solid rgba(78,161,255,.3);border-radius:8px;padding:10px 13px;margin-bottom:14px">&#128161; <b>TLOD '+d.balanced+'</b> is the balanced pick, but <b>TLOD '+t+'</b> is noticeably calmer on '
+          +[feltBetter?'felt stutters (&gt;100ms)':'',taxiBetter?'taxi-phase stutter':''].filter(Boolean).join(' and ')
+          +' &mdash; drop to it if you feel hitches on the ground.</div>';
+        break;
+      }
+    }
   }
   // expand toggle
   h+='<div onclick="baselineToggleDetail()" style="cursor:pointer;font-size:12px;color:var(--ink2);font-family:\'JetBrains Mono\',monospace;user-select:none;margin-bottom:'+(_blDetail?'14px':'0')+'">'
@@ -3969,13 +4092,15 @@ function renderBaseline(){
     h+='<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">Per-plane best balance (before blending): '+_BL.AC.map(ac=>'<b>'+esc(ac)+'</b> '+md(d.knee[ac])).join(' &nbsp;&middot;&nbsp; ')+(_BL.AC.length>1?'. The blended pick takes the most constrained plane at each step.':'.')+'</div>';
     // combined table
     h+='<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:\'JetBrains Mono\',monospace;margin-bottom:12px">'
-      +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:4px 6px">TLOD (both planes, worst-case)</th><th style="padding:4px 6px">min n</th><th style="padding:4px 6px">p99 ms</th><th style="padding:4px 6px">stutter%</th><th style="padding:4px 6px">cons%</th><th style="padding:4px 6px">peak VRAM</th><th style="padding:4px 6px">verdict</th></tr>';
+      +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:4px 6px">TLOD (both planes, worst-case)</th><th style="padding:4px 6px">min n</th><th style="padding:4px 6px">p99 ms</th><th style="padding:4px 6px">stutter%</th><th style="padding:4px 6px" title="worst of departing/arrival taxi stutter — where TLOD shows up on a CPU-bound rig">taxi%</th><th style="padding:4px 6px" title="big &gt;100ms hitches per hour — the ones you feel">felt/hr</th><th style="padding:4px 6px">cons%</th><th style="padding:4px 6px">peak VRAM</th><th style="padding:4px 6px">verdict</th></tr>';
     for(const t of _BL.TL){ const p=d.prof[t];
       if(!p||p.incomplete){ h+='<tr style="color:var(--ink3)"><td style="padding:4px 6px">'+t+'</td><td colspan="6" style="padding:4px 6px;text-align:right">missing a plane at this TLOD</td></tr>'; continue; }
       const ok=p.pass, bS=p.stut>_BL.LIM.stut, bC=p.cons<_BL.LIM.cons, bV=p.pvram>d.VRAM_LIM, rd=';color:#e23;font-weight:700';
       h+='<tr style="text-align:right;color:'+(ok?'var(--ink1)':'var(--ink3)')+'"><td style="text-align:left;padding:4px 6px">'+t+(t===rec?' <span style="color:'+(cov.ready?'#46c46a':'var(--acc)')+'">&#9664; pick</span>':'')+'</td>'
         +'<td style="padding:4px 6px">'+p.minN+'</td><td style="padding:4px 6px">'+p.p99.toFixed(1)+'</td>'
         +'<td style="padding:4px 6px'+(bS?rd:'')+'" title="'+(bS?'over the '+_BL.LIM.stut+'% stutter limit':'')+'">'+p.stut.toFixed(2)+'</td>'
+        +'<td style="padding:4px 6px">'+(p.taxiStut!=null?p.taxiStut.toFixed(2):'&mdash;')+'</td>'
+        +'<td style="padding:4px 6px">'+(p.feltHr!=null?p.feltHr.toFixed(1):'&mdash;')+'</td>'
         +'<td style="padding:4px 6px'+(bC?rd:'')+'" title="'+(bC?'under the '+_BL.LIM.cons+'% consistency floor':'')+'">'+p.cons.toFixed(1)+'</td>'
         +'<td style="padding:4px 6px'+(bV?rd:'')+'" title="'+(bV?'over the '+Math.round(d.VRAM_LIM)+' MB VRAM ceiling':'')+'">'+Math.round(p.pvram)+'</td>'
         +'<td style="padding:4px 6px;color:'+(ok?'#46c46a':'#e0823c')+'">'+(ok?'pass':'fail')+'</td></tr>';
@@ -6141,5 +6266,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.3.14</div>
+  pointer-events:none;">v6.4.0</div>
 </body></html>

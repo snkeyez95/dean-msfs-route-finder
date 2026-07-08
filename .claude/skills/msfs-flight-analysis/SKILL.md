@@ -60,7 +60,12 @@ two things that actually move are:
 1. **Smoothness** - `p99_ft_ms` is the headline number (target &le;16.7ms is butter, &le;20ms is
    smooth, &le;33.3ms is starting to stutter, above that is a real problem). Back it up with
    `stutter_pct` (frames over the stutter threshold), `consistency_pct`, `frametime_stdev_ms`, and
-   `one_pct_low_fps` / `point_one_pct_low_fps` for how bad the worst moments get.
+   `one_pct_low_fps` / `point_one_pct_low_fps` for how bad the worst moments get. **Felt stutters
+   (v6.4.0):** `perceptible_count` = frames over 100 ms, and `felt_stutter_hr` (perf-compare-data) =
+   those per rendered hour — the big hitches Dean actually notices (33-50 ms ones he doesn't). Old
+   flights carry `perceptible_count` in the `phases_ext.json` sidecar; new flights in `summary.json`.
+   For a CPU-bound rig where overall p99 is flat across TLOD, **taxi-phase stutter + felt/hr are the
+   real discriminators** — weigh them over overall p99 when recommending a TLOD.
 2. **VRAM headroom** - `peak_vram_mb` against the known 12,288 MB card. `avg_vram_mb` shows typical
    load; the gap between avg and peak shows how spiky it is. No VRAM creep across a long flight
    (peak not still climbing near the end) rules out a leak - mention this when a flight runs long.
@@ -86,6 +91,14 @@ out explicitly if so rather than silently averaging over it:
 - **GSX or other addons** running or not (sometimes noted in `notes`).
 - **Flight duration** - a 47-minute hop and a 125-minute flight aren't directly comparable for VRAM
   creep; normalize the framing ("no creep over 2 hours" is a stronger claim than over 45 minutes).
+
+**Version comparisons (the honest method, matches the app's v6.4.0 verdict card + drift monitor):**
+never compare two driver/sim versions by pooling all-vs-all means — that's the "fake 2 ms" trap (a
+version mix confounded by aircraft/TLOD). Compare only flights that share the SAME (aircraft, TLOD)
+cell, average the per-cell deltas, and treat a difference as REAL only when it exceeds ±1σ of the
+pooled noise (need ~3 flights per side, else say "collecting"). The app's Compare view (group by
+driver/sim) shows a verdict card doing exactly this; a Performance-tab drift banner fires when the
+newest-flown version is worse beyond the band vs the baseline. State the verdict this way in chat too.
 
 ## How to answer common question types
 

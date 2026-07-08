@@ -9,6 +9,7 @@ const fs = require('fs');
 const TARGET_FRAMETIME_MS  = 16.67;
 const STUTTER_FRAMETIME_MS = TARGET_FRAMETIME_MS * 2.0;  // 33.34
 const SPIKE_FRAMETIME_MS   = 50.0;
+const PERCEPTIBLE_FRAMETIME_MS = 100.0;  // native-era addition (no Python counterpart): frames Dean actually FEELS as a hitch
 const CONSISTENCY_BAND     = 0.20;
 const MIN_VALID_MS         = 0.0;
 const MAX_VALID_MS         = 1000.0;
@@ -86,13 +87,14 @@ function computeStats(frametimes, cpuBusy, gpuBusy){
   const stdev = n > 1 ? pstdev(s) : 0.0;
   const low = p50 * (1 - CONSISTENCY_BAND), high = p50 * (1 + CONSISTENCY_BAND);
   let inBand = 0; for(const v of s){ if(v >= low && v <= high) inBand++; }
-  let stutter = 0, spikes = 0; for(const v of s){ if(v > STUTTER_FRAMETIME_MS) stutter++; if(v > SPIKE_FRAMETIME_MS) spikes++; }
+  let stutter = 0, spikes = 0, perceptible = 0;
+  for(const v of s){ if(v > STUTTER_FRAMETIME_MS) stutter++; if(v > SPIKE_FRAMETIME_MS) spikes++; if(v > PERCEPTIBLE_FRAMETIME_MS) perceptible++; }
   const duration = sum / 1000.0;
   const stats = {
     avg_ft_ms: pyRound(avg, 2), p50_ft_ms: pyRound(p50, 2), p95_ft_ms: pyRound(p95, 2),
     p99_ft_ms: pyRound(p99, 2), p999_ft_ms: pyRound(p999, 2), max_ft_ms: pyRound(mx, 2),
     frametime_stdev_ms: pyRound(stdev, 2), consistency_pct: pyRound(inBand / n * 100, 1),
-    stutter_pct: pyRound(stutter / n * 100, 2), stutter_count: stutter, spike_count: spikes,
+    stutter_pct: pyRound(stutter / n * 100, 2), stutter_count: stutter, spike_count: spikes, perceptible_count: perceptible,
     one_pct_low_fps: p99 ? pyRound(1000.0 / p99, 1) : null,
     point_one_pct_low_fps: p999 ? pyRound(1000.0 / p999, 1) : null,
     avg_fps: pyRound(1000.0 / avg, 1), frame_count: n, duration_seconds: pyRound(duration, 1),

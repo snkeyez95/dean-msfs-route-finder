@@ -54,7 +54,20 @@ function computeExt(dir, summary) {
   for (const ph of Object.keys(phases)) if (pv[ph]) { phases[ph].vram_peak = pv[ph].vram_peak; phases[ph].vram_avg = pv[ph].vram_avg; }
   const route = String((summary.settings && summary.settings.simbrief_route) || summary.notes || '').toUpperCase();
   const m = /([A-Z]{3,4})-([A-Z]{3,4})/.exec(route);
-  return { v: 1, phases, dep_icao: m ? m[1] : null, arr_icao: m ? m[2] : null };
+  return { v: 1, phases, dep_icao: m ? m[1] : null, arr_icao: m ? m[2] : null, perceptible_count: computePerceptibleFt(ft) };
+}
+
+// v6.4.0 "felt stutter" backfill: count frames > 100ms in the trimmed frametimes (same trim as the
+// engine's stats), for flights whose summary predates the perceptible_count field.
+function computePerceptibleFt(ft){ let c = 0; for (const v of ft) if (v > 100) c++; return c; }
+function computePerceptible(dir, summary){
+  const raw = path.join(dir, 'frametimes.csv');
+  if (!fs.existsSync(raw)) return null;
+  const sm = (summary && summary.smoothness) || {};
+  let ft; try { ({ ft } = readChronological(raw)); } catch (_) { return null; }
+  [ft] = trimHead(ft, [], [], HEAD);
+  [ft] = trimTail(ft, [], [], sm.stop_trim_s || 0);
+  return computePerceptibleFt(ft);
 }
 
 function runBackfill(sessionsDir, tpIcaos) {
@@ -66,11 +79,25 @@ function runBackfill(sessionsDir, tpIcaos) {
     const dir = path.join(sessionsDir, s.folder.replace(/\//g, '\\'));
     const extPath = path.join(dir, 'phases_ext.json');
     let summary = null; try { summary = JSON.parse(fs.readFileSync(path.join(dir, 'summary.json'), 'utf8')); } catch (_) {}
-    // a summary already carrying the 5-phase model is native — nothing to sidecar or regenerate
-    if (summary && summary.smoothness && summary.smoothness.phases && (summary.smoothness.phases.dep_taxi || summary.smoothness.phases.arr_taxi)) { skipped++; continue; }
+    const native5 = !!(summary && summary.smoothness && summary.smoothness.phases && (summary.smoothness.phases.dep_taxi || summary.smoothness.phases.arr_taxi));
+    const hasPerc = !!(summary && summary.smoothness && summary.smoothness.perceptible_count != null);
+    // 5-phase sidecar: only for pre-v6.3.8 flights (native 5-phase summaries already carry it)
     let ext = null;
-    if (fs.existsSync(extPath)) { try { ext = JSON.parse(fs.readFileSync(extPath, 'utf8')); } catch (_) {} skipped++; }
+    if (native5) { skipped++; }
+    else if (fs.existsSync(extPath)) { try { ext = JSON.parse(fs.readFileSync(extPath, 'utf8')); } catch (_) {} skipped++; }
     else { ext = summary ? computeExt(dir, summary) : null; if (ext) { try { fs.writeFileSync(extPath, JSON.stringify(ext)); wrote++; } catch (_) {} } else { noData++; } }
+    // v6.4.0 perceptible_count backfill — for any flight whose SUMMARY predates the field, store it in
+    // the sidecar (fresh phase sidecars from computeExt already include it; this covers existing
+    // sidecars + native-5-phase flights captured before v6.4.0).
+    if (!hasPerc && summary) {
+      let sc = ext;
+      if (!sc && fs.existsSync(extPath)) { try { sc = JSON.parse(fs.readFileSync(extPath, 'utf8')); } catch (_) {} }
+      if (sc) {
+        if (sc.perceptible_count == null) { const pc = computePerceptible(dir, summary); if (pc != null) { sc.perceptible_count = pc; try { fs.writeFileSync(extPath, JSON.stringify(sc)); } catch (_) {} } }
+      } else {
+        const pc = computePerceptible(dir, summary); if (pc != null) { try { fs.writeFileSync(extPath, JSON.stringify({ v: 1, perceptible_count: pc })); } catch (_) {} }
+      }
+    }
     // regenerate a stale (old 4-phase) report.html from the sidecar so it shows the new model + ✳
     if (ext && summary && regenReportIfStale(dir, summary, ext, tpSet)) reports++;
   }
