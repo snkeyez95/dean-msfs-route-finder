@@ -218,8 +218,20 @@ ipcMain.handle('scan-folder', async (_,p)=>{
   try{
     const entries=fs.readdirSync(p,{withFileTypes:true});
     const folders=entries.filter(e=>e.isDirectory()).map(e=>e.name);
-    LOG.info('scan-folder found', folders.length, 'subfolders');
-    return {success:true,folders};
+    // Wrapper detection: a folder with no manifest.json of its OWN, but whose immediate subfolders ARE
+    // packages (each has manifest.json), is a WRAPPER (e.g. "KLAS FlyTampa" → airport + city). MSFS only
+    // loads a package that sits DIRECTLY in Community, so a wrapper's inner packages must be linked
+    // individually. pkgMap[folder] = [innerPackageNames] for wrappers; normal packages are absent.
+    const pkgMap={};
+    for(const f of folders){
+      const full=path.join(p,f);
+      if(pkgIsPackageDir(full))continue;                 // folder is itself a package → link as-is
+      let inner=[];
+      try{ inner=fs.readdirSync(full,{withFileTypes:true}).filter(e=>e.isDirectory()&&pkgIsPackageDir(path.join(full,e.name))).map(e=>e.name); }catch(_){}
+      if(inner.length)pkgMap[f]=inner;                   // wrapper → link each inner package directly
+    }
+    LOG.info('scan-folder found', folders.length, 'subfolders,', Object.keys(pkgMap).length, 'wrapper(s)');
+    return {success:true,folders,pkgMap};
   }catch(e){
     LOG.error('scan-folder failed:', e.message);
     return {success:false,error:e.message};
@@ -641,29 +653,32 @@ ipcMain.handle('si-write-community-routes', (_, snapshot) => {
   }
 });
 
-ipcMain.handle('activate-scenery', (_, {dep, arr, depFolder, arrFolder, folders, libraryFolder, communityFolder}) => {
+ipcMain.handle('activate-scenery', (_, {dep, arr, depFolder, arrFolder, folders, items, libraryFolder, communityFolder}) => {
   const created = [], skipped = [], errors = [];
-  // Prefer an explicit folder list (an ICAO can own more than one scenery folder, e.g. KLAS =
-  // airport + city). Fall back to the legacy dep/arr pair for any older caller.
-  const pairs = Array.isArray(folders) && folders.length
-    ? folders.map(f => [null, f])
-    : [[dep, depFolder], [arr, arrFolder]];
-  for (const [icao, folder] of pairs) {
-    if (!folder) continue;
-    const src = path.join(libraryFolder, folder);
-    const dest = path.join(communityFolder, folder);
+  // Preferred: explicit items [{name, rel}] — name = the Community link name, rel = path under the
+  // library (rel may be "wrapper/innerPackage" so a wrapped addon links its inner packages directly).
+  // Fallbacks: folders[] (name = rel = folder), then the legacy dep/arr pair.
+  const list = Array.isArray(items) && items.length
+    ? items.map(it => [it.name, it.rel])
+    : Array.isArray(folders) && folders.length
+      ? folders.map(f => [f, f])
+      : [[depFolder, depFolder], [arrFolder, arrFolder]];
+  for (const [name, rel] of list) {
+    if (!name || !rel) continue;
+    const src = path.join(libraryFolder, rel);
+    const dest = path.join(communityFolder, name);
     try {
       if (fs.existsSync(dest)) {
-        skipped.push(folder);
-        LOG.info(`[SCENE] ${icao}: junction already exists at ${dest}`);
+        skipped.push(name);
+        LOG.info(`[SCENE] junction already exists at ${dest}`);
       } else {
         fs.symlinkSync(src, dest, 'junction');
-        created.push(folder);
-        LOG.info(`[SCENE] ${icao}: junction created ${dest} -> ${src}`);
+        created.push(name);
+        LOG.info(`[SCENE] junction created ${dest} -> ${src}`);
       }
     } catch(e) {
-      errors.push(folder + ': ' + e.message);
-      LOG.error(`[SCENE] ${icao}: junction failed:`, e.message);
+      errors.push(name + ': ' + e.message);
+      LOG.error(`[SCENE] junction failed:`, e.message);
     }
   }
   return {ok: errors.length === 0, created, skipped, errors};
