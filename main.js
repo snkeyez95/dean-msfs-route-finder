@@ -956,13 +956,17 @@ function datisCleanText(s){
 }
 function datisLetterOf(t){ const m=(t||'').match(/ATIS\s+([A-Z])\b/) || (t||'').match(/INFO\s+([A-Z])\b/); return m?m[1]:null; }
 function datisTimeOf(t){ const m=(t||'').match(/\b(\d{3,4}Z)\b/); return m?m[1]:null; }
+// atis.info returns el.time as a bare "1856" (no Z); atis.guru's regex time carries the Z.
+// Normalize a bare 3-4 digit time to "1856Z" so zuluAgeMin() can read it (age display + the
+// stale-D-ATIS wind cross-check both need the Z). Returns null for anything non-bare (e.g. ISO).
+function datisTimeNorm(t){ const m=String(t||'').match(/^\s*(\d{3,4})Z?\s*$/); return m?m[1]+'Z':null; }
 function parseAtisInfo(body){
   let arr=null, dep=null, combined=null, metar=null;
   let json; try{ json = JSON.parse(body); }catch(e){ return {hasData:false}; }
   if(!Array.isArray(json) || !json.length) return {hasData:false};
   for(const el of json){
     if(!el || !el.datis) continue;
-    const block = {letter: el.code || datisLetterOf(el.datis), time: el.time || datisTimeOf(el.datis), text: el.datis.trim()};
+    const block = {letter: el.code || datisLetterOf(el.datis), time: datisTimeOf(el.datis) || datisTimeNorm(el.time), text: el.datis.trim()};
     const ty = (el.type||'').toLowerCase();
     if(ty === 'arr' || ty === 'arrival') arr = block;
     else if(ty === 'dep' || ty === 'departure') dep = block;
