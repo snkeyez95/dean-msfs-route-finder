@@ -6049,7 +6049,7 @@ function flightMins(nm){return Math.round((nm/450)*60*1.10)+BLOCK_PAD_MIN;}   //
 const LATC={ on:false, status:'off', pos:null, controllers:[], db:null, dbLoading:false, posIv:null, feedIv:null, lastSetHz:null, autoSet:false };
 const LATC_TIER={2:'DEL',3:'GND',4:'TWR',5:'APP',6:'CTR',1:'FSS'};
 const LATC_RADIUS={CTR:400,APP:150,TWR:50,GND:20,DEL:10,FSS:600};   // default coverage nm when visual_range is 0/missing
-const LATC_ENV_NM=12, LATC_ENV_AGL=3000, LATC_UNICOM=122.800;
+const LATC_TWR_NM=7, LATC_TWR_AGL=4000, LATC_NEARFIELD_NM=20, LATC_UNICOM=122.800;   // Tower owns near-field+low only; near-field = CTAF-vs-UNICOM cutoff
 function latcTierLabel(t){ return {DEL:'Clearance/Delivery',GND:'Ground',TWR:'Tower',APP:'Approach',CTR:'Center',FSS:'Radio/FSS',UNICOM:'UNICOM',CTAF:'CTAF'}[t]||t; }
 function latcHz(mhz){ return Math.round(mhz*1e6); }
 function latcFmt(mhz){ return (Math.round(mhz*1000)/1000).toFixed(3); }
@@ -6233,9 +6233,13 @@ function recommendFreq(pos, controllers, dbMap){
         const tc=traconCovers(c.callsign, pos.lat, pos.lon);
         if(tc!=null){ placed=true; covers=(tc===true); }
       }
-      if(!placed){                                               // DEL/GND/TWR, or an APP with no TRACON shape → airport + distance circle
+      if(!placed){                                               // DEL/GND/TWR, or an APP with no TRACON shape → airport + distance
         apt=latcAirportForCallsign(c.callsign, dbMap);
-        if(apt){ placed=true; dist=gcDist(pos.lat,pos.lon,apt.lat,apt.lon); covers=dist<=radius; }
+        if(apt){ placed=true; dist=gcDist(pos.lat,pos.lon,apt.lat,apt.lon);
+          // Tower owns only the runway + pattern (near-field AND low) — not a 50nm circle that keeps
+          // "covering" you deep into the climb after you've been handed to Approach.
+          covers = (tier==='TWR') ? (dist<=LATC_TWR_NM && (pos.onGround || pos.agl==null || pos.agl<LATC_TWR_AGL)) : (dist<=radius);
+        }
       }
     }
     enr.push({callsign:c.callsign, freq:fr, tier, apt, radius, dist, covers, placed});
@@ -6245,11 +6249,14 @@ function recommendFreq(pos, controllers, dbMap){
   const verify=enr.filter(c=>!c.placed).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
   const near=latcNearestAirport(pos, dbMap);
   const nearDist=near?gcDist(pos.lat,pos.lon,near.lat,near.lon):null;
-  const phase = pos.onGround ? 'ground' : (near && nearDist<=LATC_ENV_NM && (pos.agl==null||pos.agl<LATC_ENV_AGL) ? 'airport' : 'enroute');
-  const apt = (phase==='enroute') ? null : near;
-  // top-down: on the ground DEL→GND→TWR→APP→CTR; near a field TWR→APP→CTR; enroute CTR→FSS. CTR/FSS
-  // now join the walk-up because polygon coverage can place them (e.g. field Tower offline → Center).
-  const pref = phase==='ground' ? ['DEL','GND','TWR','APP','CTR'] : phase==='airport' ? ['TWR','APP','CTR'] : ['CTR','FSS'];
+  const onGround=!!pos.onGround;
+  const nearField = onGround || (nearDist!=null && nearDist<=LATC_NEARFIELD_NM);   // at/near a field → CTAF (not UNICOM) fallback
+  const phase = onGround ? 'ground' : (nearField ? 'airport' : 'enroute');         // display pill only
+  const apt = near;                                                                // DEL/GND/TWR ownership match
+  // On the ground, work field positions top-down (DEL→GND→TWR→APP→CTR). Airborne, let REALISTIC coverage
+  // decide (Tower=near-field+low, Approach=its polygon/circle, Center=its FIR) — no fixed-altitude snap,
+  // so you HOLD Approach through the climb inside its airspace, then move to Center only on polygon exit.
+  const pref = onGround ? ['DEL','GND','TWR','APP','CTR'] : ['TWR','APP','CTR','FSS'];
   const owns = t => (t==='DEL'||t==='GND'||t==='TWR');
   for(let i=0;i<pref.length;i++){
     const tier=pref[i];
@@ -6263,7 +6270,7 @@ function recommendFreq(pos, controllers, dbMap){
       return {found:true, tier, freq:pick.freq, callsign:pick.callsign, label:latcTierLabel(tier), why, phase, apt, others, verify};
     }
   }
-  if(phase==='enroute') return {found:false, tier:'UNICOM', freq:LATC_UNICOM, callsign:null, label:'UNICOM', why:verify.length?('No field position applies enroute &mdash; '+verify.length+' ATC online we can&rsquo;t place precisely; verify which covers you (precise airspace comes in a later update)'):'No ATC online in your area', phase, apt:null, others:[], verify};
+  if(!nearField) return {found:false, tier:'UNICOM', freq:LATC_UNICOM, callsign:null, label:'UNICOM', why:verify.length?('No field position applies enroute &mdash; '+verify.length+' ATC online we can&rsquo;t place precisely; verify which covers you (precise airspace comes in a later update)'):'No ATC online in your area', phase, apt:null, others:[], verify};
   // VATSIM CTAF is a US/VATPAC thing — a field's tower freq is the CTAF only in the divisions that run it
   // (US: K/P, Australia: Y). Everywhere else VATSIM uses the universal 122.800 unicom for uncontrolled fields.
   const ctaf = (apt && apt.twr && /^[KPY]/.test(apt.icao)) ? apt.twr : null;
