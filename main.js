@@ -183,7 +183,10 @@ if(!app.requestSingleInstanceLock()){
   app.exit(0);
 }else{
   app.on('second-instance', () => {   // user opened a second copy — focus the existing window
-    if(win){ if(win.isMinimized()) win.restore(); win.focus(); }
+    // isDestroyed guard (v6.6.2, Dean hit this live): during a silent auto-update the dying instance
+    // still holds the single-instance lock while its window is already destroyed — the relaunched copy
+    // fires second-instance on it and win.isMinimized() threw "Object has been destroyed".
+    try{ if(win && !win.isDestroyed()){ if(win.isMinimized()) win.restore(); win.focus(); } }catch(_){}
   });
   app.whenReady().then(createWindow);
   // v6.3.8: one-time sidecar backfill of the 5-phase split for pre-v6.3.8 flights (idempotent, skips
@@ -2046,7 +2049,9 @@ function overlayEnsure(){
   overlayWin.on('closed',()=>{ overlayWin=null; });
   return overlayWin;
 }
-ipcMain.handle('overlay-toast', (_, payload) => { try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
+ipcMain.handle('overlay-toast', (_, payload) => {
+  if(_cleanupDone) return {ok:false};   // QA fix (2026-07-09): a toast arriving mid-quit must not RE-CREATE the overlay window before-quit just destroyed
+  try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
 ipcMain.handle('overlay-hide', () => { try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.close(); }catch(_){} overlayWin=null; return {ok:true}; });
 
 // Airspace boundaries (VATSpy Data Project) — FIR/ARTCC polygons + the callsign-prefix→boundary map, so

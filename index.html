@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.6.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.6.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.6.1</div>
+    <div class="sb-ver">v6.6.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -5878,7 +5878,10 @@ async function fetchDatis(icao,idx,side,prefix){
   try{await fetchRwyData(icao);}catch(e){}
   let data;
   const cached=S.datisCache[icao];
-  if(cached&&(Date.now()-cached.ts)<300000){data=cached.data;}
+  // QA fix (2026-07-09): a VATSIM-applied ATIS is an EXPLICIT user choice — it must not silently expire
+  // after 5 min and revert to real-world D-ATIS on the next re-render. It stays until the user clicks
+  // revert (or re-applies for a fresh copy); only ordinary D-ATIS entries use the 5-min cache window.
+  if(cached&&(cached.vatsim||(Date.now()-cached.ts)<300000)){data=cached.data;}
   else{
     try{data=await window.api.fetchDatis({icao});}catch(e){data=null;}
     if(data)S.datisCache[icao]={data,ts:Date.now()};
@@ -5976,7 +5979,7 @@ async function fetchDatis(icao,idx,side,prefix){
   const ageTag=dAge!=null?` &middot; <span style="color:${dAge>90?'var(--acc)':'var(--ink3)'}">${ageLabel(dAge)}</span>`:'';
   const head=icon+' '+verb+(rwyTxt?' RWY '+rwyTxt:'')+
     (info.approach?' &middot; '+info.approach:'')+
-    (info.letter?' &middot; Info '+info.letter:'')+
+    (info.letter?' &middot; Info '+esc(String(info.letter)):'')+   // QA: atis_code comes straight off the network feed — escape it
     (info.time?' &middot; '+info.time:'')+ageTag;
   const bullets=info.bullets.length
     ? '<details class="datis-exp"><summary>Plain-English details</summary><ul class="datis-ul">'+
@@ -6328,11 +6331,17 @@ function latcNextActionable(rec, seq){
   return null;
 }
 // The enriched sequence for whatever route is currently known (filed VATSIM plan or last SimBrief) —
-// shared by the card's "Next up" line and the look-ahead auto-standby logic.
+// shared by the card's "Next up" line and the look-ahead auto-standby logic. MEMOIZED on the feed
+// timestamp + route (QA 2026-07-09): building it runs great-circle sampling × point-in-polygon over
+// Center FIR polygons, and up to 3 callers hit it per 5s poll — same inputs, same output, compute once.
 function latcSeqForNow(){
   if(!LATC.db) return [];
   const r=latcBriefRoute(); if(!r) return [];
-  return latcEnrichedSequence(LATC.db.get(r.dep), LATC.db.get(r.arr), LATC.controllers, LATC.db);
+  const key=(_vFeed&&_vFeed.ts||0)+'|'+r.dep+'|'+r.arr;
+  if(LATC._seqCache && LATC._seqCache.key===key) return LATC._seqCache.seq;
+  const seq=latcEnrichedSequence(LATC.db.get(r.dep), LATC.db.get(r.arr), LATC.controllers, LATC.db);
+  LATC._seqCache={key, seq};
+  return seq;
 }
 
 async function latcEnsureDb(){
@@ -6420,8 +6429,20 @@ function latcVerifyStandbySoon(targetHz){ return new Promise(res=>setTimeout(asy
 // active; only the pilot swaps).
 function latcAutoTarget(rec){
   const activeMhz=LATC.pos&&LATC.pos.comActiveMhz;
-  const onCurrent=activeMhz!=null && rec.freq!=null && Math.abs(activeMhz-rec.freq)<0.001;
-  if(onCurrent){ const next=latcNextActionable(rec, latcSeqForNow()); if(next && next.freq!=null) return next; }
+  if(activeMhz==null || rec.freq==null) return rec;
+  const seq=latcSeqForNow();
+  // Advance from wherever you ACTUALLY are in the sequence — the furthest of (current rec, whatever
+  // your active radio matches). QA fix (2026-07-09): on the ground the rec stays Ground the whole taxi,
+  // so after Ground hands you to Tower (you swap; active=Tower ≠ rec) the old logic regressed standby
+  // BACK to Ground. Matching active against the sequence keeps standby one step ahead of the frequency
+  // you're really on, even when you're ahead of the rec.
+  const findIdx=(freq,callsign)=>seq.findIndex(x=>(callsign&&x.callsign===callsign)||(x.freq!=null&&Math.abs(x.freq-freq)<0.001));
+  const recIdx=findIdx(rec.freq, rec.callsign), actIdx=findIdx(activeMhz, null);
+  const fromIdx=Math.max(recIdx, actIdx);
+  const onCurrent=Math.abs(activeMhz-rec.freq)<0.001;
+  if(fromIdx>=0 && (onCurrent || actIdx>recIdx)){
+    for(let i=fromIdx+1;i<seq.length;i++){ if(seq[i].kind!=='atis' && seq[i].freq!=null) return seq[i]; }
+  }
   return rec;
 }
 function latcApplyAuto(){
@@ -6944,5 +6965,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.6.1</div>
+  pointer-events:none;">v6.6.2</div>
 </body></html>
