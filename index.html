@@ -5829,6 +5829,11 @@ async function fetchDatis(icao,idx,side,prefix){
   if(!box)return;
   icao=(icao||'').toUpperCase();
   box.innerHTML='<div class="datis-note">Loading D-ATIS&hellip;</div>';
+  // VATSIM ATIS button — a sibling created once, just under the D-ATIS box; updates async (greyed
+  // unless a VATSIM controller is staffing this field's ATIS). Independent of Live mode.
+  let _vb=document.getElementById(prefix+'vbtn-'+side+'-'+idx);
+  if(!_vb&&box.parentNode){ _vb=document.createElement('div'); _vb.id=prefix+'vbtn-'+side+'-'+idx; _vb.style.marginTop='4px'; box.parentNode.insertBefore(_vb, box.nextSibling); }
+  renderVatsimAtisBtn(icao,idx,side,prefix);
   // ensure the airport's runway list is loaded so runway tokens validate correctly
   try{await fetchRwyData(icao);}catch(e){}
   let data;
@@ -5872,6 +5877,7 @@ async function fetchDatis(icao,idx,side,prefix){
     return;
   }
   const isArr=side==='arr';
+  const isVatsim=!!(data&&data.vatsim);   // VATSIM ATIS is live/controller-set (no stale-wind cross-check, own label)
   const rwyTxt=info.runways.length?info.runways.join('/'):null;
   const dAge=info.time?zuluAgeMin(info.time):null;
   // STALE-D-ATIS WIND CROSS-CHECK (2026-07-08): a D-ATIS runway older than 3h may no longer match
@@ -5882,8 +5888,8 @@ async function fetchDatis(icao,idx,side,prefix){
   let staleNote='';
   if(rwyEl&&rwyTxt){
     let rwyHtml=null;
-    const stale=dAge!=null&&dAge>DATIS_STALE_MIN;
-    const veryStale=dAge!=null&&dAge>DATIS_VERYSTALE_MIN;
+    const stale=!isVatsim&&dAge!=null&&dAge>DATIS_STALE_MIN;
+    const veryStale=!isVatsim&&dAge!=null&&dAge>DATIS_VERYSTALE_MIN;
     const m=stale?await fetchMetarObj(icao):null;
     if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
     const w=m?parseWind(m.rawOb||''):null;
@@ -5921,12 +5927,12 @@ async function fetchDatis(icao,idx,side,prefix){
       staleNote='<div class="datis-note" style="margin-top:3px;color:var(--acc)">D-ATIS '+ageLabel(dAge)+' &mdash; very old; verify the active runway on ATIS.</div>';
     }
     if(rwyHtml==null){
-      rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag">D-ATIS</span>';
+      rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag"'+(isVatsim?' style="color:var(--grn);border-color:var(--grn)"':'')+'>'+(isVatsim?'VATSIM':'D-ATIS')+'</span>';
     }
     rwyEl.innerHTML=rwyHtml;
   }
-  const icon=isArr?'&#128757;':'&#128745;'; // 🛬 / 🛫
-  const verb=isArr?'Landing':'Departure';
+  const icon=isVatsim?'&#128251;':(isArr?'&#128757;':'&#128745;'); // 📻 VATSIM / 🛬 / 🛫
+  const verb=(isVatsim?'VATSIM ':'')+(isArr?'Landing':'Departure');
   const ageTag=dAge!=null?` &middot; <span style="color:${dAge>90?'var(--acc)':'var(--ink3)'}">${ageLabel(dAge)}</span>`:'';
   const head=icon+' '+verb+(rwyTxt?' RWY '+rwyTxt:'')+
     (info.approach?' &middot; '+info.approach:'')+
@@ -5936,7 +5942,7 @@ async function fetchDatis(icao,idx,side,prefix){
     ? '<details class="datis-exp"><summary>Plain-English details</summary><ul class="datis-ul">'+
       info.bullets.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details>'
     : '';
-  const raw='<details class="datis-exp"><summary>Raw D-ATIS</summary><pre class="datis-raw">'+
+  const raw='<details class="datis-exp"><summary>Raw '+(isVatsim?'VATSIM ATIS'+(data.atisCallsign?' ('+esc(data.atisCallsign)+')':''):'D-ATIS')+'</summary><pre class="datis-raw">'+
     esc(info.raw)+'</pre></details>';
   box.innerHTML='<div class="datis-head">'+head+'</div>'+staleNote+bullets+raw;
 }
@@ -6059,7 +6065,46 @@ async function latcEnsureDb(){
   catch(e){ RLOG('[LiveATC] airport DB error '+((e&&e.message)||e)); }
   LATC.dbLoading=false; renderLiveAtc();
 }
-async function latcFetchFeed(){ try{ const r=await window.api.liveVatsimFeed(); if(r&&r.ok) LATC.controllers=r.controllers||[]; }catch(e){} }
+// Shared VATSIM datafeed cache — Live mode (forces fresh every 30s) and the weather-card VATSIM button
+// (uses the ~60s cache) both read from here, so we never double-fetch the ~20MB feed.
+let _vFeed={controllers:[],atis:[],pilots:[],ts:0}, _vFeedLoading=null;
+async function vatsimFeedGet(force){
+  if(!force && _vFeed.ts && Date.now()-_vFeed.ts<60000) return _vFeed;
+  if(_vFeedLoading) return _vFeedLoading;
+  _vFeedLoading=(async()=>{ try{ const r=await window.api.liveVatsimFeed(); if(r&&r.ok){ _vFeed={controllers:r.controllers||[],atis:r.atis||[],pilots:r.pilots||[],ts:Date.now()}; } }catch(e){} _vFeedLoading=null; return _vFeed; })();
+  return _vFeedLoading;
+}
+async function latcFetchFeed(){ const f=await vatsimFeedGet(true); LATC.controllers=f.controllers||[]; }
+// Build a D-ATIS-shaped object from the VATSIM ATIS entries for an airport, so it drops straight into
+// S.datisCache and every existing consumer (active-runway display, SimBrief origrwy/destrwy) uses it.
+function vatsimAtisData(icao){
+  icao=(icao||'').toUpperCase();
+  const list=((_vFeed&&_vFeed.atis)||[]).filter(a=>String(a.callsign||'').toUpperCase().startsWith(icao+'_'));
+  if(!list.length) return null;
+  const timeOf=t=>{const m=String(t).match(/\b(\d{4})Z\b/);return m?m[1]+'Z':null;};
+  const mk=a=>{const text=(a.text_atis||[]).join(' ');return {letter:a.atis_code||null,time:timeOf(text),text};};
+  const arrA=list.find(a=>/_A_|_ARR/.test(a.callsign.toUpperCase()));
+  const depA=list.find(a=>/_D_|_DEP/.test(a.callsign.toUpperCase()));
+  const meta={vatsim:true, atisCallsign:list.map(a=>a.callsign).join(', ')};
+  if(arrA||depA) return Object.assign({hasData:true, arr:arrA?mk(arrA):null, dep:depA?mk(depA):null, combined:mk(list[0])}, meta);
+  return Object.assign({hasData:true, combined:mk(list[0]), arr:null, dep:null}, meta);
+}
+function vatsimAtisAvail(icao){ return !!vatsimAtisData(icao); }
+// The VATSIM button shown under each airport's D-ATIS block. Greyed unless that field's ATIS is online.
+async function renderVatsimAtisBtn(icao,idx,side,prefix){
+  prefix=prefix||''; const id=prefix+'vbtn-'+side+'-'+idx;
+  const set=html=>{const el=document.getElementById(id); if(el)el.innerHTML=html||'';};
+  if(!vCfg().weatherButton){ set(''); return; }
+  const cached=S.datisCache[(icao||'').toUpperCase()];
+  if(cached&&cached.vatsim){ set('<button class="btn bg bxs" onclick="revertVatsimAtis(\''+icao+'\','+idx+',\''+side+'\',\''+prefix+'\')" style="color:var(--grn);border-color:var(--grn)" title="Showing VATSIM ATIS — click to switch back to real-world D-ATIS">&#10003; VATSIM ATIS</button>'); return; }
+  set('<button class="btn bg bxs" disabled style="opacity:.5" title="Checking VATSIM…">VATSIM</button>');
+  await vatsimFeedGet();
+  if(!document.getElementById(id)) return;
+  if(vatsimAtisAvail(icao)) set('<button class="btn bg bxs" onclick="applyVatsimAtis(\''+icao+'\','+idx+',\''+side+'\',\''+prefix+'\')" style="color:var(--acc);border-color:var(--acc)" title="A VATSIM controller is staffing this field’s ATIS — use its active runway (also fills SimBrief)">&#128251; VATSIM ATIS</button>');
+  else set('<button class="btn bg bxs" disabled style="opacity:.4" title="No VATSIM ATIS online for '+icao+'">VATSIM</button>');
+}
+function applyVatsimAtis(icao,idx,side,prefix){ const d=vatsimAtisData(icao); if(!d)return; S.datisCache[(icao||'').toUpperCase()]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
+function revertVatsimAtis(icao,idx,side,prefix){ delete S.datisCache[(icao||'').toUpperCase()]; fetchDatis(icao,idx,side,prefix); }
 async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcApplyAuto(); renderLiveAtc(); updateVatsimHeader(); }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
 function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }

@@ -1981,9 +1981,20 @@ ipcMain.handle('live-atc-start', () => { LiveATC.start(); return {ok:true}; });
 ipcMain.handle('live-atc-stop',  () => { LiveATC.stop();  return {ok:true}; });
 ipcMain.handle('live-position',  () => LiveATC.latest());
 ipcMain.handle('live-set-standby', (_, o) => LiveATC.setStandby((o&&o.freqHz)||0));
-// VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns online controllers.
+// VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns controllers + ATIS +
+// pilots (pilots trimmed to the connection/flight-plan fields we use, to keep the payload small).
 ipcMain.handle('live-vatsim-feed', async () => {
-  try{ const body=await _httpGetLarge('https://data.vatsim.net/v3/vatsim-data.json'); if(!body) return {ok:false}; const j=JSON.parse(body); return {ok:true, controllers:j.controllers||[]}; }
+  try{
+    const body=await _httpGetLarge('https://data.vatsim.net/v3/vatsim-data.json'); if(!body) return {ok:false};
+    const j=JSON.parse(body);
+    const pilots=(j.pilots||[]).map(p=>({cid:p.cid, callsign:p.callsign, latitude:p.latitude, longitude:p.longitude, altitude:p.altitude, transponder:p.transponder, flight_plan:p.flight_plan||null}));
+    return {ok:true, controllers:j.controllers||[], atis:j.atis||[], pilots};
+  }
+  catch(e){ return {ok:false, error:e.message}; }
+});
+// VATSIM's own METAR (the weather injected into the sim on VATSIM) — separate from aviationweather.gov.
+ipcMain.handle('vatsim-metar', async (_, o) => {
+  try{ const icao=String((o&&o.icao)||'').toUpperCase(); if(!icao) return {ok:false}; const body=await _httpGetLarge('https://metar.vatsim.net/'+icao); const raw=(body||'').trim(); return {ok:!!raw, raw}; }
   catch(e){ return {ok:false, error:e.message}; }
 });
 

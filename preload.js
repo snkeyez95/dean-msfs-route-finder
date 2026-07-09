@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('api', {
   liveSetStandby:     (o)   => ipcRenderer.invoke('live-set-standby', o||{}),
   liveAirportDb:      (o)   => ipcRenderer.invoke('live-airport-db', o||{}),
   liveVatsimFeed:     ()    => ipcRenderer.invoke('live-vatsim-feed'),
+  vatsimMetar:        (o)   => ipcRenderer.invoke('vatsim-metar', o||{}),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available',   (_, ver) => cb(ver)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded',  (_, ver) => cb(ver)),
   installUpdate:      ()    => ipcRenderer.send('install-update'),
