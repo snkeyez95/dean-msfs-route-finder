@@ -1,5 +1,13 @@
 ; ABRP custom NSIS hooks (wired via package.json build.nsis.include)
 ;
+; customInit — force-close any running/stuck ABRP before installing (v6.6.3). Proven need 2026-07-09:
+; a windowless zombie instance (the overlay-window lifecycle bug) held a lock on the exe, so silent
+; auto-updates FAILED without any error and the installed app silently stayed on the old version.
+; The app itself guards against updating mid-capture (renderer-side), so killing here is safe.
+!macro customInit
+  nsExec::Exec 'taskkill /F /IM "A Better Route Planner.exe"'
+!macroend
+
 ; customUnInstall — clean-uninstall prompt. On a REAL uninstall, offer to also remove the app's
 ; data folders so nothing is left behind (Revo-clean); default is NO because the data includes
 ; irreplaceable flight logs. ${isUpdated} guards the auto-updater path: when electron-updater

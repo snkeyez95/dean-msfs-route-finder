@@ -171,6 +171,17 @@ function createWindow() {
     });
     if (choice === 0) { _perfAllowClose = true; win.close(); }
   });
+  win.on('closed', () => {
+    // v6.6.3 ZOMBIE FIX (root cause of Dean's stuck updates, 2026-07-09): the invisible in-sim OVERLAY
+    // is a real BrowserWindow, so while it existed 'window-all-closed' never fired when the user closed
+    // ABRP — the app lived on as a windowless zombie that (a) held the single-instance lock, (b) threw
+    // the destroyed-window error at every relaunch attempt, and (c) held a file lock on the exe so NSIS
+    // updates silently failed (disk stayed on the old version). Closing the main window now tears the
+    // overlay down with it, letting window-all-closed -> app.quit() proceed normally.
+    try { if (overlayWin && !overlayWin.isDestroyed()) overlayWin.destroy(); } catch (_) {}
+    overlayWin = null;
+    win = null;
+  });
   win.loadFile('index.html');
   win.webContents.once('did-finish-load', checkForUpdate);
 }
