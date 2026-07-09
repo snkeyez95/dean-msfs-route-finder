@@ -351,6 +351,10 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
     <span id="cap-badge-text">Capture</span>
   </div>
+  <div id="vatsim-hdr" onclick="latcToggle(!LATC.on)" title="VATSIM Live ATC — click to toggle Live mode" style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;border:1px solid var(--sep);color:var(--ink3);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
+    <span id="vatsim-hdr-dot" style="width:8px;height:8px;border-radius:50%;background:var(--ink4);display:inline-block"></span>
+    <span id="vatsim-hdr-text">VATSIM</span>
+  </div>
   <div class="theme-pill" onclick="toggleTheme()" title="Toggle light/dark theme">
     <span>🌙</span>
     <span>☀️</span>
@@ -689,6 +693,11 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
         <div id="ar-next-refresh"></div>
       </div>
     </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin:24px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">VATSIM Live ATC</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-s" style="margin-bottom:12px">Settings for the <b>&#128251; Live ATC</b> tab &mdash; the VATSIM frequency helper. Turn each piece on or off individually. Your CID is optional and read-only.</div>
+    <div id="vatsim-settings"></div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin:24px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Apps to close during flight</div>
   <div class="api-pan" style="margin-bottom:14px">
@@ -1314,6 +1323,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   checkMaintenanceVersions();
   // Drift monitor: alert if the newest-flown driver/sim is measurably worse than your baseline.
   checkDrift();
+  // VATSIM header chip (always visible; click toggles Live mode).
+  updateVatsimHeader();
   // NVCP backup stamp.
   nvcpRefreshStatus();
   // Auto-refresh routes
@@ -1418,7 +1429,7 @@ function sw(t){
   if(t==='addons')renderAddonsPane();
   if(t==='companions')renderCompanionsPane();
   if(t==='perf')renderPerfPane();
-  if(t==='settings'){renderFlightApps();enhanceSettingsSections();}
+  if(t==='settings'){renderFlightApps();enhanceSettingsSections();renderVatsimSettings();}
   if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();}
   if(t==='liveatc')renderLiveAtc();
 }
@@ -5930,6 +5941,51 @@ async function fetchDatis(icao,idx,side,prefix){
   box.innerHTML='<div class="datis-head">'+head+'</div>'+staleNote+bullets+raw;
 }
 
+// VATSIM config (persisted in cfg.vatsim) — each function is an independent toggle. Ensures + returns
+// the fully-populated object so toggles can write straight to it.
+function vCfg(){
+  if(!S.cfg.vatsim) S.cfg.vatsim={};
+  const v=S.cfg.vatsim, d={enabled:false,cid:'',autoSetStandby:false,weatherButton:true};
+  for(const k in d) if(v[k]===undefined) v[k]=d[k];
+  v.overlay=Object.assign({enabled:true,freqChange:true,newController:true,handoff:true,connectionLost:true,loggingStarted:true}, v.overlay||{});
+  v.sound=Object.assign({newController:false,handoff:false,connectionLost:false}, v.sound||{});
+  return v;
+}
+function vSet(path,val){ const v=vCfg(); const p=path.split('.'); if(p.length===1)v[p[0]]=val; else v[p[0]][p[1]]=val; window.api.saveConfig(S.cfg); updateVatsimHeader(); }
+function vSetCid(val){ vCfg().cid=(val||'').trim(); window.api.saveConfig(S.cfg); }
+function renderVatsimSettings(){
+  const el=document.getElementById('vatsim-settings'); if(!el)return;
+  const v=vCfg();
+  const row=(label,checked,onchg,sub)=>'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink1);cursor:pointer;padding:3px 0"><input type="checkbox" '+(checked?'checked':'')+' onchange="'+onchg+'" style="accent-color:var(--acc);width:15px;height:15px"> '+label+(sub?' <span style="color:var(--ink3);font-size:11px">'+sub+'</span>':'')+'</label>';
+  const hdr=t=>'<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin:14px 0 5px">'+t+'</div>';
+  let h='<div style="margin-bottom:6px"><label style="font-size:12px;color:var(--ink3)">Your VATSIM ID (CID) <span style="color:var(--ink4)">&mdash; optional; lets ABRP find your filed flight plan &amp; confirm you\'re connected</span></label><br><input id="vatsim-cid" value="'+esc(v.cid||'')+'" onchange="vSetCid(this.value)" placeholder="e.g. 1234567" style="margin-top:5px;background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;width:170px"></div>';
+  h+=hdr('In-sim overlay <span style="color:var(--ink4)">(borderless/windowed MSFS only)</span>');
+  h+=row('Show the overlay', v.overlay.enabled, "vSet('overlay.enabled',this.checked)");
+  h+=row('Frequency-change toast', v.overlay.freqChange, "vSet('overlay.freqChange',this.checked)");
+  h+=row('New controller online', v.overlay.newController, "vSet('overlay.newController',this.checked)");
+  h+=row('Handoff approaching', v.overlay.handoff, "vSet('overlay.handoff',this.checked)", '(needs airspace data)');
+  h+=row('Connection lost', v.overlay.connectionLost, "vSet('overlay.connectionLost',this.checked)");
+  h+=row('&ldquo;Logging started&rdquo; confirmation', v.overlay.loggingStarted, "vSet('overlay.loggingStarted',this.checked)");
+  h+=hdr('Sound cues <span style="color:var(--ink4)">(off by default)</span>');
+  h+=row('Chime on new controller', v.sound.newController, "vSet('sound.newController',this.checked)");
+  h+=row('Chime on handoff', v.sound.handoff, "vSet('sound.handoff',this.checked)");
+  h+=row('Chime on connection lost', v.sound.connectionLost, "vSet('sound.connectionLost',this.checked)");
+  h+=hdr('Behavior');
+  h+=row('Auto-set COM1 standby on change', v.autoSetStandby, "vSet('autoSetStandby',this.checked)", '(otherwise one click on the card)');
+  h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
+  el.innerHTML=h;
+}
+// Header chip: always visible; click toggles Live mode. Shows the current recommended frequency when live.
+function updateVatsimHeader(){
+  const el=document.getElementById('vatsim-hdr'); if(!el)return;
+  el.style.display='flex';
+  const dot=document.getElementById('vatsim-hdr-dot'), txt=document.getElementById('vatsim-hdr-text');
+  if(typeof LATC==='undefined'||!LATC.on){ if(dot)dot.style.background='var(--ink4)'; if(txt)txt.textContent='VATSIM'; el.style.color='var(--ink3)'; el.style.borderColor='var(--sep)'; return; }
+  const rec=(typeof latcCurrentRec==='function')?latcCurrentRec():null;
+  if(LATC.status==='live'&&rec){ if(dot)dot.style.background='var(--grn)'; el.style.color='var(--grn)'; el.style.borderColor='var(--grn)'; if(txt)txt.textContent='VATSIM · '+latcFmt(rec.freq)+(rec.callsign?' '+rec.callsign:''); }
+  else { if(dot)dot.style.background='var(--acc)'; el.style.color='var(--acc)'; el.style.borderColor='var(--acc)'; if(txt)txt.textContent='VATSIM · '+(LATC.status==='sim-off'?'sim off':'connecting'); }
+}
+
 // ── CHALLENGES ───────────────────────────────────────────────────────────────
 function gcDist(lat1,lon1,lat2,lon2){
   const R=3440,d2r=Math.PI/180;
@@ -6004,17 +6060,18 @@ async function latcEnsureDb(){
   LATC.dbLoading=false; renderLiveAtc();
 }
 async function latcFetchFeed(){ try{ const r=await window.api.liveVatsimFeed(); if(r&&r.ok) LATC.controllers=r.controllers||[]; }catch(e){} }
-async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcApplyAuto(); renderLiveAtc(); }
+async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcApplyAuto(); renderLiveAtc(); updateVatsimHeader(); }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
-function latcApplyAuto(){ if(!LATC.autoSet)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
+function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
 async function latcToggle(on){
   LATC.on=on;
   if(on){ await window.api.liveAtcStart(); latcEnsureDb(); await latcFetchFeed(); if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
   else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; }
-  renderLiveAtc();
+  try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
+  renderLiveAtc(); updateVatsimHeader();
 }
 async function latcSetStandby(){ const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); const r=await window.api.liveSetStandby({freqHz:hz}); LATC.lastSetHz=hz; const n=document.getElementById('latc-setmsg'); if(n)n.textContent=(r&&r.ok)?('✓ Loaded '+latcFmt(rec.freq)+' into COM1 standby'):('Could not set standby: '+((r&&r.error)||'?')); }
-function latcToggleAuto(v){ LATC.autoSet=v; if(v)latcApplyAuto(); renderLiveAtc(); }
+function latcToggleAuto(v){ vCfg().autoSetStandby=v; window.api.saveConfig(S.cfg); if(v)latcApplyAuto(); renderLiveAtc(); renderVatsimSettings(); }
 async function latcRefreshDb(){ LATC.db=null; LATC.dbLoading=true; renderLiveAtc(); try{ const r=await window.api.liveAirportDb({refresh:true}); if(r&&r.ok){ const m=new Map(); for(const a of r.airports)m.set(a.icao,a); LATC.db=m; } }catch(e){} LATC.dbLoading=false; renderLiveAtc(); }
 
 function renderLiveAtc(){
@@ -6040,7 +6097,7 @@ function renderLiveAtc(){
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
     +'<div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">'
       +'<button class="btn bg bsm" style="border-color:'+accent+';color:'+accent+'" onclick="latcSetStandby()">&#128225; Set COM1 standby</button>'
-      +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);cursor:pointer"><input type="checkbox" '+(LATC.autoSet?'checked':'')+' onchange="latcToggleAuto(this.checked)" style="accent-color:var(--acc)"> auto-set standby on change</label>'
+      +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);cursor:pointer"><input type="checkbox" '+(vCfg().autoSetStandby?'checked':'')+' onchange="latcToggleAuto(this.checked)" style="accent-color:var(--acc)"> auto-set standby on change</label>'
       +'<span id="latc-setmsg" style="font-size:12px;color:var(--grn)"></span></div></div>';
   if(rec.others&&rec.others.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Also in range</div><div style="margin-bottom:14px">';
     for(const c of rec.others) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+(c.dist!=null?' &middot; '+Math.round(c.dist)+' nm':'')+'</span></div>';
