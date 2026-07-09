@@ -30,6 +30,38 @@ function trimTail(ft, cpu, gpu, seconds) {
   return [ft.slice(0, cut), cpu && cpu.length ? cpu.slice(0, cut) : cpu, gpu && gpu.length ? gpu.slice(0, cut) : gpu];
 }
 
+// v6.6 CANONICAL TAIL TRIM — MOVEMENT-AGNOSTIC. The old tail trim keyed off the SimConnect movement/
+// stop signal, which fails when the user quits mid-taxi (never fully stops, no parking brake). Instead
+// detect the sim's SHUTDOWN TEARDOWN directly from the frametimes: it's always a trailing burst of huge
+// frames (menu transition / process teardown) that never recovers to sustained normal gameplay —
+// regardless of whether the aircraft stopped, parked, or was still rolling. This keeps real (smooth)
+// parked-at-gate frames and cuts only the teardown. Refines the CapFrameX >200ms/last-60s rule by
+// requiring "no sustained normal run after", so a genuine late hitch followed by more flying is kept.
+const TEARDOWN_MS = 200.0;       // a frame this big at the tail = teardown, not gameplay (taxi never sustains it)
+const TEARDOWN_WINDOW_S = 120;   // only consider the last N seconds — protect real mid-flight spikes
+const TEARDOWN_RESUME_S = 15;    // a sustained normal run this long after a big frame = flight continued (keep it)
+const TEARDOWN_NORMAL_MS = 60;   // "normal gameplay frame" ceiling for the resume test
+// Returns the cut index: everything from here to the end is teardown. ft.length = no teardown found.
+function flightEndIndex(ft) {
+  const n = ft.length; if (n < 10) return n;
+  let t = 0, w = 0;
+  for (let i = n - 1; i >= 0; i--) { t += ft[i]; if (t >= TEARDOWN_WINDOW_S * 1000) { w = i; break; } }
+  for (let i = w; i < n; i++) {
+    if (ft[i] <= TEARDOWN_MS) continue;
+    let run = 0, resumed = false;
+    for (let j = i + 1; j < n; j++) { if (ft[j] <= TEARDOWN_NORMAL_MS) { run += ft[j]; if (run >= TEARDOWN_RESUME_S * 1000) { resumed = true; break; } } else run = 0; }
+    if (!resumed) return i;
+  }
+  return n;
+}
+// Trim the teardown tail; returns [ft, cpu, gpu, secondsCut] (secondsCut → stored as stop_trim_s).
+function trimTeardownTail(ft, cpu, gpu) {
+  const cut = flightEndIndex(ft);
+  if (cut >= ft.length) return [ft, cpu, gpu, 0];
+  let cutMs = 0; for (let i = cut; i < ft.length; i++) cutMs += ft[i];
+  return [ft.slice(0, cut), cpu && cpu.length ? cpu.slice(0, cut) : cpu, gpu && gpu.length ? gpu.slice(0, cut) : gpu, cutMs / 1000];
+}
+
 // v6.3.8 — the single on-ground state is split into DEPARTING TAXI and ARRIVAL TAXI so ground
 // performance attributes to the departure vs arrival airport. The classifier only knows "ground"
 // (simconnect.js), so we split by the TIMELINE: ground before the first airborne phase = departing
@@ -131,6 +163,6 @@ function phaseLogFromTelemetry(telemetryRows) {
 }
 
 module.exports = {
-  trimHead, trimTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry,
-  taxiBoundaries, computePhaseVram, STUTTER_FRAMETIME_MS,
+  trimHead, trimTail, trimTeardownTail, flightEndIndex, splitFrametimesByPhase, computePhaseStats,
+  phaseLogFromTelemetry, taxiBoundaries, computePhaseVram, STUTTER_FRAMETIME_MS,
 };

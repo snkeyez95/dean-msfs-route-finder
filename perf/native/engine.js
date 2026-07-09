@@ -10,7 +10,7 @@
 // (stats, phases, report, combined, index rows) are already byte-proven individually.
 const fs = require('fs'), path = require('path');
 const { computeStats } = require('./stats.js');
-const { trimHead, trimTail, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
+const { trimHead, trimTail, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
 const { readChronological, readTelemetry } = require('./report_charts.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
@@ -109,8 +109,10 @@ function fileSession(opts) {
   // stats from trimmed frames
   let { ft, cpu, gpu } = readChronological(rawCsvPath);
   [ft, cpu, gpu] = trimHead(ft, cpu, gpu, HEAD_TRIM_S);
-  [ft, cpu, gpu] = trimTail(ft, cpu, gpu, stopTrimS || 0);
-  const smoothness = computeSmoothness(ft, cpu, gpu, stopTrimS, phaseLog, recordingWallStart);
+  // v6.6: movement-agnostic teardown trim (detects the shutdown burst from the frametimes, so a
+  // mid-taxi quit / no-parking-brake finish is cut correctly). Replaces the movement-based stopTrimS.
+  let teardownS; [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu);
+  const smoothness = computeSmoothness(ft, cpu, gpu, teardownS, phaseLog, recordingWallStart);
   // per-phase VRAM (peak/avg) from the just-written telemetry, merged into the frametime phase stats
   // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
   try {
