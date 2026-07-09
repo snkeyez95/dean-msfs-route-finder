@@ -6122,25 +6122,32 @@ function latcFreqStack(depApt, arrApt, controllers, dbMap){
   }
   return st;
 }
-// The online CTR/APP position whose polygon covers a point (first match), or null. Used to look ahead
-// along the route for the next controller.
-function latcCoveringCtrl(lat,lon,controllers){
+// The online CTR/APP position covering a point, or null. dbMap is optional — when passed, Approach also
+// falls back to a distance circle (like recommendFreq) so the handoff prompt/next-up never skips an
+// Approach that only has circle coverage (found live: a climbout handoff said Center when it should have
+// said Approach, because this used to be polygon-only with no fallback).
+function latcCoveringCtrl(lat,lon,controllers,dbMap){
   for(const c of _latcOnline(controllers)){
     if(c.tier==='CTR'||c.tier==='FSS'){ if(airspaceCovers(c.callsign,lat,lon)===true) return c; }
-    else if(c.tier==='APP'){ if(traconCovers(c.callsign,lat,lon)===true) return c; }
+    else if(c.tier==='APP'){
+      const tc=traconCovers(c.callsign,lat,lon);
+      if(tc===true) return c;
+      if(tc==null && dbMap){ const a=latcAirportForCallsign(c.callsign,dbMap);
+        if(a && gcDist(lat,lon,a.lat,a.lon)<=(LATC_RADIUS.APP||150)) return c; }
+    }
   }
   return null;
 }
 // Route-aware handoff: scan ahead from the current position toward the destination and return the first
 // DIFFERENT online controller you'll cross into (with distance), or null. curCallsign = who you're on now.
-function latcNextHandoff(pos, arrApt, controllers, curCallsign){
+function latcNextHandoff(pos, arrApt, controllers, curCallsign, dbMap){
   if(!pos||!arrApt) return null;
   const LOOK_NM=80, total=gcDist(pos.lat,pos.lon,arrApt.lat,arrApt.lon), reach=Math.min(LOOK_NM,total);
   if(reach<5) return null;                                        // essentially at the destination
   const samples=gcSamples(pos.lat,pos.lon,arrApt.lat,arrApt.lon,10);
   for(let i=1;i<samples.length;i++){ const [la,lo]=samples[i], d=gcDist(pos.lat,pos.lon,la,lo);
     if(d>reach) break;
-    const cover=latcCoveringCtrl(la,lo,controllers);
+    const cover=latcCoveringCtrl(la,lo,controllers,dbMap);
     if(cover && cover.callsign!==curCallsign) return {callsign:cover.callsign, freq:cover.freq, distNm:Math.round(d)};
   }
   return null;
@@ -6277,6 +6284,57 @@ function recommendFreq(pos, controllers, dbMap){
   return {found:false, tier:'CTAF', freq: ctaf||LATC_UNICOM, callsign:null, label: ctaf?('CTAF ('+apt.icao+')'):'UNICOM', why:(apt?('No confirmable ATC for '+apt.icao+' &mdash; use '+(ctaf?'CTAF (its tower frequency)':'UNICOM 122.800')):'No ATC nearby')+(verify.length?'. '+verify.length+' position'+(verify.length>1?'s':'')+' online may cover you top-down &mdash; verify':''), phase, apt, others:[], verify};
 }
 
+// v6.6.1(A-rest): ATIS-first sequence + "Next up" + look-ahead standby (Dean 2026-07-09).
+// Just the callsign+frequency for an airport's VATSIM ATIS (separate from vatsimAtisData, which parses
+// the full text for the weather-card swap — this stays a lightweight lookup so that path is untouched).
+function latcAtisFreq(icao){
+  icao=(icao||'').toUpperCase();
+  const a=((_vFeed&&_vFeed.atis)||[]).find(x=>String(x.callsign||'').toUpperCase().startsWith(icao+'_'));
+  if(!a) return null;
+  const fr=parseFloat(a.frequency); if(!(fr>0)) return null;
+  return {callsign:a.callsign, freq:fr};
+}
+// The full ordered sequence for this leg: dep ATIS (informational — tune to ACTIVE yourself; ABRP only
+// ever loads standby) -> dep field positions -> enroute Centers -> arrival ATIS -> arrival field
+// positions -> CTAF/UNICOM. Built from the SAME data as the pre-flight briefing (latcFreqStack) so
+// "Next up" always agrees with the briefing card.
+function latcEnrichedSequence(depApt, arrApt, controllers, dbMap){
+  const seq=[];
+  const depAtis=depApt?latcAtisFreq(depApt.icao):null; if(depAtis) seq.push({kind:'atis', tier:'ATIS', icao:depApt.icao, callsign:depAtis.callsign, freq:depAtis.freq});
+  const st=latcFreqStack(depApt, arrApt, controllers, dbMap);
+  for(const x of st.dep) seq.push(Object.assign({kind:'atc'}, x));
+  for(const x of st.enr) seq.push(Object.assign({kind:'atc', tier:'CTR'}, x));
+  const arrAtis=arrApt?latcAtisFreq(arrApt.icao):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
+  for(const x of st.arr) seq.push(Object.assign({kind:'atc'}, x));
+  if(arrApt){ const ctaf=(arrApt.twr&&/^[KPY]/.test(arrApt.icao))?arrApt.twr:LATC_UNICOM; seq.push({kind:'atc', tier:'CTAF', callsign:null, freq:ctaf}); }
+  return seq;
+}
+// The sequence entry right after the one matching the current recommendation — for the "Next up"
+// display line. Returns null when the current rec isn't found in the planned sequence (a live top-down
+// substitute, or off the filed route) — honest: no next-up claimed rather than a guess.
+function latcNextUp(rec, seq){
+  if(!rec || !seq || !seq.length) return null;
+  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<0.001));
+  if(idx<0 || idx+1>=seq.length) return null;
+  return seq[idx+1];
+}
+// Same as latcNextUp but skips ATIS entries — for the look-ahead STANDBY target (ATIS is a "tune active
+// yourself" suggestion; ABRP never loads it into standby, only real ATC/CTAF frequencies you'll swap to).
+function latcNextActionable(rec, seq){
+  if(!rec || !seq || !seq.length) return null;
+  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<0.001));
+  if(idx<0) return null;
+  for(let i=idx+1;i<seq.length;i++){ if(seq[i].kind!=='atis') return seq[i]; }
+  return null;
+}
+// The enriched sequence for whatever route is currently known (filed VATSIM plan or last SimBrief) —
+// shared by the card's "Next up" line and the look-ahead auto-standby logic.
+function latcSeqForNow(){
+  if(!LATC.db) return [];
+  const r=latcBriefRoute(); if(!r) return [];
+  return latcEnrichedSequence(LATC.db.get(r.dep), LATC.db.get(r.arr), LATC.controllers, LATC.db);
+}
+
 async function latcEnsureDb(){
   if(LATC.db||LATC.dbLoading) return;
   LATC.dbLoading=true; renderLiveAtc();
@@ -6340,7 +6398,7 @@ function latcCheckToasts(){
   // prompt once ~6 min out (or ≤30 nm when groundspeed is unknown). Cleared when passed onto or gone.
   const p=LATC.pos, r=latcBriefRoute(), arrApt=(r&&LATC.db)?LATC.db.get(r.arr):null;
   if(p && !p.onGround && arrApt){
-    const next=latcNextHandoff(p, arrApt, LATC.controllers, rec.callsign);
+    const next=latcNextHandoff(p, arrApt, LATC.controllers, rec.callsign, LATC.db);
     if(!next){ LATC._handoffKey=null; }
     else{
       const etaMin=(p.gs>30)?(next.distNm/p.gs*60):null, near=(etaMin!=null)?etaMin<=6:next.distNm<=30;
@@ -6355,8 +6413,20 @@ function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LA
 // radio actually changed. Wait one sim data cycle, then read COM1 standby back and compare. No BCD
 // fallback — see the main.js comment: it would silently mistune modern 8.33kHz frequencies.
 function latcVerifyStandbySoon(targetHz){ return new Promise(res=>setTimeout(async()=>{ try{ res(await window.api.liveVerifyStandby({targetHz})); }catch(e){ res({ok:false,verified:false}); } },1500)); }
+// v6.6.1: LOOK-AHEAD standby (Dean 2026-07-09) — once you've actually swapped onto the current
+// recommendation (COM1 active matches it), advance standby to the NEXT frequency in the sequence so
+// it's always one swap ahead. Until then (you haven't tuned it yet), standby holds the current
+// recommendation itself — the original behavior. NEVER touches active (safety: vPilot transmits on
+// active; only the pilot swaps).
+function latcAutoTarget(rec){
+  const activeMhz=LATC.pos&&LATC.pos.comActiveMhz;
+  const onCurrent=activeMhz!=null && rec.freq!=null && Math.abs(activeMhz-rec.freq)<0.001;
+  if(onCurrent){ const next=latcNextActionable(rec, latcSeqForNow()); if(next && next.freq!=null) return next; }
+  return rec;
+}
 function latcApplyAuto(){
-  if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq);
+  if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return;
+  const target=latcAutoTarget(rec); const hz=latcHz(target.freq);
   if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz;
     window.api.liveSetStandby({freqHz:hz}).then(r=>{ if(!r||!r.ok)return;
       latcVerifyStandbySoon(r.targetHz||hz).then(v=>{ LATC.standbyVerified=!!(v&&v.verified); LATC.standbyIssue=(v&&!v.verified)?(v.reason||'the aircraft did not confirm the change'):null; renderLiveAtc(); });
@@ -6419,6 +6489,14 @@ function renderLiveAtc(){
   if(LATC.status!=='live'||!LATC.pos){ h+='<div style="font-size:13px;color:var(--ink3);background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">'+(LATC.status==='sim-off'?'Waiting for MSFS &mdash; start a flight and this connects automatically.':'Connecting to the sim…')+'</div>'; el.innerHTML=h; return; }
   const rec=latcCurrentRec();
   if(!rec){ h+='<div style="font-size:13px;color:var(--ink3)">Waiting for position + controller data…</div>'; el.innerHTML=h; return; }
+  const seq=latcSeqForNow();
+  // ATIS-first (Dean 2026-07-09): at the gate, before you've contacted anyone, point at the dep field's
+  // VATSIM ATIS to tune to ACTIVE yourself — ABRP still only ever loads the real next ATC freq (Ground)
+  // into standby, unchanged below.
+  if(rec.phase==='ground'){ const r0=latcBriefRoute(); const depAtis=(r0&&LATC.db)?latcAtisFreq(r0.dep):null;
+    if(depAtis) h+='<div style="background:var(--bg2);border:1px solid var(--acc);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--ink1)">&#128251; Listen to <b>'+esc(depAtis.callsign)+'</b> <span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+latcFmt(depAtis.freq)+'</span> first &mdash; tune it to your ACTIVE radio yourself, then swap standby to what&rsquo;s below.</div>';
+  }
+  const nextUp=latcNextUp(rec, seq);
   const phChip={ground:'ON GROUND',airport:'AIRPORT AREA',enroute:'ENROUTE'}[rec.phase]||rec.phase;
   const accent=rec.found?'var(--grn)':'var(--acc)';
   h+='<div style="background:var(--bg);border:1px solid '+accent+';border-radius:12px;padding:18px 20px;margin-bottom:14px">'
@@ -6426,6 +6504,7 @@ function renderLiveAtc(){
     +'<div style="font-size:34px;font-weight:800;color:'+accent+';letter-spacing:-.02em;font-family:\'JetBrains Mono\',monospace">'+latcFmt(rec.freq)+'</div>'
     +'<div style="font-size:15px;font-weight:600;color:var(--ink1);margin-top:2px">'+(rec.callsign?esc(rec.callsign)+' &middot; ':'')+esc(rec.label)+'</div>'
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
+    +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">Next up: <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+'</div>':'')
     +'<div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">'
       +'<button class="btn bg bsm" style="border-color:'+accent+';color:'+accent+'" onclick="latcSetStandby()">&#128225; Set COM1 standby</button>'
       +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);cursor:pointer"><input type="checkbox" '+(vCfg().autoSetStandby?'checked':'')+' onchange="latcToggleAuto(this.checked)" style="accent-color:var(--acc)"> auto-set standby on change</label>'

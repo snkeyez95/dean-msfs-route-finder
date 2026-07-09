@@ -1945,6 +1945,9 @@ const LiveATC = (() => {
       // actually reached the aircraft's radio — some custom avionics (found live on Dean's PMDG 737)
       // ignore the standard SimConnect event and silently leave this unread-back "success" wrong.
       h.addToDataDefinition(DEF,'COM STANDBY FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
+      // v6.6.1: read COM1 ACTIVE too — the look-ahead standby logic needs to know when you've actually
+      // swapped onto the recommended frequency, so it can advance standby to the NEXT one in the sequence.
+      h.addToDataDefinition(DEF,'COM ACTIVE FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
       h.requestDataOnSimObject(REQ,DEF,0,SimConnectPeriod.SECOND);
       try{ h.mapClientEventToSimEvent(EVT_STBY,'COM_STBY_RADIO_SET_HZ'); }catch(_){}
       h.on('simObjectData',(recv)=>{
@@ -1952,8 +1955,8 @@ const LiveATC = (() => {
         try{
           const lat=recv.data.readFloat64(), lon=recv.data.readFloat64(), alt=recv.data.readFloat64(),
                 agl=recv.data.readFloat64(), og=recv.data.readInt32(), gs=recv.data.readFloat64(),
-                comStandbyMhz=recv.data.readFloat64();
-          pos={lat,lon,alt,agl,onGround:!!og,gs,comStandbyMhz,ts:Date.now()}; status='live';
+                comStandbyMhz=recv.data.readFloat64(), comActiveMhz=recv.data.readFloat64();
+          pos={lat,lon,alt,agl,onGround:!!og,gs,comStandbyMhz,comActiveMhz,ts:Date.now()}; status='live';
         }catch(_){}
       });
       const drop=()=>{ if(!stopped) _reconnect(); };
