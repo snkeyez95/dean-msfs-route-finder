@@ -4788,11 +4788,11 @@ async function updateCaptureBadge(){
 // ── APPS TO CLOSE DURING FLIGHT (Phase 3 — config + UI; engine execution wired next) ──
 const FLIGHT_APP_MODES={'close-reopen':'Close & reopen','close-only':"Close, don't reopen",'kill-after':'Close only after sim'};
 // One-time seed from Dean's record_clean.bat lists (fully editable after).
-const FLIGHT_APPS_SEED=[
-  {name:'SABnzbd',mode:'close-reopen'},{name:'Plex Media Server',mode:'close-reopen'},
-  {name:'Plex Tuner Service',mode:'close-reopen'},{name:'Radarr',mode:'close-reopen'},
-  {name:'Prowlarr',mode:'close-reopen'},{name:'Sonarr',mode:'close-reopen'},{name:'qbPortWeaver',mode:'close-reopen'},
-  {name:'qbittorrent',mode:'close-only'},{name:'PlexScriptHost',mode:'close-only'},{name:'steam',mode:'kill-after'}];
+// New users start with an EMPTY close-during-flight list and build it via "Detect running apps" — the
+// apps to close are entirely personal, so seeding a default would be one user's setup on everyone's
+// machine (CLAUDE.md rule #3). Dean's existing list lives in his config and is untouched by this
+// (seedFlightApps only seeds when there is no saved array). The empty-state guides new users to Detect.
+const FLIGHT_APPS_SEED=[];
 let _detectedApps=[];
 function seedFlightApps(){
   if(!Array.isArray(S.cfg.flightCloseApps)){
