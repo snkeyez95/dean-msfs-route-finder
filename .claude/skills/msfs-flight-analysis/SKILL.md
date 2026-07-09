@@ -72,6 +72,16 @@ two things that actually move are:
    flights carry `perceptible_count` in the `phases_ext.json` sidecar; new flights in `summary.json`.
    For a CPU-bound rig where overall p99 is flat across TLOD, **taxi-phase stutter + felt/hr are the
    real discriminators** — weigh them over overall p99 when recommending a TLOD.
+   **TEARDOWN-CORRECTED VALUES (v6.6):** the sim shutdown/menu teardown at the very end of a flight
+   (a 300–1300 ms burst, even when sitting at the gate or quitting mid-taxi) used to leak into the
+   kept window and inflate `max_ft_ms`, `spike_count`, and `perceptible_count`. The capture engine now
+   trims it movement-agnostically, and a launch backfill re-trimmed every OLD flight into the sidecar
+   (`phases_ext.json` with `trim_v:"teardown"`) — carrying corrected `max_ft_ms`/`spike_count`/
+   `perceptible_count` + re-trimmed taxi phases WITHOUT touching the raw logs. `perf-compare-data`
+   prefers those. So: **trust the sidecar's corrected max/spike/perceptible over the summary's** for
+   any flight whose sidecar is `trim_v:"teardown"`; a raw `summary.json` `max_ft_ms` in the hundreds
+   of ms at 96–100% of the flight is the teardown artifact, already corrected — don't report it as a
+   stutter.
 2. **VRAM headroom** - `peak_vram_mb` against the known 12,288 MB card. `avg_vram_mb` shows typical
    load; the gap between avg and peak shows how spiky it is. No VRAM creep across a long flight
    (peak not still climbing near the end) rules out a leak - mention this when a flight runs long.

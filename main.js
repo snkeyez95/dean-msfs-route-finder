@@ -1211,21 +1211,25 @@ ipcMain.handle('perf-compare-data', () => {
           const ph = sj && sj.smoothness && sj.smoothness.phases;
           if (ph && (ph.dep_taxi || ph.arr_taxi)) { dep_taxi = ph.dep_taxi || null; arr_taxi = ph.arr_taxi || null; }
         }
-        if (!dep_taxi && !arr_taxi && fdir) {   // fall back to the sidecar for pre-v6.3.8 flights
+        // Sidecar: the 5-phase split for pre-v6.3.8 flights, AND (v6.6) the teardown-corrected
+        // max/spike/perceptible + re-trimmed phases (trim_v:'teardown') — which SUPERSEDE the summary's
+        // shutdown-inflated values so the Compare/felt-stutter surfaces show the real numbers.
+        if (fdir) {
           const ext = path.join(fdir, 'phases_ext.json');
-          if (fs.existsSync(ext)) { const e = JSON.parse(fs.readFileSync(ext, 'utf8')); const p = e.phases || {};
-            dep_taxi = p.dep_taxi || null; arr_taxi = p.arr_taxi || null;
+          if (fs.existsSync(ext)) { try {
+            const e = JSON.parse(fs.readFileSync(ext, 'utf8')); const p = e.phases || {};
+            const corrected = e.trim_v === 'teardown';
+            if ((corrected || (!dep_taxi && !arr_taxi)) && (p.dep_taxi || p.arr_taxi)) {
+              dep_taxi = p.dep_taxi || dep_taxi; arr_taxi = p.arr_taxi || arr_taxi;
+            }
             if (dep_icao == null) dep_icao = e.dep_icao || null;
             if (arr_icao == null) arr_icao = e.arr_icao || null;
             if (dep_scenery == null) dep_scenery = e.dep_scenery ?? null;
             if (arr_scenery == null) arr_scenery = e.arr_scenery ?? null;
-          }
-        }
-        // perceptible_count may live in the sidecar even when the 5-phase split does not (native
-        // flights captured before v6.4.0, or old flights) — pick it up independently.
-        if (perceptible_count == null && fdir) {
-          const ext = path.join(fdir, 'phases_ext.json');
-          if (fs.existsSync(ext)) { try { const e = JSON.parse(fs.readFileSync(ext, 'utf8')); if (e.perceptible_count != null) perceptible_count = e.perceptible_count; } catch(_){} }
+            // teardown-corrected metrics win over the shutdown-inflated summary values
+            if (corrected && e.spike_count != null) spike_count = e.spike_count;
+            if (e.perceptible_count != null && (corrected || perceptible_count == null)) perceptible_count = e.perceptible_count;
+          } catch(_){} }
         }
       } catch(_){}
       const pv = (o, k) => (o && o[k] != null) ? o[k] : null;
