@@ -73,8 +73,25 @@ The app's measurement lab, and it works in plain English:
 
 Also here: **Compare** (group your flights by sim version, GPU driver, aircraft, or TLOD and see if the numbers actually moved) and **CapFrameX** export.
 
+### Live ATC (VATSIM frequency helper)
+For VATSIM flying. It answers the one question that trips people up — *"which frequency should I be on right now?"* — and loads the answer into your standby radio with one click.
+
+Turn on **Live mode** (the tab's toggle, or the **VATSIM** chip in the title bar) before a VATSIM flight. With MSFS running and you connected via vPilot, ABRP watches your position and everyone who's controlling on the network, then recommends the right frequency for your phase of flight:
+
+- **Top-down, the way real VATSIM works** — it doesn't just grab the nearest controller; it picks the *lowest* position that owns your airspace for your phase (Clearance → Ground → Tower → Approach → Center) and walks *up* when a lower one is offline ("Tower is offline — Approach covers you top-down"). When nobody covers you it gives **CTAF** (the field's own tower frequency) on the ground and in the pattern, or **UNICOM 122.800** enroute.
+- **Real airspace shapes** — Center and Approach coverage use the actual VATSIM sector maps (VATSpy centers + SimAware TRACONs), so a New York or SoCal Approach that isn't named after an airport still gets placed correctly instead of guessed with a distance circle.
+- **One click to standby** — the recommendation loads into your **COM1 standby** only. ABRP never touches your active radio and never transmits for you; you swap standby-to-active when you're ready (that's the moment vPilot goes live). There's an optional *auto-set standby* toggle if you'd rather it follow along hands-free.
+
+**📋 Route briefing** — the moment Live mode is on, the tab shows a **frequency stack** for the whole flight: the departure positions, the Centers your route crosses in order, and the arrival positions, each with its frequency and whether it's online. It reads your **filed VATSIM plan** (if you've saved your CID in Settings) or falls back to your **last SimBrief route** — pre-load them and you're never hunting. (Enroute Centers are estimated along the great-circle path, so the exact sequence can shift with your filed airways.)
+
+**In-sim overlay** — if you run MSFS **borderless or windowed**, ABRP can pop a small, discreet toast in the top-right corner when the frequency changes, a new controller comes online, or you're near a handoff — so you don't have to alt-tab. Each toast type is individually toggleable, with an optional aviation-style "seatbelt" chime (off by default). *Exclusive-fullscreen MSFS hides any external overlay — use borderless.*
+
+**VATSIM weather** — on any route's weather card, a **VATSIM** button lights up when that airport has a live VATSIM ATIS. Click it to swap the real-world weather + active runway for VATSIM's own (its injected METAR and the runway the online controller is actually using), which then flows into your SimBrief filing just like the real-world runway does.
+
+*Honest limits:* coverage is best in well-mapped regions (the US especially); an approach not in the sector maps falls back to a sensible distance estimate, and a few wide-area positions may be listed as "verify which covers you" rather than auto-picked. This is an awareness tool — standby only, nothing transmits on your behalf.
+
 ### Settings
-Everything configurable, top to bottom: **Run setup assistant** / **Edit benchmark plan** buttons, Route Data Source (SayIntentions cookie + auto-refresh), Apps to close during flight, GSX Pro folder + auto-install toggle + a drag-and-drop profile installer (accepts .py/.ini/folders/archives), Aircraft & Utilities library folders, Sim Integration (auto-detected; overridable), and Route Backup (snapshot export/restore + the Community Routes download).
+Everything configurable, top to bottom: **Run setup assistant** / **Edit benchmark plan** buttons, Route Data Source (SayIntentions cookie + auto-refresh), Apps to close during flight, GSX Pro folder + auto-install toggle + a drag-and-drop profile installer (accepts .py/.ini/folders/archives), Aircraft & Utilities library folders, Sim Integration (auto-detected; overridable), a **VATSIM** section (your CID, every overlay + sound-chime toggle, auto-set-standby, the weather-card VATSIM button, **auto-start Live mode when vPilot is running**, and buttons to refresh the airport + airspace map data), and Route Backup (snapshot export/restore + the Community Routes download).
 
 ### Maintenance
 Five practical tools: **Export/Import My Setup** (your whole configuration as one small .zip — perfect for a new PC), **Archive Older Raw Captures** (compresses old flight logs ~79% in place, nothing ever deleted), **Shader Cache Cleaner** (the post-update stutter fix, 7 cache locations), **PMDG/Fenix WASM cleaners** (the fix for aircraft gauge crashes after updates), and **NVIDIA Control Panel backup/restore**. The app watches your sim, driver, and aircraft versions and *offers* the right cleaner when one of them updates.
@@ -88,6 +105,8 @@ Five practical tools: **Export/Import My Setup** (your whole configuration as on
 **Find your ideal graphics settings** — Performance tab → "Set up my graphics baseline" → pick your 1–3 heaviest aircraft → fly your normal flights with ⚡ Launch + Capture until the tracker fills → read the Baseline recommendation. Then let the 🧪 Lab keep experimenting.
 
 **Added new scenery?** — My Airports → Scan Now. New airports are matched, GSX profiles bundled inside them install (or update) automatically, and routes for them appear in Plan a Flight immediately.
+
+**Fly a VATSIM flight** — save your CID once in Settings → VATSIM (optional but recommended). Open **Live ATC** → toggle **Live mode** before you connect with vPilot → the Route briefing shows your frequency stack for the whole flight. In the air, ABRP recommends the frequency for each phase and loads it to your COM1 standby on one click; you swap when ready. Prefer it hands-off? Turn on *auto-start with vPilot* so opening your pilot client turns the helper on for you.
 
 **Moving to a new PC** — Maintenance → 📋 Export My Setup on the old machine; install ABRP on the new one; 📂 Import Setup. Flight logs are separate (they're big) — copy `%APPDATA%\A Better Route Planner\Sessions\` if you want the history along.
 
@@ -108,6 +127,7 @@ Five practical tools: **Export/Import My Setup** (your whole configuration as on
 - **Community Routes** — Download a shared route database from GitHub when you don't have a SayIntentions cookie yet.
 - **Performance Logging** — A built-in engine captures real per-frame timing (via Intel PresentMon), VRAM, and system telemetry during a flight, then files a self-contained dashboard: frametime/FPS charts, stutter and variance breakdowns, phase-of-flight split, and VRAM headroom — all offline, no internet needed to view.
 - **Baseline Recommendation** — Analyzes your fixed-TLOD benchmark flights and recommends one balanced Terrain-LOD setting that keeps your chosen benchmark aircraft (any fleet — pick 1–3 in the guided walkthrough) smooth with VRAM headroom, with Smoothest / Balanced / Best-visuals modes.
+- **Live ATC (VATSIM)** — A live frequency helper for VATSIM flying: watches your position and who's controlling and recommends the right frequency for each phase using VATSIM's real top-down rules and actual sector maps (VATSpy centers + SimAware TRACONs), with one-click load to COM1 standby (never transmits). Includes a pre-flight route-briefing frequency stack (from your filed VATSIM plan or SimBrief), a discreet in-sim overlay for borderless/windowed MSFS, a VATSIM weather/ATIS button on route cards, and optional auto-start when vPilot is running.
 - **Maintenance Tools** — Dedicated tab: MSFS shader-cache cleaner, per-aircraft WASM cache cleaners (PMDG/Fenix), and NVIDIA Control Panel backup/restore — surfaced automatically when a sim update, GPU driver update, or aircraft update is detected.
 - **GSX Pro Profiles** — Per-airport GSX profile detection with auto-install of bundled profiles and a flightsim.to fallback link.
 - **Aircraft & Utility Activation** — Junction-based activation for aircraft and utility add-ons, so you can keep your Community folder slim for performance.
