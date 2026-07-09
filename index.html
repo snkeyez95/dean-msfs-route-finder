@@ -1251,6 +1251,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
   document.documentElement.setAttribute('data-theme',S.cfg.theme||'dark');
   applyNavOrder(); initNavDnd();   // restore the user's sidebar order + enable drag-to-reorder
+  startVpilotWatch();              // if 'auto-start Live ATC with vPilot' is on, begin watching
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
   // Initialise myFleet only when the key is absent from config (first run, or
@@ -5990,7 +5991,7 @@ async function fetchDatis(icao,idx,side,prefix){
 // the fully-populated object so toggles can write straight to it.
 function vCfg(){
   if(!S.cfg.vatsim) S.cfg.vatsim={};
-  const v=S.cfg.vatsim, d={enabled:false,cid:'',autoSetStandby:false,weatherButton:true};
+  const v=S.cfg.vatsim, d={enabled:false,cid:'',autoSetStandby:false,weatherButton:true,autoStartVpilot:false};
   for(const k in d) if(v[k]===undefined) v[k]=d[k];
   v.overlay=Object.assign({enabled:true,freqChange:true,newController:true,handoff:true,connectionLost:true,loggingStarted:true}, v.overlay||{});
   v.sound=Object.assign({newController:false,handoff:false,connectionLost:false}, v.sound||{});
@@ -6017,6 +6018,7 @@ function renderVatsimSettings(){
   h+=row('Chime on connection lost', v.sound.connectionLost, "vSet('sound.connectionLost',this.checked)");
   h+=hdr('Behavior');
   h+=row('Auto-set COM1 standby on change', v.autoSetStandby, "vSet('autoSetStandby',this.checked)", '(otherwise one click on the card)');
+  h+=row('Auto-start Live mode when vPilot is running', v.autoStartVpilot, "vSetAutoVpilot(this.checked)", '(links the pilot client to Live ATC)');
   h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
   h+=hdr('Data <span style="color:var(--ink4)">(downloaded once, refresh per AIRAC)</span>');
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"><button class="btn bg bxs" onclick="latcRefreshDb()">Refresh airport database</button><button class="btn bg bxs" onclick="vRefreshAirspace()">Refresh airspace boundaries (VATSpy)</button><span id="vatsim-data-msg" style="font-size:11px;color:var(--ink3);align-self:center"></span></div>';
@@ -6193,8 +6195,9 @@ function latcCheckToasts(){
 }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
 function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
-async function latcToggle(on){
+async function latcToggle(on,auto){
   LATC.on=on;
+  S._vpilotAutoOn=!!(on&&auto);   // track whether the vPilot watcher started this session (so it only auto-stops its own)
   if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
   else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; }
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
@@ -6203,6 +6206,25 @@ async function latcToggle(on){
 async function latcSetStandby(){ const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); const r=await window.api.liveSetStandby({freqHz:hz}); LATC.lastSetHz=hz; const n=document.getElementById('latc-setmsg'); if(n)n.textContent=(r&&r.ok)?('✓ Loaded '+latcFmt(rec.freq)+' into COM1 standby'):('Could not set standby: '+((r&&r.error)||'?')); }
 function latcToggleAuto(v){ vCfg().autoSetStandby=v; window.api.saveConfig(S.cfg); if(v)latcApplyAuto(); renderLiveAtc(); renderVatsimSettings(); }
 async function latcRefreshDb(){ LATC.db=null; LATC.dbLoading=true; renderLiveAtc(); try{ const r=await window.api.liveAirportDb({refresh:true}); if(r&&r.ok){ const m=new Map(); for(const a of r.airports)m.set(a.icao,a); LATC.db=m; } }catch(e){} LATC.dbLoading=false; renderLiveAtc(); }
+
+// vPilot → Live ATC link (Dean 2026-07-08): opt-in. When the VATSIM pilot client launches, auto-start
+// Live mode; when it closes, stop the session the watcher started. Edge-triggered on vPilot launch/close
+// so a MANUAL toggle is never fought (a manual Live-on sets _vpilotAutoOn=false → the watcher won't stop
+// it). Reuses the Companion-Apps process detection; the 20 s poll runs only while the toggle is on.
+async function isVpilotRunning(){
+  try{ const r=await window.api.listRunningApps(); if(!r||!r.ok||!r.apps)return false;
+    return r.apps.some(a=>String(a.name||'').toLowerCase().replace(/\.exe$/,'')==='vpilot'); }catch(e){ return false; }
+}
+async function vpilotWatch(){
+  if(!vCfg().autoStartVpilot) return;
+  const running=await isVpilotRunning();
+  if(running && !S._vpilotPrev && !LATC.on){ RLOG('[VATSIM] vPilot detected — starting Live ATC'); latcToggle(true,true); }
+  else if(!running && S._vpilotPrev && LATC.on && S._vpilotAutoOn){ RLOG('[VATSIM] vPilot closed — stopping Live ATC'); latcToggle(false); }
+  S._vpilotPrev=running;
+}
+function startVpilotWatch(){ stopVpilotWatch(); if(!vCfg().autoStartVpilot)return; S._vpilotPrev=false; S._vpilotIv=setInterval(vpilotWatch,20000); vpilotWatch(); }
+function stopVpilotWatch(){ if(S._vpilotIv){ clearInterval(S._vpilotIv); S._vpilotIv=null; } }
+function vSetAutoVpilot(on){ vCfg().autoStartVpilot=on; window.api.saveConfig(S.cfg); if(on)startVpilotWatch(); else stopVpilotWatch(); }
 
 function renderLiveAtc(){
   const el=document.getElementById('liveatc-body'); if(!el) return;
