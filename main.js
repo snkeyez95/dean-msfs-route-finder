@@ -2039,20 +2039,39 @@ function _parseVatspyDat(txt){
   }
   return prefixMap;
 }
+// v6.6 Stage 4b: SimAware TRACON boundaries (Approach/TRACON polygons). One combined GeoJSON published
+// as a GitHub release asset; each feature carries properties.id (e.g. "A90") + properties.prefix[] (e.g.
+// ["BOS"]) + a MultiPolygon. Build a map keyed by every id + prefix (uppercased) → geometry so an online
+// Approach controller's callsign (BOS_APP→BOS, N90_APP→N90, NY_APP→NY, EGLL_APP→EGLL) resolves to its
+// real TRACON shape. Renderer does the longest-prefix-first match (handles BOS_E_APP / EDGG_KL_APP).
+function _parseSimawareTracons(txt){
+  const tracons={}; let gj; try{ gj=JSON.parse(txt); }catch(_){ return tracons; }
+  for(const f of (gj.features||[])){ if(!f.geometry) continue; const p=f.properties||{};
+    const keys=new Set(); if(p.id) keys.add(String(p.id).toUpperCase());
+    if(Array.isArray(p.prefix)) for(const pr of p.prefix){ if(pr) keys.add(String(pr).toUpperCase()); }
+    // a big TRACON (N90, SCT, A90) is SPLIT across several sub-area features sharing one id — accumulate
+    // ALL geometries per key so a combined position (N90_APP) covers the union of its sub-areas.
+    for(const k of keys){ (tracons[k]=tracons[k]||[]).push(f.geometry); }
+  }
+  return tracons;
+}
 ipcMain.handle('airspace-data', async (_, o) => {
   const p=path.join(USER_DATA,'airspace.json');
-  if(!(o&&o.refresh) && fs.existsSync(p)){ try{ const j=JSON.parse(fs.readFileSync(p,'utf8')); return {ok:true, cached:true, boundaries:j.boundaries, prefixMap:j.prefixMap}; }catch(_){} }
+  // sv:2 = includes SimAware TRACON polygons; an older (sv:1 or missing) cache re-downloads so users gain them
+  if(!(o&&o.refresh) && fs.existsSync(p)){ try{ const j=JSON.parse(fs.readFileSync(p,'utf8')); if(j.sv>=2 && j.boundaries && j.prefixMap && j.tracons && Object.keys(j.tracons).length) return {ok:true, cached:true, boundaries:j.boundaries, prefixMap:j.prefixMap, tracons:j.tracons}; }catch(_){} }
   try{
-    const [geo,dat]=await Promise.all([
+    const [geo,dat,trac]=await Promise.all([
       _httpGetLarge('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson'),
-      _httpGetLarge('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/VATSpy.dat')]);
+      _httpGetLarge('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/VATSpy.dat'),
+      _httpGetLarge('https://github.com/vatsimnetwork/simaware-tracon-project/releases/latest/download/TRACONBoundaries.geojson')]);
     if(!geo||!dat) return {ok:false, error:'airspace data download failed'};
     const gj=JSON.parse(geo); const boundaries={};
     for(const f of (gj.features||[])){ const id=f.properties&&f.properties.id; if(id&&f.geometry) boundaries[id]=f.geometry; }
     const prefixMap=_parseVatspyDat(dat);
-    writeFileAtomic(p, JSON.stringify({boundaries, prefixMap, ts:Date.now()}));
-    LOG.info('[Airspace] built: '+Object.keys(boundaries).length+' boundaries, '+Object.keys(prefixMap).length+' prefixes');
-    return {ok:true, cached:false, boundaries, prefixMap};
+    const tracons=trac?_parseSimawareTracons(trac):{};
+    writeFileAtomic(p, JSON.stringify({boundaries, prefixMap, tracons, ts:Date.now(), sv:2}));
+    LOG.info('[Airspace] built: '+Object.keys(boundaries).length+' FIR boundaries, '+Object.keys(prefixMap).length+' prefixes, '+Object.keys(tracons).length+' TRACON keys');
+    return {ok:true, cached:false, boundaries, prefixMap, tracons};
   }catch(e){ LOG.error('[Airspace] failed: '+e.message); return {ok:false, error:e.message}; }
 });
 
