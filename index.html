@@ -6064,6 +6064,88 @@ function latcNearestAirport(pos, dbMap){
   for(const a of dbMap.values()){ if(Math.abs(a.lat-pos.lat)>1.2||Math.abs(a.lon-pos.lon)>1.6) continue; const d=gcDist(pos.lat,pos.lon,a.lat,a.lon); if(d<bd){bd=d;best=a;} }
   return best;
 }
+// ── Stage 5: ROUTE BRIEFING — the frequency stack for a filed route ───────────────────────────────
+// Interpolate points along the great circle dep→arr (slerp), ~every stepNm nm, so we can walk the path
+// and see which airspaces it crosses. Returns [[lat,lon],…] (endpoints included).
+function gcSamples(lat1,lon1,lat2,lon2,stepNm){
+  const d2r=Math.PI/180,r2d=180/Math.PI, φ1=lat1*d2r,λ1=lon1*d2r,φ2=lat2*d2r,λ2=lon2*d2r;
+  const dist=gcDist(lat1,lon1,lat2,lon2), δ=dist/3440;   // angular distance (rad)
+  const n=Math.max(2,Math.min(400,Math.ceil(dist/(stepNm||40)))), out=[];
+  for(let i=0;i<=n;i++){ const f=i/n;
+    if(δ<1e-9){ out.push([lat1,lon1]); continue; }
+    const A=Math.sin((1-f)*δ)/Math.sin(δ), B=Math.sin(f*δ)/Math.sin(δ);
+    const x=A*Math.cos(φ1)*Math.cos(λ1)+B*Math.cos(φ2)*Math.cos(λ2);
+    const y=A*Math.cos(φ1)*Math.sin(λ1)+B*Math.cos(φ2)*Math.sin(λ2);
+    const z=A*Math.sin(φ1)+B*Math.sin(φ2);
+    out.push([Math.atan2(z,Math.sqrt(x*x+y*y))*r2d, Math.atan2(y,x)*r2d]);
+  }
+  return out;
+}
+// Route source: the filed VATSIM plan (matched by your CID) if connected, else your most-recent SimBrief
+// route. Returns {dep,arr,route,source} or null.
+function latcBriefRoute(){
+  const cid=(vCfg().cid||'').trim();
+  if(cid){ const me=((_vFeed&&_vFeed.pilots)||[]).find(p=>String(p.cid)===cid);
+    const fp=me&&me.flight_plan;
+    if(fp&&fp.departure&&fp.arrival) return {dep:String(fp.departure).toUpperCase(), arr:String(fp.arrival).toUpperCase(), route:fp.route||'', source:'your filed VATSIM plan'}; }
+  const r=(S.cfg.recentSimBriefRoutes||[])[0];
+  if(r&&r.dep&&r.arr) return {dep:String(r.dep).toUpperCase(), arr:String(r.arr).toUpperCase(), route:'', source:'your last SimBrief route'};
+  return null;
+}
+// Online, real ATC positions (drop observers + placeholder freq), tagged with tier.
+function _latcOnline(controllers){
+  const out=[];
+  for(const c of (controllers||[])){ if(c.facility===0) continue; const fr=parseFloat(c.frequency); if(!(fr>0)||c.frequency==='199.998') continue; const tier=LATC_TIER[c.facility]; if(!tier) continue; out.push({callsign:c.callsign, freq:fr, tier}); }
+  return out;
+}
+// Build the ordered frequency stack for a route: departure field positions (DEL→GND→TWR→APP), the online
+// Centers the great-circle path crosses in order, and arrival field positions (APP→TWR→GND). Enroute
+// crossings are great-circle-approximate (not the exact filed airway path) — labelled as such in the UI.
+function latcFreqStack(depApt, arrApt, controllers, dbMap){
+  const on=_latcOnline(controllers), st={dep:[], enr:[], arr:[], enrouteGap:false};
+  const fieldPos=(apt,order)=>{ const res=[];
+    for(const tier of order){ for(const c of on){ if(c.tier!==tier) continue; let belongs=false;
+      if(tier==='APP'){ const tc=traconCovers(c.callsign,apt.lat,apt.lon); if(tc===true) belongs=true; else if(tc===null){ const a=latcAirportForCallsign(c.callsign,dbMap); belongs=!!(a&&a.icao===apt.icao); } }
+      else { const a=latcAirportForCallsign(c.callsign,dbMap); belongs=!!(a&&a.icao===apt.icao); }
+      if(belongs && !res.some(x=>x.callsign===c.callsign)) res.push({tier,callsign:c.callsign,freq:c.freq}); } }
+    return res; };
+  if(depApt) st.dep=fieldPos(depApt,['DEL','GND','TWR','APP']);
+  if(arrApt) st.arr=fieldPos(arrApt,['APP','TWR','GND']);
+  if(depApt&&arrApt){
+    const samples=gcSamples(depApt.lat,depApt.lon,arrApt.lat,arrApt.lon,40); let lastKey=null;
+    for(const [la,lo] of samples){ let cover=null;
+      for(const c of on){ if(c.tier!=='CTR'&&c.tier!=='FSS') continue; if(airspaceCovers(c.callsign,la,lo)===true){ cover=c; break; } }
+      if(!cover) st.enrouteGap=true;                             // any uncovered stretch (incl. a fully-uncovered route)
+      const key=cover?cover.callsign:null;
+      if(key!==lastKey){ if(cover && !st.enr.some(x=>x.callsign===cover.callsign)) st.enr.push({callsign:cover.callsign,freq:cover.freq}); lastKey=key; }
+    }
+  }
+  return st;
+}
+// Pre-flight briefing card HTML (shown in the Live ATC tab whenever Live mode is on and a route is known).
+function latcRenderBrief(){
+  if(!LATC.on || !LATC.db) return '';
+  const r=latcBriefRoute(); if(!r) return '';
+  const depApt=LATC.db.get(r.dep), arrApt=LATC.db.get(r.arr);
+  const st=(depApt&&arrApt)?latcFreqStack(depApt,arrApt,LATC.controllers||[],LATC.db):null;
+  const chip=(label,cs,freq)=>'<span style="display:inline-flex;gap:6px;align-items:center;font-size:11px;background:var(--bg2);border:1px solid var(--sep);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0"><b style="color:var(--acc)">'+esc(label)+'</b> '+esc(cs)+' <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink1)">'+latcFmt(freq)+'</span></span>';
+  const seg=(title,items,emptyMsg)=>'<div style="margin:6px 0"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:3px">'+title+'</div>'+(items.length?items:('<span style="font-size:11px;color:var(--ink3)">'+emptyMsg+'</span>'))+'</div>';
+  let body;
+  if(!st){ body='<div style="font-size:12px;color:var(--ink3)">Loading airport data for '+esc(r.dep)+' → '+esc(r.arr)+'…</div>'; }
+  else {
+    const depTwr=depApt.twr, arrTwr=arrApt.twr;
+    const depItems=st.dep.map(x=>chip(latcTierLabel(x.tier),x.callsign,x.freq)).join('');
+    const enrItems=st.enr.map(x=>chip('Center',x.callsign,x.freq)).join('')+(st.enrouteGap?'<span style="font-size:11px;color:var(--ink3);margin-left:4px">+ stretches with no Center online → UNICOM '+latcFmt(LATC_UNICOM)+'</span>':'');
+    const arrItems=st.arr.map(x=>chip(latcTierLabel(x.tier),x.callsign,x.freq)).join('');
+    body=seg('Departure &mdash; '+esc(r.dep), depItems, 'No ATC online &mdash; '+(depTwr?('CTAF '+latcFmt(depTwr)):('UNICOM '+latcFmt(LATC_UNICOM))))
+       + seg('Enroute (great-circle estimate)', enrItems, 'No Center online along your route &mdash; UNICOM '+latcFmt(LATC_UNICOM))
+       + seg('Arrival &mdash; '+esc(r.arr), arrItems, 'No ATC online &mdash; '+(arrTwr?('CTAF '+latcFmt(arrTwr)):('UNICOM '+latcFmt(LATC_UNICOM))));
+  }
+  return '<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px"><div style="font-size:13px;font-weight:600;color:var(--ink1)">📋 Route briefing &mdash; '+esc(r.dep)+' → '+esc(r.arr)+'</div><div style="font-size:10px;color:var(--ink3)">from '+esc(r.source)+'</div></div>'
+    +body
+    +'<div style="font-size:10px;color:var(--ink4);margin-top:6px">Frequencies to pre-load, in order. Enroute Centers are estimated from the great-circle path, so the exact sequence can shift with your filed airways.</div></div>';
+}
 // ── Airspace polygons (VATSpy FIR/ARTCC) — point-in-polygon Center coverage ──────────────────────
 let _airspace=null, _airspaceLoading=null;
 async function airspaceLoad(force){
@@ -6255,6 +6337,7 @@ function renderLiveAtc(){
     +pill(st[0],st[1])
     +(LATC.on&&LATC.controllers.length?'<span style="font-size:11px;color:var(--ink3)">'+LATC.controllers.filter(c=>c.facility!==0).length+' controllers online</span>':'')+'</div>';
   if(!LATC.on){ h+='<div style="font-size:13px;color:var(--ink3);line-height:1.6;background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">Turn on <b>Live mode</b> before a VATSIM flight. ABRP watches your position and who&rsquo;s controlling, and recommends the frequency for each phase &mdash; clearance, ground, tower, approach &mdash; or CTAF/UNICOM when the field is uncontrolled. One click loads it into your COM1 <b>standby</b>; you swap when ready.<div style="margin-top:10px;color:var(--acc)">Requires MSFS running and you connected to VATSIM (vPilot). Nothing is transmitted for you &mdash; standby only.</div></div>'; el.innerHTML=h; return; }
+  h+=latcRenderBrief();   // Stage 5: pre-flight frequency stack for the filed/SimBrief route (shown before the sim connects too)
   if(LATC.dbLoading&&!LATC.db){ h+='<div style="font-size:13px;color:var(--ink3)">Building the global airport database (one-time, ~10&ndash;20s)…</div>'; el.innerHTML=h; return; }
   if(LATC.status!=='live'||!LATC.pos){ h+='<div style="font-size:13px;color:var(--ink3);background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">'+(LATC.status==='sim-off'?'Waiting for MSFS &mdash; start a flight and this connects automatically.':'Connecting to the sim…')+'</div>'; el.innerHTML=h; return; }
   const rec=latcCurrentRec();
