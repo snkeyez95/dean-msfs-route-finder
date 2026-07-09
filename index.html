@@ -54,6 +54,7 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg0);color:va
 .sb-item{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;user-select:none;transition:color .12s,background .12s;white-space:nowrap}
 .sb-item:hover{color:var(--ink2);background:var(--bg2)}
 .sb-item.active{color:var(--acc);background:var(--acc3)}
+.sb-item.dragging{opacity:.4;background:var(--bg2)}
 .sb-ic{width:16px;text-align:center;flex-shrink:0}
 .content{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .pane{display:none;flex:1;overflow:hidden}
@@ -1249,6 +1250,7 @@ function toggleTheme(){
 window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
   document.documentElement.setAttribute('data-theme',S.cfg.theme||'dark');
+  applyNavOrder(); initNavDnd();   // restore the user's sidebar order + enable drag-to-reorder
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
   // Initialise myFleet only when the key is absent from config (first run, or
@@ -1432,6 +1434,39 @@ function sw(t){
   if(t==='settings'){renderFlightApps();enhanceSettingsSections();renderVatsimSettings();}
   if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();}
   if(t==='liveatc')renderLiveAtc();
+}
+
+// ── LEFT-NAV DRAG-TO-REORDER (Dean 2026-07-08) ───────────────────────────────
+// The sidebar tab order is user-arrangeable: drag any item, order persists in cfg.navOrder, restored
+// on load. sw()/panes key off data-tab (not DOM position), so reordering the divs is safe. A tab NOT
+// in the saved order (e.g. a new tab added by a future version) keeps its default spot at the bottom.
+function applyNavOrder(){
+  const nav=document.querySelector('.sb-nav'); if(!nav)return;
+  const order=(S.cfg&&Array.isArray(S.cfg.navOrder))?S.cfg.navOrder:null; if(!order||!order.length)return;
+  const items=Array.from(nav.querySelectorAll('.sb-item')), byTab={}; items.forEach(el=>byTab[el.dataset.tab]=el);
+  order.forEach(t=>{ if(byTab[t]){ nav.appendChild(byTab[t]); delete byTab[t]; } });   // saved order first
+  items.forEach(el=>{ if(byTab[el.dataset.tab]) nav.appendChild(el); });                // then any new/unsaved tabs, default order
+}
+function _navSaveOrder(){
+  const nav=document.querySelector('.sb-nav'); if(!nav)return;
+  S.cfg.navOrder=Array.from(nav.querySelectorAll('.sb-item')).map(el=>el.dataset.tab);
+  window.api.saveConfig(S.cfg);
+}
+function _navAfterEl(nav,y){   // the item the dragged one should be inserted BEFORE, by pointer Y
+  const els=[...nav.querySelectorAll('.sb-item:not(.dragging)')];
+  return els.reduce((closest,el)=>{ const box=el.getBoundingClientRect(), offset=y-box.top-box.height/2;
+    return (offset<0&&offset>closest.offset)?{offset,el}:closest; },{offset:-Infinity,el:null}).el;
+}
+function initNavDnd(){
+  const nav=document.querySelector('.sb-nav'); if(!nav)return;
+  let dragged=null;
+  nav.querySelectorAll('.sb-item').forEach(el=>{
+    el.setAttribute('draggable','true');
+    el.addEventListener('dragstart',e=>{ dragged=el; el.classList.add('dragging'); try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.tab||'');}catch(_){} });
+    el.addEventListener('dragend',()=>{ if(!dragged)return; dragged.classList.remove('dragging'); dragged=null; _navSaveOrder(); });
+  });
+  nav.addEventListener('dragover',e=>{ if(!dragged)return; e.preventDefault(); const after=_navAfterEl(nav,e.clientY);
+    if(after==null)nav.appendChild(dragged); else nav.insertBefore(dragged,after); });
 }
 
 // ── AIRPORTS ────────────────────────────────────────────────────────────────
