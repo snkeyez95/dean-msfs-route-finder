@@ -6350,7 +6350,19 @@ function latcCheckToasts(){
   } else { LATC._handoffKey=null; }
 }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
-function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
+// v6.6.1 — honest standby verification (Dean's PMDG flight: the write reported success but the radio
+// never moved). transmitClientEvent only tells us the SEND didn't throw, not whether the aircraft's
+// radio actually changed. Wait one sim data cycle, then read COM1 standby back and compare. No BCD
+// fallback — see the main.js comment: it would silently mistune modern 8.33kHz frequencies.
+function latcVerifyStandbySoon(targetHz){ return new Promise(res=>setTimeout(async()=>{ try{ res(await window.api.liveVerifyStandby({targetHz})); }catch(e){ res({ok:false,verified:false}); } },1500)); }
+function latcApplyAuto(){
+  if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq);
+  if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz;
+    window.api.liveSetStandby({freqHz:hz}).then(r=>{ if(!r||!r.ok)return;
+      latcVerifyStandbySoon(r.targetHz||hz).then(v=>{ LATC.standbyVerified=!!(v&&v.verified); LATC.standbyIssue=(v&&!v.verified)?(v.reason||'the aircraft did not confirm the change'):null; renderLiveAtc(); });
+    });
+  }
+}
 async function latcToggle(on,auto){
   LATC.on=on;
   S._vpilotAutoOn=!!(on&&auto);   // track whether the vPilot watcher started this session (so it only auto-stops its own)
@@ -6359,7 +6371,17 @@ async function latcToggle(on,auto){
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
   renderLiveAtc(); updateVatsimHeader();
 }
-async function latcSetStandby(){ const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); const r=await window.api.liveSetStandby({freqHz:hz}); LATC.lastSetHz=hz; const n=document.getElementById('latc-setmsg'); if(n)n.textContent=(r&&r.ok)?('✓ Loaded '+latcFmt(rec.freq)+' into COM1 standby'):('Could not set standby: '+((r&&r.error)||'?')); }
+async function latcSetStandby(){
+  const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq);
+  const n=document.getElementById('latc-setmsg'); if(n)n.textContent='Sending…';
+  const r=await window.api.liveSetStandby({freqHz:hz});
+  if(!r||!r.ok){ if(n)n.textContent='Could not set standby: '+((r&&r.error)||'?'); return; }
+  LATC.lastSetHz=hz;
+  const v=await latcVerifyStandbySoon(r.targetHz||hz);
+  if(!n)return;
+  if(v&&v.verified){ n.textContent='✓ Confirmed '+latcFmt(rec.freq)+' loaded into COM1 standby'; LATC.standbyVerified=true; LATC.standbyIssue=null; }
+  else{ const why=(v&&v.reason)?v.reason:'could not confirm the aircraft accepted it'; n.textContent='Sent '+latcFmt(rec.freq)+' — '+why+' — tune manually to be safe'; LATC.standbyVerified=false; LATC.standbyIssue=why; }
+}
 function latcToggleAuto(v){ vCfg().autoSetStandby=v; window.api.saveConfig(S.cfg); if(v)latcApplyAuto(); renderLiveAtc(); renderVatsimSettings(); }
 async function latcRefreshDb(){ LATC.db=null; LATC.dbLoading=true; renderLiveAtc(); try{ const r=await window.api.liveAirportDb({refresh:true}); if(r&&r.ok){ const m=new Map(); for(const a of r.airports)m.set(a.icao,a); LATC.db=m; } }catch(e){} LATC.dbLoading=false; renderLiveAtc(); }
 
@@ -6407,7 +6429,9 @@ function renderLiveAtc(){
     +'<div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">'
       +'<button class="btn bg bsm" style="border-color:'+accent+';color:'+accent+'" onclick="latcSetStandby()">&#128225; Set COM1 standby</button>'
       +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);cursor:pointer"><input type="checkbox" '+(vCfg().autoSetStandby?'checked':'')+' onchange="latcToggleAuto(this.checked)" style="accent-color:var(--acc)"> auto-set standby on change</label>'
-      +'<span id="latc-setmsg" style="font-size:12px;color:var(--grn)"></span></div></div>';
+      // seed the message from the LAST verified state for THIS frequency (covers the auto-set path,
+      // which verifies in the background — passively visible here, not just after a manual click)
+      +'<span id="latc-setmsg" style="font-size:12px;color:'+(LATC.standbyVerified?'var(--grn)':'var(--acc)')+'">'+((LATC.lastSetHz===latcHz(rec.freq))?(LATC.standbyVerified?('✓ Confirmed '+latcFmt(rec.freq)+' loaded into COM1 standby'):(LATC.standbyIssue?('Sent — '+esc(LATC.standbyIssue)+' — tune manually to be safe'):'')):'')+'</span></div></div>';
   if(rec.others&&rec.others.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Also in range</div><div style="margin-bottom:14px">';
     for(const c of rec.others) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+(c.dist!=null?' &middot; '+Math.round(c.dist)+' nm':'')+'</span></div>';
     h+='</div>'; }

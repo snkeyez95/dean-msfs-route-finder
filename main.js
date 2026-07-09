@@ -1941,14 +1941,19 @@ const LiveATC = (() => {
       h.addToDataDefinition(DEF,'PLANE ALT ABOVE GROUND','Feet',SimConnectDataType.FLOAT64);
       h.addToDataDefinition(DEF,'SIM ON GROUND','Bool',SimConnectDataType.INT32);
       h.addToDataDefinition(DEF,'GROUND VELOCITY','Knots',SimConnectDataType.FLOAT64);
+      // v6.6.1: read COM1 standby back (MHz) so setStandby can HONESTLY report whether the write
+      // actually reached the aircraft's radio — some custom avionics (found live on Dean's PMDG 737)
+      // ignore the standard SimConnect event and silently leave this unread-back "success" wrong.
+      h.addToDataDefinition(DEF,'COM STANDBY FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
       h.requestDataOnSimObject(REQ,DEF,0,SimConnectPeriod.SECOND);
       try{ h.mapClientEventToSimEvent(EVT_STBY,'COM_STBY_RADIO_SET_HZ'); }catch(_){}
       h.on('simObjectData',(recv)=>{
         if(recv.requestID!==REQ) return;
         try{
           const lat=recv.data.readFloat64(), lon=recv.data.readFloat64(), alt=recv.data.readFloat64(),
-                agl=recv.data.readFloat64(), og=recv.data.readInt32(), gs=recv.data.readFloat64();
-          pos={lat,lon,alt,agl,onGround:!!og,gs,ts:Date.now()}; status='live';
+                agl=recv.data.readFloat64(), og=recv.data.readInt32(), gs=recv.data.readFloat64(),
+                comStandbyMhz=recv.data.readFloat64();
+          pos={lat,lon,alt,agl,onGround:!!og,gs,comStandbyMhz,ts:Date.now()}; status='live';
         }catch(_){}
       });
       const drop=()=>{ if(!stopped) _reconnect(); };
@@ -1975,9 +1980,23 @@ const LiveATC = (() => {
       try{
         const { EventFlag } = require('node-simconnect');
         handle.transmitClientEvent(0, EVT_STBY, Math.round(freqHz), 0, EventFlag.EVENT_FLAG_DEFAULT);   // COM1 STANDBY only
-        LOG.info('[LiveATC] COM1 standby set to '+freqHz+' Hz');
-        return {ok:true};
+        LOG.info('[LiveATC] COM1 standby SET requested: '+freqHz+' Hz');
+        return {ok:true, targetHz:Math.round(freqHz)};
       }catch(e){ LOG.error('[LiveATC] setStandby failed: '+e.message); return {ok:false, error:e.message}; }
+    },
+    // v6.6.1: honest verification — the transmit above can only report whether the SEND failed, not
+    // whether the aircraft's radio actually moved. Call this ~1-2s later (after the sim's next data
+    // cycle) with the targetHz from setStandby; compares against the live COM STANDBY FREQUENCY readback.
+    // No BCD fallback here on purpose: the legacy BCD radio event only holds 2 decimal digits (25kHz
+    // spacing) and would silently mistune modern 8.33kHz frequencies (e.g. 132.975) — worse than honest
+    // failure. A write that doesn't take needs an aircraft-specific fix (PMDG/Fenix custom var), not a
+    // lossy generic one.
+    verifyStandby(targetHz){
+      if(!pos) return {ok:false, verified:false, reason:'no live position data'};
+      const readHz = pos.comStandbyMhz!=null ? Math.round(pos.comStandbyMhz*1e6) : null;
+      if(readHz==null) return {ok:true, verified:false, reason:'aircraft is not reporting COM1 standby (custom radio)'};
+      const matched = Math.abs(readHz - targetHz) <= 1000;   // 1kHz tolerance for float rounding
+      return {ok:true, verified:matched, readHz, targetHz};
     }
   };
 })();
@@ -1985,6 +2004,7 @@ ipcMain.handle('live-atc-start', () => { LiveATC.start(); return {ok:true}; });
 ipcMain.handle('live-atc-stop',  () => { LiveATC.stop();  return {ok:true}; });
 ipcMain.handle('live-position',  () => LiveATC.latest());
 ipcMain.handle('live-set-standby', (_, o) => LiveATC.setStandby((o&&o.freqHz)||0));
+ipcMain.handle('live-verify-standby', (_, o) => LiveATC.verifyStandby((o&&o.targetHz)||0));
 // VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns controllers + ATIS +
 // pilots (pilots trimmed to the connection/flight-plan fields we use, to keep the payload small).
 ipcMain.handle('live-vatsim-feed', async () => {
