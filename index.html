@@ -6122,6 +6122,29 @@ function latcFreqStack(depApt, arrApt, controllers, dbMap){
   }
   return st;
 }
+// The online CTR/APP position whose polygon covers a point (first match), or null. Used to look ahead
+// along the route for the next controller.
+function latcCoveringCtrl(lat,lon,controllers){
+  for(const c of _latcOnline(controllers)){
+    if(c.tier==='CTR'||c.tier==='FSS'){ if(airspaceCovers(c.callsign,lat,lon)===true) return c; }
+    else if(c.tier==='APP'){ if(traconCovers(c.callsign,lat,lon)===true) return c; }
+  }
+  return null;
+}
+// Route-aware handoff: scan ahead from the current position toward the destination and return the first
+// DIFFERENT online controller you'll cross into (with distance), or null. curCallsign = who you're on now.
+function latcNextHandoff(pos, arrApt, controllers, curCallsign){
+  if(!pos||!arrApt) return null;
+  const LOOK_NM=80, total=gcDist(pos.lat,pos.lon,arrApt.lat,arrApt.lon), reach=Math.min(LOOK_NM,total);
+  if(reach<5) return null;                                        // essentially at the destination
+  const samples=gcSamples(pos.lat,pos.lon,arrApt.lat,arrApt.lon,10);
+  for(let i=1;i<samples.length;i++){ const [la,lo]=samples[i], d=gcDist(pos.lat,pos.lon,la,lo);
+    if(d>reach) break;
+    const cover=latcCoveringCtrl(la,lo,controllers);
+    if(cover && cover.callsign!==curCallsign) return {callsign:cover.callsign, freq:cover.freq, distNm:Math.round(d)};
+  }
+  return null;
+}
 // Pre-flight briefing card HTML (shown in the Live ATC tab whenever Live mode is on and a route is known).
 function latcRenderBrief(){
   if(!LATC.on || !LATC.db) return '';
@@ -6162,9 +6185,20 @@ function _ptInGeom(lon,lat,g){ if(!g)return false; const polys=g.type==='MultiPo
 function airspaceCovers(callsign, lat, lon){
   const a=_airspace; if(!a) return null;
   const pfx=String(callsign||'').split('_')[0].toUpperCase();
-  let ids=a.prefixMap[pfx]||[];
-  if(!ids.length){ if(a.boundaries[pfx]) ids=[pfx]; else if(pfx.length===3&&a.boundaries['K'+pfx]) ids=['K'+pfx]; }
-  if(!ids.length) return null;
+  let ids=a.prefixMap[pfx];
+  if(!ids||!ids.length){
+    // Match the base boundary AND any '-SUFFIX' segments: US Centers split into e.g. KZNY (oceanic),
+    // KZNY-W (domestic), KZNY-BDA (Bermuda) — checking only the base misses the domestic area entirely.
+    // Memoized per prefix on the loaded airspace (a handful of prefixes per session).
+    a._idCache=a._idCache||{};
+    if(a._idCache[pfx]===undefined){
+      const bases=[pfx]; if(pfx.length===3) bases.push('K'+pfx);
+      const out=[]; for(const id of Object.keys(a.boundaries)){ for(const b of bases){ if(id===b||id.startsWith(b+'-')){ out.push(id); break; } } }
+      a._idCache[pfx]=out;
+    }
+    ids=a._idCache[pfx];
+  }
+  if(!ids||!ids.length) return null;
   for(const id of ids){ if(_ptInGeom(lon,lat,a.boundaries[id])) return true; }
   return false;
 }
@@ -6293,6 +6327,18 @@ function latcCheckToasts(){
   const cur=new Set([rec.callsign, ...(rec.others||[]).map(o=>o.callsign)].filter(Boolean));
   if(LATC._lastCtrl){ const nw=[...cur].filter(c=>!LATC._lastCtrl.has(c)); if(nw.length) latcOverlayToast('newController', nw.length>1?(nw.length+' new controllers online'):'New controller online', nw.slice(0,2).join(', ')); }
   LATC._lastCtrl=cur;
+  // Route-aware handoff prompt: airborne, look ahead along the route for the next different controller and
+  // prompt once ~6 min out (or ≤30 nm when groundspeed is unknown). Cleared when passed onto or gone.
+  const p=LATC.pos, r=latcBriefRoute(), arrApt=(r&&LATC.db)?LATC.db.get(r.arr):null;
+  if(p && !p.onGround && arrApt){
+    const next=latcNextHandoff(p, arrApt, LATC.controllers, rec.callsign);
+    if(!next){ LATC._handoffKey=null; }
+    else{
+      const etaMin=(p.gs>30)?(next.distNm/p.gs*60):null, near=(etaMin!=null)?etaMin<=6:next.distNm<=30;
+      if(near && LATC._handoffKey!==next.callsign){ latcOverlayToast('handoff','Next: '+latcFmt(next.freq), esc(next.callsign)+' in ~'+(etaMin!=null?Math.max(1,Math.round(etaMin))+' min':next.distNm+' nm')); LATC._handoffKey=next.callsign; }
+    }
+    if(rec.callsign===LATC._handoffKey) LATC._handoffKey=null;   // handoff completed → allow the next one
+  } else { LATC._handoffKey=null; }
 }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
 function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
