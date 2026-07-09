@@ -4743,6 +4743,10 @@ async function updateCaptureBadge(){
     const txt=document.getElementById('cap-badge-text');
     if(txt)txt.textContent=rec?'Recording':(s.state==='armed'?'Capture armed':'Capture');
   }
+  // in-sim overlay confirmation when recording begins (independent of VATSIM Live mode)
+  const nowRec=active&&s&&s.state==='recording';
+  if(nowRec && LATC._capWasRec===false) latcOverlayToast('loggingStarted','Performance capture recording','logging this flight');
+  if(typeof LATC!=='undefined') LATC._capWasRec=nowRec;
 }
 
 // ── APPS TO CLOSE DURING FLIGHT (Phase 3 — config + UI; engine execution wired next) ──
@@ -6105,7 +6109,19 @@ async function renderVatsimAtisBtn(icao,idx,side,prefix){
 }
 function applyVatsimAtis(icao,idx,side,prefix){ const d=vatsimAtisData(icao); if(!d)return; S.datisCache[(icao||'').toUpperCase()]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
 function revertVatsimAtis(icao,idx,side,prefix){ delete S.datisCache[(icao||'').toUpperCase()]; fetchDatis(icao,idx,side,prefix); }
-async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcApplyAuto(); renderLiveAtc(); updateVatsimHeader(); }
+async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcApplyAuto(); latcCheckToasts(); renderLiveAtc(); updateVatsimHeader(); }
+// Overlay toast (gated per-type by cfg.vatsim.overlay + optional sound). The overlay window is created
+// lazily in main on the first toast.
+function latcOverlayToast(type,title,sub,ms){ const v=vCfg(); if(!v.overlay.enabled||!v.overlay[type])return; window.api.overlayToast({type,title,sub,sound:!!(v.sound&&v.sound[type]),ms}); }
+function latcCheckToasts(){
+  const rec=(LATC.status==='live')?latcCurrentRec():null; if(!rec)return;
+  const fkey=latcFmt(rec.freq)+'|'+(rec.callsign||'');
+  if(LATC._lastFreqKey!=null && fkey!==LATC._lastFreqKey) latcOverlayToast('freqChange','Monitor '+latcFmt(rec.freq),(rec.callsign?rec.callsign+' · ':'')+rec.label);
+  LATC._lastFreqKey=fkey;
+  const cur=new Set([rec.callsign, ...(rec.others||[]).map(o=>o.callsign)].filter(Boolean));
+  if(LATC._lastCtrl){ const nw=[...cur].filter(c=>!LATC._lastCtrl.has(c)); if(nw.length) latcOverlayToast('newController', nw.length>1?(nw.length+' new controllers online'):'New controller online', nw.slice(0,2).join(', ')); }
+  LATC._lastCtrl=cur;
+}
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
 function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
 async function latcToggle(on){

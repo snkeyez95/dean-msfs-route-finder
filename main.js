@@ -891,7 +891,7 @@ function cleanupActivationsOnQuit(){
   }
 }
 let _cleanupDone = false;
-app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} cleanupActivationsOnQuit(); });
+app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.destroy(); }catch(_){} cleanupActivationsOnQuit(); });
 // When the auto-updater restarts ABRP to install a new version, exit FAST: skip the close-confirm
 // dialog and the (slow) activation cleanup so the NSIS installer doesn't catch ABRP still shutting
 // down and show "cannot be closed / Retry". The junctions are intentionally left in place — the
@@ -1997,6 +1997,30 @@ ipcMain.handle('vatsim-metar', async (_, o) => {
   try{ const icao=String((o&&o.icao)||'').toUpperCase(); if(!icao) return {ok:false}; const body=await _httpGetLarge('https://metar.vatsim.net/'+icao); const raw=(body||'').trim(); return {ok:!!raw, raw}; }
   catch(e){ return {ok:false, error:e.message}; }
 });
+
+// ── LIVE ATC IN-SIM OVERLAY ─────────────────────────────────────────────────────────────────────
+// A SECOND transparent, frameless, click-through, always-on-top window pinned top-right — discrete
+// toasts (freq change / new controller / logging started) that fade after a few seconds. Renders over
+// borderless/windowed MSFS; exclusive fullscreen hides any external window (documented limitation).
+let overlayWin=null;
+function overlayEnsure(){
+  if(overlayWin && !overlayWin.isDestroyed()) return overlayWin;
+  const { screen } = require('electron');
+  const wa=screen.getPrimaryDisplay().workArea, W=340, H=150, m=16;
+  overlayWin=new BrowserWindow({
+    width:W, height:H, x: wa.x+wa.width-W-m, y: wa.y+m,
+    frame:false, transparent:true, alwaysOnTop:true, skipTaskbar:true, resizable:false, movable:false,
+    minimizable:false, maximizable:false, focusable:false, hasShadow:false, show:false,
+    webPreferences:{ preload: path.join(__dirname,'preload.js'), contextIsolation:true, nodeIntegration:false }
+  });
+  try{ overlayWin.setAlwaysOnTop(true,'screen-saver'); }catch(_){}
+  try{ overlayWin.setIgnoreMouseEvents(true,{forward:true}); }catch(_){}   // click-through
+  overlayWin.loadFile('overlay.html');
+  overlayWin.on('closed',()=>{ overlayWin=null; });
+  return overlayWin;
+}
+ipcMain.handle('overlay-toast', (_, payload) => { try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
+ipcMain.handle('overlay-hide', () => { try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.close(); }catch(_){} overlayWin=null; return {ok:true}; });
 
 // Global airport DB (OurAirports, public domain) — slim {icao,lat,lon,twr(MHz)} for medium+large
 // airports, cached in USER_DATA. Powers nearest-airport, CTAF (tower freq), and geo-locating tower/

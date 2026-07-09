@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;-webkit-user-select:none;user-select:none;}
+  #t{ position:fixed; top:8px; right:8px; max-width:320px; background:rgba(18,20,24,0.92); border:1px solid rgba(245,166,35,0.55); border-radius:10px; padding:9px 13px; color:#e8e8ea; box-shadow:0 6px 24px rgba(0,0,0,0.55); opacity:0; transform:translateY(-6px); transition:opacity .22s ease, transform .22s ease; }
+  #t.show{ opacity:1; transform:translateY(0); }
+  #t .tk{ font-size:9px; text-transform:uppercase; letter-spacing:.09em; color:#7a7d84; margin-bottom:2px; }
+  #t .ti{ font-size:15px; font-weight:700; color:#f5a623; letter-spacing:.01em; font-variant-numeric:tabular-nums; }
+  #t .ts{ font-size:12px; color:#b9bbc0; margin-top:2px; }
+</style></head><body>
+<div id="t"><div class="tk" id="tk"></div><div class="ti" id="ti"></div><div class="ts" id="ts"></div></div>
+<script>
+  let hideTimer=null;
+  const el=document.getElementById('t'), tk=document.getElementById('tk'), ti=document.getElementById('ti'), ts=document.getElementById('ts');
+  const kind={freqChange:'Tune standby',newController:'VATSIM',handoff:'Handoff',connectionLost:'VATSIM',loggingStarted:'Performance'};
+  const accent={loggingStarted:'#46c46a',connectionLost:'#e0823c'};
+  function beep(){ try{ const c=new (window.AudioContext||window.webkitAudioContext)(); const o=c.createOscillator(), g=c.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.05; o.connect(g); g.connect(c.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.25); o.stop(c.currentTime+0.27); }catch(e){} }
+  if(window.api&&window.api.onOverlayToast) window.api.onOverlayToast(function(p){
+    p=p||{};
+    const col=accent[p.type]||'#f5a623';
+    tk.textContent=kind[p.type]||'VATSIM'; ti.textContent=p.title||''; ti.style.color=col; el.style.borderColor='rgba('+(p.type==='loggingStarted'?'70,196,106':p.type==='connectionLost'?'224,130,60':'245,166,35')+',0.55)';
+    ts.textContent=p.sub||''; ts.style.display=p.sub?'block':'none';
+    el.classList.add('show');
+    if(p.sound)beep();
+    clearTimeout(hideTimer);
+    hideTimer=setTimeout(function(){ el.classList.remove('show'); }, (p.ms||7000));
+  });
+</script></body></html>
