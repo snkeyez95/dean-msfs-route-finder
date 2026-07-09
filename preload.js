@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('api', {
   liveAirportDb:      (o)   => ipcRenderer.invoke('live-airport-db', o||{}),
   liveVatsimFeed:     ()    => ipcRenderer.invoke('live-vatsim-feed'),
   vatsimMetar:        (o)   => ipcRenderer.invoke('vatsim-metar', o||{}),
+  airspaceData:       (o)   => ipcRenderer.invoke('airspace-data', o||{}),
   overlayToast:       (o)   => ipcRenderer.invoke('overlay-toast', o||{}),
   overlayHide:        ()    => ipcRenderer.invoke('overlay-hide'),
   onOverlayToast:     (cb)  => ipcRenderer.on('overlay-toast', (_, p) => cb(p)),

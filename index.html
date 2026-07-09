@@ -5983,8 +5983,11 @@ function renderVatsimSettings(){
   h+=hdr('Behavior');
   h+=row('Auto-set COM1 standby on change', v.autoSetStandby, "vSet('autoSetStandby',this.checked)", '(otherwise one click on the card)');
   h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
+  h+=hdr('Data <span style="color:var(--ink4)">(downloaded once, refresh per AIRAC)</span>');
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"><button class="btn bg bxs" onclick="latcRefreshDb()">Refresh airport database</button><button class="btn bg bxs" onclick="vRefreshAirspace()">Refresh airspace boundaries (VATSpy)</button><span id="vatsim-data-msg" style="font-size:11px;color:var(--ink3);align-self:center"></span></div>';
   el.innerHTML=h;
 }
+async function vRefreshAirspace(){ const n=document.getElementById('vatsim-data-msg'); if(n)n.textContent='Downloading airspace boundaries…'; _airspace=null; const a=await airspaceLoad(true); if(n)n.textContent=a?('✓ '+Object.keys(a.boundaries||{}).length+' boundaries loaded'):'Download failed — check your connection'; }
 // Header chip: always visible; click toggles Live mode. Shows the current recommended frequency when live.
 function updateVatsimHeader(){
   const el=document.getElementById('vatsim-hdr'); if(!el)return;
@@ -6024,36 +6027,67 @@ function latcNearestAirport(pos, dbMap){
   for(const a of dbMap.values()){ if(Math.abs(a.lat-pos.lat)>1.2||Math.abs(a.lon-pos.lon)>1.6) continue; const d=gcDist(pos.lat,pos.lon,a.lat,a.lon); if(d<bd){bd=d;best=a;} }
   return best;
 }
+// ── Airspace polygons (VATSpy FIR/ARTCC) — point-in-polygon Center coverage ──────────────────────
+let _airspace=null, _airspaceLoading=null;
+async function airspaceLoad(force){
+  if(_airspace&&!force) return _airspace;
+  if(_airspaceLoading) return _airspaceLoading;
+  _airspaceLoading=(async()=>{ try{ const r=await window.api.airspaceData(force?{refresh:true}:{}); if(r&&r.ok&&r.boundaries&&r.prefixMap) _airspace={boundaries:r.boundaries, prefixMap:r.prefixMap}; else RLOG('[Airspace] '+((r&&r.error)||'unavailable')); }catch(e){ RLOG('[Airspace] '+((e&&e.message)||e)); } _airspaceLoading=null; return _airspace; })();
+  return _airspaceLoading;
+}
+function _ptInRing(lon,lat,ring){ let inside=false; for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]; if(((yi>lat)!==(yj>lat)) && (lon<(xj-xi)*(lat-yi)/((yj-yi)||1e-12)+xi)) inside=!inside; } return inside; }
+function _ptInGeom(lon,lat,g){ if(!g)return false; const polys=g.type==='MultiPolygon'?g.coordinates:[g.coordinates]; for(const poly of polys){ if(_ptInRing(lon,lat,poly[0])){ let hole=false; for(let h=1;h<poly.length;h++) if(_ptInRing(lon,lat,poly[h])){hole=true;break;} if(!hole)return true; } } return false; }
+// null = no airspace data / no callsign→FIR mapping (fall back to V1 verify); true/false = inside/outside.
+// Callsign prefix → boundary id: the VATSpy prefix map (EU: LON→EGTT), else the prefix as a boundary
+// id, else K+prefix (US centers connect as ZLA_CTR but VATSpy keys their boundary KZLA).
+function airspaceCovers(callsign, lat, lon){
+  const a=_airspace; if(!a) return null;
+  const pfx=String(callsign||'').split('_')[0].toUpperCase();
+  let ids=a.prefixMap[pfx]||[];
+  if(!ids.length){ if(a.boundaries[pfx]) ids=[pfx]; else if(pfx.length===3&&a.boundaries['K'+pfx]) ids=['K'+pfx]; }
+  if(!ids.length) return null;
+  for(const id of ids){ if(_ptInGeom(lon,lat,a.boundaries[id])) return true; }
+  return false;
+}
+
 // PURE recommendation. pos={lat,lon,agl,onGround}; controllers=raw datafeed; dbMap=Map(icao→airport).
+// CTR/FSS coverage uses airspace polygons (airspaceCovers) when loaded; else they stay "verify".
 function recommendFreq(pos, controllers, dbMap){
   const enr=[];
   for(const c of (controllers||[])){
     if(c.facility===0) continue;                                   // observers
     const fr=parseFloat(c.frequency); if(!(fr>0)||c.frequency==='199.998') continue;   // placeholder
     const tier=LATC_TIER[c.facility]; if(!tier) continue;
-    const apt=(tier==='CTR'||tier==='FSS')?null:latcAirportForCallsign(c.callsign, dbMap);
-    const radius=(c.visual_range>0?c.visual_range:LATC_RADIUS[tier])||50;
-    const dist=apt?gcDist(pos.lat,pos.lon,apt.lat,apt.lon):null;
-    enr.push({callsign:c.callsign, freq:fr, tier, apt, radius, dist});
+    let apt=null, dist=null, radius=(c.visual_range>0?c.visual_range:LATC_RADIUS[tier])||50, covers=false, placed=false;
+    if(tier==='CTR'||tier==='FSS'){
+      const pc=airspaceCovers(c.callsign, pos.lat, pos.lon);      // polygon coverage (null if no data)
+      if(pc!=null){ placed=true; covers=(pc===true); }
+    } else {
+      apt=latcAirportForCallsign(c.callsign, dbMap);              // field position → its airport
+      if(apt){ placed=true; dist=gcDist(pos.lat,pos.lon,apt.lat,apt.lon); covers=dist<=radius; }
+    }
+    enr.push({callsign:c.callsign, freq:fr, tier, apt, radius, dist, covers, placed});
   }
-  // positions we could NOT geo-locate (all CTR/FSS + any APP/TWR whose callsign isn't an airport code,
-  // e.g. LON_APP, NY_APP) — surfaced as "verify" rather than dropped, since V1 can't confirm coverage.
-  const verify=enr.filter(c=>c.dist==null).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
+  // positions we could NOT place (CTR/FSS with no airspace data, or APP/TWR whose callsign isn't an
+  // airport code, e.g. LON_APP) — surfaced as "verify" rather than dropped.
+  const verify=enr.filter(c=>!c.placed).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
   const near=latcNearestAirport(pos, dbMap);
   const nearDist=near?gcDist(pos.lat,pos.lon,near.lat,near.lon):null;
   const phase = pos.onGround ? 'ground' : (near && nearDist<=LATC_ENV_NM && (pos.agl==null||pos.agl<LATC_ENV_AGL) ? 'airport' : 'enroute');
   const apt = (phase==='enroute') ? null : near;
-  const pref = phase==='ground' ? ['DEL','GND','TWR','APP'] : phase==='airport' ? ['TWR','APP'] : [];
+  // top-down: on the ground DEL→GND→TWR→APP→CTR; near a field TWR→APP→CTR; enroute CTR→FSS. CTR/FSS
+  // now join the walk-up because polygon coverage can place them (e.g. field Tower offline → Center).
+  const pref = phase==='ground' ? ['DEL','GND','TWR','APP','CTR'] : phase==='airport' ? ['TWR','APP','CTR'] : ['CTR','FSS'];
   const owns = t => (t==='DEL'||t==='GND'||t==='TWR');
   for(let i=0;i<pref.length;i++){
     const tier=pref[i];
-    const cands=enr.filter(c=>c.tier===tier && c.dist!=null && c.dist<=c.radius && (owns(tier) ? (apt&&c.apt&&c.apt.icao===apt.icao) : true));
+    const cands=enr.filter(c=>c.tier===tier && c.covers && (owns(tier) ? (apt&&c.apt&&c.apt.icao===apt.icao) : true));
     if(cands.length){
-      const pick=cands.sort((a,b)=>a.dist-b.dist)[0], walked=i>0;
+      const pick=cands.slice().sort((a,b)=>((a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist)))[0], walked=i>0;
       const why = walked
         ? (apt?apt.icao:'The field')+'&rsquo;s '+pref.slice(0,i).join('/')+' '+(i>1?'are':'is')+' offline &mdash; '+esc(pick.callsign)+' covers you top-down'
         : esc(pick.callsign)+' is online and covers you';
-      const others=enr.filter(c=>c!==pick && c.dist!=null && c.dist<=c.radius).sort((a,b)=>a.dist-b.dist).slice(0,4);
+      const others=enr.filter(c=>c!==pick && c.covers).sort((a,b)=>((a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist))).slice(0,4);
       return {found:true, tier, freq:pick.freq, callsign:pick.callsign, label:latcTierLabel(tier), why, phase, apt, others, verify};
     }
   }
@@ -6126,7 +6160,7 @@ function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LA
 function latcApplyAuto(){ if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq); if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz; window.api.liveSetStandby({freqHz:hz}); } }
 async function latcToggle(on){
   LATC.on=on;
-  if(on){ await window.api.liveAtcStart(); latcEnsureDb(); await latcFetchFeed(); if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
+  if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
   else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; }
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
   renderLiveAtc(); updateVatsimHeader();

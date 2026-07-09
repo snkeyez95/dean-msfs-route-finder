@@ -2022,6 +2022,36 @@ function overlayEnsure(){
 ipcMain.handle('overlay-toast', (_, payload) => { try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
 ipcMain.handle('overlay-hide', () => { try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.close(); }catch(_){} overlayWin=null; return {ok:true}; });
 
+// Airspace boundaries (VATSpy Data Project) — FIR/ARTCC polygons + the callsign-prefix→boundary map, so
+// the renderer can point-in-polygon-test whether a Center covers the user (V1 could only circle-guess
+// airport positions). Cached in USER_DATA; Settings "refresh airspace data" re-pulls per AIRAC.
+function _parseVatspyDat(txt){
+  const prefixMap={}; let sec=null;
+  for(const raw of txt.split('\n')){ const t=raw.replace(/\r/g,'').trim();
+    if(/^\[.*\]$/.test(t)){ sec=t; continue; }
+    if(!t||t.startsWith(';')) continue;
+    if(sec==='[FIRs]'){ const c=t.split('|'); const pfx=(c[2]||c[0]||'').trim().toUpperCase(); const bnd=(c[3]||c[0]||'').trim(); if(pfx&&bnd)(prefixMap[pfx]=prefixMap[pfx]||[]).push(bnd); }
+    else if(sec==='[UIRs]'){ const c=t.split('|'); const id=(c[0]||'').trim().toUpperCase(); const firs=(c[2]||'').split(',').map(s=>s.trim()).filter(Boolean); if(id&&firs.length)(prefixMap[id]=prefixMap[id]||[]).push(...firs); }
+  }
+  return prefixMap;
+}
+ipcMain.handle('airspace-data', async (_, o) => {
+  const p=path.join(USER_DATA,'airspace.json');
+  if(!(o&&o.refresh) && fs.existsSync(p)){ try{ const j=JSON.parse(fs.readFileSync(p,'utf8')); return {ok:true, cached:true, boundaries:j.boundaries, prefixMap:j.prefixMap}; }catch(_){} }
+  try{
+    const [geo,dat]=await Promise.all([
+      _httpGetLarge('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson'),
+      _httpGetLarge('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/VATSpy.dat')]);
+    if(!geo||!dat) return {ok:false, error:'airspace data download failed'};
+    const gj=JSON.parse(geo); const boundaries={};
+    for(const f of (gj.features||[])){ const id=f.properties&&f.properties.id; if(id&&f.geometry) boundaries[id]=f.geometry; }
+    const prefixMap=_parseVatspyDat(dat);
+    writeFileAtomic(p, JSON.stringify({boundaries, prefixMap, ts:Date.now()}));
+    LOG.info('[Airspace] built: '+Object.keys(boundaries).length+' boundaries, '+Object.keys(prefixMap).length+' prefixes');
+    return {ok:true, cached:false, boundaries, prefixMap};
+  }catch(e){ LOG.error('[Airspace] failed: '+e.message); return {ok:false, error:e.message}; }
+});
+
 // Global airport DB (OurAirports, public domain) — slim {icao,lat,lon,twr(MHz)} for medium+large
 // airports, cached in USER_DATA. Powers nearest-airport, CTAF (tower freq), and geo-locating tower/
 // ground/approach controllers from their callsign (the datafeed gives controllers no lat/lon).
