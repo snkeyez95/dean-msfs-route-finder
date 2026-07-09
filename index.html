@@ -6264,8 +6264,10 @@ function recommendFreq(pos, controllers, dbMap){
     }
   }
   if(phase==='enroute') return {found:false, tier:'UNICOM', freq:LATC_UNICOM, callsign:null, label:'UNICOM', why:verify.length?('No field position applies enroute &mdash; '+verify.length+' ATC online we can&rsquo;t place precisely; verify which covers you (precise airspace comes in a later update)'):'No ATC online in your area', phase, apt:null, others:[], verify};
-  const twr = apt && apt.twr;
-  return {found:false, tier:'CTAF', freq: twr||LATC_UNICOM, callsign:null, label: twr?('CTAF ('+apt.icao+')'):'UNICOM', why:(apt?('No confirmable ATC for '+apt.icao+' &mdash; use '+(twr?'CTAF (its tower frequency)':'UNICOM')):'No ATC nearby')+(verify.length?'. '+verify.length+' position'+(verify.length>1?'s':'')+' online may cover you top-down &mdash; verify':''), phase, apt, others:[], verify};
+  // VATSIM CTAF is a US/VATPAC thing — a field's tower freq is the CTAF only in the divisions that run it
+  // (US: K/P, Australia: Y). Everywhere else VATSIM uses the universal 122.800 unicom for uncontrolled fields.
+  const ctaf = (apt && apt.twr && /^[KPY]/.test(apt.icao)) ? apt.twr : null;
+  return {found:false, tier:'CTAF', freq: ctaf||LATC_UNICOM, callsign:null, label: ctaf?('CTAF ('+apt.icao+')'):'UNICOM', why:(apt?('No confirmable ATC for '+apt.icao+' &mdash; use '+(ctaf?'CTAF (its tower frequency)':'UNICOM 122.800')):'No ATC nearby')+(verify.length?'. '+verify.length+' position'+(verify.length>1?'s':'')+' online may cover you top-down &mdash; verify':''), phase, apt, others:[], verify};
 }
 
 async function latcEnsureDb(){
