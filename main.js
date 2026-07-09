@@ -891,7 +891,7 @@ function cleanupActivationsOnQuit(){
   }
 }
 let _cleanupDone = false;
-app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; cleanupActivationsOnQuit(); });
+app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} cleanupActivationsOnQuit(); });
 // When the auto-updater restarts ABRP to install a new version, exit FAST: skip the close-confirm
 // dialog and the (slow) activation cleanup so the NSIS installer doesn't catch ABRP still shutting
 // down and show "cannot be closed / Retry". The junctions are intentionally left in place — the
@@ -1913,6 +1913,115 @@ ipcMain.on('install-update', () => {
 // Renderer-side safety check for the auto-restart countdown: never yank the app out from under a
 // running sim (an armed/recording capture is checked renderer-side via the capture badge).
 ipcMain.handle('msfs-running', () => { try { return isMsfsRunning(); } catch (_) { return false; } });
+
+// ── LIVE ATC (VATSIM frequency helper) ──────────────────────────────────────────────────────────
+// A SEPARATE continuous SimConnect client "ABRP-LiveATC" (node-simconnect), safe alongside vPilot AND
+// the capture engine — the sim serves many clients and this never touches the capture connection or
+// PresentMon. Opt-in; zero overhead when off. Streams position at 1 Hz for the renderer's top-down
+// frequency recommendation, and can load a frequency into COM1 STANDBY (never active — vPilot only
+// transmits when the pilot swaps standby→active).
+const LiveATC = (() => {
+  let handle = null, stopped = true, reconnecting = false, pos = null, status = 'off';
+  const DEF = 20, REQ = 20, EVT_STBY = 20;
+  function _open(){
+    if(stopped) return;
+    if(status !== 'live') status = 'connecting';
+    let sc; try{ sc = require('node-simconnect'); }catch(e){ status='error'; LOG.error('[LiveATC] node-simconnect load failed: '+e.message); return; }
+    const { open, Protocol, SimConnectDataType, SimConnectPeriod } = sc;
+    open('ABRP-LiveATC', Protocol.SunRise).then(({ handle: h }) => {
+      if(stopped){ try{h.close();}catch(_){} return; }
+      handle = h; reconnecting = false;
+      h.addToDataDefinition(DEF,'PLANE LATITUDE','Degrees',SimConnectDataType.FLOAT64);
+      h.addToDataDefinition(DEF,'PLANE LONGITUDE','Degrees',SimConnectDataType.FLOAT64);
+      h.addToDataDefinition(DEF,'PLANE ALTITUDE','Feet',SimConnectDataType.FLOAT64);
+      h.addToDataDefinition(DEF,'PLANE ALT ABOVE GROUND','Feet',SimConnectDataType.FLOAT64);
+      h.addToDataDefinition(DEF,'SIM ON GROUND','Bool',SimConnectDataType.INT32);
+      h.addToDataDefinition(DEF,'GROUND VELOCITY','Knots',SimConnectDataType.FLOAT64);
+      h.requestDataOnSimObject(REQ,DEF,0,SimConnectPeriod.SECOND);
+      try{ h.mapClientEventToSimEvent(EVT_STBY,'COM_STBY_RADIO_SET_HZ'); }catch(_){}
+      h.on('simObjectData',(recv)=>{
+        if(recv.requestID!==REQ) return;
+        try{
+          const lat=recv.data.readFloat64(), lon=recv.data.readFloat64(), alt=recv.data.readFloat64(),
+                agl=recv.data.readFloat64(), og=recv.data.readInt32(), gs=recv.data.readFloat64();
+          pos={lat,lon,alt,agl,onGround:!!og,gs,ts:Date.now()}; status='live';
+        }catch(_){}
+      });
+      const drop=()=>{ if(!stopped) _reconnect(); };
+      try{ h.on('quit',drop); h.on('close',drop); }catch(_){}
+      LOG.info('[LiveATC] connected');
+    }).catch(()=>{ if(!stopped){ status='sim-off'; setTimeout(_open, 60000); } });   // sim not running → retry
+  }
+  function _reconnect(){
+    if(stopped||reconnecting) return; reconnecting=true;
+    try{ handle&&handle.close(); }catch(_){}
+    handle=null; if(status==='live') status='connecting';
+    setTimeout(()=>{ reconnecting=false; _open(); }, 3000);
+  }
+  return {
+    start(){ if(!stopped) return; stopped=false; status='connecting'; _open(); },
+    stop(){ stopped=true; try{ handle&&handle.close(); }catch(_){} handle=null; status='off'; pos=null; },
+    latest(){
+      let st=status;
+      if(status==='live' && pos && Date.now()-pos.ts>15000){ st='connecting'; if(!reconnecting) _reconnect(); }
+      return { status:st, pos:(st==='live'&&pos)?pos:null };
+    },
+    setStandby(freqHz){
+      if(!handle) return {ok:false, error:'not connected to the sim'};
+      try{
+        const { EventFlag } = require('node-simconnect');
+        handle.transmitClientEvent(0, EVT_STBY, Math.round(freqHz), 0, EventFlag.EVENT_FLAG_DEFAULT);   // COM1 STANDBY only
+        LOG.info('[LiveATC] COM1 standby set to '+freqHz+' Hz');
+        return {ok:true};
+      }catch(e){ LOG.error('[LiveATC] setStandby failed: '+e.message); return {ok:false, error:e.message}; }
+    }
+  };
+})();
+ipcMain.handle('live-atc-start', () => { LiveATC.start(); return {ok:true}; });
+ipcMain.handle('live-atc-stop',  () => { LiveATC.stop();  return {ok:true}; });
+ipcMain.handle('live-position',  () => LiveATC.latest());
+ipcMain.handle('live-set-standby', (_, o) => LiveATC.setStandby((o&&o.freqHz)||0));
+// VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns online controllers.
+ipcMain.handle('live-vatsim-feed', async () => {
+  try{ const body=await _httpGetLarge('https://data.vatsim.net/v3/vatsim-data.json'); if(!body) return {ok:false}; const j=JSON.parse(body); return {ok:true, controllers:j.controllers||[]}; }
+  catch(e){ return {ok:false, error:e.message}; }
+});
+
+// Global airport DB (OurAirports, public domain) — slim {icao,lat,lon,twr(MHz)} for medium+large
+// airports, cached in USER_DATA. Powers nearest-airport, CTAF (tower freq), and geo-locating tower/
+// ground/approach controllers from their callsign (the datafeed gives controllers no lat/lon).
+function _httpGetLarge(url, depth=0){
+  return new Promise(resolve=>{
+    try{
+      const req=https.get(url,{headers:{'User-Agent':'ABRP-RoutePlanner'}},res=>{
+        if(res.statusCode>=300&&res.statusCode<400&&res.headers.location){ res.resume(); if(depth>=5) return resolve(''); return resolve(_httpGetLarge(res.headers.location, depth+1)); }
+        if(res.statusCode!==200){ res.resume(); return resolve(''); }
+        let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(d));
+      });
+      req.on('error',()=>resolve('')); req.setTimeout(30000,()=>{ req.destroy(); resolve(''); });
+    }catch(_){ resolve(''); }
+  });
+}
+function _csvLine(line){ const out=[]; let cur='',q=false; for(let i=0;i<line.length;i++){ const c=line[i]; if(q){ if(c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; } else { if(c==='"')q=true; else if(c===','){out.push(cur);cur='';} else cur+=c; } } out.push(cur); return out; }
+ipcMain.handle('live-airport-db', async (_, opts) => {
+  const p = path.join(USER_DATA, 'airport_db.json');
+  if(!(opts&&opts.refresh) && fs.existsSync(p)){ try{ return {ok:true, cached:true, airports:JSON.parse(fs.readFileSync(p,'utf8'))}; }catch(_){} }
+  try{
+    const [aptCsv, freqCsv] = await Promise.all([
+      _httpGetLarge('https://davidmegginson.github.io/ourairports-data/airports.csv'),
+      _httpGetLarge('https://davidmegginson.github.io/ourairports-data/airport-frequencies.csv'),
+    ]);
+    if(!aptCsv) return {ok:false, error:'airport data download failed (check your connection)'};
+    const rank={TWR:3,CTAF:2,UNIC:1}, bestFreq={};
+    if(freqCsv){ const L=freqCsv.split('\n'); const h=_csvLine(L[0]); const iId=h.indexOf('airport_ident'), iTy=h.indexOf('type'), iF=h.indexOf('frequency_mhz');
+      for(let i=1;i<L.length;i++){ if(!L[i])continue; const f=_csvLine(L[i]); const id=f[iId], ty=(f[iTy]||'').toUpperCase(), mhz=parseFloat(f[iF]); const r=rank[ty]||0; if(!id||!r||!(mhz>0))continue; if(!bestFreq[id]||r>bestFreq[id].r) bestFreq[id]={r,mhz}; } }
+    const airports=[]; { const L=aptCsv.split('\n'); const h=_csvLine(L[0]); const iIdent=h.indexOf('ident'), iType=h.indexOf('type'), iLat=h.indexOf('latitude_deg'), iLon=h.indexOf('longitude_deg');
+      for(let i=1;i<L.length;i++){ if(!L[i])continue; const f=_csvLine(L[i]); const type=f[iType]; if(type!=='large_airport'&&type!=='medium_airport')continue; const icao=(f[iIdent]||'').trim().toUpperCase(); const lat=parseFloat(f[iLat]), lon=parseFloat(f[iLon]); if(!icao||isNaN(lat)||isNaN(lon))continue; const bf=bestFreq[icao]; airports.push({icao,lat,lon,twr:bf?bf.mhz:null}); } }
+    writeFileAtomic(p, JSON.stringify(airports));
+    LOG.info('[LiveATC] airport DB built: '+airports.length+' airports');
+    return {ok:true, cached:false, airports};
+  }catch(e){ LOG.error('[LiveATC] airport DB failed: '+e.message); return {ok:false, error:e.message}; }
+});
 ipcMain.on('renderer-log',(_,msg)=>LOG.info('[RENDERER]',msg));
 ipcMain.on('win-minimize',()=>win.minimize());
 ipcMain.on('win-maximize',()=>win.isMaximized()?win.unmaximize():win.maximize());
