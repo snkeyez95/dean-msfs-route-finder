@@ -5778,7 +5778,7 @@ function extractRunways(text,icao,direction){
   const cues=[];let m;
   const arrRe=/(LANDING|LDG|ARRIVAL|ARR|APPROACH|APCH|APP|ILS|VISUAL|VIS|RNP|RNAV|VECTOR)/g;
   while((m=arrRe.exec(t))!==null)cues.push({pos:m.index,type:'arr'});
-  const depRe=/(DEPARTURE|DEPARTING|DEPG|DEPS|DEP|TKOF|TAKEOFF)/g;
+  const depRe=/(DEPARTURE|DEPARTING|DEPG|DEPS|DEP|TKOF|TAKE\s?OFF)/g;   // TAKE\s?OFF covers intl ATIS "TAKE OFF RWY 03R" (Athens etc.) + "TAKEOFF"
   while((m=depRe.exec(t))!==null)cues.push({pos:m.index,type:'dep'});
   const hasArr=cues.some(c=>c.type==='arr'),hasDep=cues.some(c=>c.type==='dep');
   cues.sort((a,b)=>a.pos-b.pos);
@@ -6306,11 +6306,11 @@ async function renderVatsimAtisBtn(icao,idx,side,prefix){
   const set=html=>{const el=document.getElementById(id); if(el)el.innerHTML=html||'';};
   if(!vCfg().weatherButton){ set(''); return; }
   const cached=S.datisCache[(icao||'').toUpperCase()];
-  if(cached&&cached.vatsim){ set('<button class="btn bg bxs" onclick="revertVatsimAtis(\''+icao+'\','+idx+',\''+side+'\',\''+prefix+'\')" style="color:var(--grn);border-color:var(--grn)" title="Showing VATSIM ATIS — click to switch back to real-world D-ATIS">&#10003; VATSIM ATIS</button>'); return; }
+  if(cached&&cached.vatsim){ set('<button class="btn bg bxs" onclick="revertVatsimAtis(\''+icao+'\',\''+idx+'\',\''+side+'\',\''+prefix+'\')" style="color:var(--grn);border-color:var(--grn)" title="Showing VATSIM ATIS — click to switch back to real-world D-ATIS">&#10003; VATSIM ATIS</button>'); return; }
   set('<button class="btn bg bxs" disabled style="opacity:.5" title="Checking VATSIM…">VATSIM</button>');
   await vatsimFeedGet();
   if(!document.getElementById(id)) return;
-  if(vatsimAtisAvail(icao)) set('<button class="btn bg bxs" onclick="applyVatsimAtis(\''+icao+'\','+idx+',\''+side+'\',\''+prefix+'\')" style="color:var(--acc);border-color:var(--acc)" title="A VATSIM controller is staffing this field’s ATIS — use its active runway (also fills SimBrief)">&#128251; VATSIM ATIS</button>');
+  if(vatsimAtisAvail(icao)) set('<button class="btn bg bxs" onclick="applyVatsimAtis(\''+icao+'\',\''+idx+'\',\''+side+'\',\''+prefix+'\')" style="color:var(--acc);border-color:var(--acc)" title="A VATSIM controller is staffing this field’s ATIS — use its active runway (also fills SimBrief)">&#128251; VATSIM ATIS</button>');
   else set('<button class="btn bg bxs" disabled style="opacity:.4" title="No VATSIM ATIS online for '+icao+'">VATSIM</button>');
 }
 function applyVatsimAtis(icao,idx,side,prefix){ const d=vatsimAtisData(icao); if(!d)return; S.datisCache[(icao||'').toUpperCase()]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
