@@ -2012,7 +2012,7 @@ const LiveATC = (() => {
       if(!pos) return {ok:false, verified:false, reason:'no live position data'};
       const readHz = pos.comStandbyMhz!=null ? Math.round(pos.comStandbyMhz*1e6) : null;
       if(readHz==null) return {ok:true, verified:false, reason:'aircraft is not reporting COM1 standby (custom radio)'};
-      const matched = Math.abs(readHz - targetHz) <= 1000;   // 1kHz tolerance for float rounding
+      const matched = Math.abs(readHz - targetHz) <= 5000;   // 5kHz: covers float rounding + 8.33kHz channel/RF read gap; still catches a real miss (PMDG ignore = MHz off)
       return {ok:true, verified:matched, readHz, targetHz};
     }
   };

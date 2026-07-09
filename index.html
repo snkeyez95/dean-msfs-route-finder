@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.6.3</div>
+  <div class="tname">A Better Route Planner &mdash; v6.6.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.6.3</div>
+    <div class="sb-ver">v6.6.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6290,12 +6290,27 @@ function recommendFreq(pos, controllers, dbMap){
 // v6.6.1(A-rest): ATIS-first sequence + "Next up" + look-ahead standby (Dean 2026-07-09).
 // Just the callsign+frequency for an airport's VATSIM ATIS (separate from vatsimAtisData, which parses
 // the full text for the weather-card swap — this stays a lightweight lookup so that path is untouched).
-function latcAtisFreq(icao){
+// Frequency match tolerance (MHz). 8.33kHz VATSIM channels: the datafeed's channel LABEL (e.g.
+// 121.855) can sit a few kHz off what the sim's COM ACTIVE/STANDBY read reports for the same tuned
+// channel, and a manually-typed freq can land a hair off too. 1kHz was too tight and broke look-ahead
+// matching (Dean, EDDF 2026-07-09); 5kHz safely covers the channel/RF gap and stays well under the
+// 8.33kHz spacing so it can't match a neighbouring channel.
+const LATC_FREQ_TOL=0.005;
+// VATSIM ATIS split: a field can run separate DEPARTURE (_D_ATIS) and ARRIVAL (_A_ATIS) ATIS plus a
+// combined (_ATIS). Prefer the one matching the leg role so a departure shows the DEP ATIS (e.g. EDDF
+// 118.730), not whichever happened to be first in the feed (Dean, EDDF 2026-07-09).
+function latcAtisFreq(icao, role){
   icao=(icao||'').toUpperCase();
-  const a=((_vFeed&&_vFeed.atis)||[]).find(x=>String(x.callsign||'').toUpperCase().startsWith(icao+'_'));
-  if(!a) return null;
-  const fr=parseFloat(a.frequency); if(!(fr>0)) return null;
-  return {callsign:a.callsign, freq:fr};
+  const list=((_vFeed&&_vFeed.atis)||[]).filter(x=>String(x.callsign||'').toUpperCase().startsWith(icao+'_'));
+  if(!list.length) return null;
+  const cs=x=>String(x.callsign||'').toUpperCase();
+  const isDep=x=>cs(x).includes('_D_ATIS'), isArr=x=>cs(x).includes('_A_ATIS');
+  let pick;
+  if(role==='dep') pick=list.find(isDep)||list.find(x=>!isDep(x)&&!isArr(x))||list[0];
+  else if(role==='arr') pick=list.find(isArr)||list.find(x=>!isDep(x)&&!isArr(x))||list[0];
+  else pick=list[0];
+  const fr=parseFloat(pick.frequency); if(!(fr>0)) return null;
+  return {callsign:pick.callsign, freq:fr};
 }
 // The full ordered sequence for this leg: dep ATIS (informational — tune to ACTIVE yourself; ABRP only
 // ever loads standby) -> dep field positions -> enroute Centers -> arrival ATIS -> arrival field
@@ -6303,11 +6318,11 @@ function latcAtisFreq(icao){
 // "Next up" always agrees with the briefing card.
 function latcEnrichedSequence(depApt, arrApt, controllers, dbMap, stOpt){
   const seq=[];
-  const depAtis=depApt?latcAtisFreq(depApt.icao):null; if(depAtis) seq.push({kind:'atis', tier:'ATIS', icao:depApt.icao, callsign:depAtis.callsign, freq:depAtis.freq});
+  const depAtis=depApt?latcAtisFreq(depApt.icao,'dep'):null; if(depAtis) seq.push({kind:'atis', tier:'ATIS', icao:depApt.icao, callsign:depAtis.callsign, freq:depAtis.freq});
   const st=stOpt||latcFreqStack(depApt, arrApt, controllers, dbMap);
   for(const x of st.dep) seq.push(Object.assign({kind:'atc'}, x));
   for(const x of st.enr) seq.push(Object.assign({kind:'atc', tier:'CTR'}, x));
-  const arrAtis=arrApt?latcAtisFreq(arrApt.icao):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
+  const arrAtis=arrApt?latcAtisFreq(arrApt.icao,'arr'):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
   for(const x of st.arr) seq.push(Object.assign({kind:'atc'}, x));
   if(arrApt){ const ctaf=(arrApt.twr&&/^[KPY]/.test(arrApt.icao))?arrApt.twr:LATC_UNICOM; seq.push({kind:'atc', tier:'CTAF', callsign:null, freq:ctaf}); }
   return seq;
@@ -6317,7 +6332,7 @@ function latcEnrichedSequence(depApt, arrApt, controllers, dbMap, stOpt){
 // substitute, or off the filed route) — honest: no next-up claimed rather than a guess.
 function latcNextUp(rec, seq){
   if(!rec || !seq || !seq.length) return null;
-  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<0.001));
+  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<LATC_FREQ_TOL));
   if(idx<0 || idx+1>=seq.length) return null;
   return seq[idx+1];
 }
@@ -6325,7 +6340,7 @@ function latcNextUp(rec, seq){
 // yourself" suggestion; ABRP never loads it into standby, only real ATC/CTAF frequencies you'll swap to).
 function latcNextActionable(rec, seq){
   if(!rec || !seq || !seq.length) return null;
-  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<0.001));
+  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<LATC_FREQ_TOL));
   if(idx<0) return null;
   for(let i=idx+1;i<seq.length;i++){ if(seq[i].kind!=='atis') return seq[i]; }
   return null;
@@ -6448,10 +6463,10 @@ function latcAutoTarget(rec){
   // so after Ground hands you to Tower (you swap; active=Tower ≠ rec) the old logic regressed standby
   // BACK to Ground. Matching active against the sequence keeps standby one step ahead of the frequency
   // you're really on, even when you're ahead of the rec.
-  const findIdx=(freq,callsign)=>seq.findIndex(x=>(callsign&&x.callsign===callsign)||(x.freq!=null&&Math.abs(x.freq-freq)<0.001));
+  const findIdx=(freq,callsign)=>seq.findIndex(x=>(callsign&&x.callsign===callsign)||(x.freq!=null&&Math.abs(x.freq-freq)<LATC_FREQ_TOL));
   const recIdx=findIdx(rec.freq, rec.callsign), actIdx=findIdx(activeMhz, null);
   const fromIdx=Math.max(recIdx, actIdx);
-  const onCurrent=Math.abs(activeMhz-rec.freq)<0.001;
+  const onCurrent=Math.abs(activeMhz-rec.freq)<LATC_FREQ_TOL;
   if(fromIdx>=0 && (onCurrent || actIdx>recIdx)){
     for(let i=fromIdx+1;i<seq.length;i++){ if(seq[i].kind!=='atis' && seq[i].freq!=null) return seq[i]; }
   }
@@ -6526,7 +6541,7 @@ function renderLiveAtc(){
   // ATIS-first (Dean 2026-07-09): at the gate, before you've contacted anyone, point at the dep field's
   // VATSIM ATIS to tune to ACTIVE yourself — ABRP still only ever loads the real next ATC freq (Ground)
   // into standby, unchanged below.
-  if(rec.phase==='ground'){ const r0=latcBriefRoute(); const depAtis=(r0&&LATC.db)?latcAtisFreq(r0.dep):null;
+  if(rec.phase==='ground'){ const r0=latcBriefRoute(); const depAtis=(r0&&LATC.db)?latcAtisFreq(r0.dep,'dep'):null;
     if(depAtis) h+='<div style="background:var(--bg2);border:1px solid var(--acc);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--ink1)">&#128251; Listen to <b>'+esc(depAtis.callsign)+'</b> <span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+latcFmt(depAtis.freq)+'</span> first &mdash; tune it to your ACTIVE radio yourself, then swap standby to what&rsquo;s below.</div>';
   }
   const nextUp=latcNextUp(rec, seq);
@@ -6543,7 +6558,17 @@ function renderLiveAtc(){
       +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);cursor:pointer"><input type="checkbox" '+(vCfg().autoSetStandby?'checked':'')+' onchange="latcToggleAuto(this.checked)" style="accent-color:var(--acc)"> auto-set standby on change</label>'
       // seed the message from the LAST verified state for THIS frequency (covers the auto-set path,
       // which verifies in the background — passively visible here, not just after a manual click)
-      +'<span id="latc-setmsg" style="font-size:12px;color:'+(LATC.standbyVerified?'var(--grn)':'var(--acc)')+'">'+((LATC.lastSetHz===latcHz(rec.freq))?(LATC.standbyVerified?('✓ Confirmed '+latcFmt(rec.freq)+' loaded into COM1 standby'):(LATC.standbyIssue?('Sent — '+esc(LATC.standbyIssue)+' — tune manually to be safe'):'')):'')+'</span></div></div>';
+      +'<span id="latc-setmsg" style="font-size:12px;color:'+(LATC.standbyVerified?'var(--grn)':'var(--acc)')+'">'+((LATC.lastSetHz===latcHz(rec.freq))?(LATC.standbyVerified?('✓ Confirmed '+latcFmt(rec.freq)+' loaded into COM1 standby'):(LATC.standbyIssue?('Sent — '+esc(LATC.standbyIssue)+' — tune manually to be safe'):'')):'')+'</span></div>';
+  // Diagnostic readout (Dean, EDDF 2026-07-09): show exactly what ABRP reads off your radio + the freq the
+  // look-ahead would load next, so a stuck standby is visible (is it not reading active? matching off?).
+  { const av=LATC.pos.comActiveMhz, sb=LATC.pos.comStandbyMhz, tgt=latcAutoTarget(rec);
+    const advancing=tgt&&tgt.freq!=null&&rec.freq!=null&&Math.abs(tgt.freq-rec.freq)>=LATC_FREQ_TOL;
+    h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">ABRP reads your radio &mdash; active '
+      +(av!=null?latcFmt(av):'&mdash; (not reported)')+' &middot; standby '+(sb!=null?latcFmt(sb):'&mdash; (not reported)')
+      +'<br>look-ahead would load: <span style="color:'+(advancing?'var(--grn)':'var(--ink3)')+'">'+(tgt&&tgt.freq!=null?latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):''):'&mdash;')+'</span>'
+      +(advancing?' (next in sequence)':' (holding current &mdash; not yet on the recommended freq)')+'</div>';
+  }
+  h+='</div>';
   if(rec.others&&rec.others.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Also in range</div><div style="margin-bottom:14px">';
     for(const c of rec.others) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+(c.dist!=null?' &middot; '+Math.round(c.dist)+' nm':'')+'</span></div>';
     h+='</div>'; }
@@ -6977,5 +7002,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.6.3</div>
+  pointer-events:none;">v6.6.4</div>
 </body></html>
