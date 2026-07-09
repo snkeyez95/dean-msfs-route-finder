@@ -27,6 +27,6 @@
     el.classList.add('show');
     if(p.sound)beep();
     clearTimeout(hideTimer);
-    hideTimer=setTimeout(function(){ el.classList.remove('show'); }, (p.ms||7000));
+    hideTimer=setTimeout(function(){ el.classList.remove('show'); }, (p.ms||14000));   // 14s default (Dean 2026-07-08; was 7s) — long enough to read while flying
   });
 </script></body></html>
