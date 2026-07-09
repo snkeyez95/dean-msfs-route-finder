@@ -123,14 +123,27 @@ async function runAutoCapture(opts) {
   // Mid-recording SimConnect drops are absorbed here — they must never end the capture (finding 4).
   const sampler = new ResilientSampler(appName, armed.handle, armed.state, say);
   let lastMovingTs = null, wasAirborne = false, endedOnGround = true;
+  // v6.6.1 — parking-brake end-trim anchor (Dean 2026-07-09): the START of the trailing UNBROKEN
+  // "parked" streak (brake set, not moving). An explicit release (brake===false) or real ground
+  // movement (g>AUTO_MIN_SPEED_KT) invalidates it — this is the ATC hold-and-cross guard: set the
+  // brake to hold short, get cleared, release + roll again -> the streak breaks and a later final park
+  // becomes the anchor instead. Missing/stale brake data (null) never invalidates by itself — only a
+  // definite read does. Custom aircraft that don't drive the SimVar (e.g. Fenix) just never set this,
+  // and the trim falls back to the teardown heuristic (engine.js).
+  let brakeAnchorTs = null;
   setStatus('recording');
   say('  >> RECORDING. Closing the sim files it automatically.');
 
   const telemetryRows = [];
   const tick = setInterval(() => {
-    const { gspeed: g, onGround: onG, alt } = sampler.latest();   // nulls when the stream is stale
+    const { gspeed: g, onGround: onG, alt, brake } = sampler.latest();   // nulls when the stream is stale
     if (g != null && g > AUTO_MIN_SPEED_KT) lastMovingTs = Date.now() / 1000;
     if (onG != null) { if (!onG) wasAirborne = true; endedOnGround = !!onG; }
+    if (brake === true && (g == null || g <= AUTO_MIN_SPEED_KT)) {
+      if (brakeAnchorTs == null) brakeAnchorTs = Date.now() / 1000;
+    } else if (brake === false || (g != null && g > AUTO_MIN_SPEED_KT)) {
+      brakeAnchorTs = null;
+    }
     const phase = tracker.update(onG, alt, Date.now() / 1000);
     const [sCpu, sRam, tProc, tCpu] = telem.latest();
     const v = vram.latest();
@@ -172,10 +185,16 @@ async function runAutoCapture(opts) {
 
   if (wasAirborne && !endedOnGround) settings.notes = 'mid-flight session';
 
+  // Parking-brake anchor as elapsed seconds since recordingWallStart — the same basis frametimes.csv
+  // timestamps use, so engine.js can cut the tail there directly (trimAtElapsed). null = no valid
+  // brake-set-and-held streak this flight (never set, released before the end, or the aircraft doesn't
+  // drive the SimVar) → engine.js falls back to the teardown heuristic, unchanged from before.
+  const brakeAnchorS = brakeAnchorTs != null ? (brakeAnchorTs - recordingWallStart) : null;
+
   const sessionDir = fileSession({
     rawCsvPath: tmpCsv, settings, vram: vram.summarize(), startedAt,
     telemetryRows, phaseLog: tracker.phaseLog, recordingWallStart,   // absolute times; split subtracts it
-    stopTrimS: Math.round(trimS * 10) / 10, driverVersion, simVersion: settings.sim_version,
+    stopTrimS: Math.round(trimS * 10) / 10, brakeAnchorS, driverVersion, simVersion: settings.sim_version,
     sessionsDir: opts.sessionsDir,
   });
 

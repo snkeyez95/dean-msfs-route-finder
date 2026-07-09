@@ -62,6 +62,22 @@ function trimTeardownTail(ft, cpu, gpu) {
   return [ft.slice(0, cut), cpu && cpu.length ? cpu.slice(0, cut) : cpu, gpu && gpu.length ? gpu.slice(0, cut) : gpu, cutMs / 1000];
 }
 
+// v6.6.1 — PARKING-BRAKE END-TRIM ANCHOR (Dean 2026-07-09). When the capture found a ground-truth flight
+// end (the parking brake set and never released/moved again — see capture.js), cut the tail exactly
+// there instead of guessing from the frametime shape. targetElapsedS is seconds from the START of the
+// (already head-trimmed) frametimes array to the anchor. Same [ft, cpu, gpu, secondsCut] shape as
+// trimTeardownTail so callers can use either interchangeably. Falls through untouched (secondsCut=0) if
+// the anchor is missing/out of range — caller should fall back to trimTeardownTail in that case.
+function trimAtElapsed(ft, cpu, gpu, targetElapsedS) {
+  if (!ft.length || targetElapsedS == null || targetElapsedS <= 0) return [ft, cpu, gpu, 0];
+  const targetMs = targetElapsedS * 1000.0;
+  let cum = 0, cut = ft.length;
+  for (let i = 0; i < ft.length; i++) { cum += ft[i]; if (cum >= targetMs) { cut = i + 1; break; } }
+  if (cut >= ft.length) return [ft, cpu, gpu, 0];   // anchor at/after the recorded end — nothing to cut
+  let cutMs = 0; for (let i = cut; i < ft.length; i++) cutMs += ft[i];
+  return [ft.slice(0, cut), cpu && cpu.length ? cpu.slice(0, cut) : cpu, gpu && gpu.length ? gpu.slice(0, cut) : gpu, cutMs / 1000];
+}
+
 // v6.3.8 — the single on-ground state is split into DEPARTING TAXI and ARRIVAL TAXI so ground
 // performance attributes to the departure vs arrival airport. The classifier only knows "ground"
 // (simconnect.js), so we split by the TIMELINE: ground before the first airborne phase = departing
@@ -163,6 +179,6 @@ function phaseLogFromTelemetry(telemetryRows) {
 }
 
 module.exports = {
-  trimHead, trimTail, trimTeardownTail, flightEndIndex, splitFrametimesByPhase, computePhaseStats,
+  trimHead, trimTail, trimTeardownTail, trimAtElapsed, flightEndIndex, splitFrametimesByPhase, computePhaseStats,
   phaseLogFromTelemetry, taxiBoundaries, computePhaseVram, STUTTER_FRAMETIME_MS,
 };

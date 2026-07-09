@@ -10,7 +10,7 @@
 // (stats, phases, report, combined, index rows) are already byte-proven individually.
 const fs = require('fs'), path = require('path');
 const { computeStats } = require('./stats.js');
-const { trimHead, trimTail, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
+const { trimHead, trimTail, trimTeardownTail, trimAtElapsed, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
 const { readChronological, readTelemetry } = require('./report_charts.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
@@ -91,7 +91,7 @@ function updateIndex(sessionsDir, entry, now) {
 // recordingWallStart, stopTrimS, driverVersion, simVersion, sessionsDir}. Returns the session dir.
 function fileSession(opts) {
   const { rawCsvPath, settings, vram, startedAt, telemetryRows, phaseLog, recordingWallStart,
-    stopTrimS, driverVersion, simVersion, sessionsDir } = opts;
+    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir } = opts;
   const now = startedAt || new Date();
   const tlodStr = settings.tlod != null ? 'TLOD' + settings.tlod : 'TLODna';
   const olodStr = settings.olod != null ? 'OLOD' + settings.olod : 'OLODna';
@@ -109,9 +109,21 @@ function fileSession(opts) {
   // stats from trimmed frames
   let { ft, cpu, gpu } = readChronological(rawCsvPath);
   [ft, cpu, gpu] = trimHead(ft, cpu, gpu, HEAD_TRIM_S);
-  // v6.6: movement-agnostic teardown trim (detects the shutdown burst from the frametimes, so a
-  // mid-taxi quit / no-parking-brake finish is cut correctly). Replaces the movement-based stopTrimS.
-  let teardownS; [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu);
+  // v6.6.1: PRIORITY — if the capture found a ground-truth parking-brake-set-and-held anchor (Dean
+  // 2026-07-09), cut the tail exactly there instead of guessing from the frametime shape. brakeAnchorS
+  // is elapsed seconds since recordingWallStart (the raw/untrimmed basis); subtract HEAD_TRIM_S to land
+  // in the already-head-trimmed array's own elapsed basis. FALLBACK (no anchor, or the anchor produced
+  // no real cut — e.g. Fenix/other aircraft that don't drive the SimVar, or a mid-taxi quit with the
+  // brake never set) = the v6.6 movement-agnostic teardown trim, unchanged from before.
+  let teardownS;
+  if (brakeAnchorS != null) {
+    const target = brakeAnchorS - HEAD_TRIM_S;
+    const [bft, bcpu, bgpu, bcut] = trimAtElapsed(ft, cpu, gpu, target);
+    if (bcut > 0) { ft = bft; cpu = bcpu; gpu = bgpu; teardownS = bcut; }
+    else [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu);
+  } else {
+    [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu);
+  }
   const smoothness = computeSmoothness(ft, cpu, gpu, teardownS, phaseLog, recordingWallStart);
   // per-phase VRAM (peak/avg) from the just-written telemetry, merged into the frametime phase stats
   // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
