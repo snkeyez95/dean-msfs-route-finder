@@ -3765,7 +3765,7 @@ function qlBtnHtml(){
   // for this SimBrief flight → close apps → companions → MSFS → capture). Same size; subtle accent
   // tint differentiates it. SimBrief the route first so auto-TLOD can read the aircraft.
   return`<button class="btn bg bsm" onclick="quickLaunchAll()">&#9889; Quick Launch</button>`
-    +`<button class="btn bg bsm" style="border-color:var(--acc);color:var(--acc)" onclick="launchAndCapture()" title="One click: auto-set the next benchmark TLOD for this SimBrief aircraft, close your apps, launch companions + MSFS, and capture — apps reopen after the sim. Open in SimBrief first.">&#128640; Launch + Capture</button>`;
+    +`<button class="btn bg bsm" style="border-color:var(--acc);color:var(--acc)" onclick="launchAndCapture()" title="One click: set the next benchmark TLOD for this SimBrief aircraft (or a Settings Lab experiment once your benchmark is complete; nothing once it's done and the Lab is off), close your apps, launch companions + MSFS, and capture — apps reopen after the sim. Open in SimBrief first.">&#128640; Launch + Capture</button>`;
 }
 
 async function quickLaunchAll(){
@@ -4702,7 +4702,8 @@ async function launchAndCapture(){
   const closeApps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
   const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path);
   const msg='Launch a clean benchmark flight?\n\nThis will, in order:\n'
-    +'1. Auto-set the next benchmark TLOD for your SimBrief aircraft\n'
+    +(S.cfg.labMode?'1. Apply your next Settings Lab experiment for your SimBrief aircraft (or set the next benchmark TLOD if the grid still has gaps)\n'
+                    :'1. Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete — your current settings are left alone)\n')
     +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
     +(comps.length?('3. Launch your '+comps.length+' companion app'+(comps.length>1?'s':'')+'\n'):'')
     +'4. Launch MSFS and start the performance capture\n\n'
