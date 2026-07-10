@@ -6479,7 +6479,9 @@ function latcAutoTarget(rec){
 // (the recommended frequency changed) drives the panel's auto-expand + chime.
 function latcPushOverlay(){
   const v=vCfg();
-  if(!v.enabled || !(v.overlay&&v.overlay.enabled)) return;
+  // Push whenever Live mode is on — main.js caches this payload for the in-sim toolbar panel too
+  // (v6.8.0), so the push must NOT be gated on the desktop overlay being shown.
+  if(!v.enabled) return;
   if(LATC.status!=='live'){ try{ window.api.overlayState({live:false}); }catch(e){} return; }
   const rec=latcCurrentRec();
   if(!rec){ try{ window.api.overlayState({live:false}); }catch(e){} return; }

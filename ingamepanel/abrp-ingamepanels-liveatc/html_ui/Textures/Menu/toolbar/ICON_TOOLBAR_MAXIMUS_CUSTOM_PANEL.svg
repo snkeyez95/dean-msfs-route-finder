@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- ABRP Live ATC toolbar icon: radio waves over a frequency dot (filename bound by the .spb - keep it) -->
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round">
+    <path d="M14 30a10 10 0 0 1 20 0"/>
+    <path d="M8 30a16 16 0 0 1 32 0"/>
+  </g>
+  <circle cx="24" cy="32" r="4.5" fill="#ffffff"/>
+  <rect x="22.5" y="34" width="3" height="8" rx="1.5" fill="#ffffff"/>
+</svg>
