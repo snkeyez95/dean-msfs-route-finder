@@ -6564,8 +6564,13 @@ function renderLiveAtc(){
   // look-ahead would load next, so a stuck standby is visible (is it not reading active? matching off?).
   { const av=LATC.pos.comActiveMhz, sb=LATC.pos.comStandbyMhz, tgt=latcAutoTarget(rec);
     const advancing=tgt&&tgt.freq!=null&&rec.freq!=null&&Math.abs(tgt.freq-rec.freq)>=LATC_FREQ_TOL;
+    // When the aircraft rejected our last standby write (LATC.standbyIssue), its standby lives in a
+    // custom radio system that isn't mirrored to the standard sim variable — so the standby we read is
+    // stale (Dean's Fenix: RMP 122.800, sim var frozen at 124.850). Say so instead of showing a wrong
+    // number. Active stays trustworthy (custom aircraft DO publish it — vPilot needs it).
+    const sbUnreliable=!!LATC.standbyIssue;
     h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">ABRP reads your radio &mdash; active '
-      +(av!=null?latcFmt(av):'&mdash; (not reported)')+' &middot; standby '+(sb!=null?latcFmt(sb):'&mdash; (not reported)')
+      +(av!=null?latcFmt(av):'&mdash; (not reported)')+' &middot; standby '+(sbUnreliable?'not reliably reported by this aircraft':(sb!=null?latcFmt(sb):'&mdash; (not reported)'))
       +'<br>look-ahead would load: <span style="color:'+(advancing?'var(--grn)':'var(--ink3)')+'">'+(tgt&&tgt.freq!=null?latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):''):'&mdash;')+'</span>'
       +(advancing?' (next in sequence)':' (holding current &mdash; not yet on the recommended freq)')+'</div>';
   }
