@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.7.0
+# A Better Route Planner — v6.7.1
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.7.1   Sunset the "Coverage & what to fly next" tracker now the 24-flight benchmark is complete. New "🎯 Hide coverage" button in the Performance toolbar collapses the coverage grid in the dashboard (its job is done — the Baseline view is now your day-to-day recommendation). Fully reversible: click "Show coverage" to bring it back, e.g. if you re-baseline after a GPU driver or MSFS update. Nothing else changes — logging and every other view keep working.
+
 v6.7.0   LIVE ATC PIVOT — auto-tune dropped, the overlay becomes the product. Live testing confirmed study-level aircraft (PMDG, Fenix) run custom radios that ignore the standard "set frequency" command, so ABRP can't tune them. Rather than a fragile per-aircraft workaround, ABRP is now READ-ONLY on the radio and puts its strength where it shines: recognizing your situation and recommending the right frequency. REMOVED: the "Set COM1 standby" button, auto-set, and the whole standby-write path — nothing transmits or tunes anymore; you dial the frequency yourself. NEW in-sim overlay: a small always-on dot over the sim (borderless/windowed MSFS) that auto-expands for 20 seconds with a chime whenever a new frequency is recommended — showing the ATIS to start on at the gate, the frequency to be on, who it is, what's next, and (read live) what you're currently tuned to. It then collapses back to a pulsing dot you can click anytime to review. New Settings: "Pop the panel open on a new frequency" and "Chime on a new frequency" (both on by default). The in-app Live ATC tab keeps the recommendation card, route briefing, and planning tools; it just lost the tuning buttons.
 v6.6.5   Follow-ups to v6.6.4 from the EDDH Fenix gate test. (1) The Live ATC radio readout now reads "standby not reliably reported by this aircraft" when the aircraft rejects a standby write, instead of showing a stale/wrong number — study-level aircraft (PMDG, Fenix) keep their standby in a private radio system the standard sim variable doesn't mirror, so the old line could show e.g. 124.850 while the RMP actually read 122.800. Your active frequency stays trustworthy (custom aircraft publish it — vPilot needs it), so the look-ahead is unaffected; a standard radio (Cessna) still shows the real standby. (2) Launch + Capture confirm dialog and button tooltip reworded: with the 24-flight benchmark complete, auto-TLOD no longer sets a benchmark value, so the wording now reflects the real post-benchmark behavior — a Settings Lab experiment if the Lab is on, otherwise your current graphics settings are left alone.
 

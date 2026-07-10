@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.7.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.7.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.7.0</div>
+    <div class="sb-ver">v6.7.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3823,6 +3823,7 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
     +'<button class="btn bg bsm" id="cfx-export-btn" onclick="perfExportCfx()" title="Convert the flight you&#39;re viewing to a CapFrameX-format CSV (Sessions\\CapFrameX). From the dashboard you get a picker instead — choose one flight folder, a date, or Sessions for everything.">&#8687; CapFrameX</button>'
+    +'<button class="btn bg bsm" id="perf-cov-btn" onclick="perfToggleCov()" title="Hide the &lsquo;Coverage &amp; what to fly next&rsquo; tracker now your 24-flight benchmark is complete — reversible; click again to bring it back if you re-baseline after a driver or sim update">'+(S.cfg.perfHideCoverage?'&#127919; Show coverage':'&#127919; Hide coverage')+'</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
     +'<div id="lab-panel"></div>'
@@ -3835,7 +3836,15 @@ async function renderPerfPane(){
   renderLabPanel();   // Settings Lab (Phase 9) — async, fills #lab-panel
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
-function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } }
+function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } perfApplyCovHide(); }
+// Sunset the "Coverage & what to fly next" tracker once the benchmark is complete (Dean 2026-07-09) —
+// reversible. Hides the coverage panel inside the embedded dashboard per cfg.perfHideCoverage, targeting
+// it by id (new reports) or its .covbody child (reports generated before this). Applied on every dashboard
+// load; the toolbar button toggles + persists. Bring it back anytime (e.g. re-baselining after a driver/sim update).
+function _perfCovPanel(){ const fr=document.getElementById('perf-frame'); const doc=fr&&fr.contentDocument; if(!doc)return null;
+  try{ return doc.getElementById('covpanel') || (doc.querySelector('.covbody')?doc.querySelector('.covbody').closest('.panel'):null); }catch(e){ return null; } }
+function perfApplyCovHide(){ try{ const p=_perfCovPanel(); if(p) p.style.display = S.cfg.perfHideCoverage ? 'none' : ''; }catch(e){} }
+function perfToggleCov(){ S.cfg.perfHideCoverage=!S.cfg.perfHideCoverage; try{ window.api.saveConfig(S.cfg); }catch(e){} perfApplyCovHide(); const b=document.getElementById('perf-cov-btn'); if(b) b.innerHTML=(S.cfg.perfHideCoverage?'&#127919; Show coverage':'&#127919; Hide coverage'); }
 function _perfHideViews(){ for(const id of ['perf-frame','perf-compare','perf-baseline','perf-lab','perf-scenery']){ const el=document.getElementById(id); if(el)el.style.display='none'; } }
 function perfShowDashboard(){ _perfHideViews(); const fr=document.getElementById('perf-frame'); if(fr){ fr.style.display='block'; if(_perfData&&_perfData.combinedUrl){ const u=_perfData.combinedUrl; fr.src=u+(u.indexOf('?')>-1?'&':'?')+'theme='+perfTheme(); } } }
 
@@ -6443,7 +6452,7 @@ function latcCheckToasts(){
   } else { LATC._handoffKey=null; }
 }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
-// Read-only "what's next" helper (v6.7.0 — auto-tune abandoned; this only informs the display now).
+// Read-only "what's next" helper (v6.7.1 — auto-tune abandoned; this only informs the display now).
 // Given the frequency your COM1 ACTIVE radio is actually on, return the NEXT frequency in the sequence
 // so we can show "you're on X → next Y". Falls back to the current rec until you're on it. Read-only —
 // never writes the radio.
@@ -6465,7 +6474,7 @@ function latcAutoTarget(rec){
   }
   return rec;
 }
-// v6.7.0 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
+// v6.7.1 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
 // every poll. Pre-formats every field to plain strings so overlay.html just sets textContent. isNewRec
 // (the recommended frequency changed) drives the panel's auto-expand + chime.
 function latcPushOverlay(){
@@ -6555,7 +6564,7 @@ function renderLiveAtc(){
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
     +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">Next up: <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+'</div>':'')
     ;
-  // Read-only radio readout (v6.7.0): show what your ACTIVE radio is on + the next freq in the sequence.
+  // Read-only radio readout (v6.7.1): show what your ACTIVE radio is on + the next freq in the sequence.
   // Standby number dropped (unreliable on custom aircraft). ABRP never tunes — you dial it yourself.
   { const av=LATC.pos.comActiveMhz, tgt=latcAutoTarget(rec);
     const advancing=tgt&&tgt.freq!=null&&rec.freq!=null&&Math.abs(tgt.freq-rec.freq)>=LATC_FREQ_TOL;
@@ -6996,5 +7005,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.7.0</div>
+  pointer-events:none;">v6.7.1</div>
 </body></html>

@@ -147,7 +147,7 @@ function buildCombinedReport(sessions){
     const nxt = cov.gaps.slice(0, 4).map(g => g.aircraft + ' ' + g.tlod).join(', ');
     covNext = '<div class="covnext">Next up: ' + nxt + ' · <b>' + cov.total_remaining + ' flights</b> to a full set</div>';
   } else covRec = 'Coverage complete — even spread reached, ready to finalize a TLOD.';
-  const coveragePanel = '<div class="panel" style="margin-bottom:12px"><div class="panel-h">' +
+  const coveragePanel = '<div class="panel" id="covpanel" style="margin-bottom:12px"><div class="panel-h">' +
     'Coverage &amp; what to fly next</div><div class="covbody">' +
     '<div class="covrec">' + covRec + '</div>' + covGrid + covNext +
     '<div class="covnote">Target ' + tgt + ' flights per cell · floor TLOD 100 (80 excluded as visually-safe)</div></div></div>';
