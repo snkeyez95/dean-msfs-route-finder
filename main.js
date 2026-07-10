@@ -1936,11 +1936,11 @@ ipcMain.handle('msfs-running', () => { try { return isMsfsRunning(); } catch (_)
 // A SEPARATE continuous SimConnect client "ABRP-LiveATC" (node-simconnect), safe alongside vPilot AND
 // the capture engine — the sim serves many clients and this never touches the capture connection or
 // PresentMon. Opt-in; zero overhead when off. Streams position at 1 Hz for the renderer's top-down
-// frequency recommendation, and can load a frequency into COM1 STANDBY (never active — vPilot only
-// transmits when the pilot swaps standby→active).
+// frequency recommendation. READ-ONLY: ABRP never tunes or transmits — it only reads position + the
+// COM1 active/standby frequency to recommend the right frequency and to show what you're currently on.
 const LiveATC = (() => {
   let handle = null, stopped = true, reconnecting = false, pos = null, status = 'off';
-  const DEF = 20, REQ = 20, EVT_STBY = 20;
+  const DEF = 20, REQ = 20;
   function _open(){
     if(stopped) return;
     if(status !== 'live') status = 'connecting';
@@ -1955,15 +1955,12 @@ const LiveATC = (() => {
       h.addToDataDefinition(DEF,'PLANE ALT ABOVE GROUND','Feet',SimConnectDataType.FLOAT64);
       h.addToDataDefinition(DEF,'SIM ON GROUND','Bool',SimConnectDataType.INT32);
       h.addToDataDefinition(DEF,'GROUND VELOCITY','Knots',SimConnectDataType.FLOAT64);
-      // v6.6.1: read COM1 standby back (MHz) so setStandby can HONESTLY report whether the write
-      // actually reached the aircraft's radio — some custom avionics (found live on Dean's PMDG 737)
-      // ignore the standard SimConnect event and silently leave this unread-back "success" wrong.
+      // Read COM1 standby + active (MHz). ABRP is READ-ONLY on the radio — it never tunes. Active is used
+      // to show "you're on X → next is Y" (active reads reliably on every aircraft; vPilot needs it too).
+      // Standby reads are unreliable on custom aircraft (Fenix), so we read it but don't surface the number.
       h.addToDataDefinition(DEF,'COM STANDBY FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
-      // v6.6.1: read COM1 ACTIVE too — the look-ahead standby logic needs to know when you've actually
-      // swapped onto the recommended frequency, so it can advance standby to the NEXT one in the sequence.
       h.addToDataDefinition(DEF,'COM ACTIVE FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
       h.requestDataOnSimObject(REQ,DEF,0,SimConnectPeriod.SECOND);
-      try{ h.mapClientEventToSimEvent(EVT_STBY,'COM_STBY_RADIO_SET_HZ'); }catch(_){}
       h.on('simObjectData',(recv)=>{
         if(recv.requestID!==REQ) return;
         try{
@@ -1991,37 +1988,12 @@ const LiveATC = (() => {
       let st=status;
       if(status==='live' && pos && Date.now()-pos.ts>15000){ st='connecting'; if(!reconnecting) _reconnect(); }
       return { status:st, pos:(st==='live'&&pos)?pos:null };
-    },
-    setStandby(freqHz){
-      if(!handle) return {ok:false, error:'not connected to the sim'};
-      try{
-        const { EventFlag } = require('node-simconnect');
-        handle.transmitClientEvent(0, EVT_STBY, Math.round(freqHz), 0, EventFlag.EVENT_FLAG_DEFAULT);   // COM1 STANDBY only
-        LOG.info('[LiveATC] COM1 standby SET requested: '+freqHz+' Hz');
-        return {ok:true, targetHz:Math.round(freqHz)};
-      }catch(e){ LOG.error('[LiveATC] setStandby failed: '+e.message); return {ok:false, error:e.message}; }
-    },
-    // v6.6.1: honest verification — the transmit above can only report whether the SEND failed, not
-    // whether the aircraft's radio actually moved. Call this ~1-2s later (after the sim's next data
-    // cycle) with the targetHz from setStandby; compares against the live COM STANDBY FREQUENCY readback.
-    // No BCD fallback here on purpose: the legacy BCD radio event only holds 2 decimal digits (25kHz
-    // spacing) and would silently mistune modern 8.33kHz frequencies (e.g. 132.975) — worse than honest
-    // failure. A write that doesn't take needs an aircraft-specific fix (PMDG/Fenix custom var), not a
-    // lossy generic one.
-    verifyStandby(targetHz){
-      if(!pos) return {ok:false, verified:false, reason:'no live position data'};
-      const readHz = pos.comStandbyMhz!=null ? Math.round(pos.comStandbyMhz*1e6) : null;
-      if(readHz==null) return {ok:true, verified:false, reason:'aircraft is not reporting COM1 standby (custom radio)'};
-      const matched = Math.abs(readHz - targetHz) <= 5000;   // 5kHz: covers float rounding + 8.33kHz channel/RF read gap; still catches a real miss (PMDG ignore = MHz off)
-      return {ok:true, verified:matched, readHz, targetHz};
     }
   };
 })();
 ipcMain.handle('live-atc-start', () => { LiveATC.start(); return {ok:true}; });
 ipcMain.handle('live-atc-stop',  () => { LiveATC.stop();  return {ok:true}; });
 ipcMain.handle('live-position',  () => LiveATC.latest());
-ipcMain.handle('live-set-standby', (_, o) => LiveATC.setStandby((o&&o.freqHz)||0));
-ipcMain.handle('live-verify-standby', (_, o) => LiveATC.verifyStandby((o&&o.targetHz)||0));
 // VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns controllers + ATIS +
 // pilots (pilots trimmed to the connection/flight-plan fields we use, to keep the payload small).
 ipcMain.handle('live-vatsim-feed', async () => {
@@ -2047,7 +2019,8 @@ let overlayWin=null;
 function overlayEnsure(){
   if(overlayWin && !overlayWin.isDestroyed()) return overlayWin;
   const { screen } = require('electron');
-  const wa=screen.getPrimaryDisplay().workArea, W=340, H=150, m=16;
+  // Big enough (transparent) to hold the dot AND its expanded panel; only the dot/panel are painted.
+  const wa=screen.getPrimaryDisplay().workArea, W=360, H=250, m=14;
   overlayWin=new BrowserWindow({
     width:W, height:H, x: wa.x+wa.width-W-m, y: wa.y+m,
     frame:false, transparent:true, alwaysOnTop:true, skipTaskbar:true, resizable:false, movable:false,
@@ -2055,11 +2028,28 @@ function overlayEnsure(){
     webPreferences:{ preload: path.join(__dirname,'preload.js'), contextIsolation:true, nodeIntegration:false }
   });
   try{ overlayWin.setAlwaysOnTop(true,'screen-saver'); }catch(_){}
-  try{ overlayWin.setIgnoreMouseEvents(true,{forward:true}); }catch(_){}   // click-through
+  try{ overlayWin.setIgnoreMouseEvents(true,{forward:true}); }catch(_){}   // click-through by default; the renderer toggles it off only while the cursor is over the dot/panel (forward:true keeps mousemove flowing so it can detect that)
   overlayWin.loadFile('overlay.html');
   overlayWin.on('closed',()=>{ overlayWin=null; });
   return overlayWin;
 }
+// Eagerly show the persistent dot (called when Live mode turns on, if the overlay is enabled).
+ipcMain.handle('overlay-show', () => {
+  if(_cleanupDone) return {ok:false};
+  try{ const w=overlayEnsure(); w.showInactive(); }catch(e){ LOG.error('[Overlay] '+e.message); }
+  return {ok:true};
+});
+// Push live recommendation state to the overlay each poll (dot/panel render + auto-expand on new-rec).
+ipcMain.handle('overlay-state', (_, payload) => {
+  if(_cleanupDone || !overlayWin || overlayWin.isDestroyed()) return {ok:false};
+  try{ overlayWin.webContents.send('overlay-state', payload||{}); }catch(_){}
+  return {ok:true};
+});
+// The overlay renderer toggles click-through: false while the cursor is over the dot/panel, true otherwise.
+ipcMain.handle('overlay-set-ignore', (_, o) => {
+  try{ if(overlayWin && !overlayWin.isDestroyed()) overlayWin.setIgnoreMouseEvents(!!(o&&o.ignore), {forward:true}); }catch(_){}
+  return {ok:true};
+});
 ipcMain.handle('overlay-toast', (_, payload) => {
   if(_cleanupDone) return {ok:false};   // QA fix (2026-07-09): a toast arriving mid-quit must not RE-CREATE the overlay window before-quit just destroyed
   try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });

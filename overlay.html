@@ -1,32 +1,88 @@
 <!doctype html><html><head><meta charset="utf-8"><style>
   html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;-webkit-user-select:none;user-select:none;}
-  #t{ position:fixed; top:8px; right:8px; max-width:320px; background:rgba(18,20,24,0.92); border:1px solid rgba(245,166,35,0.55); border-radius:10px; padding:9px 13px; color:#e8e8ea; box-shadow:0 6px 24px rgba(0,0,0,0.55); opacity:0; transform:translateY(-6px); transition:opacity .22s ease, transform .22s ease; }
-  #t.show{ opacity:1; transform:translateY(0); }
-  #t .tk{ font-size:9px; text-transform:uppercase; letter-spacing:.09em; color:#7a7d84; margin-bottom:2px; }
-  #t .ti{ font-size:15px; font-weight:700; color:#f5a623; letter-spacing:.01em; font-variant-numeric:tabular-nums; }
-  #t .ts{ font-size:12px; color:#b9bbc0; margin-top:2px; }
+  /* Always-visible dot, top-right. Amber = live; grey = live mode on but sim not connected yet. */
+  #dot{ position:fixed; top:14px; right:14px; width:15px; height:15px; border-radius:50%;
+        background:#f5a623; box-shadow:0 0 0 3px rgba(245,166,35,0.18), 0 2px 8px rgba(0,0,0,0.55); cursor:pointer; }
+  #dot.off{ background:#5a5d64; box-shadow:0 0 0 3px rgba(90,93,100,0.15), 0 2px 8px rgba(0,0,0,0.55); }
+  #dot.pulse{ animation:pulse 1.25s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 3px rgba(245,166,35,0.20),0 2px 8px rgba(0,0,0,0.55);} 50%{ box-shadow:0 0 0 8px rgba(245,166,35,0.34),0 2px 8px rgba(0,0,0,0.55);} }
+  /* Expandable panel under the dot. */
+  #panel{ position:fixed; top:38px; right:14px; width:300px; background:rgba(18,20,24,0.95);
+          border:1px solid rgba(245,166,35,0.45); border-radius:12px; padding:12px 14px; color:#e8e8ea;
+          box-shadow:0 8px 30px rgba(0,0,0,0.62); opacity:0; transform:translateY(-6px); pointer-events:none;
+          transition:opacity .2s ease, transform .2s ease; }
+  #panel.show{ opacity:1; transform:translateY(0); }
+  .st{ font-size:12px; color:#46c46a; margin-bottom:8px; display:none; }
+  .atis{ font-size:12px; color:#d0a93a; margin-bottom:9px; display:none; font-variant-numeric:tabular-nums; }
+  .k{ font-size:9px; text-transform:uppercase; letter-spacing:.09em; color:#7a7d84; margin-bottom:3px; }
+  .freq{ font-size:27px; font-weight:800; color:#f5a623; font-variant-numeric:tabular-nums; letter-spacing:-.01em; line-height:1.05; font-family:'JetBrains Mono','Consolas',monospace; }
+  .who{ font-size:13px; font-weight:600; color:#e8e8ea; margin-top:2px; }
+  .why{ font-size:11px; color:#9a9da3; margin-top:5px; line-height:1.4; }
+  .next{ font-size:11.5px; color:#b9bbc0; margin-top:8px; font-variant-numeric:tabular-nums; display:none; }
+  .cur{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
 </style></head><body>
-<div id="t"><div class="tk" id="tk"></div><div class="ti" id="ti"></div><div class="ts" id="ts"></div></div>
+<div id="dot" class="off" title="VATSIM frequency helper — click to expand"></div>
+<div id="panel">
+  <div class="st" id="st"></div>
+  <div class="atis" id="atis"></div>
+  <div class="k">Frequency to be on</div>
+  <div class="freq" id="freq">&mdash;</div>
+  <div class="who" id="who"></div>
+  <div class="why" id="why"></div>
+  <div class="next" id="next"></div>
+  <div class="cur" id="cur"></div>
+</div>
 <script>
-  let hideTimer=null;
-  const el=document.getElementById('t'), tk=document.getElementById('tk'), ti=document.getElementById('ti'), ts=document.getElementById('ts');
-  const kind={freqChange:'Tune standby',newController:'VATSIM',handoff:'Handoff',connectionLost:'VATSIM',loggingStarted:'Performance'};
-  const accent={loggingStarted:'#46c46a',connectionLost:'#e0823c'};
-  // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note), not a generic beep.
+  const dot=document.getElementById('dot'), panel=document.getElementById('panel');
+  const st=document.getElementById('st'), atis=document.getElementById('atis'), freq=document.getElementById('freq'),
+        who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), cur=document.getElementById('cur');
+  let expanded=false, collapseTimer=null, statusTimer=null, curIgnore=true;
+
+  // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note).
   function beep(){ try{ const c=new (window.AudioContext||window.webkitAudioContext)();
     function tone(f,t0,dur){ const o=c.createOscillator(),g=c.createGain(); o.type='sine'; o.frequency.value=f;
       g.gain.setValueAtTime(0.0001,c.currentTime+t0); g.gain.exponentialRampToValueAtTime(0.09,c.currentTime+t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+t0+dur);
       o.connect(g); g.connect(c.destination); o.start(c.currentTime+t0); o.stop(c.currentTime+t0+dur+0.03); }
-    tone(1046.5,0,0.5); tone(830.6,0.26,0.62);   // C6 → G#5, the classic cabin "bing-bong"
+    tone(1046.5,0,0.5); tone(830.6,0.26,0.62);   // C6 → G#5
   }catch(e){} }
+
+  function expand(){ expanded=true; panel.classList.add('show'); dot.classList.remove('pulse'); }
+  function collapse(){ expanded=false; panel.classList.remove('show'); }
+  // Auto-open the panel for `ms`, then collapse to the dot and pulse it so a missed alert is still visible.
+  function autoExpand(ms){ expand(); clearTimeout(collapseTimer); collapseTimer=setTimeout(function(){ collapse(); dot.classList.add('pulse'); }, ms||20000); }
+
+  dot.addEventListener('click', function(){ clearTimeout(collapseTimer); if(expanded){ collapse(); } else { expand(); dot.classList.remove('pulse'); } });
+
+  // Live recommendation state — pushed every ~5s from the app. Fields are pre-formatted strings.
+  if(window.api&&window.api.onOverlayState) window.api.onOverlayState(function(p){
+    p=p||{};
+    if(!p.live){ dot.className='off'; freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
+      atis.style.display='none'; nxt.style.display='none'; cur.style.display='none'; return; }
+    dot.classList.remove('off');   // live — keep any pulse
+    freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
+    atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
+    nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
+    cur.textContent=p.cur||''; cur.style.display=p.cur?'block':'none';
+    // New recommended frequency: pop open (+chime) if enabled, else just pulse the dot to flag it.
+    if(p.isNewRec){ if(p.pop!==false){ autoExpand(20000); if(p.sound) beep(); } else { dot.classList.add('pulse'); } }
+  });
+
+  // Status blips unrelated to frequency (performance-logging started, connection lost) — shown briefly at
+  // the top of the panel, reusing the same expand + chime.
   if(window.api&&window.api.onOverlayToast) window.api.onOverlayToast(function(p){
     p=p||{};
-    const col=accent[p.type]||'#f5a623';
-    tk.textContent=kind[p.type]||'VATSIM'; ti.textContent=p.title||''; ti.style.color=col; el.style.borderColor='rgba('+(p.type==='loggingStarted'?'70,196,106':p.type==='connectionLost'?'224,130,60':'245,166,35')+',0.55)';
-    ts.textContent=p.sub||''; ts.style.display=p.sub?'block':'none';
-    el.classList.add('show');
-    if(p.sound)beep();
-    clearTimeout(hideTimer);
-    hideTimer=setTimeout(function(){ el.classList.remove('show'); }, (p.ms||14000));   // 14s default (Dean 2026-07-08; was 7s) — long enough to read while flying
+    st.textContent=(p.title||'')+(p.sub?' — '+p.sub:''); st.style.color=(p.type==='connectionLost'?'#e0823c':'#46c46a'); st.style.display='block';
+    autoExpand(p.ms||14000); if(p.sound)beep();
+    clearTimeout(statusTimer); statusTimer=setTimeout(function(){ st.style.display='none'; }, (p.ms||14000));
+  });
+
+  // Interactivity: only the dot (and the panel while open) catches the mouse; everything else is
+  // click-through to the sim. mousemove is forwarded even while click-through, so we hit-test + toggle.
+  function inRect(x,y,el){ const r=el.getBoundingClientRect(); return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom; }
+  function setIgnore(ig){ if(ig===curIgnore)return; curIgnore=ig; try{ window.api.overlaySetIgnore({ignore:ig}); }catch(e){} }
+  document.addEventListener('mousemove', function(e){
+    const overDot = inRect(e.clientX,e.clientY,dot);
+    const overPanel = panel.classList.contains('show') && inRect(e.clientX,e.clientY,panel);
+    setIgnore(!(overDot||overPanel));
   });
 </script></body></html>

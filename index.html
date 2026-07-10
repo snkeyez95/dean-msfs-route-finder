@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.6.5</div>
+  <div class="tname">A Better Route Planner &mdash; v6.7.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.6.5</div>
+    <div class="sb-ver">v6.7.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -895,7 +895,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </div></div>
 <div class="pane" id="pane-liveatc"><div class="scroll">
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Live ATC <span style="font-size:11px;color:var(--ink3);font-weight:400">&middot; VATSIM frequency helper</span></div>
-  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Reads your live position, checks who&rsquo;s online on VATSIM, and tells you the frequency to be on &mdash; with one click to load it into COM1 <b>standby</b> (never active; vPilot transmits only when you swap).</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Reads your live position, checks who&rsquo;s online on VATSIM, and tells you the frequency to be on &mdash; here and on a small <b>in-sim overlay</b>. ABRP never tunes or transmits; you dial the frequency yourself.</div>
   <div id="liveatc-body"><div style="font-size:13px;color:var(--ink3)">Loading&hellip;</div></div>
 </div></div>
 
@@ -5995,10 +5995,10 @@ async function fetchDatis(icao,idx,side,prefix){
 // the fully-populated object so toggles can write straight to it.
 function vCfg(){
   if(!S.cfg.vatsim) S.cfg.vatsim={};
-  const v=S.cfg.vatsim, d={enabled:false,cid:'',autoSetStandby:false,weatherButton:true,autoStartVpilot:false};
+  const v=S.cfg.vatsim, d={enabled:false,cid:'',weatherButton:true,autoStartVpilot:false};
   for(const k in d) if(v[k]===undefined) v[k]=d[k];
   v.overlay=Object.assign({enabled:true,freqChange:true,newController:true,handoff:true,connectionLost:true,loggingStarted:true}, v.overlay||{});
-  v.sound=Object.assign({newController:false,handoff:false,connectionLost:false}, v.sound||{});
+  v.sound=Object.assign({freqChange:true,newController:false,handoff:false,connectionLost:false}, v.sound||{});
   return v;
 }
 function vSet(path,val){ const v=vCfg(); const p=path.split('.'); if(p.length===1)v[p[0]]=val; else v[p[0]][p[1]]=val; window.api.saveConfig(S.cfg); updateVatsimHeader(); }
@@ -6011,17 +6011,17 @@ function renderVatsimSettings(){
   let h='<div style="margin-bottom:6px"><label style="font-size:12px;color:var(--ink3)">Your VATSIM ID (CID) <span style="color:var(--ink4)">&mdash; optional; lets ABRP find your filed flight plan &amp; confirm you\'re connected</span></label><br><input id="vatsim-cid" value="'+esc(v.cid||'')+'" onchange="vSetCid(this.value)" placeholder="e.g. 1234567" style="margin-top:5px;background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;width:170px"></div>';
   h+=hdr('In-sim overlay <span style="color:var(--ink4)">(borderless/windowed MSFS only)</span>');
   h+=row('Show the overlay', v.overlay.enabled, "vSet('overlay.enabled',this.checked)");
-  h+=row('Frequency-change toast', v.overlay.freqChange, "vSet('overlay.freqChange',this.checked)");
+  h+=row('Pop the panel open on a new frequency', v.overlay.freqChange, "vSet('overlay.freqChange',this.checked)", '(otherwise the dot just pulses)');
   h+=row('New controller online', v.overlay.newController, "vSet('overlay.newController',this.checked)");
   h+=row('Handoff approaching', v.overlay.handoff, "vSet('overlay.handoff',this.checked)", '(needs airspace data)');
   h+=row('Connection lost', v.overlay.connectionLost, "vSet('overlay.connectionLost',this.checked)");
   h+=row('&ldquo;Logging started&rdquo; confirmation', v.overlay.loggingStarted, "vSet('overlay.loggingStarted',this.checked)");
-  h+=hdr('Sound cues <span style="color:var(--ink4)">(off by default)</span>');
+  h+=hdr('Sound cues');
+  h+=row('Chime on a new frequency', v.sound.freqChange, "vSet('sound.freqChange',this.checked)");
   h+=row('Chime on new controller', v.sound.newController, "vSet('sound.newController',this.checked)");
   h+=row('Chime on handoff', v.sound.handoff, "vSet('sound.handoff',this.checked)");
   h+=row('Chime on connection lost', v.sound.connectionLost, "vSet('sound.connectionLost',this.checked)");
   h+=hdr('Behavior');
-  h+=row('Auto-set COM1 standby on change', v.autoSetStandby, "vSet('autoSetStandby',this.checked)", '(otherwise one click on the card)');
   h+=row('Auto-start Live mode when vPilot is running', v.autoStartVpilot, "vSetAutoVpilot(this.checked)", '(links the pilot client to Live ATC)');
   h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
   h+=hdr('Data <span style="color:var(--ink4)">(downloaded once, refresh per AIRAC)</span>');
@@ -6419,15 +6419,13 @@ async function renderVatsimAtisBtn(icao,idx,side,prefix){
 }
 function applyVatsimAtis(icao,idx,side,prefix){ const d=vatsimAtisData(icao); if(!d)return; S.datisCache[(icao||'').toUpperCase()]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
 function revertVatsimAtis(icao,idx,side,prefix){ delete S.datisCache[(icao||'').toUpperCase()]; fetchDatis(icao,idx,side,prefix); }
-async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcApplyAuto(); latcCheckToasts(); renderLiveAtc(); updateVatsimHeader(); }
+async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcCheckToasts(); renderLiveAtc(); latcPushOverlay(); updateVatsimHeader(); }
 // Overlay toast (gated per-type by cfg.vatsim.overlay + optional sound). The overlay window is created
 // lazily in main on the first toast.
 function latcOverlayToast(type,title,sub,ms){ const v=vCfg(); if(!v.overlay.enabled||!v.overlay[type])return; window.api.overlayToast({type,title,sub,sound:!!(v.sound&&v.sound[type]),ms}); }
 function latcCheckToasts(){
   const rec=(LATC.status==='live')?latcCurrentRec():null; if(!rec)return;
-  const fkey=latcFmt(rec.freq)+'|'+(rec.callsign||'');
-  if(LATC._lastFreqKey!=null && fkey!==LATC._lastFreqKey) latcOverlayToast('freqChange','Monitor '+latcFmt(rec.freq),(rec.callsign?rec.callsign+' · ':'')+rec.label);
-  LATC._lastFreqKey=fkey;
+  // freq-change now drives the persistent overlay panel's auto-expand (latcPushOverlay), not a toast.
   const cur=new Set([rec.callsign, ...(rec.others||[]).map(o=>o.callsign)].filter(Boolean));
   if(LATC._lastCtrl){ const nw=[...cur].filter(c=>!LATC._lastCtrl.has(c)); if(nw.length) latcOverlayToast('newController', nw.length>1?(nw.length+' new controllers online'):'New controller online', nw.slice(0,2).join(', ')); }
   LATC._lastCtrl=cur;
@@ -6445,16 +6443,10 @@ function latcCheckToasts(){
   } else { LATC._handoffKey=null; }
 }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
-// v6.6.1 — honest standby verification (Dean's PMDG flight: the write reported success but the radio
-// never moved). transmitClientEvent only tells us the SEND didn't throw, not whether the aircraft's
-// radio actually changed. Wait one sim data cycle, then read COM1 standby back and compare. No BCD
-// fallback — see the main.js comment: it would silently mistune modern 8.33kHz frequencies.
-function latcVerifyStandbySoon(targetHz){ return new Promise(res=>setTimeout(async()=>{ try{ res(await window.api.liveVerifyStandby({targetHz})); }catch(e){ res({ok:false,verified:false}); } },1500)); }
-// v6.6.1: LOOK-AHEAD standby (Dean 2026-07-09) — once you've actually swapped onto the current
-// recommendation (COM1 active matches it), advance standby to the NEXT frequency in the sequence so
-// it's always one swap ahead. Until then (you haven't tuned it yet), standby holds the current
-// recommendation itself — the original behavior. NEVER touches active (safety: vPilot transmits on
-// active; only the pilot swaps).
+// Read-only "what's next" helper (v6.7.0 — auto-tune abandoned; this only informs the display now).
+// Given the frequency your COM1 ACTIVE radio is actually on, return the NEXT frequency in the sequence
+// so we can show "you're on X → next Y". Falls back to the current rec until you're on it. Read-only —
+// never writes the radio.
 function latcAutoTarget(rec){
   const activeMhz=LATC.pos&&LATC.pos.comActiveMhz;
   if(activeMhz==null || rec.freq==null) return rec;
@@ -6473,35 +6465,43 @@ function latcAutoTarget(rec){
   }
   return rec;
 }
-function latcApplyAuto(){
-  if(!vCfg().autoSetStandby)return; const rec=latcCurrentRec(); if(!rec)return;
-  const target=latcAutoTarget(rec); const hz=latcHz(target.freq);
-  if(hz&&hz!==LATC.lastSetHz){ LATC.lastSetHz=hz;
-    window.api.liveSetStandby({freqHz:hz}).then(r=>{ if(!r||!r.ok)return;
-      latcVerifyStandbySoon(r.targetHz||hz).then(v=>{ LATC.standbyVerified=!!(v&&v.verified); LATC.standbyIssue=(v&&!v.verified)?(v.reason||'the aircraft did not confirm the change'):null; renderLiveAtc(); });
-    });
-  }
+// v6.7.0 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
+// every poll. Pre-formats every field to plain strings so overlay.html just sets textContent. isNewRec
+// (the recommended frequency changed) drives the panel's auto-expand + chime.
+function latcPushOverlay(){
+  const v=vCfg();
+  if(!v.enabled || !(v.overlay&&v.overlay.enabled)) return;
+  if(LATC.status!=='live'){ try{ window.api.overlayState({live:false}); }catch(e){} return; }
+  const rec=latcCurrentRec();
+  if(!rec){ try{ window.api.overlayState({live:false}); }catch(e){} return; }
+  const seq=latcSeqForNow(), nextUp=latcNextUp(rec, seq);
+  let atis='';
+  if(rec.phase==='ground'){ const r0=latcBriefRoute(); const da=(r0&&LATC.db)?latcAtisFreq(r0.dep,'dep'):null; if(da) atis='ATIS first — '+da.callsign+' '+latcFmt(da.freq); }
+  const activeMhz=LATC.pos&&LATC.pos.comActiveMhz;
+  const fkey=latcFmt(rec.freq)+'|'+(rec.callsign||'');
+  const isNewRec = fkey!==LATC._lastOverlayKey;
+  LATC._lastOverlayKey=fkey;
+  try{ window.api.overlayState({
+    live:true,
+    freq:latcFmt(rec.freq),
+    who:(rec.callsign?rec.callsign+' · ':'')+(rec.label||''),
+    why:String(rec.why||'').replace(/<[^>]*>/g,''),
+    atis:atis,
+    next: nextUp?('Next up: '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))):'',
+    cur: (activeMhz!=null)?("you're tuned to "+latcFmt(activeMhz)):'',
+    isNewRec:isNewRec,
+    pop:(v.overlay.freqChange!==false),        // auto-expand the panel on a new freq (Dean: default on)
+    sound:(v.sound&&v.sound.freqChange!==false) // chime on a new freq (default on)
+  }); }catch(e){}
 }
 async function latcToggle(on,auto){
   LATC.on=on;
   S._vpilotAutoOn=!!(on&&auto);   // track whether the vPilot watcher started this session (so it only auto-stops its own)
-  if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
-  else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; }
+  if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(vCfg().overlay.enabled){ try{ window.api.overlayShow(); }catch(e){} } if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
+  else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; LATC._lastOverlayKey=undefined; try{ window.api.overlayHide(); }catch(e){} }
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
   renderLiveAtc(); updateVatsimHeader();
 }
-async function latcSetStandby(){
-  const rec=latcCurrentRec(); if(!rec)return; const hz=latcHz(rec.freq);
-  const n=document.getElementById('latc-setmsg'); if(n)n.textContent='Sending…';
-  const r=await window.api.liveSetStandby({freqHz:hz});
-  if(!r||!r.ok){ if(n)n.textContent='Could not set standby: '+((r&&r.error)||'?'); return; }
-  LATC.lastSetHz=hz;
-  const v=await latcVerifyStandbySoon(r.targetHz||hz);
-  if(!n)return;
-  if(v&&v.verified){ n.textContent='✓ Confirmed '+latcFmt(rec.freq)+' loaded into COM1 standby'; LATC.standbyVerified=true; LATC.standbyIssue=null; }
-  else{ const why=(v&&v.reason)?v.reason:'could not confirm the aircraft accepted it'; n.textContent='Sent '+latcFmt(rec.freq)+' — '+why+' — tune manually to be safe'; LATC.standbyVerified=false; LATC.standbyIssue=why; }
-}
-function latcToggleAuto(v){ vCfg().autoSetStandby=v; window.api.saveConfig(S.cfg); if(v)latcApplyAuto(); renderLiveAtc(); renderVatsimSettings(); }
 async function latcRefreshDb(){ LATC.db=null; LATC.dbLoading=true; renderLiveAtc(); try{ const r=await window.api.liveAirportDb({refresh:true}); if(r&&r.ok){ const m=new Map(); for(const a of r.airports)m.set(a.icao,a); LATC.db=m; } }catch(e){} LATC.dbLoading=false; renderLiveAtc(); }
 
 // vPilot → Live ATC link (Dean 2026-07-08): opt-in. When the VATSIM pilot client launches, auto-start
@@ -6549,30 +6549,18 @@ function renderLiveAtc(){
   const phChip={ground:'ON GROUND',airport:'AIRPORT AREA',enroute:'ENROUTE'}[rec.phase]||rec.phase;
   const accent=rec.found?'var(--grn)':'var(--acc)';
   h+='<div style="background:var(--bg);border:1px solid '+accent+';border-radius:12px;padding:18px 20px;margin-bottom:14px">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">Tune COM1 standby</span>'+pill(phChip,'var(--ink3)')+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">Frequency to be on</span>'+pill(phChip,'var(--ink3)')+'</div>'
     +'<div style="font-size:34px;font-weight:800;color:'+accent+';letter-spacing:-.02em;font-family:\'JetBrains Mono\',monospace">'+latcFmt(rec.freq)+'</div>'
     +'<div style="font-size:15px;font-weight:600;color:var(--ink1);margin-top:2px">'+(rec.callsign?esc(rec.callsign)+' &middot; ':'')+esc(rec.label)+'</div>'
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
     +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">Next up: <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+'</div>':'')
-    +'<div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">'
-      +'<button class="btn bg bsm" style="border-color:'+accent+';color:'+accent+'" onclick="latcSetStandby()">&#128225; Set COM1 standby</button>'
-      +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);cursor:pointer"><input type="checkbox" '+(vCfg().autoSetStandby?'checked':'')+' onchange="latcToggleAuto(this.checked)" style="accent-color:var(--acc)"> auto-set standby on change</label>'
-      // seed the message from the LAST verified state for THIS frequency (covers the auto-set path,
-      // which verifies in the background — passively visible here, not just after a manual click)
-      +'<span id="latc-setmsg" style="font-size:12px;color:'+(LATC.standbyVerified?'var(--grn)':'var(--acc)')+'">'+((LATC.lastSetHz===latcHz(rec.freq))?(LATC.standbyVerified?('✓ Confirmed '+latcFmt(rec.freq)+' loaded into COM1 standby'):(LATC.standbyIssue?('Sent — '+esc(LATC.standbyIssue)+' — tune manually to be safe'):'')):'')+'</span></div>';
-  // Diagnostic readout (Dean, EDDF 2026-07-09): show exactly what ABRP reads off your radio + the freq the
-  // look-ahead would load next, so a stuck standby is visible (is it not reading active? matching off?).
-  { const av=LATC.pos.comActiveMhz, sb=LATC.pos.comStandbyMhz, tgt=latcAutoTarget(rec);
+    ;
+  // Read-only radio readout (v6.7.0): show what your ACTIVE radio is on + the next freq in the sequence.
+  // Standby number dropped (unreliable on custom aircraft). ABRP never tunes — you dial it yourself.
+  { const av=LATC.pos.comActiveMhz, tgt=latcAutoTarget(rec);
     const advancing=tgt&&tgt.freq!=null&&rec.freq!=null&&Math.abs(tgt.freq-rec.freq)>=LATC_FREQ_TOL;
-    // When the aircraft rejected our last standby write (LATC.standbyIssue), its standby lives in a
-    // custom radio system that isn't mirrored to the standard sim variable — so the standby we read is
-    // stale (Dean's Fenix: RMP 122.800, sim var frozen at 124.850). Say so instead of showing a wrong
-    // number. Active stays trustworthy (custom aircraft DO publish it — vPilot needs it).
-    const sbUnreliable=!!LATC.standbyIssue;
-    h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">ABRP reads your radio &mdash; active '
-      +(av!=null?latcFmt(av):'&mdash; (not reported)')+' &middot; standby '+(sbUnreliable?'not reliably reported by this aircraft':(sb!=null?latcFmt(sb):'&mdash; (not reported)'))
-      +'<br>look-ahead would load: <span style="color:'+(advancing?'var(--grn)':'var(--ink3)')+'">'+(tgt&&tgt.freq!=null?latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):''):'&mdash;')+'</span>'
-      +(advancing?' (next in sequence)':' (holding current &mdash; not yet on the recommended freq)')+'</div>';
+    if(av!=null) h+='<div style="font-size:11px;color:var(--ink3);margin-top:10px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">You&rsquo;re tuned to <span style="color:var(--ink1)">'+latcFmt(av)+'</span>'
+      +(advancing?' &rarr; next <span style="color:var(--grn)">'+latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):'')+'</span>':'')+'</div>';
   }
   h+='</div>';
   if(rec.others&&rec.others.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Also in range</div><div style="margin-bottom:14px">';
@@ -6581,7 +6569,7 @@ function renderLiveAtc(){
   if(rec.verify&&rec.verify.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Online ATC we can&rsquo;t place precisely <span style="color:var(--ink4)">(Center/wide-area positions &mdash; verify which covers you; precise airspace maps come in a later update)</span></div><div style="margin-bottom:14px">';
     for(const c of rec.verify.slice(0,6)) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+'</span></div>';
     h+='</div>'; }
-  h+='<div style="font-size:11px;color:var(--ink4);line-height:1.6;border-top:1px solid var(--sep);padding-top:10px">Guidance, not gospel: coverage is approximated from each controller&rsquo;s published range and their airport&rsquo;s location. Standby only &mdash; ABRP never transmits or tunes your active radio. <a href="#" onclick="latcRefreshDb();return false" style="color:var(--acc)">Refresh airport database</a></div>';
+  h+='<div style="font-size:11px;color:var(--ink4);line-height:1.6;border-top:1px solid var(--sep);padding-top:10px">Guidance, not gospel: coverage is approximated from each controller&rsquo;s published range and their airport&rsquo;s location. ABRP never transmits or tunes your radio &mdash; it only tells you the frequency; you dial it yourself. <a href="#" onclick="latcRefreshDb();return false" style="color:var(--acc)">Refresh airport database</a></div>';
   el.innerHTML=h;
 }
 
@@ -7008,5 +6996,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.6.5</div>
+  pointer-events:none;">v6.7.0</div>
 </body></html>
