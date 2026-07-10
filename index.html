@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.7.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.8.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.7.1</div>
+    <div class="sb-ver">v6.8.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6452,7 +6452,7 @@ function latcCheckToasts(){
   } else { LATC._handoffKey=null; }
 }
 function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
-// Read-only "what's next" helper (v6.7.1 — auto-tune abandoned; this only informs the display now).
+// Read-only "what's next" helper (v6.8.0 — auto-tune abandoned; this only informs the display now).
 // Given the frequency your COM1 ACTIVE radio is actually on, return the NEXT frequency in the sequence
 // so we can show "you're on X → next Y". Falls back to the current rec until you're on it. Read-only —
 // never writes the radio.
@@ -6474,7 +6474,7 @@ function latcAutoTarget(rec){
   }
   return rec;
 }
-// v6.7.1 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
+// v6.8.0 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
 // every poll. Pre-formats every field to plain strings so overlay.html just sets textContent. isNewRec
 // (the recommended frequency changed) drives the panel's auto-expand + chime.
 function latcPushOverlay(){
@@ -6566,7 +6566,7 @@ function renderLiveAtc(){
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
     +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">Next up: <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+'</div>':'')
     ;
-  // Read-only radio readout (v6.7.1): show what your ACTIVE radio is on + the next freq in the sequence.
+  // Read-only radio readout (v6.8.0): show what your ACTIVE radio is on + the next freq in the sequence.
   // Standby number dropped (unreliable on custom aircraft). ABRP never tunes — you dial it yourself.
   { const av=LATC.pos.comActiveMhz, tgt=latcAutoTarget(rec);
     const advancing=tgt&&tgt.freq!=null&&rec.freq!=null&&Math.abs(tgt.freq-rec.freq)>=LATC_FREQ_TOL;
@@ -7007,5 +7007,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.7.1</div>
+  pointer-events:none;">v6.8.0</div>
 </body></html>

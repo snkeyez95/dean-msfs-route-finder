@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.7.1
+# A Better Route Planner — v6.8.0
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.8.0   IN-SIM TOOLBAR PANEL (POC) — Live ATC inside MSFS, fullscreen-proof, any aircraft. When Live mode is on, ABRP now serves its frequency recommendation on a private local address (your PC only, port 8177); a small companion package (repo folder ingamepanel/abrp-ingamepanels-liveatc — add it via Aircraft & Util → Utilities, or copy to Community) adds an ABRP icon to the in-flight toolbar whose window shows the live recommendation: ATIS to start on, frequency to be on, who/why, next up, and what you're currently tuned to — updating every 5 seconds, visible even in exclusive fullscreen. The panel is a thin shell; all intelligence stays in ABRP, so app updates improve the panel without touching the sim package. Server is GET-only, localhost-only, and inert until Live mode is on.
+
 v6.7.1   Sunset the "Coverage & what to fly next" tracker now the 24-flight benchmark is complete. New "🎯 Hide coverage" button in the Performance toolbar collapses the coverage grid in the dashboard (its job is done — the Baseline view is now your day-to-day recommendation). Fully reversible: click "Show coverage" to bring it back, e.g. if you re-baseline after a GPU driver or MSFS update. Nothing else changes — logging and every other view keep working.
 
 v6.7.0   LIVE ATC PIVOT — auto-tune dropped, the overlay becomes the product. Live testing confirmed study-level aircraft (PMDG, Fenix) run custom radios that ignore the standard "set frequency" command, so ABRP can't tune them. Rather than a fragile per-aircraft workaround, ABRP is now READ-ONLY on the radio and puts its strength where it shines: recognizing your situation and recommending the right frequency. REMOVED: the "Set COM1 standby" button, auto-set, and the whole standby-write path — nothing transmits or tunes anymore; you dial the frequency yourself. NEW in-sim overlay: a small always-on dot over the sim (borderless/windowed MSFS) that auto-expands for 20 seconds with a chime whenever a new frequency is recommended — showing the ATIS to start on at the gate, the frequency to be on, who it is, what's next, and (read live) what you're currently tuned to. It then collapses back to a pulsing dot you can click anytime to review. New Settings: "Pop the panel open on a new frequency" and "Chime on a new frequency" (both on by default). The in-app Live ATC tab keeps the recommendation card, route briefing, and planning tools; it just lost the tuning buttons.
