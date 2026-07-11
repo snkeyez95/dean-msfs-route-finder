@@ -1946,11 +1946,40 @@ ipcMain.handle('msfs-running', () => { try { return isMsfsRunning(); } catch (_)
 // A SEPARATE continuous SimConnect client "ABRP-LiveATC" (node-simconnect), safe alongside vPilot AND
 // the capture engine — the sim serves many clients and this never touches the capture connection or
 // PresentMon. Opt-in; zero overhead when off. Streams position at 1 Hz for the renderer's top-down
-// frequency recommendation. READ-ONLY: ABRP never tunes or transmits — it only reads position + the
-// COM1 active/standby frequency to recommend the right frequency and to show what you're currently on.
+// frequency recommendation. Radio policy: READ everywhere (position + COM1 active/standby); the ONLY
+// write is the per-aircraft STANDBY adapter below — explicit button click, closed-loop verified,
+// never the active frequency, never automatic (the v6.7.0 lesson stands).
+//
+// PMDG STANDBY ADAPTER (2026-07-11, from the plan-file design): the PMDG ignores the sim's SET event
+// but its cockpit knobs are drivable by the custom events published in Dean's own PMDG_NG3_SDK.h —
+// EVT_COM1_OUTER_SELECTOR (69632+726) / EVT_COM1_INNER_SELECTOR (69632+727), one click per event with
+// MOUSE_FLAG_WHEEL_UP (0x4000) / MOUSE_FLAG_WHEEL_DOWN (0x2000). The walk is a FEEDBACK LOOP: send a
+// short burst, re-read the standby from the 1 Hz stream, re-plan from the fresh value (self-heals
+// missed clicks, learns knob polarity AND the radio's channel step — 25 vs 8.33 kHz), verify at the
+// end. Unexpected movement (pilot on the knob) aborts; a failed write disables the adapter for the
+// session so it never spams or fights.
+// Pure click planner — desk-testable. No wrap assumption (the PMDG outer knob's wrap behavior is
+// unverified): always walks the direct direction, max 18 MHz clicks.
+function _planClicks(curMhz, targetMhz, innerStepKhz){
+  const curK=Math.round(curMhz*1000), tgtK=Math.round(targetMhz*1000);
+  const outer=Math.trunc(tgtK/1000)-Math.trunc(curK/1000);
+  const remK=(tgtK-Math.trunc(tgtK/1000)*1000)-(curK-Math.trunc(curK/1000)*1000);
+  const inner=Math.round(remK/(innerStepKhz||25));
+  return { outer, inner };
+}
+const RADIO_ADAPTERS=[
+  { id:'pmdg737', label:'PMDG 737', match:t=>t.includes('pmdg')&&/73[7-9]/.test(t) },
+];
+function _radioAdapterFor(title){
+  const t=String(title||'').toLowerCase(); if(!t) return null;
+  for(const a of RADIO_ADAPTERS){ if(a.match(t)) return a; }
+  return null;
+}
 const LiveATC = (() => {
   let handle = null, stopped = true, reconnecting = false, pos = null, status = 'off';
   const DEF = 20, REQ = 20;
+  const CE_OUTER = 91, CE_INNER = 92;                      // our client-side ids for the mapped PMDG events
+  let writing = false, adapterDisabled = false;
   function _open(){
     if(stopped) return;
     if(status !== 'live') status = 'connecting';
@@ -1965,19 +1994,26 @@ const LiveATC = (() => {
       h.addToDataDefinition(DEF,'PLANE ALT ABOVE GROUND','Feet',SimConnectDataType.FLOAT64);
       h.addToDataDefinition(DEF,'SIM ON GROUND','Bool',SimConnectDataType.INT32);
       h.addToDataDefinition(DEF,'GROUND VELOCITY','Knots',SimConnectDataType.FLOAT64);
-      // Read COM1 standby + active (MHz). ABRP is READ-ONLY on the radio — it never tunes. Active is used
-      // to show "you're on X → next is Y" (active reads reliably on every aircraft; vPilot needs it too).
-      // Standby reads are unreliable on custom aircraft (Fenix), so we read it but don't surface the number.
+      // Read COM1 standby + active (MHz). Active shows "you're on X → next is Y" (reads reliably on
+      // every aircraft; vPilot needs it too). Standby is unreliable on custom aircraft generally, but
+      // on the PMDG it reads correctly — which is exactly what the adapter's feedback loop relies on.
       h.addToDataDefinition(DEF,'COM STANDBY FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
       h.addToDataDefinition(DEF,'COM ACTIVE FREQUENCY:1','MHz',SimConnectDataType.FLOAT64);
+      h.addToDataDefinition(DEF,'TITLE',null,SimConnectDataType.STRING256);   // adapter gating (strings last)
       h.requestDataOnSimObject(REQ,DEF,0,SimConnectPeriod.SECOND);
+      // PMDG custom cockpit events ('#' = raw third-party event number, from PMDG_NG3_SDK.h)
+      try{
+        h.mapClientEventToSimEvent(CE_OUTER, '#70358');    // EVT_COM1_OUTER_SELECTOR (69632+726) — MHz knob
+        h.mapClientEventToSimEvent(CE_INNER, '#70359');    // EVT_COM1_INNER_SELECTOR (69632+727) — kHz knob
+      }catch(e){ LOG.info('[LiveATC] event map: '+e.message); }
       h.on('simObjectData',(recv)=>{
         if(recv.requestID!==REQ) return;
         try{
           const lat=recv.data.readFloat64(), lon=recv.data.readFloat64(), alt=recv.data.readFloat64(),
                 agl=recv.data.readFloat64(), og=recv.data.readInt32(), gs=recv.data.readFloat64(),
-                comStandbyMhz=recv.data.readFloat64(), comActiveMhz=recv.data.readFloat64();
-          pos={lat,lon,alt,agl,onGround:!!og,gs,comStandbyMhz,comActiveMhz,ts:Date.now()}; status='live';
+                comStandbyMhz=recv.data.readFloat64(), comActiveMhz=recv.data.readFloat64(),
+                title=(recv.data.readString(256)||'').trim();
+          pos={lat,lon,alt,agl,onGround:!!og,gs,comStandbyMhz,comActiveMhz,title,ts:Date.now()}; status='live';
         }catch(_){}
       });
       const drop=()=>{ if(!stopped) _reconnect(); };
@@ -1991,19 +2027,83 @@ const LiveATC = (() => {
     handle=null; if(status==='live') status='connecting';
     setTimeout(()=>{ reconnecting=false; _open(); }, 3000);
   }
+  function _click(ce, up, n){                                  // n wheel clicks on one knob, ~55ms apart
+    const sc=require('node-simconnect');
+    const flag=(sc.EventFlag&&sc.EventFlag.EVENT_FLAG_GROUPID_IS_PRIORITY)||16;
+    const PARAM=up?0x4000:0x2000;                              // MOUSE_FLAG_WHEEL_UP / _DOWN
+    return new Promise(res=>{ let i=0; const t=setInterval(()=>{
+      try{ handle.transmitClientEvent(0, ce, PARAM, 1, flag); }catch(_){}   // objectId 0=user, groupId 1=HIGHEST priority
+      if(++i>=n){ clearInterval(t); res(); }
+    }, 55); });
+  }
+  function _freshRead(afterTs){                                // wait for a 1 Hz sample newer than the burst
+    return new Promise(res=>{ const t0=Date.now(); const t=setInterval(()=>{
+      if(pos&&pos.ts>afterTs){ clearInterval(t); res(pos.comStandbyMhz); }
+      else if(Date.now()-t0>4000){ clearInterval(t); res(null); }
+    }, 200); });
+  }
+  // Closed-loop standby walk (PMDG adapter). Never touches the ACTIVE frequency.
+  async function writeStandby(targetMhz){
+    if(writing) return {ok:false,msg:'a radio write is already running'};
+    if(adapterDisabled) return {ok:false,msg:'radio adapter disabled for this session (a write failed) — tune manually'};
+    if(!handle||status!=='live'||!pos) return {ok:false,msg:'sim not connected'};
+    const ad=_radioAdapterFor(pos.title);
+    if(!ad) return {ok:false,msg:'no radio adapter for this aircraft'};
+    if(!(targetMhz>=118&&targetMhz<=137)) return {ok:false,msg:'not a COM frequency'};
+    if(pos.comStandbyMhz==null) return {ok:false,msg:'aircraft is not reporting COM1 standby'};
+    writing=true;
+    const TOL=0.005;                                           // 5 kHz — 8.33-channel-label safe
+    let outerDir=1, innerDir=1, innerStep=25, clicksSent=0;    // polarity + channel step LEARNED from observation
+    try{
+      let cur=pos.comStandbyMhz;
+      for(let round=0; round<26; round++){
+        if(Math.abs(cur-targetMhz)<=TOL){ LOG.info('[LiveATC] standby walk verified '+targetMhz.toFixed(3)+' ('+clicksSent+' clicks)'); return {ok:true,verified:true,read:cur}; }
+        if(clicksSent>260) break;                              // runaway guard (8.33-kHz radios can genuinely need ~120 inner clicks)
+        const plan=_planClicks(cur, targetMhz, innerStep);
+        const useOuter=plan.outer!==0;
+        const want=useOuter?plan.outer:plan.inner;
+        const n=Math.min(Math.abs(want), useOuter?6:12);       // short bursts so the re-read can correct course
+        const up=(want>0)?((useOuter?outerDir:innerDir)>0):((useOuter?outerDir:innerDir)<0);
+        const t0=Date.now();
+        await _click(useOuter?CE_OUTER:CE_INNER, up, n); clicksSent+=n;
+        const fresh=await _freshRead(t0);
+        if(fresh==null){ LOG.error('[LiveATC] standby walk: no fresh read'); break; }
+        const moved=Math.round((fresh-cur)*1000);              // kHz actually moved
+        const expect=(want>0?1:-1)*n*(useOuter?1000:innerStep);
+        if(moved===0 && n>0){                                  // knob didn't respond (radio unpowered / events ignored)
+          if(round>=1){ adapterDisabled=true; return {ok:false,msg:'the radio didn’t respond (unpowered, or the aircraft ignores the events) — tune manually'}; }
+        } else if(Math.sign(moved)!==Math.sign(expect)&&moved!==0){
+          // opposite movement: EITHER our polarity guess is wrong (learn + continue) or the pilot is
+          // turning the knob (abort). Distinguish by magnitude: a clean polarity flip moves ~|expect|.
+          if(Math.abs(Math.abs(moved)-Math.abs(expect))<=Math.abs(expect)*0.6+innerStep){ if(useOuter)outerDir=-outerDir; else innerDir=-innerDir; }
+          else { return {ok:false,msg:'the standby moved unexpectedly (someone on the knob?) — aborted, no harm done'}; }
+        } else if(!useOuter && n>0 && moved!==0){
+          innerStep=Math.max(5, Math.min(50, Math.abs(moved)/n)); // learn the real channel step (25 vs 8.33)
+        }
+        cur=fresh;
+      }
+      adapterDisabled=true;
+      return {ok:false,verified:false,read:pos&&pos.comStandbyMhz,msg:'couldn’t drive the radio to '+targetMhz.toFixed(3)+' — tune manually (adapter off for this session)'};
+    } finally { writing=false; }
+  }
   return {
     start(){ if(!stopped) return; stopped=false; status='connecting'; _open(); },
     stop(){ stopped=true; try{ handle&&handle.close(); }catch(_){} handle=null; status='off'; pos=null; },
+    writeStandby,
     latest(){
       let st=status;
       if(status==='live' && pos && Date.now()-pos.ts>15000){ st='connecting'; if(!reconnecting) _reconnect(); }
-      return { status:st, pos:(st==='live'&&pos)?pos:null };
+      const ad=(st==='live'&&pos&&!adapterDisabled)?_radioAdapterFor(pos.title):null;
+      return { status:st, pos:(st==='live'&&pos)?pos:null, writable:!!ad, adapterLabel:ad?ad.label:null };
     }
   };
 })();
 ipcMain.handle('live-atc-start', () => { LiveATC.start(); return {ok:true}; });
 ipcMain.handle('live-atc-stop',  () => { LiveATC.stop();  return {ok:true}; });
 ipcMain.handle('live-position',  () => LiveATC.latest());
+// PMDG standby adapter — the ONLY radio write in the app: explicit button click, standby only,
+// closed-loop verified, disables itself for the session on failure. Never the active frequency.
+ipcMain.handle('live-write-standby', (_, o) => LiveATC.writeStandby(parseFloat(o&&o.mhz)));
 // VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns controllers + ATIS +
 // pilots (pilots trimmed to the connection/flight-plan fields we use, to keep the payload small).
 ipcMain.handle('live-vatsim-feed', async () => {

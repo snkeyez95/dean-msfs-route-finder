@@ -6518,7 +6518,20 @@ async function renderVatsimAtisBtn(icao,idx,side,prefix){
 }
 function applyVatsimAtis(icao,idx,side,prefix){ const d=vatsimAtisData(icao); if(!d)return; S.datisCache[(icao||'').toUpperCase()]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
 function revertVatsimAtis(icao,idx,side,prefix){ delete S.datisCache[(icao||'').toUpperCase()]; fetchDatis(icao,idx,side,prefix); }
-async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); }catch(e){} latcCheckToasts(); renderLiveAtc(); latcPushOverlay(); updateVatsimHeader(); }
+async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); LATC.writable=!!r.writable; LATC.adapterLabel=r.adapterLabel||null; }catch(e){} latcCheckToasts(); renderLiveAtc(); latcPushOverlay(); updateVatsimHeader(); }
+// PMDG standby adapter (2026-07-11): the one sanctioned radio WRITE — explicit click, STANDBY only,
+// closed-loop knob walk in main.js with honest verify (the v6.7.0 no-auto-writes lesson stands).
+let _latcWriting=false;
+async function latcWriteStandby(mhz){
+  if(_latcWriting) return;
+  const el=document.getElementById('latc-wmsg'); _latcWriting=true;
+  if(el) el.textContent='Walking the radio to '+latcFmt(mhz)+'…';
+  try{
+    const r=await window.api.liveWriteStandby({mhz});
+    if(el) el.textContent = (r&&r.ok&&r.verified) ? ('✓ standby '+latcFmt(mhz)+' — verified on the radio') : ((r&&r.msg)||'couldn’t drive the radio — tune manually');
+  }catch(e){ if(el) el.textContent='write failed — tune manually'; }
+  _latcWriting=false;
+}
 // Overlay toast (gated per-type by cfg.vatsim.overlay + optional sound). The overlay window is created
 // lazily in main on the first toast.
 function latcOverlayToast(type,title,sub,ms){ const v=vCfg(); if(!v.overlay.enabled||!v.overlay[type])return; window.api.overlayToast({type,title,sub,sound:!!(v.sound&&v.sound[type]),ms}); }
@@ -6641,7 +6654,7 @@ function renderLiveAtc(){
     +'<label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--ink1)"><input type="checkbox" '+(LATC.on?'checked':'')+' onchange="latcToggle(this.checked)" style="accent-color:var(--acc);width:16px;height:16px"> Live mode</label>'
     +pill(st[0],st[1])
     +(LATC.on&&LATC.controllers.length?'<span style="font-size:11px;color:var(--ink3)">'+LATC.controllers.filter(c=>c.facility!==0).length+' controllers online</span>':'')+'</div>';
-  if(!LATC.on){ h+='<div style="font-size:13px;color:var(--ink3);line-height:1.6;background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">Turn on <b>Live mode</b> before a VATSIM flight. ABRP watches your position and who&rsquo;s controlling, and recommends the frequency for each phase &mdash; clearance, ground, tower, approach &mdash; or CTAF/UNICOM when the field is uncontrolled. One click loads it into your COM1 <b>standby</b>; you swap when ready.<div style="margin-top:10px;color:var(--acc)">Requires MSFS running and you connected to VATSIM (vPilot). Nothing is transmitted for you &mdash; standby only.</div></div>'; el.innerHTML=h; return; }
+  if(!LATC.on){ h+='<div style="font-size:13px;color:var(--ink3);line-height:1.6;background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">Turn on <b>Live mode</b> before a VATSIM flight. ABRP watches your position and who&rsquo;s controlling, and recommends the frequency for each phase &mdash; clearance, ground, tower, approach &mdash; or CTAF/UNICOM when the field is uncontrolled. You tune it yourself; on the <b>PMDG 737</b> one click can walk it into your COM1 <b>standby</b> for you.<div style="margin-top:10px;color:var(--acc)">Requires MSFS running and you connected to VATSIM (vPilot). Nothing is ever transmitted for you, and the active frequency is never touched.</div></div>'; el.innerHTML=h; return; }
   h+=latcRenderBrief();   // Stage 5: pre-flight frequency stack for the filed/SimBrief route (shown before the sim connects too)
   if(LATC.dbLoading&&!LATC.db){ h+='<div style="font-size:13px;color:var(--ink3)">Building the global airport database (one-time, ~10&ndash;20s)…</div>'; el.innerHTML=h; return; }
   if(LATC.status!=='live'||!LATC.pos){ h+='<div style="font-size:13px;color:var(--ink3);background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">'+(LATC.status==='sim-off'?'Waiting for MSFS &mdash; start a flight and this connects automatically.':'Connecting to the sim…')+'</div>'; el.innerHTML=h; return; }
@@ -6671,6 +6684,13 @@ function renderLiveAtc(){
     if(av!=null) h+='<div style="font-size:11px;color:var(--ink3);margin-top:10px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">You&rsquo;re tuned to <span style="color:var(--ink1)">'+latcFmt(av)+'</span>'
       +(advancing?' &rarr; next <span style="color:var(--grn)">'+latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):'')+'</span>':'')+'</div>';
   }
+  // PMDG standby adapter: shown ONLY when the loaded aircraft has a write adapter (main.js gates it).
+  // Standby only — never the active — and the walk verifies itself; a failure disables it for the session.
+  if(LATC.writable&&rec.freq!=null){
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-top:10px">'
+      +'<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="latcWriteStandby('+(+rec.freq)+')">&#9881; Set standby '+latcFmt(rec.freq)+' ('+esc(LATC.adapterLabel||'')+')</button>'
+      +'<span id="latc-wmsg" style="font-size:11px;color:var(--ink3)"></span></div>';
+  }
   h+='</div>';
   if(rec.others&&rec.others.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Also in range</div><div style="margin-bottom:14px">';
     for(const c of rec.others) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+(c.dist!=null?' &middot; '+Math.round(c.dist)+' nm':'')+'</span></div>';
@@ -6678,7 +6698,7 @@ function renderLiveAtc(){
   if(rec.verify&&rec.verify.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Online ATC we can&rsquo;t place precisely <span style="color:var(--ink4)">(Center/wide-area positions &mdash; verify which covers you; precise airspace maps come in a later update)</span></div><div style="margin-bottom:14px">';
     for(const c of rec.verify.slice(0,6)) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+'</span></div>';
     h+='</div>'; }
-  h+='<div style="font-size:11px;color:var(--ink4);line-height:1.6;border-top:1px solid var(--sep);padding-top:10px">Guidance, not gospel: coverage is approximated from each controller&rsquo;s published range and their airport&rsquo;s location. ABRP never transmits or tunes your radio &mdash; it only tells you the frequency; you dial it yourself. <a href="#" onclick="latcRefreshDb();return false" style="color:var(--acc)">Refresh airport database</a></div>';
+  h+='<div style="font-size:11px;color:var(--ink4);line-height:1.6;border-top:1px solid var(--sep);padding-top:10px">Guidance, not gospel: coverage is approximated from each controller&rsquo;s published range and their airport&rsquo;s location. ABRP never transmits, and never touches your ACTIVE frequency &mdash; you dial that yourself. On the PMDG 737 the optional Set-standby button drives the radio&rsquo;s own knobs (standby only, verified). <a href="#" onclick="latcRefreshDb();return false" style="color:var(--acc)">Refresh airport database</a></div>';
   el.innerHTML=h;
 }
 

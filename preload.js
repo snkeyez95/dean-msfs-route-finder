@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('api', {
   liveAtcStart:       ()    => ipcRenderer.invoke('live-atc-start'),
   liveAtcStop:        ()    => ipcRenderer.invoke('live-atc-stop'),
   livePosition:       ()    => ipcRenderer.invoke('live-position'),
+  liveWriteStandby:   (o)   => ipcRenderer.invoke('live-write-standby', o||{}),   // PMDG adapter: standby only, click-gated
   liveAirportDb:      (o)   => ipcRenderer.invoke('live-airport-db', o||{}),
   liveVatsimFeed:     ()    => ipcRenderer.invoke('live-vatsim-feed'),
   vatsimMetar:        (o)   => ipcRenderer.invoke('vatsim-metar', o||{}),
