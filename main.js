@@ -139,22 +139,69 @@ function seedPerfLibs(){
   }catch(e){ try{LOG.warn('seedPerfLibs failed: '+e.message);}catch(_){} }
 }
 let _perfAllowClose = false;
+// ── Window size/position persistence (Dean 2026-07-11: default was too short to show a whole route
+// card; remember whatever size the user picks). Stored in its own tiny file (not config.json — this
+// is loss-tolerable UI state, and keeping it separate never risks the route data). Off-screen guard:
+// a saved position on a monitor that's since been unplugged would strand the window — only restore a
+// position that still lands on a connected display.
+const WIN_STATE = path.join(USER_DATA, 'window_state.json');
+const WIN_DEFAULT = { width:1440, height:980, minW:1100, minH:700 };
+function loadWindowState(){
+  try{
+    const s = JSON.parse(fs.readFileSync(WIN_STATE,'utf8'));
+    if(!s || typeof s.width!=='number' || typeof s.height!=='number') return null;
+    s.width = Math.max(WIN_DEFAULT.minW, Math.round(s.width));
+    s.height = Math.max(WIN_DEFAULT.minH, Math.round(s.height));
+    // keep the saved x/y only if the window still lands on a connected display
+    if(typeof s.x==='number' && typeof s.y==='number'){
+      try{
+        const { screen } = require('electron');
+        const onScreen = screen.getAllDisplays().some(d=>{
+          const w=d.workArea;
+          return s.x < w.x+w.width && s.x+s.width > w.x && s.y < w.y+w.height && s.y+s.height > w.y;
+        });
+        if(!onScreen){ delete s.x; delete s.y; }
+      }catch(_){ delete s.x; delete s.y; }
+    }
+    return s;
+  }catch(_){ return null; }
+}
+let _winSaveT=null;
+function saveWindowState(){
+  if(!win || win.isDestroyed()) return;
+  try{
+    const maximized = win.isMaximized();
+    // when maximized, persist the NORMAL bounds so un-maximizing restores a sensible size
+    const b = maximized ? win.getNormalBounds() : win.getBounds();
+    writeFileAtomic(WIN_STATE, JSON.stringify({ x:b.x, y:b.y, width:b.width, height:b.height, maximized }));
+  }catch(_){}
+}
+function queueWindowSave(){ if(_winSaveT) clearTimeout(_winSaveT); _winSaveT=setTimeout(saveWindowState, 400); }
+
 function createWindow() {
   seedPerfLibs();
   // Catch-up: if a prior run closed apps but never reopened them (ABRP/sim ended early) and the
   // sim isn't running now, reopen them so nothing stays closed.
   try { if (fs.existsSync(FLIGHT_STATE()) && !isMsfsRunning()) { _flightReopenPending = true; flightReopenApps(); } } catch(_){}
+  const ws = loadWindowState();
   win = new BrowserWindow({
-    width:1440, height:900, minWidth:1100, minHeight:700,
+    width:(ws&&ws.width)||WIN_DEFAULT.width, height:(ws&&ws.height)||WIN_DEFAULT.height,
+    ...(ws&&typeof ws.x==='number'?{x:ws.x, y:ws.y}:{}),
+    minWidth:WIN_DEFAULT.minW, minHeight:WIN_DEFAULT.minH,
     frame:false, backgroundColor:'#000000',
     webPreferences:{
       preload: path.join(__dirname,'preload.js'),
       contextIsolation:true, nodeIntegration:false
     }
   });
+  if(ws && ws.maximized) win.maximize();
+  // Remember size/position across sessions — debounced on resize/move, and a final save on close.
+  win.on('resize', queueWindowSave);
+  win.on('move', queueWindowSave);
   // "Sim is running — confirm close" guard (Dean's ask). Capture runs detached, so closing
   // ABRP never affects it; this is just a deliberate heads-up.
   win.on('close', (e) => {
+    saveWindowState();                 // final, synchronous save before teardown (beats the debounce)
     if (_perfAllowClose) return;
     let simUp = false, capUp = false;
     try { simUp = isMsfsRunning(); } catch (_) {}
