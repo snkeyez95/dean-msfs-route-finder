@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.8.3</div>
+  <div class="tname">A Better Route Planner &mdash; v6.8.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.8.3</div>
+    <div class="sb-ver">v6.8.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6494,6 +6494,14 @@ function latcAutoTarget(rec){
 // v6.8.0 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
 // every poll. Pre-formats every field to plain strings so overlay.html just sets textContent. isNewRec
 // (the recommended frequency changed) drives the panel's auto-expand + chime.
+// The overlay + in-sim panel render text as PLAIN text (textContent), but recommendFreq builds strings
+// for the in-app card's innerHTML — so they carry HTML entities (&rsquo; &mdash; …). Strip tags and
+// DECODE the common entities so the overlay shows "SCEL's TWR/APP are offline — …", not the raw markup.
+function latcPlain(s){ return String(s||'').replace(/<[^>]*>/g,'')
+  .replace(/&rsquo;|&#8217;/g,'’').replace(/&lsquo;|&#8216;/g,'‘')
+  .replace(/&mdash;|&#8212;/g,'—').replace(/&ndash;|&#8211;/g,'–')
+  .replace(/&middot;|&#183;/g,'·').replace(/&hellip;|&#8230;/g,'…')
+  .replace(/&quot;/g,'"').replace(/&amp;/g,'&'); }
 function latcPushOverlay(){
   const v=vCfg();
   // Push whenever Live mode is on — main.js caches this payload for the in-sim toolbar panel too
@@ -6513,7 +6521,7 @@ function latcPushOverlay(){
     live:true,
     freq:latcFmt(rec.freq),
     who:(rec.callsign?rec.callsign+' · ':'')+(rec.label||''),
-    why:String(rec.why||'').replace(/<[^>]*>/g,''),
+    why:latcPlain(rec.why),
     atis:atis,
     next: nextUp?('Next up: '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))):'',
     cur: (activeMhz!=null)?("you're tuned to "+latcFmt(activeMhz)):'',
@@ -7024,5 +7032,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.8.3</div>
+  pointer-events:none;">v6.8.4</div>
 </body></html>
