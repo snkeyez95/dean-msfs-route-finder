@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.10.2
+# A Better Route Planner — v6.10.3
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.10.3  AUDIT FIXES. Full adversarial audit of everything since v6.9.2 (45 test suites, all green; the Live ATC core verified byte-identical). Two fixes: (1) with the 📡 VATSIM toggle on, a search/filter that matched zero routes could send the route list into an endless refresh loop (CPU pegged) — now the refresh fires exactly once per network update regardless of what's in the list; (2) app startup no longer waits on the sim-detection check before painting your theme — boots a touch faster with no flash.
+
 v6.10.2  WINDOW SIZE IS NOW REMEMBERED. Resize or move the app however you like and it stays that way next time you open it — including maximized. The default starting size is also a bit taller so a full route card and its Activate/Launch buttons fit without stretching. If you unplug a monitor the window won't get stranded off-screen — it falls back to a visible spot. (Saved separately from your settings, so it never touches your routes or config.)
 
 v6.10.1  END-TO-END COVERAGE BADGE — full-coverage flights are now obvious at a glance. When a route has someone to talk to at EVERY phase — both airports served (staffed positions, or covered top-down) and no gap in enroute coverage — its score pill gets a solid border and a ✓, and the expanded breakdown shows a green "END-TO-END ✓" chip. Delivery is never required (a staffed Ground or Tower works clearance top-down). Two scoring refinements land with it: a staffed Tower now correctly covers its own field's Ground/Delivery top-down (partial credit), and the enroute check now counts Approach/TRACON airspace too — the FIR map shapes have holes exactly at big terminal areas (KJFK famously sits in none), so genuinely gapless routes can now actually read 100%. The score still tells you the quality (a lone Center covering you gate-to-gate ≈ 59 with a ✓; fully staffed ≈ 98–100 with a ✓); the badge tells you the continuity.
