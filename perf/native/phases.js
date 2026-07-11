@@ -132,6 +132,28 @@ function trimChartTail(ft, telemetryRows, headTrimS) {
   return cut >= ft.length ? ft : ft.slice(0, cut);
 }
 
+// v6.9.5 — LAST-MOVEMENT END-TRIM ANCHOR (Dean 2026-07-11). The most honest "flight is over" signal:
+// the last moment the aircraft was actually MOVING. Cutting just after it keeps every bit of taxi to
+// the gate, yet drops the parked/shutdown tail — and it is inherently ATC-hold-proof: a hold (stop,
+// then roll again) has movement AFTER it, so only the FINAL stop anchors; a mid-taxi quit anchors at
+// wherever it was still rolling. Reads the persisted ground speed from telemetry (v6.9.5+), so it also
+// works retroactively / in backfill. Returns elapsed seconds since recordingWallStart (same basis as
+// the brake anchor), or null when there is no ground-speed data or the aircraft never moved.
+const MOVE_KT = 2.0;               // above GSX-reposition/parked jitter, below real taxi (matches AUTO_MIN_SPEED_KT)
+const MOVE_STOP_BUFFER_S = 5;      // small grace after the last movement for the final coast to a stop
+function lastMovementEndS(telemetryRows) {
+  if (!telemetryRows || !telemetryRows.length) return null;
+  let lastMoveMs = null, sawSpeed = false;
+  for (const r of telemetryRows) {
+    const g = r.gspeed_kt;
+    if (g == null) continue;
+    sawSpeed = true;
+    if (g > MOVE_KT && r.wall_ms != null) lastMoveMs = r.wall_ms;
+  }
+  if (!sawSpeed || lastMoveMs == null) return null;   // no speed data, or never moved above the threshold
+  return lastMoveMs / 1000.0 + MOVE_STOP_BUFFER_S;
+}
+
 // v6.3.8 — the single on-ground state is split into DEPARTING TAXI and ARRIVAL TAXI so ground
 // performance attributes to the departure vs arrival airport. The classifier only knows "ground"
 // (simconnect.js), so we split by the TIMELINE: ground before the first airborne phase = departing
@@ -234,6 +256,6 @@ function phaseLogFromTelemetry(telemetryRows) {
 
 module.exports = {
   trimHead, trimTail, trimTeardownTail, trimAtElapsed, flightEndIndex, chartFlightEndIndex, trimChartTail,
-  splitFrametimesByPhase, computePhaseStats,
+  lastMovementEndS, splitFrametimesByPhase, computePhaseStats,
   phaseLogFromTelemetry, taxiBoundaries, computePhaseVram, STUTTER_FRAMETIME_MS,
 };

@@ -181,6 +181,7 @@ async function runAutoCapture(opts) {
       sCpu != null ? sCpu.toFixed(1) : '',
       tProc || '',
       tCpu != null ? tCpu.toFixed(1) : '',
+      g != null ? g.toFixed(1) : '',    // v6.9.5: ground speed persisted → movement-based end-trim anchor
     ]);
   }, 1000);
 

@@ -164,7 +164,7 @@ function readTelemetry(sessionDir){
     const cols = lines[i].split(','); const row = {}; header.forEach((h, j) => row[h] = cols[j]);
     out.push({ wall_ms: num(row, 'wall_ms'), phase: row['phase'] || '', alt_ft: num(row, 'alt_ft'),
       vram_mb: num(row, 'vram_mb'), sys_ram_pct: num(row, 'sys_ram_pct'), sys_cpu_pct: num(row, 'sys_cpu_pct'),
-      top_proc: row['top_proc'] || '', top_proc_cpu: num(row, 'top_proc_cpu') });
+      top_proc: row['top_proc'] || '', top_proc_cpu: num(row, 'top_proc_cpu'), gspeed_kt: num(row, 'gspeed_kt') });
   }
   const filtered = out.filter(r => r.wall_ms !== null);
   filtered.sort((a, b) => a.wall_ms - b.wall_ms);

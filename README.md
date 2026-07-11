@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.9.4
+# A Better Route Planner — v6.9.5
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.9.5   SMARTER END-OF-FLIGHT TRIM — now anchored to when you actually stop moving. The performance logger now records your ground speed and uses "the last moment the aircraft was moving" as the end of the flight. This keeps every bit of your taxi to the gate, cleanly drops the parked/shutdown tail (no more shutdown spikes to trim), and is smart about real situations: an ATC hold where you sit still and then roll again is preserved (only your FINAL stop ends the flight), and a shutdown mid-taxi (no full stop) is handled too. The order of preference is parking brake (if your aircraft reports it) → last movement → the old frametime-shape fallback, so it's robust across the Fenix, PMDG, and default aircraft. Applies to new flights (your existing logs keep the v6.9.3 chart cleanup). Confirm on your next flight — the report shows which method trimmed it.
+
 v6.9.4   FLIGHTSIM.TO LINKS NOW FILTER TO MSFS 2024. The "Search flightsim.to" links (Challenging Approaches) and the GSX "flightsim.to" search pills now add the site's MSFS 2024 filter (base=msfs2024) automatically, so you stop seeing MSFS 2020 scenery/GSX results. The app detects which sim you have installed: 2024 gets the filter (that's you); if only MSFS 2020 is found, the links stay exactly as before. Direct download links to a specific file aren't touched.
 
 v6.9.3   CLEANER PERFORMANCE CHARTS — shutdown spikes are gone from the graphs. The frametime chart on every flight report used to still draw the sim's shutdown/park hitches at the very end (the tall spike near the right edge), even though your headline numbers already excluded them. Now the chart ends exactly where real flying stops: it detects the true end of flight (parking brake, the VRAM drop as the sim unloads, or the shutdown-hitch pattern) and trims the parked/teardown tail from the plot. Real in-flight hitches on climb, cruise, and approach are always kept; only the gate teardown is dropped. Your data and scores are unchanged — this is a chart-only fix. Applies to new flights and re-draws all your existing reports automatically on launch.

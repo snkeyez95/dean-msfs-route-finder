@@ -10,14 +10,14 @@
 // (stats, phases, report, combined, index rows) are already byte-proven individually.
 const fs = require('fs'), path = require('path');
 const { computeStats } = require('./stats.js');
-const { trimHead, trimTail, trimTeardownTail, trimAtElapsed, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
+const { trimHead, trimTail, trimTeardownTail, trimAtElapsed, lastMovementEndS, splitFrametimesByPhase, computePhaseStats, computePhaseVram } = require('./phases.js');
 const { readChronological, readTelemetry } = require('./report_charts.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { buildSessionsNavJs, INDEX_CSV_FIELDS } = require('./index_writer.js');
 
 const HEAD_TRIM_S = 5;
-const TELEMETRY_COLUMNS = ['wall_ms', 'phase', 'alt_ft', 'vram_mb', 'sys_ram_pct', 'sys_cpu_pct', 'top_proc', 'top_proc_cpu'];
+const TELEMETRY_COLUMNS = ['wall_ms', 'phase', 'alt_ft', 'vram_mb', 'sys_ram_pct', 'sys_cpu_pct', 'top_proc', 'top_proc_cpu', 'gspeed_kt'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const p2 = n => String(n).padStart(2, '0');
 
@@ -105,33 +105,36 @@ function fileSession(opts) {
 
   // 1b. telemetry sidecar (before the report, so the altitude overlay picks it up)
   writeTelemetryCsv(sessionDir, telemetryRows);
+  let tel = null; try { tel = readTelemetry(sessionDir); } catch (_) {}
 
   // stats from trimmed frames
   let { ft, cpu, gpu } = readChronological(rawCsvPath);
   [ft, cpu, gpu] = trimHead(ft, cpu, gpu, HEAD_TRIM_S);
-  // v6.6.1: PRIORITY — if the capture found a ground-truth parking-brake-set-and-held anchor (Dean
-  // 2026-07-09), cut the tail exactly there instead of guessing from the frametime shape. brakeAnchorS
-  // is elapsed seconds since recordingWallStart (the raw/untrimmed basis); subtract HEAD_TRIM_S to land
-  // in the already-head-trimmed array's own elapsed basis. FALLBACK (no anchor, or the anchor produced
-  // no real cut — e.g. Fenix/other aircraft that don't drive the SimVar, or a mid-taxi quit with the
-  // brake never set) = the v6.6 movement-agnostic teardown trim, unchanged from before.
+  // End-trim anchor, most-authoritative first (each is elapsed seconds since recordingWallStart, the
+  // raw/untrimmed basis; subtract HEAD_TRIM_S to land in the already-head-trimmed array's basis):
+  //   1) BRAKE (v6.6.1) — parking brake set-and-held: the explicit "I've parked" ground truth.
+  //   2) MOVEMENT (v6.9.5) — the last moment the aircraft was actually moving (from persisted ground
+  //      speed): keeps all taxi-to-gate, drops the parked/shutdown tail, inherently ATC-hold-proof
+  //      (only the FINAL stop counts), and works when the aircraft doesn't drive the brake SimVar (Fenix).
+  //   3) TEARDOWN (v6.6) — frametime-shape fallback for flights with neither signal (older logs).
+  const moveAnchorS = lastMovementEndS(tel);
   let teardownS, trimMethod;
-  if (brakeAnchorS != null) {
-    const target = brakeAnchorS - HEAD_TRIM_S;
-    const [bft, bcpu, bgpu, bcut] = trimAtElapsed(ft, cpu, gpu, target);
-    if (bcut > 0) { ft = bft; cpu = bcpu; gpu = bgpu; teardownS = bcut; trimMethod = 'brake'; }
-    else { [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu); trimMethod = 'teardown'; }
-  } else {
+  const tryAnchor = (anchorS, method) => {
+    if (anchorS == null) return false;
+    const [a, b, c, cut] = trimAtElapsed(ft, cpu, gpu, anchorS - HEAD_TRIM_S);
+    if (cut > 0) { ft = a; cpu = b; gpu = c; teardownS = cut; trimMethod = method; return true; }
+    return false;
+  };
+  if (!tryAnchor(brakeAnchorS, 'brake') && !tryAnchor(moveAnchorS, 'movement')) {
     [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu); trimMethod = 'teardown';
   }
   const smoothness = computeSmoothness(ft, cpu, gpu, teardownS, phaseLog, recordingWallStart);
-  // v6.9.1: record which end-trim path won so a parking-brake validation flight is provable at a
-  // glance ('brake' = the ground-truth anchor drove it; 'teardown' = frametime-shape fallback).
+  // v6.9.1/6.9.5: record which end-trim path won so a validation flight is provable at a glance
+  // ('brake'/'movement' = a ground-truth anchor drove it; 'teardown' = frametime-shape fallback).
   smoothness.trim_method = trimMethod;
   // per-phase VRAM (peak/avg) from the just-written telemetry, merged into the frametime phase stats
   // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
   try {
-    const tel = readTelemetry(sessionDir);
     if (tel && smoothness.phases) {
       const pv = computePhaseVram(tel);
       for (const ph of Object.keys(smoothness.phases)) {
