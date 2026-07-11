@@ -13,7 +13,7 @@ const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
 const { startPresentmon, stopPresentmon, findPresentmon, killStrayPresentmon, TARGET_PROCESS } = require('./presentmon.js');
 const { readSettings } = require('./settings.js');
-const { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle } = require('./sysinfo.js');
+const { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, vatsimConnected } = require('./sysinfo.js');
 const { fileSession } = require('./engine.js');
 
 const HEAD_TRIM_S = 5, STOP_BUFFER_S = 30, TAIL_FALLBACK_S = 60, MIN_TAIL_TRIM_S = 5;
@@ -102,9 +102,19 @@ async function runAutoCapture(opts) {
   try {
     const out = require('child_process').spawnSync('tasklist', ['/NH'], { encoding: 'utf8', timeout: 15000 }).stdout || '';
     const low = out.toLowerCase();
-    const vatsim = low.includes('vpilot'), batc = low.includes('beyondatc');
-    if (vatsim || batc) settings.online_traffic = (vatsim && batc) ? 'vatsim+batc' : (vatsim ? 'vatsim' : 'batc');
+    const vpilotRunning = low.includes('vpilot'), batc = low.includes('beyondatc');
     if (low.includes('autofps')) settings.autofps_active = true;
+    // vPilot running ≠ on VATSIM (Dean 2026-07-10: left open as a companion but never connected). If a
+    // CID is set, CONFIRM the connection via the live datafeed; only tag 'vatsim' when it's positively
+    // NOT connected do we drop the tag. No CID / feed unreachable → fall back to process-presence (best-
+    // effort; err toward tagging so an unconfirmed online flight can't silently pollute the baseline).
+    let vatsim = false;
+    if (vpilotRunning) {
+      const conn = await vatsimConnected(process.env.ABRP_VATSIM_CID);   // true / false / null
+      vatsim = (conn === false) ? false : true;
+      if (conn === false) say('  CONTEXT: vPilot running but CID not connected to VATSIM → NOT tagged online');
+    }
+    if (vatsim || batc) settings.online_traffic = (vatsim && batc) ? 'vatsim+batc' : (vatsim ? 'vatsim' : 'batc');
     if (settings.online_traffic || settings.autofps_active)
       say('  CONTEXT: ' + [settings.online_traffic, settings.autofps_active ? 'AutoFPS' : null].filter(Boolean).join(' + '));
   } catch (_) {}

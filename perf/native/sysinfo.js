@@ -90,4 +90,24 @@ function getSimbriefRoute(username) {
   });
 }
 
-module.exports = { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, nvidiaSmi };
+// Is this CID actually CONNECTED to VATSIM right now? Checks the live datafeed pilots[] (v6.9.0).
+// Returns true (connected), false (POSITIVELY not connected — vPilot open but not logged in), or
+// null (couldn't determine: no CID, or the feed fetch failed). Lets the tag distinguish "flying
+// online" from "vPilot left running as a companion app" instead of trusting process-presence.
+function vatsimConnected(cid) {
+  return new Promise((resolve) => {
+    cid = String(cid || '').trim();
+    if (!cid) return resolve(null);
+    const req = https.get('https://data.vatsim.net/v3/vatsim-data.json', { timeout: 9000 }, (res) => {
+      let data = ''; res.on('data', d => data += d);
+      res.on('end', () => {
+        try { const j = JSON.parse(data); resolve((j.pilots || []).some(p => String(p.cid) === cid)); }
+        catch (_) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+module.exports = { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, nvidiaSmi, vatsimConnected };

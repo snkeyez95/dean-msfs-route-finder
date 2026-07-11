@@ -502,6 +502,10 @@ function thirdPartyIcaos(){
     return [...new Set(rows.filter(r => r && r.icao && r.selected !== false && r.method !== 'noise').map(r => String(r.icao).toUpperCase()))]; }
   catch(_){ return []; }
 }
+// VATSIM CID (v6.9.0) — passed to the capture engine so it can CONFIRM an actual VATSIM connection
+// (your CID in the live datafeed) rather than just "vPilot.exe is running" (Dean 2026-07-10: vPilot
+// left open as a companion but never connected must NOT tag the flight as vatsim).
+function vatsimCid(){ try { return String((_perfCfg().vatsim||{}).cid || '').trim() || null; } catch(_){ return null; } }
 (()=>{  // one-time seed for existing installs so the renderer always finds cfg.benchmark
   try {
     if (!fs.existsSync(CFG)) return;                       // brand-new install: the wizard writes it
@@ -1741,6 +1745,7 @@ ipcMain.handle('perf-start-capture', () => {
         ...(simbriefUser() ? { ABRP_SIMBRIEF_USER: simbriefUser() } : {}),
         ABRP_BENCHMARK: JSON.stringify(benchCfg()),   // user grid + aircraft match terms (Phase 10)
         ABRP_THIRDPARTY_ICAOS: JSON.stringify(thirdPartyIcaos()),   // scenery attribution (v6.3.8)
+        ...(vatsimCid() ? { ABRP_VATSIM_CID: vatsimCid() } : {}),   // confirm real VATSIM connection (v6.9.0)
         // node-simconnect (+ its 13 deps) is asarUnpack'd; point the detached process at it.
         NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
                                   : path.join(__dirname, 'node_modules'),
