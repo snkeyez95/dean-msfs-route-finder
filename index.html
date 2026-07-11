@@ -1252,7 +1252,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.cfg=await window.api.loadConfig();
   // Which MSFS is installed — used to tag flightsim.to links with the 2024 filter (base=msfs2024).
   // Default true (this app targets MSFS 2024); only a positive MSFS-2020 detection turns it off.
-  try{ const _det=await window.api.msfsDetect(); S.is2024 = _det && _det.edition!=='2020'; }catch(e){ S.is2024=true; }
+  // Fire-and-forget (audit 2026-07-11): awaiting this IPC blocked theme + the whole boot chain for
+  // no reason — links render on user interaction long after this resolves, and the true-until-proven-
+  // 2020 default is already the correct answer for a 2024 user.
+  S.is2024=true;
+  window.api.msfsDetect().then(_det=>{ S.is2024 = !(_det && _det.edition==='2020'); }).catch(()=>{});
   document.documentElement.setAttribute('data-theme',S.cfg.theme||'dark');
   applyNavOrder(); initNavDnd();   // restore the user's sidebar order + enable drag-to-reorder
   startVpilotWatch();              // if 'auto-start Live ATC with vPilot' is on, begin watching
@@ -2799,8 +2803,11 @@ function populateAirlineDropdown(){
 function renderRoutes(){
   if(S.freeRouteMode){renderFreeRouteResults();updateStats();return;}
   // 📡 keep VATSIM scores current: refresh the feed (60s renderer cache makes this free most renders)
-  // and re-render once if the timestamp actually moved. ts guard prevents render loops; no timers.
-  if(VSCORE.on&&VSCORE.ready){ vatsimFeedGet().then(f=>{ if(f&&f.ts&&f.ts!==VSCORE.ts&&VSCORE.on&&!S.freeRouteMode) renderRoutes(); }); }
+  // and re-render once if the timestamp actually moved. The callback SYNCS VSCORE.ts itself (audit
+  // 2026-07-11): vscoreFor only syncs it when a route actually renders, so on an EMPTY filtered list
+  // the old ts-mismatch re-fired on every render → infinite re-render loop. Syncing here makes the
+  // refresh one-shot per new feed timestamp regardless of list contents.
+  if(VSCORE.on&&VSCORE.ready){ vatsimFeedGet().then(f=>{ if(f&&f.ts&&f.ts!==VSCORE.ts&&VSCORE.on&&!S.freeRouteMode){ VSCORE.cache.clear(); VSCORE.ts=f.ts; renderRoutes(); } }); }
   console.log('[WX] buildRouteList: metarCache has',Object.keys(S.metarCache||{}).length,'entries');
   populateAirlineDropdown();
   const rs=getRoutes();
