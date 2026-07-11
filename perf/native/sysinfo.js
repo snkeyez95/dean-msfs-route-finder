@@ -90,10 +90,13 @@ function getSimbriefRoute(username) {
   });
 }
 
-// Is this CID actually CONNECTED to VATSIM right now? Checks the live datafeed pilots[] (v6.9.0).
+// Is this CID actually CONNECTED to VATSIM right now? Checks the live datafeed (v6.9.0).
 // Returns true (connected), false (POSITIVELY not connected — vPilot open but not logged in), or
 // null (couldn't determine: no CID, or the feed fetch failed). Lets the tag distinguish "flying
 // online" from "vPilot left running as a companion app" instead of trusting process-presence.
+// v6.9.1: also match controllers[] — Dean flies VATSIM in vPilot OBSERVER mode, which appears in
+// controllers[] (facility 0, callsign like CFG2, placeholder freq 199.998) and NOT in pilots[],
+// yet online traffic is still injected + rendered, so it's a genuine online flight for the tag.
 function vatsimConnected(cid) {
   return new Promise((resolve) => {
     cid = String(cid || '').trim();
@@ -101,7 +104,11 @@ function vatsimConnected(cid) {
     const req = https.get('https://data.vatsim.net/v3/vatsim-data.json', { timeout: 9000 }, (res) => {
       let data = ''; res.on('data', d => data += d);
       res.on('end', () => {
-        try { const j = JSON.parse(data); resolve((j.pilots || []).some(p => String(p.cid) === cid)); }
+        try {
+          const j = JSON.parse(data);
+          const has = (arr) => Array.isArray(arr) && arr.some(p => String(p.cid) === cid);
+          resolve(has(j.pilots) || has(j.controllers));
+        }
         catch (_) { resolve(null); }
       });
     });

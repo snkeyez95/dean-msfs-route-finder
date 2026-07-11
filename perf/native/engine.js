@@ -115,16 +115,19 @@ function fileSession(opts) {
   // in the already-head-trimmed array's own elapsed basis. FALLBACK (no anchor, or the anchor produced
   // no real cut — e.g. Fenix/other aircraft that don't drive the SimVar, or a mid-taxi quit with the
   // brake never set) = the v6.6 movement-agnostic teardown trim, unchanged from before.
-  let teardownS;
+  let teardownS, trimMethod;
   if (brakeAnchorS != null) {
     const target = brakeAnchorS - HEAD_TRIM_S;
     const [bft, bcpu, bgpu, bcut] = trimAtElapsed(ft, cpu, gpu, target);
-    if (bcut > 0) { ft = bft; cpu = bcpu; gpu = bgpu; teardownS = bcut; }
-    else [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu);
+    if (bcut > 0) { ft = bft; cpu = bcpu; gpu = bgpu; teardownS = bcut; trimMethod = 'brake'; }
+    else { [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu); trimMethod = 'teardown'; }
   } else {
-    [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu);
+    [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu); trimMethod = 'teardown';
   }
   const smoothness = computeSmoothness(ft, cpu, gpu, teardownS, phaseLog, recordingWallStart);
+  // v6.9.1: record which end-trim path won so a parking-brake validation flight is provable at a
+  // glance ('brake' = the ground-truth anchor drove it; 'teardown' = frametime-shape fallback).
+  smoothness.trim_method = trimMethod;
   // per-phase VRAM (peak/avg) from the just-written telemetry, merged into the frametime phase stats
   // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
   try {
