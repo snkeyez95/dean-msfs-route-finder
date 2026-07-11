@@ -105,6 +105,20 @@ out explicitly if so rather than silently averaging over it:
   scenery at the departure/arrival. Dean doesn't log routes/scenery as structured data, so check
   `notes` and ask Dean if it's not obvious and the comparison hinges on it.
 - **GSX or other addons** running or not (sometimes noted in `notes`).
+- **Online traffic + AutoFPS (v6.9.0 tags — post-benchmark Dean flies VATSIM most flights):** each
+  flight carries `online_traffic` ('vatsim' / 'batc' / 'vatsim+batc'; absent = offline) and
+  `autofps_active` (true when the AutoFPS app was running — the logged `tlod` is then only the start
+  cap, NOT what rendered), auto-detected at capture start; also in the index entries and
+  perf-compare-data (which adds readable defaults 'offline' / 'fixed tlod'). Rules that mirror the
+  app: online/AutoFPS flights are QUARANTINED from the fixed-TLOD baseline, coverage, and drift;
+  version verdicts match cells on (aircraft, TLOD, online_traffic) so traffic load can't masquerade
+  as a driver/sim regression, and AutoFPS flights are dropped from them entirely. To answer "does
+  VATSIM cost performance?": Compare grouped by Online traffic (matched cells, min-n ~3/side, ±1σ) —
+  expect the difference to concentrate in the taxi phases (ground traffic) and felt-stutter/hr, not
+  overall p99. Flights tagged before v6.9.0: only 2026-07-09_1121 (vatsim) and 2026-07-06_2237 (batc,
+  also excluded) were backfilled; everything earlier is genuinely offline. Scenery-view caveat: the
+  🛬 Scenery ranking does NOT exclude online flights (the per-aircraft baseline pool shifts with how
+  Dean flies) — mention it when a scenery verdict hinges on airports he only visits on VATSIM.
 - **Flight duration** - a 47-minute hop and a 125-minute flight aren't directly comparable for VRAM
   creep; normalize the framing ("no creep over 2 hours" is a stronger claim than over 45 minutes).
 

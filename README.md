@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.8.5
+# A Better Route Planner — v6.9.0
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.9.0   FLY HOW YOU LIKE — flight-context tags. With the 24-flight benchmark done, you fly VATSIM (or BeyondATC, or AutoFPS) whenever you want, and the tools now keep up. Every capture auto-detects what was running when the recording started and tags the flight: online traffic (vPilot → "vatsim", BeyondATC → "batc") and AutoFPS. Those flights are quarantined from the fixed-TLOD baseline, coverage, and the drift monitor — so online traffic or dynamic TLOD can never sway the recommended TLOD or fake a "driver got worse" alert (version comparisons now match cells on aircraft + TLOD + traffic context, and AutoFPS flights sit those out entirely since their logged TLOD is only the starting cap). NEW in Compare: group by "Online traffic" (vatsim / batc / offline) — the honest answer to "does VATSIM cost me performance?", including the taxi-phase metrics where ground traffic would show up — and by "AutoFPS" (autofps vs fixed tlod). Backfilled: the LGAV-LGKR VATSIM flight and the excluded BeyondATC flight are tagged; everything older was offline. Verified: the recommended TLOD stays 125 and coverage stays 24/24 after the change.
+
 v6.8.5   Uncontrolled-arrival frequency now labelled UNICOM (not CTAF) outside the US/Australia. On VATSIM, 122.800 is the universal UNICOM; a field's tower frequency is used as CTAF only in the divisions that run it (US K/P, Australia Y). The "Next up" sequence hardcoded "CTAF" for the arrival even when it fell back to 122.800 — so an arrival like SAEZ showed "122.800 CTAF". Now it reads "122.800 UNICOM" there, and still "CTAF" at US/Australian fields.
 
 v6.8.4   Overlay/panel text fix: the recommendation's explanation line showed raw HTML codes (e.g. "SCEL&rsquo;s TWR/APP are offline &mdash; …") instead of the punctuation. The "why" text is built for the in-app card (which renders HTML), but the in-sim panel and desktop overlay show plain text — so entities like &rsquo; and &mdash; leaked through. Now decoded to proper apostrophes and dashes.

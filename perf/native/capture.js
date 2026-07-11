@@ -93,6 +93,21 @@ async function runAutoCapture(opts) {
       say('  LAB: this flight is tagged experiment "' + settings.experiment + '"');
     }
   } catch (_) {}
+  // Flight-context tags (v6.9.0): ONE one-shot process probe at RECORDING start — not at arm/spawn
+  // time, because vPilot/BeyondATC/AutoFPS are often launched after ABRP arms the capture. vPilot →
+  // online_traffic:'vatsim', BeyondATC → 'batc' (both → 'vatsim+batc'); AutoFPS → autofps_active=true
+  // (the long-planned tag the baseline/scenery views already READ — this finally writes it). Post-
+  // benchmark Dean flies however he likes; these tags keep the baseline/drift math apples-to-apples
+  // and give Compare an "online traffic on vs off" dimension.
+  try {
+    const out = require('child_process').spawnSync('tasklist', ['/NH'], { encoding: 'utf8', timeout: 15000 }).stdout || '';
+    const low = out.toLowerCase();
+    const vatsim = low.includes('vpilot'), batc = low.includes('beyondatc');
+    if (vatsim || batc) settings.online_traffic = (vatsim && batc) ? 'vatsim+batc' : (vatsim ? 'vatsim' : 'batc');
+    if (low.includes('autofps')) settings.autofps_active = true;
+    if (settings.online_traffic || settings.autofps_active)
+      say('  CONTEXT: ' + [settings.online_traffic, settings.autofps_active ? 'AutoFPS' : null].filter(Boolean).join(' + '));
+  } catch (_) {}
   settings.simbrief_route = await getSimbriefRoute(opts.username);
   // Scenery attribution (v6.3.8): split the route into dep/arr ICAO and flag each against the user's
   // 3rd-party library (ABRP_THIRDPARTY_ICAOS, passed by main.js the same way as ABRP_BENCHMARK).

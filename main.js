@@ -1260,6 +1260,11 @@ ipcMain.handle('perf-compare-data', () => {
         arr_taxi_p99: pv(arr_taxi,'p99_ft'), arr_taxi_stutter: pv(arr_taxi,'stutter_pct'), arr_taxi_vram: pv(arr_taxi,'vram_peak'),
         dep_icao, arr_icao, dep_scenery, arr_scenery,
         experiment: s.experiment || null, autofps_active: s.autofps_active || null,
+        // flight-context (v6.9.0): 'vatsim' / 'batc' / 'vatsim+batc' / 'offline' (all pre-tag flights
+        // were offline — the two known VATSIM flights are backfilled). autofps_mode = readable Compare
+        // group labels for the AutoFPS dimension.
+        online_traffic: s.online_traffic || 'offline',
+        autofps_mode: s.autofps_active ? 'autofps' : 'fixed tlod',
         excluded: s.excluded || null,
         route: s.route || null
       };

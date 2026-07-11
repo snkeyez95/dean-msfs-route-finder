@@ -170,6 +170,9 @@ function fileSession(opts) {
     peak_vram_mb: vram ? vram.peak_vram_mb : null, frame_count: smoothness.frame_count,
     aircraft: settings.aircraft, route: settings.simbrief_route || '',
     ...(settings.experiment ? { experiment: settings.experiment } : {}),   // Settings Lab tag (absent = normal flight)
+    // flight-context tags (v6.9.0): flown with online traffic (vatsim/batc) and/or AutoFPS (absent = offline, fixed TLOD)
+    ...(settings.online_traffic ? { online_traffic: settings.online_traffic } : {}),
+    ...(settings.autofps_active ? { autofps_active: true } : {}),
     // scenery attribution (v6.3.8): dep/arr ICAO + whether each is a 3rd-party scenery the user owns
     ...(settings.dep_icao ? { dep_icao: settings.dep_icao } : {}),
     ...(settings.arr_icao ? { arr_icao: settings.arr_icao } : {}),

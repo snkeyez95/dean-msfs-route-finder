@@ -25,7 +25,9 @@ function computeCoverage(sessions, grid){
     const ac = s.aircraft, t = s.tlod;
     // s.excluded = confounded flight (e.g. flown with BATC unlike the rest of the benchmark) —
     // logged and viewable forever, but never fills a cell nor sways any recommendation.
-    if(s.excluded) continue;
+    // v6.9.0: same for online-traffic (vatsim/batc) and AutoFPS flights — a post-benchmark flight
+    // flown "how Dean likes" must never fill a cell in a future re-baseline sweep.
+    if(s.excluded || s.online_traffic || s.autofps_active) continue;
     if(ACL.includes(ac) && TLL.includes(t) && s.p99_ft_ms != null) counts[ac + '|' + t]++;
   }
   const acTotals = {};
