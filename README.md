@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.9.5
+# A Better Route Planner — v6.10.0
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.10.0  VATSIM ROUTE SCORE — the app now finds you a well-covered VATSIM flight. New "📡 VATSIM" toggle in Plan a Flight (next to Fresh routes): every route gets a live 0–100 coverage score and the list sorts by "Best VATSIM coverage" automatically. The score is arrival-weighted (a staffed arrival is what makes the flight: arrival 45, departure 30, enroute Centers 25) and honest about top-down coverage — a dedicated Tower/Approach at the field scores full points, while a Center covering it top-down earns partial credit. Expand any route for the breakdown: score, DEP/ARR position chips (lit = staffed, half-lit = covered top-down, dim = nothing) and the % of the route under Center coverage. Uses the same live data and airspace boundaries as Live ATC — no extra setup, works with Live mode off, costs nothing while the toggle is off. First toggle downloads the live network data (a few seconds, honest "…" while it loads).
+
 v6.9.5   SMARTER END-OF-FLIGHT TRIM — now anchored to when you actually stop moving. The performance logger now records your ground speed and uses "the last moment the aircraft was moving" as the end of the flight. This keeps every bit of your taxi to the gate, cleanly drops the parked/shutdown tail (no more shutdown spikes to trim), and is smart about real situations: an ATC hold where you sit still and then roll again is preserved (only your FINAL stop ends the flight), and a shutdown mid-taxi (no full stop) is handled too. The order of preference is parking brake (if your aircraft reports it) → last movement → the old frametime-shape fallback, so it's robust across the Fenix, PMDG, and default aircraft. Applies to new flights (your existing logs keep the v6.9.3 chart cleanup). Confirm on your next flight — the report shows which method trimmed it.
 
 v6.9.4   FLIGHTSIM.TO LINKS NOW FILTER TO MSFS 2024. The "Search flightsim.to" links (Challenging Approaches) and the GSX "flightsim.to" search pills now add the site's MSFS 2024 filter (base=msfs2024) automatically, so you stop seeing MSFS 2020 scenery/GSX results. The app detects which sim you have installed: 2024 gets the filter (that's you); if only MSFS 2020 is found, the links stay exactly as before. Direct download links to a specific file aren't touched.

@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.9.5</div>
+  <div class="tname">A Better Route Planner &mdash; v6.10.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.9.5</div>
+    <div class="sb-ver">v6.10.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -505,7 +505,8 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
         <div class="chip sq" data-region="oceania" onclick="setRegion('oceania')">Oceania</div>
       </div>
       <div class="crow" id="fresh-row">
-        <div class="chip sq" id="fresh-toggle-btn" style="margin-left:auto" onclick="toggleFreshOnly()" title="Hide city pairs you've flown recently (either direction)">&#10038; Fresh routes</div>
+        <div class="chip sq" id="vatsim-toggle-btn" style="margin-left:auto" onclick="toggleVatsimRoutes()" title="Score routes by live VATSIM ATC coverage (arrival-weighted: staffed arrival > departure > enroute Centers)">&#128225; VATSIM</div>
+        <div class="chip sq" id="fresh-toggle-btn" onclick="toggleFreshOnly()" title="Hide city pairs you've flown recently (either direction)">&#10038; Fresh routes</div>
       </div>
     </div>
     <div id="fr-inputs-wrap" style="display:none;margin-bottom:12px">
@@ -1272,6 +1273,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.frAcft=S.cfg.frAcft||'';
   S.freshOnly=!!S.cfg.freshOnly;
   {const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);}
+  // 📡 VATSIM score toggle restore — flag + chip only, NO feed fetch at boot (the ~20MB datafeed
+  // loads lazily the first time Plan a Flight renders — see sw('routes')).
+  VSCORE.on=!!S.cfg.vatsimRoutes;
+  {const b=document.getElementById('vatsim-toggle-btn');if(b)b.classList.toggle('on',VSCORE.on);}
   if(S.freeRouteMode)applyFreeRouteMode();
   restoreTripPlan();
   if(S.cfg.siCookie){
@@ -1427,6 +1432,8 @@ function sw(t){
       S.routeRegistry=await window.api.siGetRegistry();
       renderRoutes();updateStats();
       fetchMetarBatch();
+      // 📡 lazy VATSIM-score boot: a restored-on toggle costs nothing until Plan a Flight opens
+      if(VSCORE.on&&!VSCORE.ready){ await vscoreEnsureDeps(); vscoreSortOption(true); renderRoutes(); }
     })();
   }
   if(t==='challenges')buildChDepSelect();
@@ -2752,6 +2759,14 @@ function getRoutes(){
     return true;
   });
   rs.sort((a,b)=>{
+    if(srt==='vatsim'&&VSCORE.on){
+      // 📡 Best VATSIM coverage first; unscored pairs (missing ICAO in the DB) sink; duration tiebreak
+      // below keeps the order deterministic. vscoreFor is memoized per dep|arr pair — cheap in a comparator.
+      const sc=r=>{const v=vscoreFor(r);return v?v.score:-1;};
+      const d=sc(b)-sc(a);
+      if(d)return d;
+      return(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0);
+    }
     if(srt==='airline')return(a.airline||'').localeCompare(b.airline||'');
     if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
     if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
@@ -2783,6 +2798,9 @@ function populateAirlineDropdown(){
 
 function renderRoutes(){
   if(S.freeRouteMode){renderFreeRouteResults();updateStats();return;}
+  // 📡 keep VATSIM scores current: refresh the feed (60s renderer cache makes this free most renders)
+  // and re-render once if the timestamp actually moved. ts guard prevents render loops; no timers.
+  if(VSCORE.on&&VSCORE.ready){ vatsimFeedGet().then(f=>{ if(f&&f.ts&&f.ts!==VSCORE.ts&&VSCORE.on&&!S.freeRouteMode) renderRoutes(); }); }
   console.log('[WX] buildRouteList: metarCache has',Object.keys(S.metarCache||{}).length,'entries');
   populateAirlineDropdown();
   const rs=getRoutes();
@@ -2806,13 +2824,14 @@ function renderRoutes(){
     const dur=fmtFlightLen(r.flight_length);
     const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
     const _wxPill=getWxPill(r,i);
+    const _vsPill=VSCORE.on?getVatsimPill(r):'';    // 📡 stacked under the WX pill only while the toggle is on
     const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</div>
           <div class="rc">${da[1]||r.departure_airport} &rarr; ${aa[1]||r.arrival_airport}</div></td>
       <td><div class="ra">${esc(r.airline||r.callsign)||'—'}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
-      <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}</td>
+      <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}${_vsPill?'<div style="margin-top:2px">'+_vsPill+'</div>':''}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
       <td style="font-size:12px;color:var(--ink2)">${dist}</td>
     </tr>`;
@@ -2834,6 +2853,7 @@ function renderRoutes(){
         <div class="dp-dash"></div></div>
         <div class="dp-apt"><div class="dp-icao">${r.arrival_airport}</div><div class="dp-city">${aa[1]||''}</div></div>
       </div>
+      ${VSCORE.on?vscoreDetailRow(r):''}
       <div class="dp-grid">
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
@@ -2915,6 +2935,36 @@ function toggleFreshOnly(){
   S.freshOnly=!S.freshOnly;S.cfg.freshOnly=S.freshOnly;window.api.saveConfig(S.cfg);
   const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);
   S.openRoute=null;renderRoutes();
+}
+
+// 📡 VATSIM route score toggle (v6.10.0). ON: load deps (feed + airport DB + polygons; honest "…"
+// while loading), add + select the "Best VATSIM coverage" sort. OFF: restore the previous sort and
+// remove the option — the feature leaves zero footprint when off.
+function vscoreSortOption(add){
+  const sel=document.getElementById('sort-f'); if(!sel) return;
+  const opt=sel.querySelector('option[value="vatsim"]');
+  if(add && !opt){ const o=document.createElement('option'); o.value='vatsim'; o.textContent='Sort: Best VATSIM coverage'; sel.appendChild(o); }
+  else if(!add && opt) opt.remove();
+}
+async function toggleVatsimRoutes(){
+  VSCORE.on=!VSCORE.on; S.cfg.vatsimRoutes=VSCORE.on; window.api.saveConfig(S.cfg);
+  const b=document.getElementById('vatsim-toggle-btn');
+  const sel=document.getElementById('sort-f');
+  if(VSCORE.on){
+    if(b){ b.classList.add('on'); b.innerHTML='&#128225; VATSIM &hellip;'; }
+    VSCORE.loading=true;
+    await vscoreEnsureDeps();
+    VSCORE.loading=false;
+    if(b) b.innerHTML='&#128225; VATSIM';
+    if(!VSCORE.on) return;                       // toggled back off while loading
+    vscoreSortOption(true);
+    if(sel){ VSCORE.prevSort=sel.value; sel.value='vatsim'; }
+  } else {
+    if(b){ b.classList.remove('on'); b.innerHTML='&#128225; VATSIM'; }
+    if(sel && sel.value==='vatsim') sel.value=VSCORE.prevSort||'dur';
+    vscoreSortOption(false);
+  }
+  renderRoutes();
 }
 
 function exportCSV(){
@@ -5584,6 +5634,44 @@ function getWxPill(r,idx){
   }
 }
 
+// 📡 VATSIM score pill (v6.10.0) — same visual language as the WX pill above; stacked under it in
+// the WX cell while the toggle is on (no new column: the table is dense and 5 colspans depend on 7).
+// Bands: high coverage green → decent blue → thin amber → scraps orange → dark-network grey.
+function vsColor(score){ return score>=70?'#32d74b':score>=45?'#0a84ff':score>=20?'#f5a623':score>0?'#ff6b35':'#8e8e93'; }
+function vsBg(score){ return score>=70?'#1a3a1a':score>=45?'#0a1a3a':score>=20?'#2a1a00':score>0?'#2a1000':'#1c1c1e'; }
+function getVatsimPill(r){
+  try{
+    const v=vscoreFor(r);
+    if(!v) return '<span style="color:#444;font-size:10px;font-family:monospace;pointer-events:none;min-width:86px;display:inline-block;text-align:center">&#128225; &hellip;</span>';
+    const c=vsColor(v.score), bg=vsBg(v.score);
+    const tip='VATSIM '+v.score+' &middot; DEP '+v.depPts+'/30 &middot; ENR '+v.enrPct+'% &middot; ARR '+v.arrPts+'/45';
+    return '<span style="background:'+bg+';color:'+c+';border:0.5px solid '+c+'44;font-family:monospace;font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;pointer-events:none;min-width:86px;display:inline-block;text-align:center" title="'+tip+'">&#128225; '+(v.score>0?v.score:'&mdash;')+'</span>';
+  }catch(e){ return ''; }
+}
+// The clinical one-row breakdown for the expanded route detail panel: score chip + per-tier staffing
+// chips (lit = dedicated position, half-lit = covered top-down by Center/Approach at partial credit,
+// dim = nothing) + enroute Center coverage %. Callsigns are remote feed data — esc() everywhere.
+function vscoreDetailRow(r){
+  const v=vscoreFor(r);
+  if(!v) return '';
+  const chip=(tier,state,cs)=>{
+    const label=tier.toUpperCase();
+    if(state==='full') return '<span style="background:#1a3a1a;color:#32d74b;border:1px solid #32d74b55;font-family:monospace;font-size:9px;padding:2px 5px;border-radius:4px" title="'+esc(cs||'')+'">'+label+'</span>';
+    if(state==='topdown') return '<span style="background:#2a1a00;color:#f5a623;border:1px solid #f5a62344;font-family:monospace;font-size:9px;padding:2px 5px;border-radius:4px;opacity:.75" title="Covered top-down by '+esc(cs||'')+' (partial credit)">'+label+'</span>';
+    return '<span style="color:var(--ink4);border:1px solid var(--sep);font-family:monospace;font-size:9px;padding:2px 5px;border-radius:4px;opacity:.45">'+label+'</span>';
+  };
+  const depChips=['del','gnd','twr','app'].map(t=>chip(t,v.dep[t],v.depCallsigns[t])).join('');
+  const arrChips=['app','twr','gnd'].map(t=>chip(t,v.arr[t],v.arrCallsigns[t])).join('');
+  const c=vsColor(v.score);
+  const enrTip=v.enrCallsigns.length?('Centers: '+v.enrCallsigns.map(esc).join(', ')):'No Center coverage along the route';
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;margin:2px 0 6px;background:var(--bg2);border:1px solid var(--sep);border-radius:8px;font-size:10px" title="Live VATSIM staffing. Half-lit = no dedicated position, covered top-down by Center/Approach.">'+
+    '<span style="color:'+c+';font-family:monospace;font-weight:700">&#128225; VATSIM '+v.score+'</span>'+
+    '<span style="color:var(--ink3)">DEP</span><span style="display:flex;gap:3px">'+depChips+'</span>'+
+    '<span style="color:var(--ink3);font-family:monospace" title="'+enrTip+'">ENR '+v.enrPct+'%</span>'+
+    '<span style="color:var(--ink3)">ARR</span><span style="display:flex;gap:3px">'+arrChips+'</span>'+
+    '</div>';
+}
+
 function wxColor(score){
   if(score>=19)return'#ff453a';
   if(score>=13)return'#ff6b35';
@@ -6160,6 +6248,63 @@ function latcFreqStack(depApt, arrApt, controllers, dbMap){
   }
   return st;
 }
+// ── 📡 VATSIM ROUTE SCORE (v6.10.0, Dean 2026-07-11) ─────────────────────────────────────────────
+// Pure scorer: how well is this route covered by live VATSIM ATC right now? 0–100, arrival-biased
+// (a staffed arrival is what makes or breaks the flight): ARR 45 (APP 18 · TWR 18 · GND 9),
+// DEP 30 (DEL 3 · GND 6 · TWR 10.5 · APP 10.5), ENR 25 × the fraction of the great-circle under an
+// online Center. Tier credit: 'full' = a dedicated position at the field (exactly what latcFreqStack's
+// fieldPos finds); 'topdown' = no dedicated position but an online APP/CTR whose polygon covers the
+// field (partial credit VS_TOPDOWN — being "technically covered" isn't the same as a staffed field);
+// 'off' = nothing. Pure given _airspace loaded — desk-testable, no sim, no Live mode.
+const VS_TOPDOWN=0.45;
+const VS_DEP_PTS={DEL:3, GND:6, TWR:10.5, APP:10.5};    // = 30
+const VS_ARR_PTS={APP:18, TWR:18, GND:9};               // = 45
+const VS_ENR_PTS=25;
+function vatsimRouteScore(depApt, arrApt, controllers, dbMap, stepNm){
+  if(!depApt||!arrApt||!dbMap) return null;
+  const st=latcFreqStack(depApt, arrApt, controllers, dbMap);       // dedicated field positions (unmodified)
+  const on=_latcOnline(controllers);
+  // One top-down probe per airport, reused across its unstaffed tiers: the first online APP whose
+  // TRACON polygon covers the field, and the first online CTR/FSS whose FIR covers it.
+  const topdownAt=(apt)=>{
+    let app=null, ctr=null;
+    for(const c of on){
+      if(!app && c.tier==='APP' && traconCovers(c.callsign,apt.lat,apt.lon)===true) app=c;
+      else if(!ctr && (c.tier==='CTR'||c.tier==='FSS') && airspaceCovers(c.callsign,apt.lat,apt.lon)===true) ctr=c;
+      if(app&&ctr) break;
+    }
+    return app||ctr;                                                // APP is the closer substitute — prefer it
+  };
+  const grade=(fieldEntries, apt, ptsMap)=>{
+    const out={}, cs={}; let pts=0, td;
+    for(const tier of Object.keys(ptsMap)){
+      const hit=fieldEntries.find(e=>e.tier===tier);
+      if(hit){ out[tier.toLowerCase()]='full'; cs[tier.toLowerCase()]=hit.callsign; pts+=ptsMap[tier]; }
+      else{
+        if(td===undefined) td=topdownAt(apt);                       // lazy: only probe when a tier is unstaffed
+        if(td){ out[tier.toLowerCase()]='topdown'; cs[tier.toLowerCase()]=td.callsign; pts+=ptsMap[tier]*VS_TOPDOWN; }
+        else out[tier.toLowerCase()]='off';
+      }
+    }
+    return {out, cs, pts};
+  };
+  const dep=grade(st.dep, depApt, VS_DEP_PTS);
+  const arr=grade(st.arr, arrApt, VS_ARR_PTS);
+  // Enroute covered fraction — a sibling walk (latcFreqStack dedupes and returns no fraction; leave it
+  // untouched — the Live ATC briefing + handoff depend on it). Coarser 60nm default: a fraction needs
+  // less resolution than an ordered frequency list.
+  const samples=gcSamples(depApt.lat,depApt.lon,arrApt.lat,arrApt.lon,stepNm||60);
+  let covered=0;
+  for(const [la,lo] of samples){
+    for(const c of on){ if(c.tier!=='CTR'&&c.tier!=='FSS') continue; if(airspaceCovers(c.callsign,la,lo)===true){ covered++; break; } }
+  }
+  const enrFrac=samples.length?covered/samples.length:0;
+  const score=Math.max(0,Math.min(100,Math.round(dep.pts+arr.pts+enrFrac*VS_ENR_PTS)));
+  return { score, dep:dep.out, arr:arr.out, depCallsigns:dep.cs, arrCallsigns:arr.cs,
+           enrPct:Math.round(enrFrac*100), enrCallsigns:st.enr.map(e=>e.callsign),
+           depPts:Math.round(dep.pts), arrPts:Math.round(arr.pts) };
+}
+
 // The online CTR/APP position covering a point, or null. dbMap is optional — when passed, Approach also
 // falls back to a distance circle (like recommendFreq) so the handoff prompt/next-up never skips an
 // Approach that only has circle coverage (found live: a climbout handoff said Center when it should have
@@ -6499,6 +6644,34 @@ async function vatsimFeedGet(force){
   return _vFeedLoading;
 }
 async function latcFetchFeed(){ const f=await vatsimFeedGet(true); LATC.controllers=f.controllers||[]; }
+
+// ── 📡 VATSIM route-score plumbing (v6.10.0) — memo + dependency loader ─────────────────────────
+// Scores live only while the Plan-a-Flight toggle is ON; zero cost otherwise. Cache is per dep|arr
+// PAIR (routes share pairs heavily) and clears whole when the feed timestamp moves (the same
+// invalidation rule as latcStackForNow). null results are cached too (missing-ICAO pairs).
+const VSCORE={ on:false, cache:new Map(), ts:0, prevSort:null, loading:false, ready:false };
+function vscoreFor(r){
+  if(!VSCORE.on || !VSCORE.ready || !LATC.db) return null;
+  const fts=(_vFeed&&_vFeed.ts)||0;
+  if(fts!==VSCORE.ts){ VSCORE.cache.clear(); VSCORE.ts=fts; }
+  const key=r.departure_airport+'|'+r.arrival_airport;
+  if(VSCORE.cache.has(key)) return VSCORE.cache.get(key);
+  // Big filtered lists: coarsen the enroute walk (fraction barely changes, cost halves again).
+  const step=VSCORE.cache.size>500?120:60;
+  let v=null;
+  try{ v=vatsimRouteScore(LATC.db.get(r.departure_airport), LATC.db.get(r.arrival_airport), _vFeed.controllers, LATC.db, step); }catch(e){}
+  VSCORE.cache.set(key,v);
+  return v;
+}
+// Load everything the scorer needs (idempotent; all three are cached after the first call):
+// the OurAirports DB, the VATSpy/SimAware polygons, and the datafeed. Live ATC may already be
+// loading the DB — latcEnsureDb() returns immediately then, so poll it briefly.
+async function vscoreEnsureDeps(){
+  await Promise.all([latcEnsureDb(), airspaceLoad(), vatsimFeedGet()]);
+  let waited=0;
+  while(!LATC.db && LATC.dbLoading && waited<15000){ await new Promise(res=>setTimeout(res,200)); waited+=200; }
+  VSCORE.ready=!!LATC.db;
+}
 // Build a D-ATIS-shaped object from the VATSIM ATIS entries for an airport, so it drops straight into
 // S.datisCache and every existing consumer (active-runway display, SimBrief origrwy/destrwy) uses it.
 function vatsimAtisData(icao){
@@ -7136,5 +7309,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.9.5</div>
+  pointer-events:none;">v6.10.0</div>
 </body></html>
