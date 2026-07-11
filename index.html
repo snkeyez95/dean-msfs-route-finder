@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.8.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.8.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.8.0</div>
+    <div class="sb-ver">v6.8.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3688,9 +3688,13 @@ function sceneryBtnHtml(dep,arr,ns,idx,acType){
   if(!S.cfg.communityFolder)return'';
   const depRows=S.allRows.filter(r=>r.icao===dep&&r.selected!==false);
   const arrRows=S.allRows.filter(r=>r.icao===arr&&r.selected!==false);
-  if(!depRows.length&&!arrRows.length)return'';
   const acGroup=acType?aircraftGroupForType(acType):null;
   const acActive=acGroup?(S.cfg.aircraftActive||[]).includes(acGroup.id):true;
+  const hasScenery=depRows.length||arrRows.length;
+  // Show the block when there's scenery to manage OR the route's aircraft still needs linking (Dean
+  // 2026-07-10: on a Free Route / non-library airports the aircraft still needs activating — don't hide
+  // the button just because neither airport is in the library).
+  if(!hasScenery && !(acGroup && !acActive)) return '';
   const junctions=S.cfg.activeJunctions||[];
   const allLinked=rows=>rows.length>0&&rows.every(r=>rowLinked(r,junctions));   // every package of every folder for this ICAO is active
   const anyLinked=rows=>rows.some(r=>rowLinkNames(r).some(n=>junctions.includes(n)));
@@ -3704,13 +3708,13 @@ function sceneryBtnHtml(dep,arr,ns,idx,acType){
   const anyActive=anyLinked(depRows)||anyLinked(arrRows);
   const allActive=(!depRows.length||depActive)&&(!arrRows.length||arrActive)&&acActive;
   const acTypeEsc=(acType||'').replace(/'/g,"\\'");
-  const activateBtn=!allActive?`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}','${acTypeEsc}')">&#9654; Activate</button>`:'';
+  const activateBtn=!allActive?`<button class="btn bg bsm" style="border-color:rgba(245,166,35,.4);color:var(--acc)" onclick="doActivateScenery('${dep}','${arr}','${acTypeEsc}')">&#9654; ${hasScenery?'Activate':'Activate aircraft'}</button>`:'';
   const removeBtn=anyActive?`<button class="btn bg bsm" style="border-color:rgba(50,215,75,.3);color:var(--grn)" onclick="doDeactivateScenery('${dep}','${arr}')">&#10006; Remove</button>`:'';
   const acLine=acGroup?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${acActive?'<span style="color:var(--grn);font-size:13px" title="Aircraft linked into Community">✓</span>':'<span style="color:var(--acc);font-size:13px" title="Aircraft available to link">◎</span>'}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${acType}</span><span style="color:var(--ink3)">${acGroup.label} (${acGroup.packages.length} pkg)</span></div>`:'';
   const folderTxt=rows=>rows.length?rows.map(r=>r.folder).join(', '):'not in library';
   return`<div style="display:flex;flex-direction:column;gap:4px;margin-left:4px;align-self:center">
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(depRows)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${dep}</span><span style="color:var(--ink3)">${folderTxt(depRows)}</span></div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(arrRows)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${arr}</span><span style="color:var(--ink3)">${folderTxt(arrRows)}</span></div>
+    ${hasScenery?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(depRows)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${dep}</span><span style="color:var(--ink3)">${folderTxt(depRows)}</span></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2)">${statusIcon(arrRows)}<span style="font-family:'JetBrains Mono',monospace;color:var(--acc)">${arr}</span><span style="color:var(--ink3)">${folderTxt(arrRows)}</span></div>`:''}
     ${acLine}
     <div style="display:flex;gap:6px;margin-top:2px">${activateBtn}${removeBtn}</div>
   </div>`;
@@ -3741,7 +3745,7 @@ async function doActivateScenery(dep,arr,acType){
   }
   window.api.saveConfig(S.cfg);
   RLOG('[SCENE] Activated: '+res.created.join(', ')+acMsg+(res.skipped.length?' | skipped: '+res.skipped.join(', '):''));
-  if(acMsg)gsxToast('Activated scenery'+acMsg);
+  if(acMsg)gsxToast(res.created.length?('Activated scenery'+acMsg):('Activated'+acMsg.replace(/^ \+/,'')));
   renderRoutes();if(S.freeRouteMode)renderFreeRouteResults();renderTripCard();renderApts();
 }
 
@@ -7007,5 +7011,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.8.0</div>
+  pointer-events:none;">v6.8.1</div>
 </body></html>

@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.8.0
+# A Better Route Planner — v6.8.1
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.8.1   Activate-aircraft on any route card, even with no scenery. The Activate control used to appear only when a route touched one of your 3rd-party scenery airports — so on a Free Route (or between airports you don't own scenery for) there was no way to one-click link the selected aircraft. Now the card shows an "▶ Activate aircraft" button whenever the route's aircraft (e.g. PMDG 737-800) isn't linked into your Community folder yet, regardless of scenery.
+
 v6.8.0   IN-SIM TOOLBAR PANEL (POC) — Live ATC inside MSFS, fullscreen-proof, any aircraft. When Live mode is on, ABRP now serves its frequency recommendation on a private local address (your PC only, port 8177); a small companion package (repo folder ingamepanel/abrp-ingamepanels-liveatc — add it via Aircraft & Util → Utilities, or copy to Community) adds an ABRP icon to the in-flight toolbar whose window shows the live recommendation: ATIS to start on, frequency to be on, who/why, next up, and what you're currently tuned to — updating every 5 seconds, visible even in exclusive fullscreen. The panel is a thin shell; all intelligence stays in ABRP, so app updates improve the panel without touching the sim package. Server is GET-only, localhost-only, and inert until Live mode is on.
 
 v6.7.1   Sunset the "Coverage & what to fly next" tracker now the 24-flight benchmark is complete. New "🎯 Hide coverage" button in the Performance toolbar collapses the coverage grid in the dashboard (its job is done — the Baseline view is now your day-to-day recommendation). Fully reversible: click "Show coverage" to bring it back, e.g. if you re-baseline after a GPU driver or MSFS update. Nothing else changes — logging and every other view keep working.
