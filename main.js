@@ -2049,8 +2049,8 @@ ipcMain.handle('overlay-show', () => {
   try{ const w=overlayEnsure(); w.showInactive(); }catch(e){ LOG.error('[Overlay] '+e.message); }
   return {ok:true};
 });
-// Push live recommendation state to the overlay each poll (dot/panel render + auto-expand on new-rec).
-ipcMain.handle('overlay-state', (_, payload) => {
+// Push live recommendation state to the overlay each poll (dot/panel render + auto-expand on new-rec).
+ipcMain.handle('overlay-state', (_, payload) => {
   if(_cleanupDone || !overlayWin || overlayWin.isDestroyed()) return {ok:false};
   try{ overlayWin.webContents.send('overlay-state', payload||{}); }catch(_){}
   return {ok:true};
@@ -2098,8 +2098,9 @@ function _parseSimawareTracons(txt){
 }
 ipcMain.handle('airspace-data', async (_, o) => {
   const p=path.join(USER_DATA,'airspace.json');
-  // sv:2 = includes SimAware TRACON polygons; an older (sv:1 or missing) cache re-downloads so users gain them
-  if(!(o&&o.refresh) && fs.existsSync(p)){ try{ const j=JSON.parse(fs.readFileSync(p,'utf8')); if(j.sv>=2 && j.boundaries && j.prefixMap && j.tracons && Object.keys(j.tracons).length) return {ok:true, cached:true, boundaries:j.boundaries, prefixMap:j.prefixMap, tracons:j.tracons}; }catch(_){} }
+  // sv:3 = adds VATGlasses sub-sector ownership data (altitude-aware, curated top-down); an older
+  // cache (sv:2 TRACON-era or earlier) re-downloads once so users gain the new tier automatically.
+  if(!(o&&o.refresh) && fs.existsSync(p)){ try{ const j=JSON.parse(fs.readFileSync(p,'utf8')); if(j.sv>=3 && j.boundaries && j.prefixMap && j.tracons && Object.keys(j.tracons).length) return {ok:true, cached:true, boundaries:j.boundaries, prefixMap:j.prefixMap, tracons:j.tracons, vg:j.vg||null}; }catch(_){} }
   try{
     const [geo,dat,trac]=await Promise.all([
       _httpGetLarge('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson'),
@@ -2110,11 +2111,65 @@ ipcMain.handle('airspace-data', async (_, o) => {
     for(const f of (gj.features||[])){ const id=f.properties&&f.properties.id; if(id&&f.geometry) boundaries[id]=f.geometry; }
     const prefixMap=_parseVatspyDat(dat);
     const tracons=trac?_parseSimawareTracons(trac):{};
-    writeFileAtomic(p, JSON.stringify({boundaries, prefixMap, tracons, ts:Date.now(), sv:2}));
-    LOG.info('[Airspace] built: '+Object.keys(boundaries).length+' FIR boundaries, '+Object.keys(prefixMap).length+' prefixes, '+Object.keys(tracons).length+' TRACON keys');
-    return {ok:true, cached:false, boundaries, prefixMap, tracons};
+    // VATGlasses is an ENHANCER: a failed build ships null (FIR/TRACON tiers unaffected) and the cache
+    // still writes sv:3 so launches don't re-download in a loop — Settings "refresh airspace data" retries.
+    const vg=await _buildVatglasses();
+    writeFileAtomic(p, JSON.stringify({boundaries, prefixMap, tracons, vg, ts:Date.now(), sv:3}));
+    LOG.info('[Airspace] built: '+Object.keys(boundaries).length+' FIR boundaries, '+Object.keys(prefixMap).length+' prefixes, '+Object.keys(tracons).length+' TRACON keys, '
+      +(vg?(Object.keys(vg.pos).length+' VATGlasses positions / '+vg.air.length+' airspaces'):'VATGlasses unavailable'));
+    return {ok:true, cached:false, boundaries, prefixMap, tracons, vg};
   }catch(e){ LOG.error('[Airspace] failed: '+e.message); return {ok:false, error:e.message}; }
 });
+// Stage 4c — VATGlasses sub-sector data (github.com/lennycolton/vatglasses-data): one JSON per vACC
+// with positions (callsign prefix + type + frequency), airspace volumes carrying ALTITUDE bounds, and
+// owner lists in priority order. Compiled here ONCE into a slim index the renderer can point-test:
+//   pos: { "ds/PID": {pre[], type, khz, cs} }
+//   air: [ {o:[owner ids, priority order], ds, s:[{m,M (FL bounds), b:[bbox], r:[flat lat,lon ring]}]} ]
+// Per-file try/catch — one malformed country file is skipped, never aborts the build. Runway-conditioned
+// sectors are skipped in v1 (live runway config unknown). Coordinates arrive as "ddmmss"/"dddmmss"
+// strings; parsed to decimal and rounded to 4 dp (~11 m — plenty for sector membership).
+async function _buildVatglasses(){
+  try{
+    const listing=await _httpGetLarge('https://api.github.com/repos/lennycolton/vatglasses-data/contents/data');
+    if(!listing) return null;
+    const files=JSON.parse(listing).filter(f=>f&&f.type==='file'&&/\.json$/i.test(f.name)&&f.name!=='nodata.json');
+    if(!files.length) return null;
+    const pos={}, air=[];
+    const dms=s=>{ s=String(s); const neg=s[0]==='-'; const t=neg?s.slice(1):s; const v=(+t.slice(0,-4))+(+t.slice(-4,-2))/60+(+t.slice(-2))/3600; return neg?-v:v; };
+    let idx=0, skipped=0;
+    const worker=async()=>{ for(;;){ const f=files[idx++]; if(!f) return;
+      try{
+        const txt=await _httpGetLarge('https://raw.githubusercontent.com/lennycolton/vatglasses-data/main/data/'+f.name);
+        if(!txt){ skipped++; continue; }
+        const j=JSON.parse(txt); const ds=f.name.replace(/\.json$/i,'');
+        for(const pid of Object.keys(j.positions||{})){ const pp=j.positions[pid];
+          const khz=pp.frequency?Math.round(parseFloat(pp.frequency)*1000):null;
+          pos[ds+'/'+pid]={pre:(pp.pre||[]).map(x=>String(x).toUpperCase()), type:String(pp.type||'').toUpperCase(), khz:(isFinite(khz)&&khz>0)?khz:null, cs:pp.callsign||''};
+        }
+        for(const a of (j.airspace||[])){
+          const owners=(a.owner||[]).map(o=>String(o).includes('/')?String(o):ds+'/'+o);
+          if(!owners.length) continue;
+          const secs=[];
+          for(const s of (a.sectors||[])){
+            if(s.runways) continue;
+            const ring=[]; let bLat=90,BLat=-90,bLon=180,BLon=-180; let bad=false;
+            for(const pt of (s.points||[])){
+              const la=Math.round(dms(pt[0])*1e4)/1e4, lo=Math.round(dms(pt[1])*1e4)/1e4;
+              if(!isFinite(la)||!isFinite(lo)||Math.abs(la)>90||Math.abs(lo)>180){ bad=true; break; }
+              ring.push(la,lo); if(la<bLat)bLat=la; if(la>BLat)BLat=la; if(lo<bLon)bLon=lo; if(lo>BLon)BLon=lo;
+            }
+            if(!bad && ring.length>=6) secs.push({m:(s.min==null?0:s.min), M:(s.max==null?999:s.max), b:[bLat,bLon,BLat,BLon], r:ring});
+          }
+          if(secs.length) air.push({o:owners, ds, s:secs});
+        }
+      }catch(e){ skipped++; LOG.info('[Airspace] VATGlasses skip '+f.name+': '+e.message); }
+    }};
+    await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);
+    if(!Object.keys(pos).length || !air.length) return null;
+    if(skipped) LOG.info('[Airspace] VATGlasses: '+skipped+' file(s) skipped');
+    return {pos, air};
+  }catch(e){ LOG.error('[Airspace] VATGlasses build failed: '+e.message); return null; }
+}
 
 // Global airport DB (OurAirports, public domain) — slim {icao,lat,lon,twr(MHz)} for medium+large
 // airports, cached in USER_DATA. Powers nearest-airport, CTAF (tower freq), and geo-locating tower/
