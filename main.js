@@ -909,7 +909,7 @@ function cleanupActivationsOnQuit(){
   }
 }
 let _cleanupDone = false;
-app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} try{ latcPanelStop(); }catch(_){} try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.destroy(); }catch(_){} cleanupActivationsOnQuit(); });
+app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.destroy(); }catch(_){} cleanupActivationsOnQuit(); });
 // When the auto-updater restarts ABRP to install a new version, exit FAST: skip the close-confirm
 // dialog and the (slow) activation cleanup so the NSIS installer doesn't catch ABRP still shutting
 // down and show "cannot be closed / Retry". The junctions are intentionally left in place — the
@@ -2001,7 +2001,7 @@ const LiveATC = (() => {
     }
   };
 })();
-ipcMain.handle('live-atc-start', () => { LiveATC.start(); try{ latcPanelStart(); }catch(e){ LOG.error('[LiveATC panel] '+e.message); } return {ok:true}; });
+ipcMain.handle('live-atc-start', () => { LiveATC.start(); return {ok:true}; });
 ipcMain.handle('live-atc-stop',  () => { LiveATC.stop();  return {ok:true}; });
 ipcMain.handle('live-position',  () => LiveATC.latest());
 // VATSIM datafeed proxied through main (avoids any renderer CORS issue); returns controllers + ATIS +
@@ -2049,11 +2049,8 @@ ipcMain.handle('overlay-show', () => {
   try{ const w=overlayEnsure(); w.showInactive(); }catch(e){ LOG.error('[Overlay] '+e.message); }
   return {ok:true};
 });
-// Push live recommendation state to the overlay each poll (dot/panel render + auto-expand on new-rec).
-// The cache ALSO feeds the in-sim toolbar panel server (v6.8.0) — cache BEFORE the overlay-window
-// early-return so the panel keeps working even when the desktop overlay is hidden/destroyed.
-ipcMain.handle('overlay-state', (_, payload) => {
-  _latcLastState = { payload: payload||{}, ts: Date.now() };
+// Push live recommendation state to the overlay each poll (dot/panel render + auto-expand on new-rec).
+ipcMain.handle('overlay-state', (_, payload) => {
   if(_cleanupDone || !overlayWin || overlayWin.isDestroyed()) return {ok:false};
   try{ overlayWin.webContents.send('overlay-state', payload||{}); }catch(_){}
   return {ok:true};
@@ -2068,80 +2065,7 @@ ipcMain.handle('overlay-toast', (_, payload) => {
   try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
 ipcMain.handle('overlay-hide', () => { try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.close(); }catch(_){} overlayWin=null; return {ok:true}; });
 
-// ── In-sim toolbar panel service (v6.8.0) ───────────────────────────────────────────────────────
-// A tiny loopback-only HTTP server that feeds the MSFS in-game toolbar panel (a dumb iframe shell in
-// the Community folder pointing at /panel). ABRP stays the single brain: the renderer already pushes
-// the full pre-formatted recommendation payload here every 5s (overlay-state above); we just cache +
-// serve it. GET-only, bound to 127.0.0.1, nothing sensitive (VATSIM frequencies). Started when Live
-// mode turns on; stopped on quit. UI iterates freely — the sim package never needs rebuilding.
-let _latcLastState = null;
-let _latcHttp = null;
-const LATC_PANEL_STALE_MS = 15000;   // renderer pushes every 5s; >15s old = Live mode off / app gone
-const LATC_PANEL_HTML = [
-'<!doctype html><html><head><meta charset="utf-8"><title>ABRP Live ATC</title><style>',
-'html,body{margin:0;padding:0;background:#121418;color:#e8e8ea;font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden;}',
-'#wrap{padding:14px 16px;}',
-'.k{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#7a7d84;margin-bottom:3px;}',
-'#atis{font-size:13px;color:#d0a93a;margin-bottom:10px;display:none;font-variant-numeric:tabular-nums;}',
-'#freq{font-size:34px;font-weight:800;color:#f5a623;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.05;font-family:Consolas,monospace;transition:text-shadow .3s;}',
-'#freq.flash{text-shadow:0 0 18px rgba(245,166,35,.9);}',
-'#who{font-size:15px;font-weight:600;margin-top:3px;}',
-'#why{font-size:12px;color:#9a9da3;margin-top:6px;line-height:1.45;}',
-'#next{font-size:13px;color:#b9bbc0;margin-top:10px;display:none;font-variant-numeric:tabular-nums;}',
-'#cur{font-size:11.5px;color:#7a7d84;margin-top:6px;display:none;font-variant-numeric:tabular-nums;}',
-'#wait{font-size:13px;color:#9a9da3;padding:8px 0;display:none;}',
-'#foot{font-size:9.5px;color:#5a5d64;margin-top:12px;}',
-'</style></head><body><div id="wrap">',
-'<div id="wait">Waiting for ABRP &mdash; open A Better Route Planner and turn on Live mode (Live ATC tab).</div>',
-'<div id="main" style="display:none">',
-'<div id="atis"></div>',
-'<div class="k">Frequency to be on</div>',
-'<div id="freq">&mdash;</div>',
-'<div id="who"></div>',
-'<div id="why"></div>',
-'<div id="next"></div>',
-'<div id="cur"></div>',
-'</div>',
-'<div id="foot">ABRP Live ATC &middot; guidance only &mdash; nothing is tuned or transmitted</div>',
-'</div><script>',
-'var els={};["wait","main","atis","freq","who","why","next","cur"].forEach(function(i){els[i]=document.getElementById(i);});',
-'function show(el,txt){el.textContent=txt||"";el.style.display=txt?"block":"none";}',
-'function render(p){',
-'  if(!p||!p.live){els.wait.style.display="block";els.main.style.display="none";return;}',
-'  els.wait.style.display="none";els.main.style.display="block";',
-'  show(els.atis,p.atis);els.freq.textContent=p.freq||"\\u2014";els.who.textContent=p.who||"";els.why.textContent=p.why||"";',
-'  show(els.next,p.next);show(els.cur,p.cur);',
-'  if(p.isNewRec){els.freq.classList.add("flash");setTimeout(function(){els.freq.classList.remove("flash");},3000);}',
-'}',
-'function tick(){',
-'  fetch("/latc/state",{cache:"no-store"}).then(function(r){return r.json();}).then(render)',
-'  .catch(function(){render(null);});',
-'}',
-'tick();setInterval(tick,5000);',
-'</script></body></html>'
-].join('\n');
-function latcPanelStart(){
-  if(_latcHttp) return;
-  let port = 8177;
-  try{ const c=JSON.parse(fs.readFileSync(CFG,'utf8')); if(c.latcPanelPort>0) port=c.latcPanelPort|0; }catch(_){}
-  const http = require('http');
-  const srv = http.createServer((req,res)=>{
-    if(req.method!=='GET'){ res.writeHead(405); res.end(); return; }
-    const u = (req.url||'').split('?')[0];
-    if(u==='/latc/state'){
-      const st=_latcLastState, fresh=st && (Date.now()-st.ts)<LATC_PANEL_STALE_MS;
-      const body=JSON.stringify(fresh ? Object.assign({ts:st.ts}, st.payload) : {live:false});
-      res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});
-      res.end(body); return;
-    }
-    if(u==='/panel'||u==='/'){ res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); res.end(LATC_PANEL_HTML); return; }
-    res.writeHead(404); res.end();
-  });
-  srv.on('error',(e)=>{ LOG.error('[LiveATC panel] server error: '+e.message); _latcHttp=null; });
-  srv.listen(port,'127.0.0.1',()=>LOG.info('[LiveATC panel] serving http://127.0.0.1:'+port+'/panel'));
-  _latcHttp = srv;
-}
-function latcPanelStop(){ try{ _latcHttp&&_latcHttp.close(); }catch(_){} _latcHttp=null; }
+
 
 // Airspace boundaries (VATSpy Data Project) — FIR/ARTCC polygons + the callsign-prefix→boundary map, so
 // the renderer can point-in-polygon-test whether a Center covers the user (V1 could only circle-guess
