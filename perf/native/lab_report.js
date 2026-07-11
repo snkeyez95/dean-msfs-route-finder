@@ -11,6 +11,7 @@
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 const { pstdev, pickColumn } = require('./stats.js');
 const { chartFrametimeSeries, rollingMeanSeries, readTelemetry, fmt } = require('./report_charts.js');
+const { trimChartTail } = require('./phases.js');
 const lab = require('./lab.js');
 
 // Phase 10: grid follows config.benchmark (passed via ABRP_BENCHMARK env into this child process);
@@ -111,12 +112,17 @@ function trimFt(ft, headS, tailS) {
 function seriesFor(sessionsDir, folder) {
   const dir = path.join(sessionsDir, folder);
   const cache = path.join(dir, 'series.json');
-  try { const c = JSON.parse(fs.readFileSync(cache, 'utf8')); if (c && c.v === 2) return c; } catch (_) {}
+  try { const c = JSON.parse(fs.readFileSync(cache, 'utf8')); if (c && c.v === 3) return c; } catch (_) {}
   const sj = readSummary(sessionsDir, folder);
   const sm = (sj && sj.smoothness) || {};
   const raw = readFt(dir);
   if (!raw) return null;
-  const ft = trimFt(raw, sm.start_trim_s != null ? sm.start_trim_s : 5, sm.stop_trim_s != null ? sm.stop_trim_s : 5);
+  const headTrimS = sm.start_trim_s != null ? sm.start_trim_s : 5;
+  let ft = trimFt(raw, headTrimS, sm.stop_trim_s != null ? sm.stop_trim_s : 5);
+  if (ft.length < 100) return null;
+  // v6.9.3: cut the parked/teardown tail so the fingerprint (and the arrival-taxi window below) never
+  // includes gate-idle or shutdown spikes — same chart-only trim the per-flight report uses.
+  ft = trimChartTail(ft, readTelemetry(dir), headTrimS);
   if (ft.length < 100) return null;
   const smooth = (arr, maxPts) => {
     const [, meanPts, totalMin] = chartFrametimeSeries(arr, maxPts);
@@ -148,7 +154,7 @@ function seriesFor(sessionsDir, folder) {
       if (gf.length >= 100) ground = smooth(gf, 300).pts;
     }
   }
-  const out = { v: 2, dur_min: Math.round(full.totalMin * 10) / 10, full: full.pts, ground };
+  const out = { v: 3, dur_min: Math.round(full.totalMin * 10) / 10, full: full.pts, ground };
   try { fs.writeFileSync(cache, JSON.stringify(out)); } catch (_) {}
   return out;
 }

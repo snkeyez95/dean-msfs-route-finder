@@ -78,6 +78,60 @@ function trimAtElapsed(ft, cpu, gpu, targetElapsedS) {
   return [ft.slice(0, cut), cpu && cpu.length ? cpu.slice(0, cut) : cpu, gpu && gpu.length ? gpu.slice(0, cut) : gpu, cutMs / 1000];
 }
 
+// v6.9.3 — CHART-ONLY TAIL TRIM (Dean 2026-07-11). The STATS teardown trim (above) is deliberately
+// conservative — it only cuts frames > TEARDOWN_MS (200) that never recover, so the headline max stays
+// honest. But that leaves a trailing cluster of 100–195 ms park/shutdown hitches at the arrival gate,
+// and the frametime chart (which plots per-bucket MAX) draws each as a tall spike. Dean's rule: the
+// CHART must never show a shutdown spike, even though the data behind it already excludes them. So the
+// chart series is cut at the true end of flying — the parked/teardown tail is dropped for the plot only
+// (stats/summary untouched). Detection, safest signal first:
+//   1) VRAM teardown cliff (telemetry): the sim unloading is an unambiguous "flight is over" marker —
+//      a trailing contiguous run of VRAM below CHART_VRAM_CLIFF_FRAC × the flight's median. Bounds the end.
+//   2) Pull back over the park cluster: within CHART_PULLBACK_S before that end, cut at the FIRST frame
+//      exceeding CHART_TEARDOWN_MS — this drops the gate spikes AND the flat gate-idle after them.
+// The short pull-back window protects real flight: an approach/taxi hitch far from the end is never cut.
+// No telemetry → fall back to the frametime-only spike scan in the last window (older pre-telemetry logs).
+const CHART_TEARDOWN_MS = 80.0;        // a tail frame this big = park/shutdown hitch (real taxi rarely sustains it)
+const CHART_PULLBACK_S = 45;           // only pull the cut back this far before the end — protects real flight
+const CHART_VRAM_CLIFF_FRAC = 0.55;    // trailing VRAM below this × flight-median = the sim unloading
+// Returns the chart cut index: plot ft[0..cut). ft.length = nothing to trim. telemetryRows: readTelemetry()
+// output (recording-relative wall_ms + vram_mb) or null; headTrimS = the head trim already applied to ft.
+function chartFlightEndIndex(ft, telemetryRows, headTrimS) {
+  const n = ft.length; if (n < 30) return n;
+  const head = (headTrimS == null ? 5 : headTrimS) * 1000.0;
+  const cum = new Array(n); { let c = 0; for (let i = 0; i < n; i++) { c += ft[i]; cum[i] = c / 60000.0; } }
+  const totalMin = cum[n - 1];
+  // 1) VRAM teardown cliff → an elapsed-minute upper bound on flight-end
+  let cliffMin = null;
+  if (telemetryRows && telemetryRows.length) {
+    const vals = telemetryRows.map(r => r.vram_mb).filter(v => v != null && v > 0);
+    if (vals.length >= 5) {
+      const s = vals.slice().sort((a, b) => a - b); const med = s[Math.floor(s.length / 2)];
+      if (med > 0) {
+        const thr = med * CHART_VRAM_CLIFF_FRAC; let lowStart = null;
+        for (let i = telemetryRows.length - 1; i >= 0; i--) { const v = telemetryRows[i].vram_mb; if (v != null && v < thr) lowStart = i; else break; }
+        if (lowStart != null) cliffMin = (telemetryRows[lowStart].wall_ms - head) / 60000.0;
+      }
+    }
+  }
+  let endBound = n;
+  if (cliffMin != null && cliffMin > 0) { for (let i = 0; i < n; i++) { if (cum[i] >= cliffMin) { endBound = i; break; } } }
+  if (endBound < 1) endBound = n;
+  // 2) pull the cut back over the park spike cluster within the last CHART_PULLBACK_S before endBound
+  const endMin = endBound >= n ? totalMin : cum[endBound];
+  const winStartMin = endMin - CHART_PULLBACK_S / 60.0;
+  let wStart = 0; for (let i = 0; i < endBound; i++) { if (cum[i] >= winStartMin) { wStart = i; break; } }
+  let cut = endBound;
+  for (let i = wStart; i < endBound; i++) { if (ft[i] > CHART_TEARDOWN_MS) { cut = i; break; } }
+  if (cut < n * 0.5) return n;           // defensive: never trust a cut that would drop >half the flight
+  return cut;
+}
+// Convenience: slice a chart series' frametimes to the true flight end (chart-only; stats use the full ft).
+function trimChartTail(ft, telemetryRows, headTrimS) {
+  const cut = chartFlightEndIndex(ft, telemetryRows, headTrimS);
+  return cut >= ft.length ? ft : ft.slice(0, cut);
+}
+
 // v6.3.8 — the single on-ground state is split into DEPARTING TAXI and ARRIVAL TAXI so ground
 // performance attributes to the departure vs arrival airport. The classifier only knows "ground"
 // (simconnect.js), so we split by the TIMELINE: ground before the first airborne phase = departing
@@ -179,6 +233,7 @@ function phaseLogFromTelemetry(telemetryRows) {
 }
 
 module.exports = {
-  trimHead, trimTail, trimTeardownTail, trimAtElapsed, flightEndIndex, splitFrametimesByPhase, computePhaseStats,
+  trimHead, trimTail, trimTeardownTail, trimAtElapsed, flightEndIndex, chartFlightEndIndex, trimChartTail,
+  splitFrametimesByPhase, computePhaseStats,
   phaseLogFromTelemetry, taxiBoundaries, computePhaseVram, STUTTER_FRAMETIME_MS,
 };

@@ -20,6 +20,7 @@ const { buildReport } = require('./report_html.js');
 
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
+const REPORT_V = 'chart-tail'; // marker: report.html regenerated with the v6.9.3 chart tail-trim (bump to re-run)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -84,7 +85,7 @@ function backfillCorrection(dir, summary, extPath) {
 // (regenerable) — raw logs stay put. Returns true if it rewrote the report.
 function regenReport(dir, summary, ext, tpSet) {
   try {
-    if (ext && ext.report_trim_v === TRIM_V) return false;
+    if (ext && ext.report_trim_v === REPORT_V) return false;
     const rp = path.join(dir, 'report.html');
     if (!fs.existsSync(rp)) return false;
     const t = readTrimmedFt(dir); if (!t) return false;
@@ -124,7 +125,7 @@ function runBackfill(sessionsDir, tpIcaos) {
     // regenerate the report from the trimmed data (idempotent via ext.report_trim_v)
     if (regenReport(dir, summary, ext, tpSet)) {
       reports++;
-      try { const e = ext || {}; e.report_trim_v = TRIM_V; fs.writeFileSync(extPath, JSON.stringify(e)); } catch (_) {}
+      try { const e = ext || {}; e.report_trim_v = REPORT_V; fs.writeFileSync(extPath, JSON.stringify(e)); } catch (_) {}
     }
   }
   return { corrected, skipped, noData, reports };

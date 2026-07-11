@@ -6,6 +6,7 @@
 const A = require('./report_assets.js');
 const { pyRound } = require('./stats.js');
 const RC = require('./report_charts.js');
+const { trimChartTail } = require('./phases.js');
 
 const TARGET_FRAMETIME_MS = 16.67, STUTTER_FRAMETIME_MS = 33.34;
 
@@ -82,10 +83,14 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const rdJson = pyJson({ metrics, pies: { stut: stutPie, var: varPie } });
   const sessionIdJson = pyJson(sessionId);
 
-  const [ftPoints, meanPoints, totalMin] = RC.chartFrametimeSeries(ftInOrder);
+  // v6.9.3: the CHART is trimmed to the true end of flying so no shutdown/park spike is ever drawn
+  // (stats/summary above stay on the full ftInOrder — data unchanged). Altitude auto-aligns because it
+  // filters to the shorter totalMin. over_count annotates the chart, so count it on the plotted series.
+  const chartFt = trimChartTail(ftInOrder, RC.readTelemetry(sessionDir), g(stats, 'start_trim_s') ?? 5);
+  const [ftPoints, meanPoints, totalMin] = RC.chartFrametimeSeries(chartFt);
   const altPoints = RC.chartAltitudeSeries(sessionDir, totalMin);
   const altJson = altPoints ? altPoints.map(([x, a]) => [x, PInt(a)]) : null;
-  let overCount = 0; for(const v of ftInOrder) if(v > 100.0) overCount++;
+  let overCount = 0; for(const v of chartFt) if(v > 100.0) overCount++;
   let overMax = g(stats, 'max_ft_ms');
   if(overMax == null) { overMax = 0.0; for(const v of ftInOrder) if(v > overMax) overMax = v; }
   const mavgPoints = RC.rollingMeanSeries(meanPoints);
