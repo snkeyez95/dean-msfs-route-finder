@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.8.4
+# A Better Route Planner — v6.8.5
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.8.5   Uncontrolled-arrival frequency now labelled UNICOM (not CTAF) outside the US/Australia. On VATSIM, 122.800 is the universal UNICOM; a field's tower frequency is used as CTAF only in the divisions that run it (US K/P, Australia Y). The "Next up" sequence hardcoded "CTAF" for the arrival even when it fell back to 122.800 — so an arrival like SAEZ showed "122.800 CTAF". Now it reads "122.800 UNICOM" there, and still "CTAF" at US/Australian fields.
+
 v6.8.4   Overlay/panel text fix: the recommendation's explanation line showed raw HTML codes (e.g. "SCEL&rsquo;s TWR/APP are offline &mdash; …") instead of the punctuation. The "why" text is built for the in-app card (which renders HTML), but the in-sim panel and desktop overlay show plain text — so entities like &rsquo; and &mdash; leaked through. Now decoded to proper apostrophes and dashes.
 
 v6.8.3   Extends the v6.8.2 "move forward with you" fix to the AIR, not just the ground. At 3700 ft climbing out you'd already switched to Center, but the panel still recommended Tower (Tower "covers" you near the field below 4000 ft) and even said "Center in ~3 min" while you were on it. Now the frequency you're tuned to sets a floor airborne too (Tower → Approach → Center): once you've moved up, it recommends where you are and points "Next up" at what follows — and the handoff prompt looks past the controller you're already on. Still only ever advances, never backward; you always make the switch yourself.
