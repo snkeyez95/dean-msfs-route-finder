@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.8.2
+# A Better Route Planner — v6.8.3
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.8.3   Extends the v6.8.2 "move forward with you" fix to the AIR, not just the ground. At 3700 ft climbing out you'd already switched to Center, but the panel still recommended Tower (Tower "covers" you near the field below 4000 ft) and even said "Center in ~3 min" while you were on it. Now the frequency you're tuned to sets a floor airborne too (Tower → Approach → Center): once you've moved up, it recommends where you are and points "Next up" at what follows — and the handoff prompt looks past the controller you're already on. Still only ever advances, never backward; you always make the switch yourself.
+
 v6.8.2   Live ATC recommendation now moves FORWARD with you on the ground. Before, while parked or taxiing it always recommended the lowest tier (Clearance/Delivery) because it only looked at your position. Now it also reads the frequency you're actually tuned to: once you've been handed forward — e.g. pushed back and switched to Ground — the recommendation follows you to Ground (with "Next up: Tower"), instead of pulling you back to Delivery. It only ever advances through Delivery → Ground → Tower, never backward, and still starts you on Delivery when you're on ATIS/unicom and haven't checked in yet.
 
 v6.8.1   Activate-aircraft on any route card, even with no scenery. The Activate control used to appear only when a route touched one of your 3rd-party scenery airports — so on a Free Route (or between airports you don't own scenery for) there was no way to one-click link the selected aircraft. Now the card shows an "▶ Activate aircraft" button whenever the route's aircraft (e.g. PMDG 737-800) isn't linked into your Community folder yet, regardless of scenery.

@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.8.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.8.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.8.2</div>
+    <div class="sb-ver">v6.8.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6282,15 +6282,17 @@ function recommendFreq(pos, controllers, dbMap){
   // so you HOLD Approach through the climb inside its airspace, then move to Center only on polygon exit.
   const pref = onGround ? ['DEL','GND','TWR','APP','CTR'] : ['TWR','APP','CTR','FSS'];
   const owns = t => (t==='DEL'||t==='GND'||t==='TWR');
-  // The pilot's ACTIVE radio sets a FLOOR on the ground top-down search: once you've been handed forward
-  // (e.g. pushed back onto Ground), don't recommend a LOWER tier than the field position you're already
-  // tuned to (Dean 2026-07-10 — the panel showed Delivery while he was already on Ground after pushback).
-  // Only counts covering DEL/GND/TWR positions at THIS field whose freq matches your active radio, so the
-  // recommendation only ever moves forward through DEL→GND→TWR, never back.
+  // The pilot's ACTIVE radio sets a FLOOR on the top-down search — on the ground AND airborne. Once you've
+  // been handed forward (pushed back onto Ground; climbed out and switched to Center), don't recommend a
+  // LOWER tier than the covering position you're already tuned to (Dean 2026-07-10: rec stuck on Delivery
+  // after pushback, then stuck on Tower at 3700' while already on Center). Matches the furthest COVERING
+  // position in pref whose freq == your active radio (field tiers DEL/GND/TWR must be THIS field; APP/CTR
+  // match by coverage), so the recommendation only ever moves forward, never back. No match (ATIS/unicom/
+  // default) → floor 0 → normal lowest-tier top-down.
   let floorI = 0;
-  if(onGround && pos.comActiveMhz!=null && apt){
-    for(let i=0;i<pref.length;i++){ if(!owns(pref[i])) continue;
-      if(enr.some(c=>c.tier===pref[i] && c.covers && c.apt && c.apt.icao===apt.icao && Math.abs(c.freq-pos.comActiveMhz)<LATC_FREQ_TOL)) floorI=i;
+  if(pos.comActiveMhz!=null){
+    for(let i=0;i<pref.length;i++){
+      if(enr.some(c=>c.tier===pref[i] && c.covers && Math.abs(c.freq-pos.comActiveMhz)<LATC_FREQ_TOL && (owns(pref[i])?(apt&&c.apt&&c.apt.icao===apt.icao):true))) floorI=i;
     }
   }
   for(let i=floorI;i<pref.length;i++){
@@ -7022,5 +7024,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.8.2</div>
+  pointer-events:none;">v6.8.3</div>
 </body></html>
