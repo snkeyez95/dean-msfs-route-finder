@@ -105,8 +105,8 @@ async function runAutoCapture(opts) {
     const vpilotRunning = low.includes('vpilot'), batc = low.includes('beyondatc');
     if (low.includes('autofps')) settings.autofps_active = true;
     // vPilot running ≠ on VATSIM (Dean 2026-07-10: left open as a companion but never connected). If a
-    // CID is set, CONFIRM the connection via the live datafeed; only tag 'vatsim' when it's positively
-    // NOT connected do we drop the tag. No CID / feed unreachable → fall back to process-presence (best-
+    // CID is set, CONFIRM the connection via the live datafeed; the tag is dropped ONLY when the feed
+    // positively says NOT connected. No CID / feed unreachable → fall back to process-presence (best-
     // effort; err toward tagging so an unconfirmed online flight can't silently pollute the baseline).
     let vatsim = false;
     if (vpilotRunning) {
