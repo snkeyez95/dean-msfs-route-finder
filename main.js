@@ -1067,16 +1067,20 @@ ipcMain.handle('msfs-detect', () => {
   const steamCommunity = path.join(home, 'AppData', 'Roaming', 'Microsoft Flight Simulator 2024', 'Packages', 'Community');
   const storeCommunity = path.join(home, 'AppData', 'Local', 'Packages', 'Microsoft.Limitless_8wekyb3d8bbwe', 'LocalCache', 'Packages', 'Community');
   const defaultSteamExe = 'C:\\Program Files (x86)\\Steam\\steam.exe';
+  // edition = which MSFS is actually installed (used e.g. to tag flightsim.to links with base=msfs2024).
+  // 2024 wins if both are present; only a POSITIVE 2020-only find reports '2020'.
+  const has2020 = fs.existsSync(path.join(home, 'AppData', 'Roaming', 'Microsoft Flight Simulator', 'Packages', 'Community'))
+    || fs.existsSync(path.join(home, 'AppData', 'Local', 'Packages', 'Microsoft.FlightSimulator_8wekyb3d8bbwe', 'LocalCache', 'Packages', 'Community'));
   if (fs.existsSync(steamCommunity)) {
     LOG.info('[DETECT] MSFS 2024 Steam detected. Community:', steamCommunity);
-    return {version: 'steam', communityFolder: steamCommunity, steamExe: defaultSteamExe};
+    return {version: 'steam', communityFolder: steamCommunity, steamExe: defaultSteamExe, edition: '2024'};
   }
   if (fs.existsSync(storeCommunity)) {
     LOG.info('[DETECT] MSFS 2024 Store detected. Community:', storeCommunity);
-    return {version: 'store', communityFolder: storeCommunity};
+    return {version: 'store', communityFolder: storeCommunity, edition: '2024'};
   }
-  LOG.info('[DETECT] MSFS 2024 not found at known paths');
-  return {version: null, communityFolder: null};
+  LOG.info('[DETECT] MSFS 2024 not found at known paths' + (has2020 ? ' (MSFS 2020 present)' : ''));
+  return {version: null, communityFolder: null, edition: has2020 ? '2020' : null};
 });
 
 ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {

@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.9.3
+# A Better Route Planner — v6.9.4
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.9.4   FLIGHTSIM.TO LINKS NOW FILTER TO MSFS 2024. The "Search flightsim.to" links (Challenging Approaches) and the GSX "flightsim.to" search pills now add the site's MSFS 2024 filter (base=msfs2024) automatically, so you stop seeing MSFS 2020 scenery/GSX results. The app detects which sim you have installed: 2024 gets the filter (that's you); if only MSFS 2020 is found, the links stay exactly as before. Direct download links to a specific file aren't touched.
+
 v6.9.3   CLEANER PERFORMANCE CHARTS — shutdown spikes are gone from the graphs. The frametime chart on every flight report used to still draw the sim's shutdown/park hitches at the very end (the tall spike near the right edge), even though your headline numbers already excluded them. Now the chart ends exactly where real flying stops: it detects the true end of flight (parking brake, the VRAM drop as the sim unloads, or the shutdown-hitch pattern) and trims the parked/teardown tail from the plot. Real in-flight hitches on climb, cruise, and approach are always kept; only the gate teardown is dropped. Your data and scores are unchanged — this is a chart-only fix. Applies to new flights and re-draws all your existing reports automatically on launch.
 
 v6.9.2   Two big Live ATC upgrades, both bench-proven. (1) VATGLASSES AIRSPACE: the frequency recommendation now uses the VATGlasses community sector data as its finest layer — exact sub-sector positions (which London sector owns YOUR chunk of sky, not just "a London Center"), altitude-aware boundaries, and real-world ownership priority when positions combine. Where the data has no coverage (much of the US) everything behaves exactly as before. The airspace database rebuilds itself on first launch (~5s, one time). (2) PMDG SET-STANDBY: on the PMDG 737 the Live ATC card gains a "Set standby" button that walks the radio's own knobs to the recommended frequency — closed-loop (it watches the radio respond and corrects course), verified honestly, aborts if you touch the knob, and disables itself for the session if the radio doesn't respond. Standby only, click only, never the active frequency, never automatic. Other aircraft are unchanged (read-only). Plus: full pre-release QA audit of v6.8.x–v6.9.1 (zero product findings; regression board 39/39 green).
