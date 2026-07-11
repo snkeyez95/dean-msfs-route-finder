@@ -2103,7 +2103,7 @@ function addonRow(id,kind,label,meta,on){
       <span style="font-size:13px;color:var(--ink1)">${label}</span>
       ${meta?`<span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-left:8px">${meta}</span>`:''}
     </span>
-    <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${on?'var(--grn)':'var(--ink4)'}">${on?'LINKED':'off'}</span>
+    <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${on?'var(--grn)':'var(--ink3)'}">${on?'LINKED':'off'}</span>
   </label>`;
 }
 
@@ -2275,7 +2275,7 @@ function acftGroupRow(g,on){
       <span style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-left:8px">${g.packages.length} package${g.packages.length!==1?'s':''}</span>${depSummary}
     </span>
     <span onclick="toggleDepEdit('${esc(g.id)}')" style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${deps.length?'var(--blu)':'var(--ink3)'};border:1px solid var(--sep);border-radius:6px;padding:2px 7px;cursor:pointer" title="Set which other groups this one needs">requires${open?' ▴':' ▾'}</span>
-    <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${on?'var(--grn)':'var(--ink4)'};min-width:34px;text-align:right">${on?'LINKED':'off'}</span>
+    <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${on?'var(--grn)':'var(--ink3)'};min-width:34px;text-align:right">${on?'LINKED':'off'}</span>
   </div>`;
   if(open){
     const others=S.acftGroups.filter(x=>x.id!==g.id);
