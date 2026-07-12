@@ -25,7 +25,7 @@
 <div id="panel">
   <div class="st" id="st"></div>
   <div class="atis" id="atis"></div>
-  <div class="k">Frequency to be on</div>
+  <div class="k" id="klabel">Frequency to be on</div>
   <div class="freq" id="freq">&mdash;</div>
   <div class="who" id="who"></div>
   <div class="why" id="why"></div>
@@ -35,7 +35,8 @@
 <script>
   const dot=document.getElementById('dot'), panel=document.getElementById('panel');
   const st=document.getElementById('st'), atis=document.getElementById('atis'), freq=document.getElementById('freq'),
-        who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), cur=document.getElementById('cur');
+        who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), cur=document.getElementById('cur'),
+        klabel=document.getElementById('klabel');
   let expanded=false, collapseTimer=null, statusTimer=null, curIgnore=true;
 
   // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note).
@@ -62,7 +63,13 @@
     freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
     atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
     nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
-    cur.textContent=p.cur||''; cur.style.display=p.cur?'block':'none';
+    // On-frequency: the header confirms ("ON FREQUENCY ✓" green + green number) and the redundant
+    // "you're tuned to X" line is dropped. Otherwise it instructs ("Frequency to be on") and shows
+    // what you're currently on so the gap is obvious.
+    if(p.onFreq){ klabel.textContent='On frequency ✓'; klabel.style.color='#46c46a'; freq.style.color='#46c46a';
+      cur.style.display='none'; }
+    else{ klabel.textContent='Frequency to be on'; klabel.style.color=''; freq.style.color='';
+      cur.textContent=p.cur||''; cur.style.display=p.cur?'block':'none'; }
     // New recommended frequency: pop open (+chime) if enabled, else just pulse the dot to flag it.
     if(p.isNewRec){ if(p.pop!==false){ autoExpand(20000); if(p.sound) beep(); } else { dot.classList.add('pulse'); } }
   });
