@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.10.4
+# A Better Route Planner — v6.10.5
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.10.5  TWO PLAN-A-FLIGHT SAFEGUARDS. (1) A route you're actively flying no longer disappears from Plan a Flight mid-session: SimBrief, Activate, Quick Launch, and Launch + Capture all now keep that route visible under the "Fresh routes" filter until you next restart the app (it was already doing this for SimBrief only). (2) Launch + Capture now checks activation: if the route's aircraft (or its 3rd-party scenery) isn't activated, the launch confirmation shows a "⚠ You have NOT activated…" heads-up — so you don't spawn in without your plane. No extra clicks when everything's already activated.
+
 v6.10.4  IN-SIM OVERLAY — "ON FREQUENCY" CONFIRMATION. When you're already tuned to the frequency the overlay recommends, it now flips from the amber "Frequency to be on" instruction to a green "On frequency ✓" confirmation (and the number turns green), and it drops the now-redundant "you're tuned to X" line. When you're not on it yet, it still instructs and shows your current frequency so the gap is clear. Cleaner glance: amber = get on this, green = you're set.
 
 v6.10.3  AUDIT FIXES. Full adversarial audit of everything since v6.9.2 (45 test suites, all green; the Live ATC core verified byte-identical). Two fixes: (1) with the 📡 VATSIM toggle on, a search/filter that matched zero routes could send the route list into an endless refresh loop (CPU pegged) — now the refresh fires exactly once per network update regardless of what's in the list; (2) app startup no longer waits on the sim-detection check before painting your theme — boots a touch faster with no flash.

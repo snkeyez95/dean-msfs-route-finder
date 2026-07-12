@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.10.4</div>
+  <div class="tname">A Better Route Planner &mdash; v6.10.5</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.10.4</div>
+    <div class="sb-ver">v6.10.5</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2897,7 +2897,7 @@ function renderRoutes(){
         <button class="btn bp bsm" onclick="openSimBrief('${r.departure_airport}','${r.arrival_airport}','${r.aircraft_type}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'main',i,r.aircraft_type)}
-        ${qlBtnHtml()}
+        ${qlBtnHtml(r.departure_airport,r.arrival_airport,r.aircraft_type)}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -3193,7 +3193,7 @@ function renderFreeRouteResults(){
         <button class="btn bp bsm" onclick="openSimBrief('${nmDep}','${nmArr}','${t}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('https://skyvector.com/?fpl=${nmDep}%20${nmArr}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(nmDep,nmArr,'fr','nm',t)}
-        ${qlBtnHtml()}
+        ${qlBtnHtml(nmDep,nmArr,t)}
       </div>
       <div class="dp-note">No scheduled routes for ${nmDep} &rarr; ${nmArr}${t?' with the '+tLabel:' with your active fleet'} &mdash; open in SimBrief to plan it manually.${t?' SimBrief will be set up as '+tLabel+'.':''}</div>
     </div></td></tr>`;
@@ -3279,7 +3279,7 @@ function renderFreeRouteResults(){
         <button class="btn bp bsm" onclick="openSimBrief('${dep}','${arr}','${acType}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(r.departure_airport,r.arrival_airport,'fr',i,r.aircraft_type)}
-        ${qlBtnHtml()}
+        ${qlBtnHtml(r.departure_airport,r.arrival_airport,r.aircraft_type)}
       </div>
       <div class="dp-note">Use FlightAware to confirm direct service before filing in SimBrief.</div>
     </div></td></tr>`;
@@ -3673,7 +3673,7 @@ function renderTripCard(){
         <button class="btn bp bsm" onclick="openSimBrief('${leg.dep}','${leg.arr}','${sbType}','${sbU}')">&#9992; Open in SimBrief</button>
         <button class="btn bg bsm" onclick="window.api.openExternal('${svU}')">&#128506; SkyVector</button>
         ${sceneryBtnHtml(leg.dep,leg.arr,'tp',i,sbType)}
-        ${qlBtnHtml()}
+        ${qlBtnHtml(leg.dep,leg.arr,sbType)}
       </div>
     </div></td></tr>`;
     return[main,det];
@@ -3790,6 +3790,7 @@ function sceneryBtnHtml(dep,arr,ns,idx,acType){
 
 async function doActivateScenery(dep,arr,acType){
   if(!S.cfg.communityFolder){alert('Set your Community folder in Settings → Sim Integration first.');return;}
+  protectRoutePair(dep,arr);   // activating a route = you're flying it → keep it visible this session
   // Link EVERY package of EVERY folder owned by dep and by arr (an ICAO can have >1 folder, and a
   // folder can wrap >1 package, e.g. KLAS).
   const items=S.allRows.filter(r=>(r.icao===dep||r.icao===arr)&&r.selected!==false).flatMap(rowPkgItems);
@@ -3832,15 +3833,19 @@ async function doDeactivateScenery(dep,arr){
 }
 
 // ── QUICK LAUNCH COMPANION APPS ──────────────────────────────────────────────
-function qlBtnHtml(){
+function qlBtnHtml(dep,arr,acType){
   // Quick Launch (companions + MSFS) and, right beside it, the one-click Launch + Capture (auto-TLOD
   // for this SimBrief flight → close apps → companions → MSFS → capture). Same size; subtle accent
-  // tint differentiates it. SimBrief the route first so auto-TLOD can read the aircraft.
-  return`<button class="btn bg bsm" onclick="quickLaunchAll()">&#9889; Quick Launch</button>`
-    +`<button class="btn bg bsm" style="border-color:var(--acc);color:var(--acc)" onclick="launchAndCapture()" title="One click: set the next benchmark TLOD for this SimBrief aircraft (or a Settings Lab experiment once your benchmark is complete; nothing once it's done and the Lab is off), close your apps, launch companions + MSFS, and capture — apps reopen after the sim. Open in SimBrief first.">&#128640; Launch + Capture</button>`;
+  // tint differentiates it. SimBrief the route first so auto-TLOD can read the aircraft. The route
+  // context (dep/arr/aircraft) is passed so both actions keep the route visible this session and
+  // Launch + Capture can warn when its aircraft/scenery isn't activated (Dean 2026-07-12).
+  const ctx=(dep&&arr)?("'"+dep+"','"+arr+"','"+(acType||'')+"'"):'';
+  return`<button class="btn bg bsm" onclick="quickLaunchAll(${ctx})">&#9889; Quick Launch</button>`
+    +`<button class="btn bg bsm" style="border-color:var(--acc);color:var(--acc)" onclick="launchAndCapture(${ctx})" title="One click: set the next benchmark TLOD for this SimBrief aircraft (or a Settings Lab experiment once your benchmark is complete; nothing once it's done and the Lab is off), close your apps, launch companions + MSFS, and capture — apps reopen after the sim. Open in SimBrief first.">&#128640; Launch + Capture</button>`;
 }
 
-async function quickLaunchAll(){
+async function quickLaunchAll(dep,arr,acType){
+  if(protectRoutePair(dep,arr)&&S.freshOnly)renderRoutes();   // keep this route visible in Plan a Flight this session
   // Companion apps start immediately; MSFS is delayed 5s (the 5s lets companions settle before the
   // sim starts).
   const apps=S.cfg.quickLaunchApps||[];
@@ -4789,10 +4794,28 @@ async function perfArmCapture(){
 // coverage model as the tracker) -> close checked apps -> launch companions -> launch MSFS -> arm
 // capture. Apps reopen on sim-close via the watcher. The TLOD it set is surfaced so it visibly
 // matches the Performance tracker. Assumes you've already generated your SimBrief plan + MSFS is cold.
-async function launchAndCapture(){
+async function launchAndCapture(dep,arr,acType){
+  // Activation awareness (Dean 2026-07-12): Launch + Capture is a per-route button, so it knows which
+  // aircraft/scenery this flight needs — and Activate is what links your plane. Warn (in the existing
+  // confirm, no extra click on the happy path) when the route's aircraft or its 3rd-party scenery
+  // isn't activated, so you don't spawn without your plane.
+  let warn='';
+  if(dep&&arr){
+    const acGroup=acType?aircraftGroupForType(acType):null;
+    const acActive=acGroup?(S.cfg.aircraftActive||[]).includes(acGroup.id):true;   // null group (e.g. default Cessna) → nothing to warn
+    const junc=S.cfg.activeJunctions||[];
+    const depRows=S.allRows.filter(x=>x.icao===dep&&x.selected!==false);
+    const arrRows=S.allRows.filter(x=>x.icao===arr&&x.selected!==false);
+    const sceneryNeeded=depRows.length||arrRows.length;   // only 3rd-party library airports have rows
+    const sceneryLinked=(!depRows.length||depRows.every(x=>rowLinked(x,junc)))&&(!arrRows.length||arrRows.every(x=>rowLinked(x,junc)));
+    const missing=[];
+    if(acGroup&&!acActive)missing.push('the aircraft ('+((typeof FLEET_LBL!=='undefined'&&FLEET_LBL[acType])||acType)+')');
+    if(sceneryNeeded&&!sceneryLinked)missing.push('scenery for '+dep+'/'+arr);
+    if(missing.length)warn='⚠ You have NOT activated '+missing.join(' or ')+'.\nYou may spawn without it — use “Activate” on the route card first.\n\n';
+  }
   const closeApps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
   const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path);
-  const msg='Launch a clean benchmark flight?\n\nThis will, in order:\n'
+  const msg=warn+'Launch a clean benchmark flight?\n\nThis will, in order:\n'
     +(S.cfg.labMode?'1. Apply your next Settings Lab experiment for your SimBrief aircraft (or set the next benchmark TLOD if the grid still has gaps)\n'
                     :'1. Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete — your current settings are left alone)\n')
     +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
@@ -4801,6 +4824,7 @@ async function launchAndCapture(){
     +'Make sure you’ve already generated your SimBrief plan and MSFS isn’t already running.\n'
     +'A summary note appears after OK — no more clicks needed.';
   if(!confirm(msg))return;
+  if(protectRoutePair(dep,arr)&&S.freshOnly)renderRoutes();   // you're flying it → keep it visible in Plan a Flight this session
   // 1) Auto-TLOD — must finish BEFORE MSFS launches (it writes UserCfg.opt; engine backs it up).
   let prep; try{ prep=await window.api.perfPrepNext(); }catch(e){ prep={ok:false,error:(e&&e.message)||'error'}; }
   if(!(prep&&prep.set)){
@@ -5068,6 +5092,16 @@ function renderDashStats(){
   el.innerHTML=card('Airports in Library',airports,'va')+card('Routes in Registry',routes,'vg')+card('Fleet Aircraft',fleet,'vb')+card('Companion Apps',apps,'vw');
 }
 
+// Keep a route visible in Plan a Flight's "Fresh routes" filter for the REST OF THIS SESSION — it only
+// begins hiding next app launch (S.sessionSimBrief resets each run). Called whenever you actively engage
+// a route: SimBrief it, Activate it, Quick Launch or Launch + Capture it. Fixes Dean's 2026-07-12 case
+// where a route he'd just launched (already in recentSimBriefRoutes from a prior session) vanished from
+// Plan a Flight mid-session — you should never lose sight of a flight you're actively flying.
+function protectRoutePair(dep,arr){
+  if(!dep||!arr)return false;
+  (S.sessionSimBrief||(S.sessionSimBrief=new Set())).add([dep,arr].sort().join('>'));
+  return true;
+}
 function openSimBrief(dep,arr,type,url){
   RLOG('[SB] openSimBrief called: dep='+dep+' arr='+arr+' type='+type);
   const entry={dep,arr,type,ts:Date.now()};
@@ -7341,5 +7375,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.10.4</div>
+  pointer-events:none;">v6.10.5</div>
 </body></html>
