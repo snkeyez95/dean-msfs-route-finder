@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.10.6
+# A Better Route Planner — v6.10.7
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.10.7  TRIM-ACCURACY FIX (found on the first brake-trimmed flight). When a flight's end was trimmed by a ground-truth anchor — the parking brake or your last movement — the Compare view and felt-stutter numbers were still pulling their max/spike counts from a secondary "teardown" recompute that trims a little less. They now use the more accurate brake/movement trim. One-frame difference on the flight that surfaced it; only affects brake/movement-trimmed flights (everything else is unchanged).
+
 v6.10.6  DASHBOARD SHOWS ONLY FLOWN FLIGHTS. The dashboard's "Recent Routes" list now comes from your performance capture log — actual flights the logger recorded — instead of routes you merely opened in SimBrief. Plan or SimBrief a route and it no longer appears here; you have to fly it (with Launch + Capture). Repeated hops are collapsed to the most recent, newest first. (The "Fresh routes" filter in Plan a Flight is unchanged — that still tracks what you've planned.)
 
 v6.10.5  TWO PLAN-A-FLIGHT SAFEGUARDS. (1) A route you're actively flying no longer disappears from Plan a Flight mid-session: SimBrief, Activate, Quick Launch, and Launch + Capture all now keep that route visible under the "Fresh routes" filter until you next restart the app (it was already doing this for SimBrief only). (2) Launch + Capture now checks activation: if the route's aircraft (or its 3rd-party scenery) isn't activated, the launch confirmation shows a "⚠ You have NOT activated…" heads-up — so you don't spawn in without your plane. No extra clicks when everything's already activated.

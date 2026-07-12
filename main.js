@@ -1261,6 +1261,10 @@ ipcMain.handle('perf-compare-data', () => {
     const data = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
     const flights = (data.sessions || []).map(s => {
       let avg_vram_mb = null, spike_count = null, total_vram_mb = null, perceptible_count = null, duration_seconds = null;
+      // v6.10.7: when the summary was trimmed by a GROUND-TRUTH anchor (parking brake / last-movement,
+      // v6.6.1/v6.9.5), its max/spike/perceptible are more accurate than the sidecar's teardown recompute
+      // — so the sidecar must NOT override them (it would slightly under-trim vs the brake/movement cut).
+      let groundTruthTrim = false;
       // v6.3.8 5-phase model: departing + arrival taxi (each p99/stutter/peak-VRAM). New flights carry
       // it in summary.smoothness.phases; the 24 pre-v6.3.8 flights carry it in the phases_ext.json
       // sidecar (originals untouched). Also dep/arr ICAO + 3rd-party scenery flags.
@@ -1277,6 +1281,8 @@ ipcMain.handle('perf-compare-data', () => {
           if (sj && sj.smoothness && sj.smoothness.spike_count != null) spike_count = sj.smoothness.spike_count;
           if (sj && sj.smoothness && sj.smoothness.perceptible_count != null) perceptible_count = sj.smoothness.perceptible_count;
           if (sj && sj.smoothness && sj.smoothness.duration_seconds != null) duration_seconds = sj.smoothness.duration_seconds;
+          const tm = sj && sj.smoothness && sj.smoothness.trim_method;
+          if (tm === 'brake' || tm === 'movement') groundTruthTrim = true;
           const ph = sj && sj.smoothness && sj.smoothness.phases;
           if (ph && (ph.dep_taxi || ph.arr_taxi)) { dep_taxi = ph.dep_taxi || null; arr_taxi = ph.arr_taxi || null; }
         }
@@ -1287,7 +1293,8 @@ ipcMain.handle('perf-compare-data', () => {
           const ext = path.join(fdir, 'phases_ext.json');
           if (fs.existsSync(ext)) { try {
             const e = JSON.parse(fs.readFileSync(ext, 'utf8')); const p = e.phases || {};
-            const corrected = e.trim_v === 'teardown';
+            // teardown recompute corrects OLD flights, but never overrides a brake/movement-trimmed summary
+            const corrected = e.trim_v === 'teardown' && !groundTruthTrim;
             if ((corrected || (!dep_taxi && !arr_taxi)) && (p.dep_taxi || p.arr_taxi)) {
               dep_taxi = p.dep_taxi || dep_taxi; arr_taxi = p.arr_taxi || arr_taxi;
             }
