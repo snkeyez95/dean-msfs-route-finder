@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.10.5
+# A Better Route Planner — v6.10.6
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.10.6  DASHBOARD SHOWS ONLY FLOWN FLIGHTS. The dashboard's "Recent Routes" list now comes from your performance capture log — actual flights the logger recorded — instead of routes you merely opened in SimBrief. Plan or SimBrief a route and it no longer appears here; you have to fly it (with Launch + Capture). Repeated hops are collapsed to the most recent, newest first. (The "Fresh routes" filter in Plan a Flight is unchanged — that still tracks what you've planned.)
+
 v6.10.5  TWO PLAN-A-FLIGHT SAFEGUARDS. (1) A route you're actively flying no longer disappears from Plan a Flight mid-session: SimBrief, Activate, Quick Launch, and Launch + Capture all now keep that route visible under the "Fresh routes" filter until you next restart the app (it was already doing this for SimBrief only). (2) Launch + Capture now checks activation: if the route's aircraft (or its 3rd-party scenery) isn't activated, the launch confirmation shows a "⚠ You have NOT activated…" heads-up — so you don't spawn in without your plane. No extra clicks when everything's already activated.
 
 v6.10.4  IN-SIM OVERLAY — "ON FREQUENCY" CONFIRMATION. When you're already tuned to the frequency the overlay recommends, it now flips from the amber "Frequency to be on" instruction to a green "On frequency ✓" confirmation (and the number turns green), and it drops the now-redundant "you're tuned to X" line. When you're not on it yet, it still instructs and shows your current frequency so the gap is clear. Cleaner glance: amber = get on this, green = you're set.
