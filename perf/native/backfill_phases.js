@@ -17,10 +17,11 @@ const fs = require('fs'), path = require('path');
 const { readChronological, readTelemetry } = require('./report_charts.js');
 const { trimHead, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram } = require('./phases.js');
 const { buildReport } = require('./report_html.js');
+const { buildCombinedReport } = require('./report_combined.js');
 
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
-const REPORT_V = 'chart-tail'; // marker: report.html regenerated with the v6.9.3 chart tail-trim (bump to re-run)
+const REPORT_V = 'autofps-label'; // marker: bump to force a one-time report.html regen for ALL flights (v6.10.8: AutoFPS 'dynamic TLOD' label)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -128,6 +129,9 @@ function runBackfill(sessionsDir, tpIcaos) {
       try { const e = ext || {}; e.report_trim_v = REPORT_V; fs.writeFileSync(extPath, JSON.stringify(e)); } catch (_) {}
     }
   }
+  // If any per-flight report regenerated, rebuild the dashboard too so its table reflects the same
+  // builders (e.g. the AutoFPS 'dynamic TLOD' flag). combined_report.html is derived/regenerable.
+  if (reports > 0) { try { fs.writeFileSync(path.join(sessionsDir, 'combined_report.html'), buildCombinedReport(idx.sessions || [])); } catch (_) {} }
   return { corrected, skipped, noData, reports };
 }
 
