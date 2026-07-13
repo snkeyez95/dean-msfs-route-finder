@@ -21,7 +21,7 @@ const { buildCombinedReport } = require('./report_combined.js');
 
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
-const REPORT_V = 'autofps-label'; // marker: bump to force a one-time report.html regen for ALL flights (v6.10.8: AutoFPS 'dynamic TLOD' label)
+const REPORT_V = 'autofps-only'; // marker: bump to force a one-time report.html regen for ALL flights (v6.10.8: AutoFPS flights show "AutoFPS" not a TLOD number)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 

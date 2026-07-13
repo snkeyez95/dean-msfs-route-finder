@@ -93,9 +93,9 @@ function buildCombinedReport(sessions){
     const p = s.p99_ft_ms, gr = gradeP99(p), vmb = s.peak_vram_mb;
     const vdisp = vmb ? RC.fmt(vmb / 1024, 1) + ' GB' : 'n/a';
     const ac = s.aircraft || 'n/a', tl = s.tlod, tld = tl != null ? String(tl) : 'n/a';
-    // AutoFPS flights: the logged TLOD is only the launch value (it was driven dynamically) — flag it
-    // so the dashboard column isn't read as a fixed-TLOD data point (Dean 2026-07-12).
-    const tldDisp = s.autofps_active ? ('<span title="AutoFPS — dynamic TLOD; ' + tld + ' was only the launch value">' + tld + '·AFPS</span>') : tld;
+    // AutoFPS flights: the logged TLOD is only the launch value (it was driven dynamically) — show
+    // "AutoFPS" instead of a misleading number (Dean 2026-07-12).
+    const tldDisp = s.autofps_active ? ('<span title="AutoFPS — dynamic TLOD (launch value ' + tld + ')">AutoFPS</span>') : tld;
     const folder = (s.folder || '').replace(/\\/g, '/');
     const href = folder ? folder + '/report.html' : '';
     // v6.3.8: ✳ next to an airport in the route when it's a 3rd-party scenery the user owns.
