@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.10.7
+# A Better Route Planner — v6.10.8
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.10.8  LIVE ATC + REPORT FIXES (five caught live on a low-ATC-coverage VATSIM flight, KBOS→CYYZ). (1) AutoFPS flights now label their TLOD as "dynamic · AutoFPS" in the per-flight report and dashboard, so the launch value isn't mistaken for a fixed setting. (2) Runway parser ignores turn-off/exit/closed phrasing — a runway named only as "approved for turn off after landing" is no longer read as an active departure runway (KBOS was showing 33R instead of 9). (3) The "may cover you top-down — verify" hint no longer fires for distant controllers it can't place — a Center across the country won't claim to cover you, and the enroute wording is cleaner. (4) CTAF is now suggested only at YOUR departure/arrival airports, not every little field you overfly, and it releases to UNICOM 122.800 once you've climbed out; the overlay also waits for a recommendation to settle before re-alerting, so no more chime spam through busy areas. (5) The "ATIS first" prompt now shows the ATIS for the field you're actually at — no more suggesting your departure airport's ATIS after you've landed at the destination.
 v6.10.7  TRIM-ACCURACY FIX (found on the first brake-trimmed flight). When a flight's end was trimmed by a ground-truth anchor — the parking brake or your last movement — the Compare view and felt-stutter numbers were still pulling their max/spike counts from a secondary "teardown" recompute that trims a little less. They now use the more accurate brake/movement trim. One-frame difference on the flight that surfaced it; only affects brake/movement-trimmed flights (everything else is unchanged).
 
 v6.10.6  DASHBOARD SHOWS ONLY FLOWN FLIGHTS. The dashboard's "Recent Routes" list now comes from your performance capture log — actual flights the logger recorded — instead of routes you merely opened in SimBrief. Plan or SimBrief a route and it no longer appears here; you have to fly it (with Launch + Capture). Repeated hops are collapsed to the most recent, newest first. (The "Fresh routes" filter in Plan a Flight is unchanged — that still tracks what you've planned.)

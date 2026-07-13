@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.10.7</div>
+  <div class="tname">A Better Route Planner &mdash; v6.10.8</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.10.7</div>
+    <div class="sb-ver">v6.10.8</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -5968,6 +5968,9 @@ function extractRunways(text,icao,direction){
     const tok=m[1],pos=m.index;
     const n=parseInt(tok,10);if(n<1||n>36)continue;        // runway numbers 01–36
     if(!datisValidRwy(icao,tok))continue;                   // must be a real runway
+    // a runway named only as a turn-off / exit / closure is NOT an active runway (Dean 2026-07-12:
+    // KBOS "RWY 33R IS APPROVED FOR TURN OFF AFTER LDG" was mis-read as a departure runway)
+    if(/\b(TURN\s?OFF|TURNOFF|EXIT|CLSD|CLOSED)\b/.test(t.slice(pos, pos+30)))continue;
     // nearest cue starting at or before this token, within a 30-char window
     let best=null;
     for(const c of cues){ if(c.pos>pos)break; if(pos-c.pos<=30)best=c; }
@@ -5981,6 +5984,7 @@ function extractRunways(text,icao,direction){
       let r;const rre=/\bRWY\s*(\d{1,2}[LRC]?)/g;
       while((r=rre.exec(t))!==null){
         const tok=r[1],n=parseInt(tok,10);
+        if(/\b(TURN\s?OFF|TURNOFF|EXIT|CLSD|CLOSED)\b/.test(t.slice(r.index, r.index+34)))continue;
         if(n>=1&&n<=36&&datisValidRwy(icao,tok)&&!out.includes(tok))out.push(tok);
       }
     }
@@ -6232,7 +6236,8 @@ function flightMins(nm){return Math.round((nm/450)*60*1.10)+BLOCK_PAD_MIN;}   //
 const LATC={ on:false, status:'off', pos:null, controllers:[], db:null, dbLoading:false, posIv:null, feedIv:null, lastSetHz:null, autoSet:false };
 const LATC_TIER={2:'DEL',3:'GND',4:'TWR',5:'APP',6:'CTR',1:'FSS'};
 const LATC_RADIUS={CTR:400,APP:150,TWR:50,GND:20,DEL:10,FSS:600};   // default coverage nm when visual_range is 0/missing
-const LATC_TWR_NM=7, LATC_TWR_AGL=4000, LATC_NEARFIELD_NM=20, LATC_UNICOM=122.800;   // Tower owns near-field+low only; near-field = CTAF-vs-UNICOM cutoff
+const LATC_TWR_NM=7, LATC_TWR_AGL=4000, LATC_NEARFIELD_NM=20, LATC_UNICOM=122.800;   // Tower owns near-field+low only
+const LATC_CTAF_NM=15, LATC_CTAF_AGL=4000;   // v6.10.8 (Dean's KBOS→CYYZ): CTAF/field-of-interest = your OWN dep/arr field — near the DEP field only while low (release on climb-out), near the ARR field at any altitude (engage on approach); else enroute UNICOM
 function latcTierLabel(t){ return {DEL:'Clearance/Delivery',GND:'Ground',TWR:'Tower',APP:'Approach',CTR:'Center',FSS:'Radio/FSS',UNICOM:'UNICOM',CTAF:'CTAF'}[t]||t; }
 function latcHz(mhz){ return Math.round(mhz*1e6); }
 function latcFmt(mhz){ return (Math.round(mhz*1000)/1000).toFixed(3); }
@@ -6533,7 +6538,7 @@ function vgCovers(callsign, freqMhz, vgAt){
 
 // PURE recommendation. pos={lat,lon,agl,onGround}; controllers=raw datafeed; dbMap=Map(icao→airport).
 // CTR/FSS coverage uses airspace polygons (airspaceCovers) when loaded; else they stay "verify".
-function recommendFreq(pos, controllers, dbMap){
+function recommendFreq(pos, controllers, dbMap, route){
   const vgAt=_vgAt(pos, controllers);                              // Stage 4c: VATGlasses ownership, resolved once per poll (null = no data)
   const enr=[];
   for(const c of (controllers||[])){
@@ -6570,13 +6575,32 @@ function recommendFreq(pos, controllers, dbMap){
   }
   // positions we could NOT place (CTR/FSS with no airspace data, or APP/TWR whose callsign isn't an
   // airport code, e.g. LON_APP) — surfaced as "verify" rather than dropped.
-  const verify=enr.filter(c=>!c.placed).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
-  const near=latcNearestAirport(pos, dbMap);
-  const nearDist=near?gcDist(pos.lat,pos.lon,near.lat,near.lon):null;
+  // "verify" = online positions we couldn't place — but only claim one "may cover you" if we can at
+  // least ROUGHLY locate it (via its callsign→airport) AND it's within a plausible top-down range. A
+  // position we can't locate at all (a distant CTR/FSS with no polygon) makes NO coverage claim — that
+  // was the KBOS false positive (Salt Lake / Denver centers "may cover you" in Boston). Dean 2026-07-12.
+  const verify=enr.filter(c=>!c.placed).filter(c=>{
+    const a=latcAirportForCallsign(c.callsign, dbMap); if(!a) return false;
+    return gcDist(pos.lat,pos.lon,a.lat,a.lon) <= ((c.tier==='CTR'||c.tier==='FSS')?500:200);
+  }).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
+  // FIELD OF INTEREST = your DEP/ARR field (route-aware), NOT the nearest random field you overfly
+  // (Dean 2026-07-12: enroute over the dense US northeast it kept latching CTAF onto KLWM etc.). Near
+  // the DEP field counts only while low (release CTAF on climb-out); near the ARR field counts at any
+  // altitude (engage on approach). No filed route → nearest field, still altitude-gated so it can't
+  // stick on climb-out.
   const onGround=!!pos.onGround;
-  const nearField = onGround || (nearDist!=null && nearDist<=LATC_NEARFIELD_NM);   // at/near a field → CTAF (not UNICOM) fallback
+  const low = onGround || pos.agl==null || pos.agl<LATC_CTAF_AGL;
+  const depApt = route&&route.dep ? dbMap.get(String(route.dep).toUpperCase()) : null;
+  const arrApt = route&&route.arr ? dbMap.get(String(route.arr).toUpperCase()) : null;
+  let near=null, nearDist=null, isDepField=false;
+  if(depApt||arrApt){
+    for(const [a,isDep] of [[depApt,true],[arrApt,false]]){ if(!a) continue; const d=gcDist(pos.lat,pos.lon,a.lat,a.lon); if(nearDist==null||d<nearDist){ nearDist=d; near=a; isDepField=isDep; } }
+  } else {
+    near=latcNearestAirport(pos, dbMap); nearDist=near?gcDist(pos.lat,pos.lon,near.lat,near.lon):null; isDepField=true;   // no route → treat like a dep field (altitude-gated)
+  }
+  const nearField = onGround || (nearDist!=null && nearDist<=LATC_CTAF_NM && (isDepField ? low : true));
   const phase = onGround ? 'ground' : (nearField ? 'airport' : 'enroute');         // display pill only
-  const apt = near;                                                                // DEL/GND/TWR ownership match
+  const apt = near;                                                                // DEL/GND/TWR ownership match (your dep/arr field)
   // On the ground, work field positions top-down (DEL→GND→TWR→APP→CTR). Airborne, let REALISTIC coverage
   // decide (Tower=near-field+low, Approach=its polygon/circle, Center=its FIR) — no fixed-altitude snap,
   // so you HOLD Approach through the climb inside its airspace, then move to Center only on polygon exit.
@@ -6607,7 +6631,7 @@ function recommendFreq(pos, controllers, dbMap){
       return {found:true, tier, freq:pick.freq, callsign:pick.callsign, label:latcTierLabel(tier), why, phase, apt, others, verify};
     }
   }
-  if(!nearField) return {found:false, tier:'UNICOM', freq:LATC_UNICOM, callsign:null, label:'UNICOM', why:verify.length?('No field position applies enroute &mdash; '+verify.length+' ATC online we can&rsquo;t place precisely; verify which covers you (precise airspace comes in a later update)'):'No ATC online in your area', phase, apt:null, others:[], verify};
+  if(!nearField) return {found:false, tier:'UNICOM', freq:LATC_UNICOM, callsign:null, label:'UNICOM', why:verify.length?('No ATC covers your area &mdash; UNICOM 122.800. '+verify.length+' nearby position'+(verify.length>1?'s':'')+' we couldn&rsquo;t place precisely &mdash; verify'):'No ATC in your area &mdash; UNICOM 122.800', phase, apt:null, others:[], verify};
   // VATSIM CTAF is a US/VATPAC thing — a field's tower freq is the CTAF only in the divisions that run it
   // (US: K/P, Australia: Y). Everywhere else VATSIM uses the universal 122.800 unicom for uncontrolled fields.
   const ctaf = (apt && apt.twr && /^[KPY]/.test(apt.icao)) ? apt.twr : null;
@@ -6812,7 +6836,7 @@ function latcCheckToasts(){
     if(rec.callsign===LATC._handoffKey) LATC._handoffKey=null;   // handoff completed → allow the next one
   } else { LATC._handoffKey=null; }
 }
-function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db):null; }
+function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db, latcBriefRoute()):null; }
 // Read-only "what's next" helper (v6.8.0 — auto-tune abandoned; this only informs the display now).
 // Given the frequency your COM1 ACTIVE radio is actually on, return the NEXT frequency in the sequence
 // so we can show "you're on X → next Y". Falls back to the current rec until you're on it. Read-only —
@@ -6856,14 +6880,23 @@ function latcPushOverlay(){
   if(!rec){ try{ window.api.overlayState({live:false}); }catch(e){} return; }
   const seq=latcSeqForNow(), nextUp=latcNextUp(rec, seq);
   let atis='';
-  if(rec.phase==='ground'){ const r0=latcBriefRoute(); const da=(r0&&LATC.db)?latcAtisFreq(r0.dep,'dep'):null; if(da) atis='ATIS first — '+da.callsign+' '+latcFmt(da.freq); }
+  // ATIS-first only for the field you're actually AT (Dean 2026-07-12: landed at CYYZ, it showed the
+  // KBOS *departure* ATIS). rec.apt is your dep/arr field of interest — pick the matching ATIS role;
+  // if that field's ATIS is offline, show nothing (never fall back to the far field's ATIS).
+  if(rec.phase==='ground' && rec.apt){ const r0=latcBriefRoute(); const role=(r0&&r0.arr&&rec.apt.icao===String(r0.arr).toUpperCase())?'arr':'dep'; const da=latcAtisFreq(rec.apt.icao, role); if(da) atis='ATIS first — '+da.callsign+' '+latcFmt(da.freq); }
   const activeMhz=LATC.pos&&LATC.pos.comActiveMhz;
   // On-frequency confirmation (Dean 2026-07-12): when you're already tuned to the recommended freq,
   // the overlay flips from "FREQUENCY TO BE ON" (an instruction) to a green "ON FREQUENCY ✓".
   const onFreq=(activeMhz!=null)&&Math.abs(activeMhz-rec.freq)<LATC_FREQ_TOL;
+  // Alert hysteresis (Dean 2026-07-12): a CHANGED recommendation must persist 2 consecutive polls (~10s)
+  // before it auto-expands + chimes, so a momentary boundary flicker can't spam you. The panel CONTENT
+  // still updates every poll — only the alert is debounced.
   const fkey=latcFmt(rec.freq)+'|'+(rec.callsign||'');
-  const isNewRec = fkey!==LATC._lastOverlayKey;
-  LATC._lastOverlayKey=fkey;
+  let isNewRec=false;
+  if(fkey!==LATC._lastStableKey){
+    if(fkey===LATC._pendKey) LATC._pendCount=(LATC._pendCount||0)+1; else { LATC._pendKey=fkey; LATC._pendCount=1; }
+    if(LATC._pendCount>=2){ isNewRec=true; LATC._lastStableKey=fkey; LATC._pendKey=null; LATC._pendCount=0; }
+  } else { LATC._pendKey=null; LATC._pendCount=0; }
   try{ window.api.overlayState({
     live:true,
     freq:latcFmt(rec.freq),
@@ -6882,7 +6915,7 @@ async function latcToggle(on,auto){
   LATC.on=on;
   S._vpilotAutoOn=!!(on&&auto);   // track whether the vPilot watcher started this session (so it only auto-stops its own)
   if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(vCfg().overlay.enabled){ try{ window.api.overlayShow(); }catch(e){} } if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
-  else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; LATC._lastOverlayKey=undefined; try{ window.api.overlayHide(); }catch(e){} }
+  else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; LATC._lastStableKey=undefined; LATC._pendKey=null; LATC._pendCount=0; try{ window.api.overlayHide(); }catch(e){} }
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
   renderLiveAtc(); updateVatsimHeader();
 }
@@ -7387,5 +7420,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.10.7</div>
+  pointer-events:none;">v6.10.8</div>
 </body></html>

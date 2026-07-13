@@ -44,10 +44,14 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const fmt = v => (v === null || v === undefined) ? 'n/a' : v;
   const g = (o, k) => (o && o[k] !== undefined) ? o[k] : undefined;
   const tlod = g(settings, 'tlod'), olod = g(settings, 'olod');
+  const autofps = !!g(settings, 'autofps_active');
   const aircraft = g(settings, 'aircraft') || 'n/a';
   const route = RC.displayRoute(g(settings, 'simbrief_route') || '');
 
-  const chipPairs = [['Aircraft', htmlEscape(String(aircraft))], ['TLOD', fmt(tlod) + ' / OLOD ' + fmt(olod)]];
+  // AutoFPS drove TLOD dynamically — the logged value is only the launch/start cap, NOT what rendered.
+  // Label it so the report never reads like a fixed-TLOD data point (Dean 2026-07-12).
+  const tlodChip = autofps ? ('dynamic · AutoFPS (start ' + fmt(tlod) + ') / OLOD ' + fmt(olod)) : (fmt(tlod) + ' / OLOD ' + fmt(olod));
+  const chipPairs = [['Aircraft', htmlEscape(String(aircraft))], ['TLOD', tlodChip]];
   if(route) chipPairs.push(['Route', htmlEscape(route)]);
   chipPairs.push(['Driver', htmlEscape(String(fmt(driverVersion)))], ['Sim', htmlEscape(String(fmt(simVersion)))]);
   const chipsHtml = chipPairs.map(([l, v]) => '<span class="chip">' + l + ' <b>' + v + '</b></span>').join('');
