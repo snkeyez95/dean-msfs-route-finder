@@ -93,12 +93,16 @@ function attachSampler(handle, tracker) {
   handle.addToDataDefinition(DEF_ID, 'GROUND VELOCITY', 'Knots', SimConnectDataType.FLOAT64);
   handle.addToDataDefinition(DEF_ID, 'SIM ON GROUND', 'Bool', SimConnectDataType.INT32);
   handle.addToDataDefinition(DEF_ID, 'PLANE ALTITUDE', 'Feet', SimConnectDataType.FLOAT64);
+  // v6.11.0: own-ship position — the VATSIM traffic-density sampler needs it to count pilots within
+  // 40nm. Standard SimVars, added mid-list: reads below are POSITIONAL and mirror this exact order.
+  handle.addToDataDefinition(DEF_ID, 'PLANE LATITUDE', 'Degrees', SimConnectDataType.FLOAT64);
+  handle.addToDataDefinition(DEF_ID, 'PLANE LONGITUDE', 'Degrees', SimConnectDataType.FLOAT64);
   // v6.6.1: parking-brake end-trim anchor (Dean 2026-07-09) — a standard SimVar; some custom aircraft
   // (e.g. Fenix) may not drive it, in which case it just reads null/0 forever and the trim falls back
   // to the teardown heuristic (capture.js / phases.js trimAtElapsed).
   handle.addToDataDefinition(DEF_ID, 'BRAKE PARKING POSITION', 'Bool', SimConnectDataType.INT32);
   handle.requestDataOnSimObject(REQ_ID, DEF_ID, 0 /* USER */, SimConnectPeriod.SECOND);
-  const state = { gspeed: null, onGround: null, alt: null, brake: null, lastUpdate: Date.now() / 1000 };
+  const state = { gspeed: null, onGround: null, alt: null, lat: null, lon: null, brake: null, lastUpdate: Date.now() / 1000 };
   handle.on('simObjectData', (recv) => {
     if (recv.requestID !== REQ_ID) return;
     try {
@@ -106,8 +110,10 @@ function attachSampler(handle, tracker) {
       const onGround = recv.data.readInt32();
       let alt = recv.data.readFloat64();
       if (alt > ALT_SANE_FT) alt = null;                      // discard unsettled garbage
+      let lat = recv.data.readFloat64(), lon = recv.data.readFloat64();
+      if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) || (lat === 0 && lon === 0)) { lat = null; lon = null; }
       const brake = !!recv.data.readInt32();
-      state.gspeed = gspeed; state.onGround = onGround; state.alt = alt; state.brake = brake;
+      state.gspeed = gspeed; state.onGround = onGround; state.alt = alt; state.lat = lat; state.lon = lon; state.brake = brake;
       state.lastUpdate = Date.now() / 1000;                   // freshness: stale = dead/menu connection
       if (tracker) tracker.update(onGround, alt, Date.now() / 1000);
     } catch (_) {}
@@ -178,9 +184,9 @@ class ResilientSampler {
     const s = this._state;
     if (!s || Date.now() / 1000 - s.lastUpdate >= STALE_DATA_SECONDS) {
       this._reconnect('no data');                    // silent freeze without a close event
-      return { gspeed: null, onGround: null, alt: null, brake: null };
+      return { gspeed: null, onGround: null, alt: null, lat: null, lon: null, brake: null };
     }
-    return { gspeed: s.gspeed, onGround: s.onGround, alt: s.alt, brake: s.brake };
+    return { gspeed: s.gspeed, onGround: s.onGround, alt: s.alt, lat: s.lat, lon: s.lon, brake: s.brake };
   }
   // Wall-clock seconds of the last REAL sample — i.e. the last moment the sim was provably alive.
   // Used as the end-of-capture trim anchor (Date.now() lies if PresentMon lingers past sim close).

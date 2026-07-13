@@ -15,9 +15,13 @@ const { readChronological, readTelemetry } = require('./report_charts.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { buildSessionsNavJs, INDEX_CSV_FIELDS } = require('./index_writer.js');
+const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
 
 const HEAD_TRIM_S = 5;
-const TELEMETRY_COLUMNS = ['wall_ms', 'phase', 'alt_ft', 'vram_mb', 'sys_ram_pct', 'sys_cpu_pct', 'top_proc', 'top_proc_cpu', 'gspeed_kt'];
+// vatsim_traffic (v6.11.0) = VATSIM pilots within 40nm of own ship (vPilot's default injection
+// radius), sampled 1 Hz on online flights; blank offline. MUST stay in lockstep with the row-push
+// order in capture.js (the CSV writer is positional).
+const TELEMETRY_COLUMNS = ['wall_ms', 'phase', 'alt_ft', 'vram_mb', 'sys_ram_pct', 'sys_cpu_pct', 'top_proc', 'top_proc_cpu', 'gspeed_kt', 'vatsim_traffic'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const p2 = n => String(n).padStart(2, '0');
 
@@ -143,6 +147,32 @@ function fileSession(opts) {
     }
   } catch (_) {}
   const sortedFt = ft.slice().sort((a, b) => a - b);
+
+  // v6.11.0: per-flight VATSIM traffic stats (peak/avg pilots within 40nm) from the telemetry rows —
+  // additive settings fields; absent on offline flights (the column is blank there).
+  try {
+    const ti = TELEMETRY_COLUMNS.indexOf('vatsim_traffic');
+    const counts = (telemetryRows || []).map(r => Array.isArray(r) ? r[ti] : r.vatsim_traffic)
+      .map(v => (v === '' || v == null) ? null : Number(v)).filter(v => v != null && !Number.isNaN(v));
+    if (counts.length) {
+      settings.vatsim_traffic_peak = Math.max(...counts);
+      settings.vatsim_traffic_avg = Math.round(counts.reduce((a, b) => a + b, 0) / counts.length);
+    }
+  } catch (_) {}
+
+  // v6.11.0: AutoFPS dynamic-TLOD trace sidecar — parsed from the AutoFPS app's own daily log,
+  // windowed to this recording, written BEFORE the report so its chart overlay picks it up. Derived +
+  // regenerable; missing/unparseable log = simply no sidecar (never fatal). AutoFPS's raw logs are
+  // never modified.
+  try {
+    if (settings.autofps_active && recordingWallStart) {
+      const lastWall = (telemetryRows && telemetryRows.length)
+        ? recordingWallStart + (Array.isArray(telemetryRows[telemetryRows.length - 1])
+            ? telemetryRows[telemetryRows.length - 1][0] : telemetryRows[telemetryRows.length - 1].wall_ms) / 1000
+        : Date.now() / 1000;
+      writeAutofpsSidecar(sessionDir, recordingWallStart, recordingWallStart, lastWall, null);
+    }
+  } catch (_) {}
 
   // 2. summary.json
   const summary = {

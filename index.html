@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.10.9</div>
+  <div class="tname">A Better Route Planner &mdash; v6.11.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.10.9</div>
+    <div class="sb-ver">v6.11.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -4274,6 +4274,52 @@ async function perfShowBaseline(){
   renderBaseline();
 }
 function baselineToggleDetail(){ _blDetail=!_blDetail; renderBaseline(); }
+// v6.11.0: AutoFPS envelope card — learns where AutoFPS actually PARKS its dynamic TLOD (from the
+// per-flight autofps_trace.json stats surfaced by perf-compare-data) and guides the Min/Max range.
+// Iterative by design: raise the ceiling → next flights show the new parking spot → re-guides.
+// Pure over _blData; needs >=2 traced AutoFPS flights, else shows "collecting".
+function _afpsEnvelope(flights, vramLim){
+  const af=(flights||[]).filter(f=>f.autofps_active&&!f.excluded&&!f.experiment);
+  const traced=af.filter(f=>f.autofps_at_cap_pct!=null&&f.autofps_tlod_med!=null);
+  if(traced.length<2) return {state:'collecting', n:traced.length, total:af.length};
+  const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+  const capMed=med(traced.map(f=>f.autofps_at_cap_pct));
+  const effMed=med(traced.map(f=>f.autofps_tlod_med));
+  const ceil=Math.max(...traced.map(f=>f.autofps_tlod_max));
+  // smoothness gates: the SAME limits the fixed-TLOD baseline enforces (p99<=20 = "smooth" grade)
+  const rough=traced.filter(f=>(f.p99_ft_ms!=null&&f.p99_ft_ms>20)||(f.stutter_pct!=null&&f.stutter_pct>_BL.LIM.stut)||(f.peak_vram_mb!=null&&vramLim&&f.peak_vram_mb>vramLim));
+  let verdict, why;
+  if(rough.length){ verdict='lower';
+    why=rough.length+' of '+traced.length+' AutoFPS flights broke a smoothness/VRAM limit &mdash; don&rsquo;t raise the ceiling; consider lowering Max TLOD or the target FPS.'; }
+  else if(capMed>=70){ verdict='raise';
+    why='AutoFPS parked at your ceiling (TLOD '+ceil+') for ~'+capMed+'% of the flight with smoothness and VRAM intact &mdash; it wants more room. Try raising Max TLOD by 25&ndash;50 and fly again; this card will show where it settles.'; }
+  else if(capMed<=20){ verdict='fine';
+    why='AutoFPS rarely touches your ceiling ('+capMed+'% of the flight) &mdash; the ceiling isn&rsquo;t limiting anything. Your current range is right.'; }
+  else { verdict='ok';
+    why='AutoFPS uses the upper range ('+capMed+'% at the ceiling) without strain &mdash; the range looks well-matched to your rig.'; }
+  return {state:'ok', n:traced.length, total:af.length, capMed, effMed, ceil, verdict, why,
+    flights:traced.map(f=>({ts:f.timestamp, ac:f.aircraft, med:f.autofps_tlod_med, max:f.autofps_tlod_max, cap:f.autofps_at_cap_pct, traffic:f.vatsim_traffic_peak}))};
+}
+function _afpsEnvCard(d, rec, recKnown){
+  const e=_afpsEnvelope(_blData||[], d.VRAM_LIM);
+  if(e.state==='collecting'&&e.total===0) return '';   // no AutoFPS flights at all → no card
+  let inner;
+  if(e.state==='collecting'){
+    inner='<div style="font-size:12px;color:var(--ink3)">Collecting &mdash; '+e.n+'/2 AutoFPS flights with a TLOD trace so far. Fly with AutoFPS running and this fills in.</div>';
+  } else {
+    const col=e.verdict==='raise'?'#46c46a':(e.verdict==='lower'?'var(--acc)':'var(--ink1)');
+    inner='<div style="font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:8px">'
+      +'Suggested range: <b style="color:'+col+'">Min '+(recKnown?rec:'&mdash;')+'</b> (your proven baseline floor) &middot; '
+      +'<b style="color:'+col+'">Max '+(e.verdict==='raise'?(e.ceil+' &rarr; try '+(e.ceil+25)+'&ndash;'+(e.ceil+50)):e.ceil)+'</b></div>'
+      +'<div style="font-size:12px;color:var(--ink2);line-height:1.6">'+e.why+'</div>'
+      +'<div style="font-size:11px;color:var(--ink3);margin-top:8px;font-family:\'JetBrains Mono\',monospace">'
+      +e.flights.map(f=>esc(String(f.ac||''))+' eff.'+f.med+' (max '+f.max+', '+f.cap+'% at cap'+(f.traffic!=null?(', traffic pk '+f.traffic):'')+')').join(' &nbsp;&middot;&nbsp; ')
+      +'</div>';
+  }
+  return '<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:14px 16px;margin-bottom:14px">'
+    +'<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:\'JetBrains Mono\',monospace;margin-bottom:6px">&#128200; AutoFPS envelope &mdash; from your real dynamic-TLOD traces</div>'
+    +inner+'</div>';
+}
 function renderBaseline(){
   const bl=document.getElementById('perf-baseline'); if(!bl)return;
   const d=_blCompute(_blData||[]);
@@ -4294,6 +4340,11 @@ function renderBaseline(){
   { const cand=[_versionVerdict(_blData||[],'driver_version'),_versionVerdict(_blData||[],'sim_version')]
       .find(x=>x&&x.state==='ok'&&['better','worse','mixed','noeffect'].includes(x.verdict));
     if(cand)h+=_verCardHtml(cand,cand.dim==='sim_version'?'Sim version':'GPU driver'); }
+  // v6.11.0: AutoFPS envelope guidance — a SEPARATE consumer of the AutoFPS flights the fixed-TLOD
+  // baseline quarantines. Uses the real dynamic-TLOD traces (effective median + % of flight parked at
+  // the ceiling) to guide the AutoFPS Min/Max range: floor = the Balanced pick; ceiling raised only
+  // when AutoFPS demonstrably parks at it WITH smoothness + VRAM headroom intact.
+  h+=_afpsEnvCard(d, rec, recKnown);
   // readiness / progress
   if(!cov.ready){
     h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6">'
@@ -7420,5 +7471,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.10.9</div>
+  pointer-events:none;">v6.11.0</div>
 </body></html>

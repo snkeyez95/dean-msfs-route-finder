@@ -18,10 +18,11 @@ const { readChronological, readTelemetry } = require('./report_charts.js');
 const { trimHead, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram } = require('./phases.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
+const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
 
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
-const REPORT_V = 'autofps-only'; // marker: bump to force a one-time report.html regen for ALL flights (v6.10.8: AutoFPS flights show "AutoFPS" not a TLOD number)
+const REPORT_V = 'autofps-trace'; // marker: bump to force a one-time report.html regen for ALL flights (v6.11.0: AutoFPS dynamic-TLOD line + traffic overlay on the chart)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -123,6 +124,23 @@ function runBackfill(sessionsDir, tpIcaos) {
     // EVERY flight (originals untouched). Also covers the pre-v6.3.8 5-phase split (computeExt).
     const { ext, wrote } = backfillCorrection(dir, summary, extPath);
     if (wrote) corrected++; else if (ext) skipped++; else noData++;
+    // v6.11.0: AutoFPS dynamic-TLOD trace backfill — for tagged flights whose sidecar doesn't exist
+    // yet, recover the trace from AutoFPS's surviving daily logs. Anchor = summary.timestamp (second-
+    // resolution, a few s before recordingWallStart — fine for a 10s-cadence step line). Log gone →
+    // skip silently. MUST run BEFORE regenReport so the regenerated chart picks the trace up.
+    try {
+      if (summary.settings && summary.settings.autofps_active && !fs.existsSync(path.join(dir, 'autofps_trace.json'))) {
+        const anchor = new Date(String(summary.timestamp)).getTime() / 1000;
+        if (isFinite(anchor)) {
+          let durS = (summary.smoothness && summary.smoothness.duration_seconds) || 0;
+          try {   // telemetry's last wall_ms is the truest recording length when present
+            const tel = readTelemetry(dir);
+            if (tel && tel.length) durS = Math.max(durS, tel[tel.length - 1].wall_ms / 1000);
+          } catch (_) {}
+          if (durS > 0) writeAutofpsSidecar(dir, anchor, anchor - 10, anchor + durS + 30, null);
+        }
+      }
+    } catch (_) {}
     // regenerate the report from the trimmed data (idempotent via ext.report_trim_v)
     if (regenReport(dir, summary, ext, tpSet)) {
       reports++;

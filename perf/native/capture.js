@@ -13,11 +13,30 @@ const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
 const { startPresentmon, stopPresentmon, findPresentmon, killStrayPresentmon, TARGET_PROCESS } = require('./presentmon.js');
 const { readSettings } = require('./settings.js');
-const { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, vatsimConnected } = require('./sysinfo.js');
+const { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, vatsimConnected, fetchVatsimPilots } = require('./sysinfo.js');
 const { fileSession } = require('./engine.js');
 
 const HEAD_TRIM_S = 5, STOP_BUFFER_S = 30, TAIL_FALLBACK_S = 60, MIN_TAIL_TRIM_S = 5;
+// v6.11.0: traffic-density radius = vPilot's default aircraft injection/draw distance, so the count
+// approximates what vPilot actually spawns into the sim around you.
+const TRAFFIC_NM = 40, TRAFFIC_FEED_MS = 30000;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Great-circle distance in nm (haversine) — for the 40nm traffic count.
+function gcNm(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+  return 3440.065 * 2 * Math.asin(Math.sqrt(a));
+}
+function trafficCount(pilots, lat, lon) {
+  if (!pilots || lat == null || lon == null) return null;
+  let n = 0;
+  for (const p of pilots) {
+    if (Math.abs(p.lat - lat) > 0.75) continue;               // cheap prefilter (~45nm of latitude)
+    if (gcNm(lat, lon, p.lat, p.lon) <= TRAFFIC_NM) n++;
+  }
+  return Math.max(0, n - 1);                                  // exclude own ship (it's in the feed too)
+}
 
 // Resolve to the end of capture: PresentMon exits on its own when MSFS closes
 // (--terminate_on_proc_exit). That is the ONLY end condition — Python parity (py:3845 waits solely on
@@ -99,6 +118,7 @@ async function runAutoCapture(opts) {
   // (the long-planned tag the baseline/scenery views already READ — this finally writes it). Post-
   // benchmark Dean flies however he likes; these tags keep the baseline/drift math apples-to-apples
   // and give Compare an "online traffic on vs off" dimension.
+  let onlineVatsim = false;   // v6.11.0: hoisted — gates the traffic-density sampler below
   try {
     const out = require('child_process').spawnSync('tasklist', ['/NH'], { encoding: 'utf8', timeout: 15000 }).stdout || '';
     const low = out.toLowerCase();
@@ -115,6 +135,7 @@ async function runAutoCapture(opts) {
       if (conn === false) say('  CONTEXT: vPilot running but CID not connected to VATSIM → NOT tagged online');
     }
     if (vatsim || batc) settings.online_traffic = (vatsim && batc) ? 'vatsim+batc' : (vatsim ? 'vatsim' : 'batc');
+    onlineVatsim = vatsim;
     if (settings.online_traffic || settings.autofps_active)
       say('  CONTEXT: ' + [settings.online_traffic, settings.autofps_active ? 'AutoFPS' : null].filter(Boolean).join(' + '));
   } catch (_) {}
@@ -159,9 +180,17 @@ async function runAutoCapture(opts) {
   setStatus('recording');
   say('  >> RECORDING. Closing the sim files it automatically.');
 
+  // v6.11.0: VATSIM traffic-density sampler — refresh the pilots cache every ~30s (the feed itself
+  // only updates ~15s; NEVER fetch at 1 Hz), count within 40nm each tick. Online-VATSIM flights only.
+  let trafficPilots = null, trafficIv = null;
+  if (onlineVatsim) {
+    const refresh = () => { fetchVatsimPilots().then(p => { if (p) trafficPilots = p; }).catch(() => {}); };
+    refresh(); trafficIv = setInterval(refresh, TRAFFIC_FEED_MS);
+  }
+
   const telemetryRows = [];
   const tick = setInterval(() => {
-    const { gspeed: g, onGround: onG, alt, brake } = sampler.latest();   // nulls when the stream is stale
+    const { gspeed: g, onGround: onG, alt, lat, lon, brake } = sampler.latest();   // nulls when the stream is stale
     if (g != null && g > AUTO_MIN_SPEED_KT) lastMovingTs = Date.now() / 1000;
     if (onG != null) { if (!onG) wasAirborne = true; endedOnGround = !!onG; }
     if (brake === true && (g == null || g <= AUTO_MIN_SPEED_KT)) {
@@ -182,6 +211,7 @@ async function runAutoCapture(opts) {
       tProc || '',
       tCpu != null ? tCpu.toFixed(1) : '',
       g != null ? g.toFixed(1) : '',    // v6.9.5: ground speed persisted → movement-based end-trim anchor
+      (() => { const c = trafficCount(trafficPilots, lat, lon); return c != null ? c : ''; })(),   // v6.11.0: pilots within 40nm
     ]);
   }, 1000);
 
@@ -193,6 +223,7 @@ async function runAutoCapture(opts) {
   const captureEndTs = Math.min(Date.now() / 1000, sampler.lastAliveTs() || Infinity);
 
   clearInterval(tick);
+  if (trafficIv) clearInterval(trafficIv);
   stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop();
   await sleep(1000);                            // CSV flush grace
 
@@ -230,4 +261,4 @@ async function runAutoCapture(opts) {
   return { ok: true, sessionDir };
 }
 
-module.exports = { runAutoCapture, waitForCaptureEnd, resolveAircraft, HEAD_TRIM_S };
+module.exports = { runAutoCapture, waitForCaptureEnd, resolveAircraft, trafficCount, gcNm, TRAFFIC_NM, HEAD_TRIM_S };

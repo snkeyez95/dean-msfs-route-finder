@@ -119,6 +119,21 @@ out explicitly if so rather than silently averaging over it:
   also excluded) were backfilled; everything earlier is genuinely offline. Scenery-view caveat: the
   🛬 Scenery ranking does NOT exclude online flights (the per-aircraft baseline pool shifts with how
   Dean flies) — mention it when a scenery verdict hinges on airports he only visits on VATSIM.
+- **AutoFPS TLOD TRACE + TRAFFIC DENSITY (v6.11.0):** AutoFPS flights get an `autofps_trace.json`
+  SIDECAR in the session folder — the REAL dynamic TLOD AutoFPS applied, parsed from its own log at
+  file time (samples `[t_rel_s, tlod, olod, agl, vram%]` every ~10s, anchored to
+  `recording_wall_start`) plus `stats` {tlod_med/p10/p90/min/max, pct_at_cap, n}. So for an AutoFPS
+  flight the honest TLOD is the sidecar's **effective median/range** (the report chip shows
+  "AutoFPS (eff. 200, 125–200)"), never the launch value. perf-compare-data surfaces
+  `autofps_tlod_med/p90/max` + `autofps_at_cap_pct`; the report chart draws the trace as a green step
+  line, clipped to the trimmed chart window (no teardown samples). No sidecar = the AutoFPS daily log
+  was gone before backfill — say "trace unavailable", don't guess. VATSIM flights also log
+  `vatsim_traffic` in telemetry.csv (pilots within 40nm — vPilot's injection radius — at 1 Hz; blank
+  offline) with `vatsim_traffic_peak/avg` in summary settings + compare-data: use it to correlate
+  arrival stutters with traffic surges. The Baseline view's "AutoFPS envelope" card guides the
+  Min/Max range from `pct_at_cap` (≥70% at cap + all smoothness/VRAM limits intact → suggest raising
+  Max; ≤20% → ceiling isn't limiting; any rough flight blocks a raise; needs ≥2 traced flights else
+  "collecting") — match that logic in chat. The fixed-TLOD baseline quarantine is unchanged.
 - **Flight duration** - a 47-minute hop and a 125-minute flight aren't directly comparable for VRAM
   creep; normalize the framing ("no creep over 2 hours" is a stronger claim than over 45 minutes).
 

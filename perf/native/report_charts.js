@@ -150,6 +150,41 @@ function displayRoute(route){
   return route;
 }
 
+// v6.11.0: the AutoFPS dynamic-TLOD trace as a chart series. Reads the autofps_trace.json sidecar
+// (written at flight-file time from the AutoFPS app's own log); x uses the SAME wall-minutes-from-
+// head-trim convention as chartAltitudeSeries AND the same [0, totalMin+0.5] window — totalMin comes
+// from the TAIL-TRIMMED frametime series, so post-landing/sim-quit samples can never be drawn
+// (Dean 2026-07-12: the chart-tail lesson, applied by construction).
+function chartTlodSeries(sessionDir, totalMin){
+  let side; try { side = JSON.parse(fs.readFileSync(path.join(sessionDir, 'autofps_trace.json'), 'utf8')); } catch(e){ return null; }
+  if(!side || !Array.isArray(side.samples) || !side.samples.length) return null;
+  const out = [];
+  for(const s of side.samples){
+    const tRel = Array.isArray(s) ? s[0] : null, tlod = Array.isArray(s) ? s[1] : null;
+    if(tRel == null || tlod == null) continue;
+    const x = (tRel - HEAD_TRIM_S) / 60.0;
+    if(x < 0 || x > totalMin + 0.5) continue;
+    out.push([pyRound(x, 4), Math.trunc(tlod)]);
+  }
+  return out.length ? out : null;
+}
+
+// v6.11.0: VATSIM nearby-traffic count (pilots within 40nm) as a chart series — from the telemetry
+// vatsim_traffic column, exact chartAltitudeSeries windowing (same trim guarantee).
+function chartTrafficSeries(sessionDir, totalMin){
+  const tel = readTelemetry(sessionDir);
+  if(!tel) return null;
+  const out = [];
+  for(const r of tel){
+    const c = r.vatsim_traffic;
+    if(c == null) continue;
+    const x = (r.wall_ms - HEAD_TRIM_S * 1000.0) / 60000.0;
+    if(x < 0 || x > totalMin + 0.5) continue;
+    out.push([pyRound(x, 4), Math.trunc(c)]);
+  }
+  return out.length ? out : null;
+}
+
 function readTelemetry(sessionDir){
   const p = path.join(sessionDir, 'telemetry.csv');
   if(!fs.existsSync(p)) return null;
@@ -164,7 +199,8 @@ function readTelemetry(sessionDir){
     const cols = lines[i].split(','); const row = {}; header.forEach((h, j) => row[h] = cols[j]);
     out.push({ wall_ms: num(row, 'wall_ms'), phase: row['phase'] || '', alt_ft: num(row, 'alt_ft'),
       vram_mb: num(row, 'vram_mb'), sys_ram_pct: num(row, 'sys_ram_pct'), sys_cpu_pct: num(row, 'sys_cpu_pct'),
-      top_proc: row['top_proc'] || '', top_proc_cpu: num(row, 'top_proc_cpu'), gspeed_kt: num(row, 'gspeed_kt') });
+      top_proc: row['top_proc'] || '', top_proc_cpu: num(row, 'top_proc_cpu'), gspeed_kt: num(row, 'gspeed_kt'),
+      vatsim_traffic: num(row, 'vatsim_traffic') });
   }
   const filtered = out.filter(r => r.wall_ms !== null);
   filtered.sort((a, b) => a.wall_ms - b.wall_ms);
@@ -185,4 +221,4 @@ function chartAltitudeSeries(sessionDir, totalMin){
   return out.length ? out : null;
 }
 
-module.exports = { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, displayRoute, readTelemetry, chartAltitudeSeries, fmt };
+module.exports = { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, displayRoute, readTelemetry, chartAltitudeSeries, chartTlodSeries, chartTrafficSeries, fmt };

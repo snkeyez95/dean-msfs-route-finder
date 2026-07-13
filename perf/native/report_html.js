@@ -49,8 +49,16 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const route = RC.displayRoute(g(settings, 'simbrief_route') || '');
 
   // AutoFPS drove TLOD dynamically — the logged value is only the launch cap, NOT what rendered, so
-  // show "AutoFPS" instead of a misleading number (Dean 2026-07-12).
-  const tlodChip = autofps ? ('AutoFPS / OLOD ' + fmt(olod)) : (fmt(tlod) + ' / OLOD ' + fmt(olod));
+  // show "AutoFPS" instead of a misleading number (Dean 2026-07-12). v6.11.0: when the trace sidecar
+  // exists, show the EFFECTIVE median + range it actually ran.
+  let afpsEff = '';
+  if (autofps) {
+    try {
+      const st = require('./autofps_log.js').readSidecar(sessionDir);
+      if (st && st.stats) afpsEff = ' (eff. ' + st.stats.tlod_med + ', ' + st.stats.tlod_min + '–' + st.stats.tlod_max + ')';
+    } catch (_) {}
+  }
+  const tlodChip = autofps ? ('AutoFPS' + afpsEff + ' / OLOD ' + fmt(olod)) : (fmt(tlod) + ' / OLOD ' + fmt(olod));
   const chipPairs = [['Aircraft', htmlEscape(String(aircraft))], ['TLOD', tlodChip]];
   if(route) chipPairs.push(['Route', htmlEscape(route)]);
   chipPairs.push(['Driver', htmlEscape(String(fmt(driverVersion)))], ['Sim', htmlEscape(String(fmt(simVersion)))]);
@@ -94,6 +102,10 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const [ftPoints, meanPoints, totalMin] = RC.chartFrametimeSeries(chartFt);
   const altPoints = RC.chartAltitudeSeries(sessionDir, totalMin);
   const altJson = altPoints ? altPoints.map(([x, a]) => [x, PInt(a)]) : null;
+  // v6.11.0: the real dynamic-TLOD trace (AutoFPS flights) + VATSIM 40nm traffic count — both series
+  // share the altitude windowing, so they inherit the tail-trim guarantee (no quit/park samples drawn).
+  const tlodPoints = RC.chartTlodSeries(sessionDir, totalMin);
+  const trafPoints = RC.chartTrafficSeries(sessionDir, totalMin);
   let overCount = 0; for(const v of chartFt) if(v > 100.0) overCount++;
   let overMax = g(stats, 'max_ft_ms');
   if(overMax == null) { overMax = 0.0; for(const v of ftInOrder) if(v > overMax) overMax = v; }
@@ -102,7 +114,9 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   if(sortedFt && sortedFt.length){ const mm = sortedFt.length; q1 = pyRound(sortedFt[Math.trunc(mm * 0.25)], 2); q3 = pyRound(sortedFt[Math.min(Math.trunc(mm * 0.75), mm - 1)], 2); }
   const chartJson = pyJson({ ft: ftPoints, mavg: mavgPoints, alt: altJson, target: TARGET_FRAMETIME_MS,
     stutter: pyRound(STUTTER_FRAMETIME_MS, 1), avg_fps: g(stats, 'avg_fps') ?? null, q1, q3,
-    over_count: PInt(overCount), over_max: pyRound(overMax, 2) });
+    over_count: PInt(overCount), over_max: pyRound(overMax, 2),
+    tlod: tlodPoints ? tlodPoints.map(([x, t]) => [x, PInt(t)]) : null,
+    traffic: trafPoints ? trafPoints.map(([x, t]) => [x, PInt(t)]) : null });
   const phaseHtml = RC.phaseBarsHtml(g(stats, 'phases'), {
     dep_icao: g(settings, 'dep_icao'), arr_icao: g(settings, 'arr_icao'),
     dep_scenery: g(settings, 'dep_scenery'), arr_scenery: g(settings, 'arr_scenery') });

@@ -1270,12 +1270,20 @@ ipcMain.handle('perf-compare-data', () => {
       // sidecar (originals untouched). Also dep/arr ICAO + 3rd-party scenery flags.
       let dep_taxi = null, arr_taxi = null, dep_icao = s.dep_icao || null, arr_icao = s.arr_icao || null,
           dep_scenery = s.dep_scenery ?? null, arr_scenery = s.arr_scenery ?? null;
+      // v6.11.0: AutoFPS effective-TLOD trace stats (from the autofps_trace.json sidecar) + VATSIM
+      // 40nm traffic peak/avg (from summary settings) — the envelope card + traffic analytics inputs.
+      let afps = null, traffic_peak = null, traffic_avg = null;
       try {
         const folder = (s.folder || '').replace(/\//g, '\\');
         const fdir = folder ? path.join(sdir, folder) : null;
         const sp = fdir ? path.join(fdir, 'summary.json') : null;
+        if (fdir && s.autofps_active) { try {
+          const tr = JSON.parse(fs.readFileSync(path.join(fdir, 'autofps_trace.json'), 'utf8'));
+          if (tr && tr.stats) afps = tr.stats;
+        } catch(_){} }
         if (sp && fs.existsSync(sp)) {
           const sj = JSON.parse(fs.readFileSync(sp, 'utf8'));
+          if (sj && sj.settings && sj.settings.vatsim_traffic_peak != null) { traffic_peak = sj.settings.vatsim_traffic_peak; traffic_avg = sj.settings.vatsim_traffic_avg ?? null; }
           if (sj && sj.vram && sj.vram.avg_vram_mb != null) avg_vram_mb = sj.vram.avg_vram_mb;
           if (sj && sj.vram && sj.vram.total_vram_mb != null) total_vram_mb = sj.vram.total_vram_mb;
           if (sj && sj.smoothness && sj.smoothness.spike_count != null) spike_count = sj.smoothness.spike_count;
@@ -1322,6 +1330,10 @@ ipcMain.handle('perf-compare-data', () => {
         arr_taxi_p99: pv(arr_taxi,'p99_ft'), arr_taxi_stutter: pv(arr_taxi,'stutter_pct'), arr_taxi_vram: pv(arr_taxi,'vram_peak'),
         dep_icao, arr_icao, dep_scenery, arr_scenery,
         experiment: s.experiment || null, autofps_active: s.autofps_active || null,
+        // v6.11.0: effective TLOD the AutoFPS flight ACTUALLY ran (null = no trace recovered) + traffic
+        autofps_tlod_med: pv(afps,'tlod_med'), autofps_tlod_p90: pv(afps,'tlod_p90'),
+        autofps_tlod_max: pv(afps,'tlod_max'), autofps_at_cap_pct: pv(afps,'pct_at_cap'),
+        vatsim_traffic_peak: traffic_peak, vatsim_traffic_avg: traffic_avg,
         // flight-context (v6.9.0): 'vatsim' / 'batc' / 'vatsim+batc' / 'offline' (all pre-tag flights
         // were offline — the two known VATSIM flights are backfilled). autofps_mode = readable Compare
         // group labels for the AutoFPS dimension.

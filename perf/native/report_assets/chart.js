@@ -16,10 +16,18 @@
       return rawT.map(function(p){return {x:p.x,y:(fixed&&p.t>curCeil)?curCeil:p.t,t:p.t};});}
     var mavgData=(CHART.mavg||[]).map(function(p){return {x:p[0],y:p[1]};});
     var altData=CHART.alt?CHART.alt.map(function(p){return {x:p[0],y:p[1]};}):null;
+    // v6.11.0: the REAL dynamic TLOD AutoFPS applied (step line) + VATSIM 40nm traffic count — both
+    // pre-windowed server-side to the trimmed chart span (no quit/park samples exist in the data).
+    var tlodData=(CHART.tlod&&CHART.tlod.length)?CHART.tlod.map(function(p){return {x:p[0],y:p[1]};}):null;
+    var trafData=(CHART.traffic&&CHART.traffic.length)?CHART.traffic.map(function(p){return {x:p[0],y:p[1]};}):null;
     var c=colors();
     var datasets=[];
     if(altData){datasets.push({label:'Altitude',data:altData,yAxisID:'yAlt',
       borderColor:c.faint,borderWidth:1,pointRadius:0,fill:false,tension:0.35,order:3,spanGaps:true});}
+    if(tlodData){datasets.push({label:'TLOD',data:tlodData,yAxisID:'yTlod',
+      borderColor:c.target,borderWidth:1.4,pointRadius:0,fill:false,stepped:'before',order:2,spanGaps:true});}
+    if(trafData){datasets.push({label:'Traffic',data:trafData,yAxisID:'yTraf',
+      borderColor:c.bad,borderWidth:1,borderDash:[2,3],pointRadius:0,fill:false,tension:0.3,order:2,spanGaps:true});}
     datasets.push({label:'Frametime',data:buildMs(),yAxisID:'yMs',
       borderColor:c.line,borderWidth:1,pointRadius:0,fill:false,tension:0,order:1});
     datasets.push({label:'Moving average',data:mavgData,yAxisID:'yMs',
@@ -46,13 +54,14 @@
         if(px<a.left||px>a.right)return;
         x.beginPath();x.moveTo(px,top+1);x.lineTo(px-4,top+8);x.lineTo(px+4,top+8);
         x.closePath();x.fill();}});x.restore();}};
-    // altitude at a given x (minutes) — nearest telemetry sample, for the shared tooltip
-    function altAt(xv){if(!altData||!altData.length)return null;
-      if(xv<=altData[0].x)return altData[0].y;
-      var hiIdx=altData.length-1;if(xv>=altData[hiIdx].x)return altData[hiIdx].y;
-      var lo=0,hi=hiIdx;while(lo<hi){var mid=(lo+hi)>>1;if(altData[mid].x<xv)lo=mid+1;else hi=mid;}
-      var A=altData[Math.max(0,lo-1)],B=altData[lo];
+    // nearest sample of a series at a given x (minutes) — for the shared tooltip readouts
+    function nearestAt(arr,xv){if(!arr||!arr.length)return null;
+      if(xv<=arr[0].x)return arr[0].y;
+      var hiIdx=arr.length-1;if(xv>=arr[hiIdx].x)return arr[hiIdx].y;
+      var lo=0,hi=hiIdx;while(lo<hi){var mid=(lo+hi)>>1;if(arr[mid].x<xv)lo=mid+1;else hi=mid;}
+      var A=arr[Math.max(0,lo-1)],B=arr[lo];
       return (Math.abs(A.x-xv)<=Math.abs(B.x-xv))?A.y:B.y;}
+    function altAt(xv){return nearestAt(altData,xv);}
     // vertical crosshair at the hovered point, tying the frametime + altitude readouts together
     var crosshair={id:'xhair',afterDatasetsDraw:function(ch){
       var tt=ch.tooltip;if(!tt||!tt.opacity||!tt.dataPoints||!tt.dataPoints.length)return;
@@ -73,20 +82,32 @@
           yAlt:{type:'linear',position:'right',display:!!altData,
             title:{display:!!altData,text:'altitude',color:c.faint},
             grid:{drawOnChartArea:false},ticks:{color:c.faint,
-            callback:function(v){return v>=1000?'FL'+Math.round(v/100):Math.round(v);}}}},
+            callback:function(v){return v>=1000?'FL'+Math.round(v/100):Math.round(v);}}},
+          yTlod:{type:'linear',position:'right',display:false,min:0,
+            max:tlodData?Math.max.apply(null,tlodData.map(function(p){return p.y;}))*1.15:100,
+            grid:{drawOnChartArea:false}},
+          yTraf:{type:'linear',position:'right',display:false,min:0,
+            max:trafData?Math.max(4,Math.max.apply(null,trafData.map(function(p){return p.y;}))*1.3):10,
+            grid:{drawOnChartArea:false}}},
         plugins:{legend:{display:false},
           decimation:{enabled:true,algorithm:'lttb',samples:1500},
           tooltip:{mode:'index',intersect:false,
-            filter:function(it){return it.dataset.label!=='Altitude';},
+            filter:function(it){var l=it.dataset.label;return l!=='Altitude'&&l!=='TLOD'&&l!=='Traffic';},
             callbacks:{
             title:function(it){return it[0].parsed.x.toFixed(1)+' min into flight';},
             label:function(it){
               if(unit==='ms'){var t=(it.raw&&it.raw.t!=null)?it.raw.t:it.parsed.y;
                 return it.dataset.label+': '+t.toFixed(1)+' ms';}
               return it.dataset.label+': '+it.parsed.y.toFixed(1)+' fps';},
-            afterBody:function(items){if(!altData||!items.length)return;
-              var alt=altAt(items[0].parsed.x);
-              if(alt!=null)return 'Altitude: '+Math.round(alt).toLocaleString()+' ft';}}},
+            afterBody:function(items){if(!items.length)return;
+              var xv=items[0].parsed.x,out=[];
+              var alt=altAt(xv);
+              if(alt!=null)out.push('Altitude: '+Math.round(alt).toLocaleString()+' ft');
+              var tl=nearestAt(tlodData,xv);
+              if(tl!=null)out.push('TLOD (AutoFPS): '+Math.round(tl));
+              var tf=nearestAt(trafData,xv);
+              if(tf!=null)out.push('VATSIM traffic ≤40nm: '+Math.round(tf));
+              return out.length?out:undefined;}}},
           zoom:{zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'},
             pan:{enabled:true,mode:'x'},limits:{x:{min:'original',max:'original'}}}}}});
     function bucketsAbove(ceil){var n=0;rawT.forEach(function(p){if(p.t>ceil)n++;});return n;}
@@ -101,8 +122,11 @@
       var cc=colors();
       var a=(unit==='ms')?['Frame time',cc.line]:['FPS',cc.line];
       var bb=(unit==='ms')?['Moving average',cc.amber]:['Avg FPS',cc.target];
-      el.innerHTML='<span class="lg"><span class="sw" style="background:'+a[1]+'"></span>'+a[0]+'</span>'
-        +'<span class="lg"><span class="sw" style="background:'+bb[1]+'"></span>'+bb[0]+'</span>';}
+      var h='<span class="lg"><span class="sw" style="background:'+a[1]+'"></span>'+a[0]+'</span>'
+        +'<span class="lg"><span class="sw" style="background:'+bb[1]+'"></span>'+bb[0]+'</span>';
+      if(tlodData)h+='<span class="lg"><span class="sw" style="background:'+cc.target+'"></span>TLOD (AutoFPS)</span>';
+      if(trafData)h+='<span class="lg"><span class="sw" style="background:'+cc.bad+'"></span>VATSIM traffic</span>';
+      el.innerHTML=h;}
     window.applyScale=function(mode){scaleMode=mode;window.__yscale=mode;
       try{localStorage.setItem('cfxYScale',mode);}catch(e){}
       if(unit!=='ms')return;
@@ -194,6 +218,8 @@
         if(d.label==='Frametime')d.borderColor=cc.line;
         else if(d.label==='Moving average')d.borderColor=cc.amber;
         else if(d.label==='Avg FPS')d.borderColor=cc.target;
+        else if(d.label==='TLOD')d.borderColor=cc.target;
+        else if(d.label==='Traffic')d.borderColor=cc.bad;
         else d.borderColor=cc.faint;});
       ['x','yMs','yAlt'].forEach(function(k){var s=chart.options.scales[k];if(!s)return;
         if(s.grid&&s.grid.color)s.grid.color=cc.grid;

@@ -117,4 +117,25 @@ function vatsimConnected(cid) {
   });
 }
 
-module.exports = { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, nvidiaSmi, vatsimConnected };
+// v6.11.0: fetch just the pilots' positions from the live VATSIM datafeed — the traffic-density
+// sampler's input (capture.js counts pilots within 40nm at 1 Hz against this ~30s-refreshed cache).
+// Resolves [{lat, lon}] or null on any failure (the sampler just keeps the previous cache).
+function fetchVatsimPilots() {
+  return new Promise((resolve) => {
+    const req = https.get('https://data.vatsim.net/v3/vatsim-data.json', { timeout: 15000 }, (res) => {
+      let data = ''; res.on('data', d => data += d);
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(data);
+          resolve((Array.isArray(j.pilots) ? j.pilots : [])
+            .filter(p => typeof p.latitude === 'number' && typeof p.longitude === 'number')
+            .map(p => ({ lat: p.latitude, lon: p.longitude })));
+        } catch (_) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+module.exports = { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, nvidiaSmi, vatsimConnected, fetchVatsimPilots };
