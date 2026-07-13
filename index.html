@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.11.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.11.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.11.0</div>
+    <div class="sb-ver">v6.11.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -4279,9 +4279,13 @@ function baselineToggleDetail(){ _blDetail=!_blDetail; renderBaseline(); }
 // Iterative by design: raise the ceiling → next flights show the new parking spot → re-guides.
 // Pure over _blData; needs >=2 traced AutoFPS flights, else shows "collecting".
 function _afpsEnvelope(flights, vramLim){
-  const af=(flights||[]).filter(f=>f.autofps_active&&!f.excluded&&!f.experiment);
+  // Lab-experiment AutoFPS flights are EXCLUDED from the math (a changed graphics setting confounds
+  // where AutoFPS parks) but COUNTED, so the card can explain instead of silently hiding — Dean's
+  // first AutoFPS flight turned out to be a clouds-quality-up Lab flight (2026-07-12).
+  const all=(flights||[]).filter(f=>f.autofps_active&&!f.excluded);
+  const af=all.filter(f=>!f.experiment), lab=all.length-af.length;
   const traced=af.filter(f=>f.autofps_at_cap_pct!=null&&f.autofps_tlod_med!=null);
-  if(traced.length<2) return {state:'collecting', n:traced.length, total:af.length};
+  if(traced.length<2) return {state:'collecting', n:traced.length, total:all.length, lab};
   const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
   const capMed=med(traced.map(f=>f.autofps_at_cap_pct));
   const effMed=med(traced.map(f=>f.autofps_tlod_med));
@@ -4305,7 +4309,9 @@ function _afpsEnvCard(d, rec, recKnown){
   if(e.state==='collecting'&&e.total===0) return '';   // no AutoFPS flights at all → no card
   let inner;
   if(e.state==='collecting'){
-    inner='<div style="font-size:12px;color:var(--ink3)">Collecting &mdash; '+e.n+'/2 AutoFPS flights with a TLOD trace so far. Fly with AutoFPS running and this fills in.</div>';
+    inner='<div style="font-size:12px;color:var(--ink3)">Collecting &mdash; '+e.n+'/2 clean AutoFPS flights with a TLOD trace so far.'
+      +(e.lab?(' '+e.lab+' AutoFPS flight'+(e.lab>1?'s were':' was')+' a Settings Lab experiment (changed graphics settings) &mdash; excluded from this math. Tip: uncheck the Lab while flying AutoFPS; the two confound each other.'):' Fly with AutoFPS running and this fills in.')
+      +'</div>';
   } else {
     const col=e.verdict==='raise'?'#46c46a':(e.verdict==='lower'?'var(--acc)':'var(--ink1)');
     inner='<div style="font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:8px">'
@@ -7471,5 +7477,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.11.0</div>
+  pointer-events:none;">v6.11.1</div>
 </body></html>
