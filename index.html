@@ -6293,8 +6293,10 @@ function flightMins(nm){return Math.round((nm/450)*60*1.10)+BLOCK_PAD_MIN;}   //
 const LATC={ on:false, status:'off', pos:null, controllers:[], db:null, dbLoading:false, posIv:null, feedIv:null, lastSetHz:null, autoSet:false };
 const LATC_TIER={2:'DEL',3:'GND',4:'TWR',5:'APP',6:'CTR',1:'FSS'};
 const LATC_RADIUS={CTR:400,APP:150,TWR:50,GND:20,DEL:10,FSS:600};   // default coverage nm when visual_range is 0/missing
-const LATC_TWR_NM=7, LATC_TWR_AGL=4000, LATC_NEARFIELD_NM=20, LATC_UNICOM=122.800;   // Tower owns near-field+low only
-const LATC_CTAF_NM=15, LATC_CTAF_AGL=4000;   // v6.10.8 (Dean's KBOS→CYYZ): CTAF/field-of-interest = your OWN dep/arr field — near the DEP field only while low (release on climb-out), near the ARR field at any altitude (engage on approach); else enroute UNICOM
+const LATC_TWR_NM=7, LATC_TWR_AGL=4000, LATC_NEARFIELD_NM=20, LATC_UNICOM=122.800;   // Tower owns near-field+low only WHEN a higher tier (APP/CTR) is online above it
+const LATC_TWR_TOPDOWN_NM=30;   // v6.6.5 (Dean 2026-07-13, KLAS): when Tower is the HIGHEST online position (no APP/CTR covering), it provides TOP-DOWN — call it well outside the pattern, at any altitude, within this range
+const LATC_CTAF_NM=15, LATC_CTAF_AGL=4000;   // v6.10.8 (Dean's KBOS→CYYZ): DEPARTURE field ring — near it only while low (release CTAF on climb-out)
+const LATC_ARR_NM=30, LATC_FIELD_HYST=5;   // v6.6.5: ARRIVAL field ring is wider (approaches legitimately swing you 15-30nm out — RNAV to KLAS via LAPIN @15.8nm). Distance hysteresis: once in field mode the exit ring gains LATC_FIELD_HYST so a boundary graze can't thrash the rec
 function latcTierLabel(t){ return {DEL:'Clearance/Delivery',GND:'Ground',TWR:'Tower',APP:'Approach',CTR:'Center',FSS:'Radio/FSS',UNICOM:'UNICOM',CTAF:'CTAF'}[t]||t; }
 function latcHz(mhz){ return Math.round(mhz*1e6); }
 function latcFmt(mhz){ return (Math.round(mhz*1000)/1000).toFixed(3); }
@@ -6595,7 +6597,7 @@ function vgCovers(callsign, freqMhz, vgAt){
 
 // PURE recommendation. pos={lat,lon,agl,onGround}; controllers=raw datafeed; dbMap=Map(icao→airport).
 // CTR/FSS coverage uses airspace polygons (airspaceCovers) when loaded; else they stay "verify".
-function recommendFreq(pos, controllers, dbMap, route){
+function recommendFreq(pos, controllers, dbMap, route, prevField){
   const vgAt=_vgAt(pos, controllers);                              // Stage 4c: VATGlasses ownership, resolved once per poll (null = no data)
   const enr=[];
   for(const c of (controllers||[])){
@@ -6640,6 +6642,13 @@ function recommendFreq(pos, controllers, dbMap, route){
     const a=latcAirportForCallsign(c.callsign, dbMap); if(!a) return false;
     return gcDist(pos.lat,pos.lon,a.lat,a.lon) <= ((c.tier==='CTR'||c.tier==='FSS')?500:200);
   }).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
+  // TOP-DOWN promotion (v6.6.5, Dean 2026-07-13 KLAS): a field Tower with NOTHING online above it (no
+  // APP/CTR covering you) provides top-down service — you'd call it well outside the pattern, at altitude.
+  // The near-field+low gate (7nm/4000ft) is right ONLY when a higher tier sits above it (stops Tower
+  // sticking as you climb past it). When Tower is the highest online position, extend it to a top-down
+  // range at any altitude so a lone inbound Tower actually gets recommended (LAS_E_TWR @11,500' was hidden).
+  const _higherCovers = enr.some(c=>(c.tier==='APP'||c.tier==='CTR'||c.tier==='FSS') && c.covers);
+  if(!_higherCovers){ for(const c of enr){ if(c.tier==='TWR' && !c.covers && c.apt && c.dist!=null && c.dist<=LATC_TWR_TOPDOWN_NM){ c.covers=true; c.topdown=true; } } }
   // FIELD OF INTEREST = your DEP/ARR field (route-aware), NOT the nearest random field you overfly
   // (Dean 2026-07-12: enroute over the dense US northeast it kept latching CTAF onto KLWM etc.). Near
   // the DEP field counts only while low (release CTAF on climb-out); near the ARR field counts at any
@@ -6655,7 +6664,13 @@ function recommendFreq(pos, controllers, dbMap, route){
   } else {
     near=latcNearestAirport(pos, dbMap); nearDist=near?gcDist(pos.lat,pos.lon,near.lat,near.lon):null; isDepField=true;   // no route → treat like a dep field (altitude-gated)
   }
-  const nearField = onGround || (nearDist!=null && nearDist<=LATC_CTAF_NM && (isDepField ? low : true));
+  // Arrival field engages within LATC_ARR_NM at ANY altitude (approaches swing you 15-30nm out — RNAV to
+  // KLAS via LAPIN @15.8nm dropped to UNICOM, Dean 2026-07-13). Departure field stays tight (LATC_CTAF_NM
+  // + low) so climb-out releases. Distance hysteresis: once in field mode (prevField), the exit ring gains
+  // LATC_FIELD_HYST so grazing the boundary can't thrash the rec.
+  const _ringBase = isDepField ? LATC_CTAF_NM : LATC_ARR_NM;
+  const _ring = prevField ? _ringBase + LATC_FIELD_HYST : _ringBase;
+  const nearField = onGround || (nearDist!=null && nearDist<=_ring && (isDepField ? low : true));
   const phase = onGround ? 'ground' : (nearField ? 'airport' : 'enroute');         // display pill only
   const apt = near;                                                                // DEL/GND/TWR ownership match (your dep/arr field)
   // On the ground, work field positions top-down (DEL→GND→TWR→APP→CTR). Airborne, let REALISTIC coverage
@@ -6683,7 +6698,7 @@ function recommendFreq(pos, controllers, dbMap, route){
       const pick=cands.slice().sort((a,b)=>((a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist)))[0], walked=i>floorI;
       const why = walked
         ? (apt?apt.icao:'The field')+'&rsquo;s '+pref.slice(floorI,i).join('/')+' '+(i-floorI>1?'are':'is')+' offline &mdash; '+esc(pick.callsign)+' covers you top-down'
-        : esc(pick.callsign)+' is online and covers you';
+        : (pick.topdown ? esc(pick.callsign)+' covers you top-down &mdash; no Approach or Center online' : esc(pick.callsign)+' is online and covers you');
       const others=enr.filter(c=>c!==pick && c.covers).sort((a,b)=>((a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist))).slice(0,4);
       return {found:true, tier, freq:pick.freq, callsign:pick.callsign, label:latcTierLabel(tier), why, phase, apt, others, verify};
     }
@@ -6742,10 +6757,18 @@ function latcEnrichedSequence(depApt, arrApt, controllers, dbMap, stOpt){
 // display line. Returns null when the current rec isn't found in the planned sequence (a live top-down
 // substitute, or off the filed route) — honest: no next-up claimed rather than a guess.
 function latcNextUp(rec, seq){
-  if(!rec || !seq || !seq.length) return null;
-  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<LATC_FREQ_TOL));
-  if(idx<0 || idx+1>=seq.length) return null;
-  return seq[idx+1];
+  if(!rec) return null;
+  if(seq && seq.length){
+    const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<LATC_FREQ_TOL));
+    if(idx>=0 && idx+1<seq.length) return seq[idx+1];
+  }
+  // Planning aid (Dean 2026-07-13): on UNICOM inbound with a dark network, surface the ARRIVAL field's
+  // CTAF as "Next up" so you know what you'll switch to as you descend in — only US/VATPAC fields that
+  // actually use a field CTAF (its tower freq). Display-only; never a standby target (latcNextActionable
+  // stays ATC-only).
+  if(rec.tier==='UNICOM' && LATC.db){ const r=latcBriefRoute(); const a=(r&&r.arr)?LATC.db.get(String(r.arr).toUpperCase()):null;
+    if(a && a.twr && /^[KPY]/.test(a.icao)) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao}; }
+  return null;
 }
 // Same as latcNextUp but skips ATIS entries — for the look-ahead STANDBY target (ATIS is a "tune active
 // yourself" suggestion; ABRP never loads it into standby, only real ATC/CTAF frequencies you'll swap to).
@@ -6893,7 +6916,7 @@ function latcCheckToasts(){
     if(rec.callsign===LATC._handoffKey) LATC._handoffKey=null;   // handoff completed → allow the next one
   } else { LATC._handoffKey=null; }
 }
-function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db, latcBriefRoute()):null; }
+function latcCurrentRec(){ return (LATC.pos&&LATC.db)?recommendFreq(LATC.pos, LATC.controllers, LATC.db, latcBriefRoute(), LATC._fieldMode):null; }
 // Read-only "what's next" helper (v6.8.0 — auto-tune abandoned; this only informs the display now).
 // Given the frequency your COM1 ACTIVE radio is actually on, return the NEXT frequency in the sequence
 // so we can show "you're on X → next Y". Falls back to the current rec until you're on it. Read-only —
@@ -6954,6 +6977,23 @@ function latcPushOverlay(){
     if(fkey===LATC._pendKey) LATC._pendCount=(LATC._pendCount||0)+1; else { LATC._pendKey=fkey; LATC._pendCount=1; }
     if(LATC._pendCount>=2){ isNewRec=true; LATC._lastStableKey=fkey; LATC._pendKey=null; LATC._pendCount=0; }
   } else { LATC._pendKey=null; LATC._pendCount=0; }
+  // Instant alert on a DEFINITE event (Dean 2026-07-13): your covering controller signed off (real ATC →
+  // CTAF/UNICOM) or new ATC came online (CTAF/UNICOM → real ATC). That's not a boundary flicker, so skip
+  // the 2-poll debounce and alert immediately — the CTAF handoff shouldn't wait until after takeoff.
+  // Controller↔controller changes keep the debounce (edge-flicker lives there).
+  const _curFound=!!rec.found;
+  if(LATC._prevFound!=null && LATC._prevFound!==_curFound && fkey!==LATC._lastStableKey){
+    isNewRec=true; LATC._lastStableKey=fkey; LATC._pendKey=null; LATC._pendCount=0;
+  }
+  LATC._prevFound=_curFound;
+  // "Also online at your field" (Dean 2026-07-13, his cycling-card idea): field ATC positions online that
+  // aren't the current pick — transparency so nothing live is hidden even when the pick is CTAF/UNICOM.
+  let also='';
+  if(rec.apt && rec.apt.icao){ const fi=rec.apt.icao, curCs=(rec.callsign||''), list=[];
+    for(const c of (LATC.controllers||[])){ if(c.facility===0)continue; const tr=LATC_TIER[c.facility], fr=parseFloat(c.frequency);
+      if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
+      const a=latcAirportForCallsign(c.callsign, LATC.db); if(a && a.icao===fi) list.push(latcTierLabel(tr)+' '+latcFmt(fr)); }
+    if(list.length) also='Also at '+fi+': '+list.slice(0,3).join(' · '); }
   try{ window.api.overlayState({
     live:true,
     freq:latcFmt(rec.freq),
@@ -6962,11 +7002,15 @@ function latcPushOverlay(){
     atis:atis,
     next: nextUp?('Next up: '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))):'',
     cur: (activeMhz!=null)?("you're tuned to "+latcFmt(activeMhz)):'',
+    also: also,
     onFreq:onFreq,
     isNewRec:isNewRec,
     pop:(v.overlay.freqChange!==false),        // auto-expand the panel on a new freq (Dean: default on)
     sound:(v.sound&&v.sound.freqChange!==false) // chime on a new freq (default on)
   }); }catch(e){}
+  // Update the field-mode sticky ONCE per poll (this is the last LATC call in latcPoll), so next poll's
+  // recommendFreq gets the hysteresis hint. enroute = not in field mode.
+  LATC._fieldMode = (rec.phase!=='enroute');
 }
 async function latcToggle(on,auto){
   LATC.on=on;
@@ -7036,6 +7080,13 @@ function renderLiveAtc(){
     if(av!=null) h+='<div style="font-size:11px;color:var(--ink3);margin-top:10px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">You&rsquo;re tuned to <span style="color:var(--ink1)">'+latcFmt(av)+'</span>'
       +(advancing?' &rarr; next <span style="color:var(--grn)">'+latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):'')+'</span>':'')+'</div>';
   }
+  // "Also online at your field" (v6.6.5) — field ATC positions live right now that aren't the current pick.
+  { if(rec.apt&&rec.apt.icao){ const fi=rec.apt.icao, curCs=(rec.callsign||''), list=[];
+      for(const c of (LATC.controllers||[])){ if(c.facility===0)continue; const tr=LATC_TIER[c.facility], fr=parseFloat(c.frequency);
+        if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
+        const a=latcAirportForCallsign(c.callsign, LATC.db); if(a&&a.icao===fi) list.push(esc(latcTierLabel(tr))+' <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(fr)+'</span>'); }
+      if(list.length) h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px">Also online at '+esc(fi)+': '+list.slice(0,3).join(' &middot; ')+'</div>';
+  } }
   // PMDG standby adapter: shown ONLY when the loaded aircraft has a write adapter (main.js gates it).
   // Standby only — never the active — and the walk verifies itself; a failure disables it for the session.
   if(LATC.writable&&rec.freq!=null){

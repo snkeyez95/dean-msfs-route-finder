@@ -19,6 +19,7 @@
   .who{ font-size:13px; font-weight:600; color:#e8e8ea; margin-top:2px; }
   .why{ font-size:11px; color:#9a9da3; margin-top:5px; line-height:1.4; }
   .next{ font-size:11.5px; color:#b9bbc0; margin-top:8px; font-variant-numeric:tabular-nums; display:none; }
+  .also{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
   .cur{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
 </style></head><body>
 <div id="dot" class="off" title="VATSIM frequency helper — click to expand"></div>
@@ -30,17 +31,24 @@
   <div class="who" id="who"></div>
   <div class="why" id="why"></div>
   <div class="next" id="next"></div>
+  <div class="also" id="also"></div>
   <div class="cur" id="cur"></div>
 </div>
 <script>
   const dot=document.getElementById('dot'), panel=document.getElementById('panel');
   const st=document.getElementById('st'), atis=document.getElementById('atis'), freq=document.getElementById('freq'),
-        who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), cur=document.getElementById('cur'),
+        who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), also=document.getElementById('also'), cur=document.getElementById('cur'),
         klabel=document.getElementById('klabel');
   let expanded=false, collapseTimer=null, statusTimer=null, curIgnore=true;
 
-  // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note).
-  function beep(){ try{ const c=new (window.AudioContext||window.webkitAudioContext)();
+  // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note). ONE persistent AudioContext,
+  // resumed each call: a fresh context per beep in a click-through window that never gets a user gesture
+  // can be born "suspended" and stay silent (Dean 2026-07-13: chime lagged/missed). resume() + a single
+  // reused context (main.js also sets autoplayPolicy:'no-user-gesture-required') makes it reliable.
+  let _actx=null;
+  function beep(){ try{
+    _actx = _actx || new (window.AudioContext||window.webkitAudioContext)();
+    const c=_actx; if(c.state==='suspended'){ try{ c.resume(); }catch(e){} }
     function tone(f,t0,dur){ const o=c.createOscillator(),g=c.createGain(); o.type='sine'; o.frequency.value=f;
       g.gain.setValueAtTime(0.0001,c.currentTime+t0); g.gain.exponentialRampToValueAtTime(0.09,c.currentTime+t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+t0+dur);
       o.connect(g); g.connect(c.destination); o.start(c.currentTime+t0); o.stop(c.currentTime+t0+dur+0.03); }
@@ -58,11 +66,12 @@
   if(window.api&&window.api.onOverlayState) window.api.onOverlayState(function(p){
     p=p||{};
     if(!p.live){ dot.className='off'; freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
-      atis.style.display='none'; nxt.style.display='none'; cur.style.display='none'; return; }
+      atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; return; }
     dot.classList.remove('off');   // live — keep any pulse
     freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
     atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
     nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
+    also.textContent=p.also||''; also.style.display=p.also?'block':'none';
     // On-frequency: the header confirms ("ON FREQUENCY ✓" green + green number) and the redundant
     // "you're tuned to X" line is dropped. Otherwise it instructs ("Frequency to be on") and shows
     // what you're currently on so the gap is obvious.
