@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.11.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.11.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.11.2</div>
+    <div class="sb-ver">v6.11.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1672,7 +1672,12 @@ function renderApts(){
     return true;
   }).map(r=>{
     const isIgnored=ignored.has(r.folder);
-    const info=AI[r.icao]||['Unknown Airport','','',''];
+    // Name couldn't be resolved (aviationweather.gov only knows fields that file weather — small
+    // strips like OMDU/KLVB/58CA have no station). Show "ICAO*" instead of "Unknown Airport": the
+    // asterisk = a real airport we just can't pull weather/details for. Dean 2026-07-14.
+    const unresolved = !AI[r.icao];
+    const info=AI[r.icao]||[(r.icao? r.icao+'*' : 'Unknown Airport'),'','',''];
+    const nameTip = unresolved && r.icao ? ' title="No weather station for this field — name/METAR can&rsquo;t be looked up. Scenery, GSX and routes all work normally."' : '';
     const junctions=S.cfg.activeJunctions||[];
     const sel=r.icao?rowLinked(r,junctions):false;   // active when ALL of the row's packages are linked
     const mc=r.method==='auto'?'var(--acc)':r.method==='fuzzy'?'#d4a017':r.method==='manual'?'var(--blu)':'var(--bg4)';
@@ -1689,7 +1694,7 @@ function renderApts(){
     return`<tr>
       <td><input type="checkbox" ${sel?'checked':''} ${r.icao?'':'disabled'} onchange="togA('${r.icao}',this.checked)" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;"></td>
       <td class="icao" style="color:${r.icao?'var(--acc)':'var(--ink4)'}">${r.icao||'&mdash;'}</td>
-      <td><div class="an">${info[0]}</div><div class="af">${r.folder}</div></td>
+      <td><div class="an"${nameTip}>${info[0]}</div><div class="af">${r.folder}</div></td>
       <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink3)"><span style="width:6px;height:6px;border-radius:50%;background:${mc};flex-shrink:0;display:inline-block"></span>${r.method||'&mdash;'}</span></td>
       ${gsxCell(r)}
       <td style="white-space:nowrap">${!r.icao?`<span style="display:inline-flex;align-items:center;gap:4px"><button class="btn bg bxs" onclick="startAddIcao(this,'${r.folder}')" title="Manually assign ICAO code" style="color:var(--acc);font-family:'JetBrains Mono',monospace;font-weight:600">+ ICAO</button><button class="btn bg bxs" onclick="ignoreFolder('${r.folder}')" title="Ignore this airport (hide from list)" style="padding:4px 8px;line-height:1;color:var(--ink3)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></span>`:''}</td>
@@ -7528,5 +7533,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.11.2</div>
+  pointer-events:none;">v6.11.3</div>
 </body></html>
