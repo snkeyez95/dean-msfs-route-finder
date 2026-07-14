@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.11.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.11.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.11.1</div>
+    <div class="sb-ver">v6.11.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6294,9 +6294,9 @@ const LATC={ on:false, status:'off', pos:null, controllers:[], db:null, dbLoadin
 const LATC_TIER={2:'DEL',3:'GND',4:'TWR',5:'APP',6:'CTR',1:'FSS'};
 const LATC_RADIUS={CTR:400,APP:150,TWR:50,GND:20,DEL:10,FSS:600};   // default coverage nm when visual_range is 0/missing
 const LATC_TWR_NM=7, LATC_TWR_AGL=4000, LATC_NEARFIELD_NM=20, LATC_UNICOM=122.800;   // Tower owns near-field+low only WHEN a higher tier (APP/CTR) is online above it
-const LATC_TWR_TOPDOWN_NM=30;   // v6.6.5 (Dean 2026-07-13, KLAS): when Tower is the HIGHEST online position (no APP/CTR covering), it provides TOP-DOWN — call it well outside the pattern, at any altitude, within this range
+const LATC_TWR_TOPDOWN_NM=30;   // v6.11.2 (Dean 2026-07-13, KLAS): when Tower is the HIGHEST online position (no APP/CTR covering), it provides TOP-DOWN — call it well outside the pattern, at any altitude, within this range
 const LATC_CTAF_NM=15, LATC_CTAF_AGL=4000;   // v6.10.8 (Dean's KBOS→CYYZ): DEPARTURE field ring — near it only while low (release CTAF on climb-out)
-const LATC_ARR_NM=30, LATC_FIELD_HYST=5;   // v6.6.5: ARRIVAL field ring is wider (approaches legitimately swing you 15-30nm out — RNAV to KLAS via LAPIN @15.8nm). Distance hysteresis: once in field mode the exit ring gains LATC_FIELD_HYST so a boundary graze can't thrash the rec
+const LATC_ARR_NM=30, LATC_FIELD_HYST=5;   // v6.11.2: ARRIVAL field ring is wider (approaches legitimately swing you 15-30nm out — RNAV to KLAS via LAPIN @15.8nm). Distance hysteresis: once in field mode the exit ring gains LATC_FIELD_HYST so a boundary graze can't thrash the rec
 function latcTierLabel(t){ return {DEL:'Clearance/Delivery',GND:'Ground',TWR:'Tower',APP:'Approach',CTR:'Center',FSS:'Radio/FSS',UNICOM:'UNICOM',CTAF:'CTAF'}[t]||t; }
 function latcHz(mhz){ return Math.round(mhz*1e6); }
 function latcFmt(mhz){ return (Math.round(mhz*1000)/1000).toFixed(3); }
@@ -6642,7 +6642,7 @@ function recommendFreq(pos, controllers, dbMap, route, prevField){
     const a=latcAirportForCallsign(c.callsign, dbMap); if(!a) return false;
     return gcDist(pos.lat,pos.lon,a.lat,a.lon) <= ((c.tier==='CTR'||c.tier==='FSS')?500:200);
   }).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
-  // TOP-DOWN promotion (v6.6.5, Dean 2026-07-13 KLAS): a field Tower with NOTHING online above it (no
+  // TOP-DOWN promotion (v6.11.2, Dean 2026-07-13 KLAS): a field Tower with NOTHING online above it (no
   // APP/CTR covering you) provides top-down service — you'd call it well outside the pattern, at altitude.
   // The near-field+low gate (7nm/4000ft) is right ONLY when a higher tier sits above it (stops Tower
   // sticking as you climb past it). When Tower is the highest online position, extend it to a top-down
@@ -7080,7 +7080,7 @@ function renderLiveAtc(){
     if(av!=null) h+='<div style="font-size:11px;color:var(--ink3);margin-top:10px;font-family:\'JetBrains Mono\',monospace;line-height:1.5">You&rsquo;re tuned to <span style="color:var(--ink1)">'+latcFmt(av)+'</span>'
       +(advancing?' &rarr; next <span style="color:var(--grn)">'+latcFmt(tgt.freq)+(tgt.callsign?' '+esc(tgt.callsign):'')+'</span>':'')+'</div>';
   }
-  // "Also online at your field" (v6.6.5) — field ATC positions live right now that aren't the current pick.
+  // "Also online at your field" (v6.11.2) — field ATC positions live right now that aren't the current pick.
   { if(rec.apt&&rec.apt.icao){ const fi=rec.apt.icao, curCs=(rec.callsign||''), list=[];
       for(const c of (LATC.controllers||[])){ if(c.facility===0)continue; const tr=LATC_TIER[c.facility], fr=parseFloat(c.frequency);
         if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
@@ -7528,5 +7528,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.11.1</div>
+  pointer-events:none;">v6.11.2</div>
 </body></html>

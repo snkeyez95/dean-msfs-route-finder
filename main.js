@@ -2205,7 +2205,7 @@ function overlayEnsure(){
     width:W, height:H, x: wa.x+wa.width-W-m, y: wa.y+m,
     frame:false, transparent:true, alwaysOnTop:true, skipTaskbar:true, resizable:false, movable:false,
     minimizable:false, maximizable:false, focusable:false, hasShadow:false, show:false,
-    webPreferences:{ preload: path.join(__dirname,'preload.js'), contextIsolation:true, nodeIntegration:false, autoplayPolicy:'no-user-gesture-required' }   // v6.6.5: the overlay is shown inactive + click-through so it never gets a user gesture; without this the chime's AudioContext can start suspended and stay silent
+    webPreferences:{ preload: path.join(__dirname,'preload.js'), contextIsolation:true, nodeIntegration:false, autoplayPolicy:'no-user-gesture-required' }   // v6.11.2: the overlay is shown inactive + click-through so it never gets a user gesture; without this the chime's AudioContext can start suspended and stay silent
   });
   try{ overlayWin.setAlwaysOnTop(true,'screen-saver'); }catch(_){}
   try{ overlayWin.setIgnoreMouseEvents(true,{forward:true}); }catch(_){}   // click-through by default; the renderer toggles it off only while the cursor is over the dot/panel (forward:true keeps mousemove flowing so it can detect that)
