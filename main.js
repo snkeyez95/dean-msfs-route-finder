@@ -435,7 +435,7 @@ function gsxExtractArchive(archivePath, tmp){
 
 // Manual drag-and-drop install: accepts loose .py/.ini files, a folder, or a
 // .zip/.rar/.7z archive (downloaded straight from flightsim.to).
-ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
+ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant})=>{
   const dir=gsxResolveDir(gsxFolder);
   const copied=[], skipped=[], errors=[], tmpDirs=[];
   let needTool=false;
@@ -464,16 +464,72 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder})=>{
       }
     }catch(e){ errors.push(path.basename(p)+': '+e.message); LOG.error('[GSX] dropped item failed:', e.message); }
   }
-  for(const src of collect){
+  // Duplicate-filename detection (v6.11.4, Dean 2026-07-14): a variant pack ships the SAME profile
+  // filename in two subfolders (normal version/ + winter version/) — a blind copy-by-basename silently
+  // installs whichever comes last (the winter-EPWA bug). Group the collisions by their immediate parent
+  // folder and let the user pick which variant. Works for ANY differently-named subfolders too.
+  const meta=collect.map(abs=>({abs, base:path.basename(abs).toLowerCase(), parent:path.basename(path.dirname(abs))}));
+  const byBase={}; for(const m of meta){ (byBase[m.base]=byBase[m.base]||[]).push(m); }
+  const dupBases=Object.keys(byBase).filter(b=>byBase[b].length>1);
+  if(dupBases.length && !variant){
+    const vset={}; for(const b of dupBases) for(const m of byBase[b]) vset[m.parent]=true;
+    for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
+    return {ok:false, dupes:true, variants:Object.keys(vset).sort(), dupCount:dupBases.length};
+  }
+  // Install: everything, OR (when a variant was chosen) the non-duplicated files + only the chosen
+  // variant's copies of the duplicated ones.
+  const toInstall = variant ? meta.filter(m => byBase[m.base].length===1 || m.parent===variant) : meta;
+  for(const m of toInstall){
     try{
-      const dest=path.join(dir, path.basename(src));
-      fs.copyFileSync(src, dest);
-      copied.push(path.basename(src));
-      LOG.info('[GSX] dropped install', path.basename(src), '->', dir);
-    }catch(e){ errors.push(path.basename(src)+': '+e.message); LOG.error('[GSX] dropped copy failed:', e.message); }
+      const destName=path.basename(m.abs);
+      fs.copyFileSync(m.abs, path.join(dir, destName));
+      copied.push(destName);
+      LOG.info('[GSX] dropped install', destName, variant?('(variant: '+variant+')'):'', '->', dir);
+    }catch(e){ errors.push(path.basename(m.abs)+': '+e.message); LOG.error('[GSX] dropped copy failed:', e.message); }
   }
   for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
-  return {ok:errors.length===0, copied, skipped, errors, needTool};
+  return {ok:errors.length===0, copied, skipped, errors, needTool, variant:variant||null};
+});
+// Drag-and-drop a scenery package into the library folder (v6.11.4). Mirrors util-add but FLATTENS a
+// wrapping archive folder so scan-folder sees the scenery at the top level: one inner folder → use it
+// (ignore stray root readmes); multiple inner folders → add each; loose files only → wrap in a folder
+// named after the archive. Skips folders already present. Dean 2026-07-14.
+ipcMain.handle('scenery-add', (_, {paths, libraryFolder})=>{
+  const root=libraryFolder;
+  const added=[], skipped=[], errors=[], tmpDirs=[]; let needTool=false;
+  if(!root || !fs.existsSync(root)) return {ok:false, added, skipped, errors:['no scenery library folder set'], needTool, noLib:true};
+  for(const p of (paths||[])){
+    try{
+      const st=fs.statSync(p);
+      if(st.isDirectory()){
+        const dest=path.join(root, path.basename(p));
+        if(fs.existsSync(dest)){ skipped.push(path.basename(p)); continue; }
+        fs.cpSync(p, dest, {recursive:true});
+        added.push(path.basename(p));
+        LOG.info('[SCN] scenery added (folder):', dest);
+      } else if(GSX_ARCHIVE_RE.test(p)){
+        const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'scnadd-'));
+        tmpDirs.push(tmp);
+        const ex=gsxExtractArchive(p, tmp);
+        if(!ex.ok){ if(ex.needTool) needTool=true; errors.push(path.basename(p)+(ex.needTool?': no .rar/.7z extractor installed':': extract failed')); continue; }
+        const entries=fs.readdirSync(tmp,{withFileTypes:true});
+        const dirs=entries.filter(e=>e.isDirectory());
+        const srcRoots = dirs.length>=1 ? dirs.map(d=>path.join(tmp,d.name)) : [tmp];  // ≥1 folder → each is a package (ignore root readmes); no folder → wrap loose files
+        for(const sr of srcRoots){
+          const name = (sr===tmp) ? path.basename(p).replace(/\.(zip|rar|7z)$/i,'') : path.basename(sr);
+          const dest=path.join(root, name);
+          if(fs.existsSync(dest)){ skipped.push(name); continue; }
+          fs.cpSync(sr, dest, {recursive:true});
+          added.push(name);
+          LOG.info('[SCN] scenery added (archive):', dest);
+        }
+      } else {
+        skipped.push(path.basename(p));   // a loose non-archive file isn't a scenery package
+      }
+    }catch(e){ errors.push(path.basename(p)+': '+e.message); LOG.error('[SCN] scenery-add failed:', e.message); }
+  }
+  for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
+  return {ok:errors.length===0, added, skipped, errors, needTool};
 });
 
 const CFG = path.join(USER_DATA, 'config.json');

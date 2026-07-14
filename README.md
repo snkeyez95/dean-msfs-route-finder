@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.11.3
+# A Better Route Planner — v6.11.4
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.11.4  DRAG-AND-DROP SCENERY + GSX VARIANT PICKER. My Airports now has a drop zone — drag a scenery folder or a .zip/.rar/.7z straight in and it's copied into your library and scanned automatically (a wrapping archive folder is flattened so the airport lands at the top level; already-installed folders are skipped). And the GSX profile importer no longer silently overwrites: when a dropped archive contains the same profile filename in two subfolders (a "normal" vs "winter" variant pack — which previously installed whichever sorted last, so you could end up on winter without knowing), it now detects the collision and asks which variant to install.
+
 v6.11.3  UNRESOLVED AIRPORTS SHOW THEIR ICAO, NOT "UNKNOWN". Small fields with no weather station (Skydive Dubai OMDU, Venice Beach KLVB, Hooper 58CA — the bonus airports bundled with some scenery packs) can't be looked up by name, because the lookup asks a weather service that only knows airports which file reports. They used to display as "Unknown Airport"; they now show their code with an asterisk (OMDU*), so you can tell at a glance it's a real airport ABRP just can't pull weather or details for. Hovering explains it. Scenery activation, GSX profiles and routes were never affected — this was always display-only.
 
 v6.11.2  LIVE ATC COVERAGE-MODEL FIXES (from a live KLAS VATSIM flight). A lone Tower with no Approach/Center online now provides TOP-DOWN coverage — it's recommended ~30nm out at any altitude instead of hiding until you're within 7nm (a live Las Vegas tower stayed invisible at 11,500ft). The arrival-field range widened from 15 to 30nm so a full approach that swings wide (an RNAV that routes you 16nm out) no longer drops you to enroute UNICOM, with a 5nm hysteresis buffer to stop the recommendation flip-flopping at the edge. When your controller signs off (or new ATC comes online) the overlay now alerts you INSTANTLY instead of after a ~10-second delay. On UNICOM inbound it shows the arrival field's CTAF as "Next up" for planning, adds an "Also online at your field" line so nothing live is ever hidden, and the chime is hardened so it never starts silent.

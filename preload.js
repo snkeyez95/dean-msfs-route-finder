@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   unlinkPackages:         (o)   => ipcRenderer.invoke('unlink-packages', o),
   pkgDefaultRoots:        ()    => ipcRenderer.invoke('pkg-default-roots'),
   utilAdd:                (o)   => ipcRenderer.invoke('util-add', o),
+  sceneryAdd:             (o)   => ipcRenderer.invoke('scenery-add', o),
   fetchDatis:             (o)   => ipcRenderer.invoke('fetch-datis', o),
   launchMsfs:             (o)   => ipcRenderer.invoke('launch-msfs', o),
   openExternal:       (url) => ipcRenderer.send('open-external', url),

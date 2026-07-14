@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.11.3</div>
+  <div class="tname">A Better Route Planner &mdash; v6.11.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.11.3</div>
+    <div class="sb-ver">v6.11.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -439,6 +439,12 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       <span>Folder contents are <strong>never read or uploaded.</strong> Only subfolder names are checked for ICAO identifiers.</span>
     </div>
     <div class="snote" id="scan-note"></div>
+    <div id="scenery-drop-zone" class="si-drop" style="margin-top:14px"
+      ondragover="onSceneryDragOver(event)" ondragleave="onSceneryDragLeave(event)" ondrop="onSceneryDrop(event)">
+      <div style="font-size:13px;color:var(--ink2)">Drag a scenery <strong>folder</strong> or <strong>.zip/.rar/.7z</strong> here to add it to your library</div>
+      <div style="font-size:11px;color:var(--ink4);margin-top:3px">Copied into your scenery folder above, then scanned automatically. Nothing is uploaded.</div>
+    </div>
+    <div id="scenery-drop-result" style="display:none;margin-top:10px;font-size:12px;font-family:'JetBrains Mono',monospace"></div>
     <div id="log-path-note" style="font-size:11px;color:var(--ink4);margin-top:4px;font-family:'JetBrains Mono',monospace;"></div>
     <div id="prog-wrap" style="display:none" class="prog">
       <div class="pt"><div class="pf" id="prog-fill" style="width:0%"></div></div>
@@ -5536,6 +5542,18 @@ async function onGsxDrop(e){
   if(rd){rd.style.display='block';rd.style.color='var(--ink3)';rd.textContent='Installing GSX profile…';}
   try{
     const res=await window.api.gsxInstallDropped({paths,gsxFolder:S.cfg.gsxFolder||''});
+    // Duplicate profile filenames across subfolders (a variant pack) — ask which to install instead of
+    // silently overwriting with whichever sorted last (the winter-EPWA bug). Dean 2026-07-14.
+    if(res&&res.dupes){
+      _gsxDropPaths=paths;
+      if(rd){ rd.style.color='var(--acc)';
+        rd.innerHTML='&#9888; This drop has <b>'+res.variants.length+' variants</b> with the same profile filename'
+          +' (e.g. a normal vs winter set). Pick one — installing all would overwrite:<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+          +res.variants.map(v=>'<button class="btn bp bsm" onclick="gsxInstallVariant('+JSON.stringify(v).replace(/"/g,'&quot;')+')">'+esc(v)+'</button>').join('')
+          +'<button class="btn bg bsm" onclick="gsxInstallVariant(null)" title="Install everything (later files overwrite earlier)">Install all anyway</button></div>';
+      }
+      return;
+    }
     const n=(res&&res.copied&&res.copied.length)||0;
     if(n){
       await gsxRefresh();renderApts();
@@ -5550,6 +5568,54 @@ async function onGsxDrop(e){
   }catch(err){
     if(rd){rd.style.color='var(--acc)';rd.textContent='Install failed: '+err.message;}
   }
+}
+// ── Scenery drag-and-drop (v6.11.4) — drop a folder/archive into the library, then auto-scan ──────
+function onSceneryDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='copy'; const z=document.getElementById('scenery-drop-zone'); if(z)z.classList.add('drag-over'); }
+function onSceneryDragLeave(e){ e.preventDefault(); const z=document.getElementById('scenery-drop-zone'); if(z)z.classList.remove('drag-over'); }
+async function onSceneryDrop(e){
+  e.preventDefault();
+  const z=document.getElementById('scenery-drop-zone'); if(z)z.classList.remove('drag-over');
+  const rd=document.getElementById('scenery-drop-result');
+  const show=(msg,c)=>{ if(rd){ rd.style.display='block'; rd.style.color=c||'var(--ink3)'; rd.innerHTML=msg; } };
+  const paths=[...(e.dataTransfer.files||[])].map(f=>f.path).filter(Boolean);
+  if(!paths.length){ show('Nothing detected in that drop — try a scenery folder or archive.','var(--acc)'); return; }
+  if(!S.folderPath){ show('Set your scenery library folder first (Browse above), then drop scenery here.','var(--acc)'); return; }
+  show('Adding scenery… (large packages can take a moment)');
+  try{
+    const res=await window.api.sceneryAdd({paths, libraryFolder:S.folderPath});
+    const added=(res&&res.added)||[], skipped=(res&&res.skipped)||[];
+    if(added.length){
+      show('Added '+added.length+' scenery folder'+(added.length>1?'s':'')+' — scanning…','var(--grn)');
+      await doScan();   // full re-scan picks up the new folder(s) + wrapper detection
+      let m='✓ Added '+added.map(esc).join(', ');
+      if(skipped.length) m+=' · already present: '+skipped.map(esc).join(', ');
+      show(m,'var(--grn)');
+    } else if(res&&res.needTool){
+      show('Couldn’t open that .rar/.7z — install 7-Zip (free) or WinRAR, or extract it yourself and drop the folder.','var(--acc)');
+    } else if(skipped.length){
+      show('Already in your library: '+skipped.map(esc).join(', ')+' — nothing to add.','var(--acc)');
+    } else {
+      show('No scenery folder or archive found in that drop.','var(--acc)');
+    }
+    if(res&&res.errors&&res.errors.length) RLOG('[SCN] drop errors: '+res.errors.join('; '));
+  }catch(err){ show('Add failed: '+esc(err.message),'var(--acc)'); }
+}
+// GSX variant picker: when a dropped archive has the same profile filename in two subfolders
+// (e.g. normal/ + winter/), install only the chosen variant instead of silently overwriting.
+let _gsxDropPaths=null;
+async function gsxInstallVariant(variant){
+  const rd=document.getElementById('gsx-drop-result');
+  if(!_gsxDropPaths){ return; }
+  if(rd){ rd.style.color='var(--ink3)'; rd.textContent='Installing '+(variant||'all')+'…'; }
+  try{
+    const res=await window.api.gsxInstallDropped({paths:_gsxDropPaths, gsxFolder:S.cfg.gsxFolder||'', variant});
+    const n=(res&&res.copied&&res.copied.length)||0;
+    if(n){ await gsxRefresh(); renderApts();
+      if(rd){ rd.style.color='var(--grn)'; rd.textContent='Installed '+n+' GSX file(s)'+(variant?(' from “'+variant+'”'):'')+'.'; }
+      gsxToast('Installed '+n+' GSX file(s)');
+    } else if(rd){ rd.style.color='var(--acc)'; rd.textContent='Nothing installed.'; }
+  }catch(err){ if(rd){ rd.style.color='var(--acc)'; rd.textContent='Install failed: '+err.message; } }
+  _gsxDropPaths=null;
 }
 function updateSimDetectStatus(){
   const el=document.getElementById('sim-detect-status');
@@ -7533,5 +7599,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.11.3</div>
+  pointer-events:none;">v6.11.4</div>
 </body></html>
