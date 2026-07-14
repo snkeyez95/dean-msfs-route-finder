@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.11.4
+# A Better Route Planner — v6.11.5
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.11.5  MY AIRPORTS SORTED + GROUPED BY REGION. The airport list used to appear in scan order, which made a specific airport hard to find. It's now sorted alphabetically by ICAO code and split into region sections by the leading letter — K — United States, C — Canada, E — Europe (North), L — Europe (South) & Mediterranean, O — Middle East, M — Mexico & Central America, S — South America, and so on. Airports still needing a manual ICAO gather in an "Unmatched" section at the bottom.
+
 v6.11.4  DRAG-AND-DROP SCENERY + GSX VARIANT PICKER. My Airports now has a drop zone — drag a scenery folder or a .zip/.rar/.7z straight in and it's copied into your library and scanned automatically (a wrapping archive folder is flattened so the airport lands at the top level; already-installed folders are skipped). And the GSX profile importer no longer silently overwrites: when a dropped archive contains the same profile filename in two subfolders (a "normal" vs "winter" variant pack — which previously installed whichever sorted last, so you could end up on winter without knowing), it now detects the collision and asks which variant to install.
 
 v6.11.3  UNRESOLVED AIRPORTS SHOW THEIR ICAO, NOT "UNKNOWN". Small fields with no weather station (Skydive Dubai OMDU, Venice Beach KLVB, Hooper 58CA — the bonus airports bundled with some scenery packs) can't be looked up by name, because the lookup asks a weather service that only knows airports which file reports. They used to display as "Unknown Airport"; they now show their code with an asterisk (OMDU*), so you can tell at a glance it's a real airport ABRP just can't pull weather or details for. Hovering explains it. Scenery activation, GSX profiles and routes were never affected — this was always display-only.
