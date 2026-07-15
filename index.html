@@ -4649,7 +4649,7 @@ function renderAB(){
           +'<td style="padding:2px 0;color:var(--ink1);font-family:\'JetBrains Mono\',monospace">'+esc(_abDisp(w,v))+'</td></tr>';
       }).join('')
       +'</table>'
-      +'<div style="font-size:10px;color:var(--ink3);margin-top:6px;line-height:1.5">Numerals are what UserCfg.opt stores; the word beside an enum is the in-sim label (calibrated live: clouds 1 = Medium — the raw numeral is always shown so a label can never hide the real value). TLOD, texture and traffic are deliberately not watched (machine-driven or VRAM/CPU levers). The AutoFPS Min/Max TLOD range is watched separately in the AutoFPS lane.</div>'
+      +'<div style="font-size:10px;color:var(--ink3);margin-top:6px;line-height:1.5">Numerals are what UserCfg.opt stores; the word beside an enum is the in-sim label — <b>calibrated against the actual in-sim settings screen</b> (quality enums: 1 = Medium; exceptions confirmed: Particles 1 = High, Water waves 512 = High). The raw numeral is always shown so a label can never hide the real value. TLOD, texture and traffic are deliberately not watched (machine-driven or VRAM/CPU levers). The AutoFPS Min/Max TLOD range is watched separately in the AutoFPS lane.</div>'
       +'</div>';
   }
   lb.innerHTML=h;

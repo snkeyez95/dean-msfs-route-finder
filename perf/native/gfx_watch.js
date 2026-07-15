@@ -6,32 +6,39 @@
 // excluded (machine-driven or VRAM levers, not candidates). A fingerprint change between
 // consecutive flights = the user changed a setting = a before/after card in the Settings A/B view.
 //
-// ⚠ LABEL CALIBRATION (Dean 2026-07-14: "you got one backwards once"): every enum key carries an
-// EXPLICIT numeral→in-sim-label map — no assumed indexing. LIVE-CALIBRATED datapoint locked
-// 2026-07-14: UserCfg `VolumetricClouds Quality 1` while AutoFPS displayed "Clouds: Med" →
-// 0=Low / 1=Medium / 2=High / 3=Ultra. The other Quality enums use the same sim-wide scale;
-// the A/B view always shows the raw numeral BESIDE the label so a mislabel can never hide a value.
+// ⚠ LABEL CALIBRATION — IN-SIM CONFIRMED 2026-07-14 (Dean's settings-screen screenshots vs his
+// UserCfg, the one-time calibration pass): every enum key carries an EXPLICIT numeral→in-sim-label
+// map — no assumed indexing, and the pass PROVED scales differ per key:
+//   · Quality enums at 1 all read "Medium" in-sim (clouds/light shafts/SSAO/raymarched refl./
+//     contact shadows/windshield ✓; glass 2=High, precache 3=Ultra, rocks 0=Low consistent)
+//   · EXCEPTION — Particles: stores 1, in-sim reads "HIGH" (its own short scale; 1=High confirmed)
+//   · Water FFTSize is a sized enum with word labels: 512 = "High" confirmed (ladder inferred)
+//   · Texture stores 2 yet reads "Medium" (a third scale — not watched, kept as proof)
+// The A/B view always shows the raw numeral BESIDE the label so a mislabel can never hide a value.
 // Sections that also have an Enabled flag report -1 (= "Off") when disabled, so toggling a feature
 // off is a tracked change, not a blind spot.
 const fs = require('fs'), path = require('path');
 
 const Q_LABELS = { '-1': 'Off', 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };
+const PARTICLE_LABELS = { '-1': 'Off', 0: 'Low', 1: 'High' };                    // 1=High IN-SIM CONFIRMED
+const WATER_LABELS = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512=High IN-SIM CONFIRMED; rest inferred
 
 // The watch list (Dean-scoped 2026-07-14, from his REAL UserCfg): GPU-work levers that don't feed
 // VRAM. Excluded deliberately: Texture (VRAM), Terrain/ObjectsLoD (machine-driven + the TLOD study),
 // Traffic (CPU), Buildings/Trees (VRAM+CPU), precaching (its own Lab experiment).
 // fmt: 'pct' = float shown as percent · 'enum' = labels map · 'raw' = plain number.
+// Labels match the IN-SIM row names so Dean recognizes them (Light Shafts, Raymarched Reflections…).
 const WATCH = [
   { id: 'Video/PrimaryScaling',            top: 'Video', key: 'PrimaryScaling', label: 'Render scale',        fmt: 'pct' },
   { id: 'Graphics/VolumetricClouds',       section: 'VolumetricClouds', key: 'Quality', gated: true, label: 'Volumetric clouds',  fmt: 'enum', labels: Q_LABELS },
-  { id: 'Graphics/VolumetricLights',       section: 'VolumetricLights', key: 'Quality', gated: true, label: 'Volumetric lights',  fmt: 'enum', labels: Q_LABELS },
-  { id: 'Graphics/SSAO',                   section: 'SSAO',             key: 'Quality', gated: true, label: 'Ambient occlusion (SSAO)', fmt: 'enum', labels: Q_LABELS },
-  { id: 'Graphics/SSR',                    section: 'SSR',              key: 'Quality', gated: true, label: 'Reflections (SSR)',  fmt: 'enum', labels: Q_LABELS },
+  { id: 'Graphics/VolumetricLights',       section: 'VolumetricLights', key: 'Quality', gated: true, label: 'Light shafts',       fmt: 'enum', labels: Q_LABELS },
+  { id: 'Graphics/SSAO',                   section: 'SSAO',             key: 'Quality', gated: true, label: 'Ambient occlusion',  fmt: 'enum', labels: Q_LABELS },
+  { id: 'Graphics/SSR',                    section: 'SSR',              key: 'Quality', gated: true, label: 'Raymarched reflections', fmt: 'enum', labels: Q_LABELS },
   { id: 'Graphics/ContactShadows',         section: 'ContactShadows',   key: 'Quality', gated: true, label: 'Contact shadows',    fmt: 'enum', labels: Q_LABELS },
-  { id: 'Graphics/Shadows/Size',           section: 'Shadows',          key: 'Size',    label: 'Shadow map size',    fmt: 'raw' },
-  { id: 'Graphics/Water/FFTSize',          section: 'Water',            key: 'FFTSize', label: 'Water waves (FFT)',  fmt: 'raw' },
+  { id: 'Graphics/Shadows/Size',           section: 'Shadows',          key: 'Size',    label: 'Shadow maps',        fmt: 'raw' },
+  { id: 'Graphics/Water/FFTSize',          section: 'Water',            key: 'FFTSize', label: 'Water waves',        fmt: 'enum', labels: WATER_LABELS },
   { id: 'Graphics/WindShield',             section: 'WindShield',       key: 'Quality', label: 'Windshield effects', fmt: 'enum', labels: Q_LABELS },
-  { id: 'Graphics/Particles',              section: 'Particles',        key: 'Quality', label: 'Particles',          fmt: 'enum', labels: Q_LABELS },
+  { id: 'Graphics/Particles',              section: 'Particles',        key: 'Quality', label: 'Particles (visual effects)', fmt: 'enum', labels: PARTICLE_LABELS },
 ];
 
 // ── full {Graphics} snapshot ─────────────────────────────────────────────────
@@ -52,7 +59,10 @@ function readAllGraphics(text) {
   const gi = t.search(/\{Graphics\b(?!VR)/);
   if (gi < 0) return Object.keys(out).length ? out : null;
   const vi = t.indexOf('{GraphicsVR', gi);
-  const gfx = t.slice(gi, vi > gi ? vi : t.length);
+  // Skip the outer "{Graphics" header line itself, or the section regex swallows the FIRST nested
+  // block ({Texture}) into a bogus "Graphics" section (calibration-pass finding 2026-07-14).
+  let gfx = t.slice(gi, vi > gi ? vi : t.length);
+  gfx = gfx.slice(gfx.indexOf('\n') + 1);
   const secRe = /\{(\w+)\n([\s\S]*?)\}/g;
   let m;
   while ((m = secRe.exec(gfx)) !== null) {

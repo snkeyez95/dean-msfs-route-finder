@@ -144,8 +144,10 @@ out explicitly if so rather than silently averaging over it:
   per flight: `gfx` (watched values; enum sections report -1 = Off), `gfx_fp`, `autofps_cfg`, plus
   the retroactive GPU balance trio `avg_gpu_busy_ms` / `avg_cpu_busy_ms` / `gpu_bound_pct` (from
   summary.smoothness — populated on ALL telemetry-era flights), and a top-level `gfxWatch` metadata
-  list (labels + explicit numeral→in-sim-label maps; clouds 1 = Medium is live-calibrated — always
-  quote the numeral beside the label). The app's 🧪 Settings A/B view groups consecutive same-
+  list (labels + explicit numeral→in-sim-label maps, IN-SIM CALIBRATED 2026-07-14 against Dean's
+  settings screenshots: quality enums 1 = Medium, but scales differ per key — Particles stores 1 =
+  in-sim "High", Water FFTSize 512 = "High", Texture stores 2 = "Medium"; always quote the numeral
+  beside the label). The app's 🧪 Settings A/B view groups consecutive same-
   fingerprint flights into runs PER LANE (fixed-TLOD vs AutoFPS, never pooled; the AutoFPS lane's
   fingerprint also includes min–max TLOD, so a cap change is a boundary) and judges each boundary's
   before/after means against ±1σ of the BEFORE-side flights — verdicts: COSTS/SAVES/TRADE-OFF/NO
