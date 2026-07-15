@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.11.6
+# A Better Route Planner — v6.11.7
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.11.7  HONEST AUTOFPS TLOD LABELS. The per-flight report's TLOD chip read "AutoFPS (eff. 800, 125–800)" — which looked like the CONFIGURED AutoFPS range, but those numbers are actually OBSERVED from the flight's trace (the min/max/median TLOD AutoFPS really flew). On a flight that never touched the floor or ceiling that presentation would mislead. It now reads "AutoFPS (flew 125–800, median 800)", and the Baseline envelope card's per-flight chips say "median/peak" instead of "eff." All existing reports regenerate once on next launch with the corrected wording. (Showing the true configured range is planned — it requires reading AutoFPS's own config, which the parked Settings A/B feature adds.)
+
 v6.11.6  MOVABLE OVERLAY DOT. The VATSIM overlay dot (and its panel) can now be dragged anywhere on screen — click and HOLD the dot, drag it where you want, release; the spot is remembered across sessions. A plain click still opens/closes the panel. The default top-right corner sat directly on the PMDG 737's overhead panel light switches, so clicking the dot was flipping cockpit switches underneath it.
 
 v6.11.5  MY AIRPORTS SORTED + GROUPED BY REGION. The airport list used to appear in scan order, which made a specific airport hard to find. It's now sorted alphabetically by ICAO code and split into region sections by the leading letter — K — United States, C — Canada, E — Europe (North), L — Europe (South) & Mediterranean, O — Middle East, M — Mexico & Central America, S — South America, and so on. Airports still needing a manual ICAO gather in an "Unmatched" section at the bottom.

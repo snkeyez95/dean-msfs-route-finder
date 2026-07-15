@@ -55,7 +55,10 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   if (autofps) {
     try {
       const st = require('./autofps_log.js').readSidecar(sessionDir);
-      if (st && st.stats) afpsEff = ' (eff. ' + st.stats.tlod_med + ', ' + st.stats.tlod_min + '–' + st.stats.tlod_max + ')';
+      // OBSERVED values from the trace (what AutoFPS actually flew) — NOT the configured min/max
+      // range, which ABRP can't confirm yet. Label accordingly (Dean 2026-07-14: "unless we can
+      // confirm the range we have set, don't show 125-800" — it read like the setting).
+      if (st && st.stats) afpsEff = ' (flew ' + st.stats.tlod_min + '–' + st.stats.tlod_max + ', median ' + st.stats.tlod_med + ')';
     } catch (_) {}
   }
   const tlodChip = autofps ? ('AutoFPS' + afpsEff + ' / OLOD ' + fmt(olod)) : (fmt(tlod) + ' / OLOD ' + fmt(olod));

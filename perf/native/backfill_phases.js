@@ -22,7 +22,7 @@ const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
 
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
-const REPORT_V = 'autofps-trace'; // marker: bump to force a one-time report.html regen for ALL flights (v6.11.0: AutoFPS dynamic-TLOD line + traffic overlay on the chart)
+const REPORT_V = 'afps-observed-label'; // marker: bump to force a one-time report.html regen for ALL flights (v6.11.7: TLOD chip now says "flew min–max, median N" — observed trace values, not the configured AutoFPS range)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
