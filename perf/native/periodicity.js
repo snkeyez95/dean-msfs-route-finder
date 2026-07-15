@@ -16,6 +16,12 @@
 // std is tiny (≤ max(0.16s, 10% of the mean)) → runs of ≥4 spikes = a periodic episode.
 // AutoFPS's live logs showed real detections at interval std 0.01–0.13s; the band + std gate mirror
 // its enforced 0.7–1.8s cadence window.
+//
+// v6.12.2 — adopts ResetXPDR AutoFPS Test15's "adjacent + skip-1 only" idea: once a fundamental
+// cadence is set from ≥2 real adjacent beats, a single DROPPED spike (a gap ≈ 2× the mean) BRIDGES
+// the run instead of breaking it — so one sustained overload no longer fragments into many short
+// episodes on the odd missed spike. A gap ≈ 3×+ the mean (two consecutive drops = a harmonic) still
+// breaks the run, exactly as Test15 excludes higher harmonics.
 
 const CADENCE_MIN_S = 0.7, CADENCE_MAX_S = 1.8;   // AutoFPS's enforced periodic-cadence band
 const REL_SPIKE = 1.8;                            // spike = frame > 1.8× the local (10s) median…
@@ -61,29 +67,38 @@ function spikeEvents(ft) {
 }
 
 // Maximal periodic runs among the spike events. A run grows while each new interval sits in the
-// cadence band AND stays close to the run's mean; accepted when it has ≥ MIN_RUN_SPIKES spikes and
-// its interval std passes the tightness gate.
+// cadence band AND stays close to the run's established mean; accepted when it has ≥ MIN_RUN_SPIKES
+// real spikes and its beat-interval std passes the tightness gate. `beats` holds per-beat intervals
+// (a bridged skip-1 gap contributes two half-beats) so mean/std track the FUNDAMENTAL cadence even
+// across a dropped spike; `run` holds only the real spikes (what we report/count).
 function periodicRuns(events) {
   const runs = [];
   let i = 0;
   while (i < events.length - 1) {
     const run = [events[i]];
+    const beats = [];        // per-beat intervals (bridged gap → two half-beats)
+    let adj = 0;             // real adjacent beats observed (need ≥2 before a bridge is allowed)
     let j = i;
     while (j < events.length - 1) {
       const d = events[j + 1].t - events[j].t;
-      if (d < CADENCE_MIN_S || d > CADENCE_MAX_S) break;
-      const ivs = [];
-      for (let k = 1; k < run.length; k++) ivs.push(run[k].t - run[k - 1].t);
-      const mean = ivs.length ? ivs.reduce((a, b) => a + b, 0) / ivs.length : d;
-      if (ivs.length && Math.abs(d - mean) > Math.max(0.25, 0.25 * mean)) break;   // drifting cadence
+      const mean = beats.length ? beats.reduce((a, b) => a + b, 0) / beats.length : null;
+      if (mean === null) {
+        if (d < CADENCE_MIN_S || d > CADENCE_MAX_S) break;   // start only on an in-band adjacent gap
+        beats.push(d); adj++;
+      } else {
+        const tol = Math.max(0.25, 0.25 * mean);
+        if (Math.abs(d - mean) <= tol) { beats.push(d); adj++; }                              // adjacent beat
+        else if (adj >= 2 && Math.abs(d - 2 * mean) <= 1.5 * tol) { beats.push(d / 2, d / 2); }  // skip-1: one dropped spike
+        else break;                                                                            // adrift / harmonic
+      }
       run.push(events[j + 1]); j++;
     }
-    if (run.length >= MIN_RUN_SPIKES) {
-      const ivs = [];
-      for (let k = 1; k < run.length; k++) ivs.push(run[k].t - run[k - 1].t);
-      const mean = ivs.reduce((a, b) => a + b, 0) / ivs.length;
-      const std = Math.sqrt(ivs.reduce((s, v) => s + (v - mean) * (v - mean), 0) / ivs.length);
-      if (std <= Math.max(0.16, 0.10 * mean)) runs.push({ run, mean, std });
+    if (run.length >= MIN_RUN_SPIKES && beats.length) {
+      const mean = beats.reduce((a, b) => a + b, 0) / beats.length;
+      const std = Math.sqrt(beats.reduce((s, v) => s + (v - mean) * (v - mean), 0) / beats.length);
+      // band-check the FINAL cadence, not just the starting gap — per-beat drift (or bridging) can
+      // walk a long run's mean out of the enforced band; a reported episode must sit inside it.
+      if (mean >= CADENCE_MIN_S && mean <= CADENCE_MAX_S && std <= Math.max(0.16, 0.10 * mean)) runs.push({ run, mean, std });
     }
     i = Math.max(j, i + 1);
   }

@@ -24,7 +24,8 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
-const REPORT_V = 'periodic-stutter'; // marker: bump to force a one-time report.html regen for ALL flights (v6.12.1: verdict now classifies spikes as periodic engine-overload vs one-off streaming hitches)
+const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
+const REPORT_V = 'periodic-stutter-v2'; // marker: bump to force a one-time report.html regen for ALL flights (v6.12.2: reclassified with skip-1 bridging → truer episode counts)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -133,9 +134,12 @@ function runBackfill(sessionsDir, tpIcaos) {
     // captures carry it in summary.smoothness; the sidecar covers every older flight. MUST run
     // BEFORE regenReport so the regenerated verdict picks it up.
     try {
-      if (ext && !('periodic_stutter' in ext) && !(summary.smoothness && summary.smoothness.periodic_stutter !== undefined)) {
+      // recompute when never classified OR classified by an older classifier version (skip when the
+      // flight's own summary already carries a native classification — new captures)
+      const needP = ext && ext.periodic_v !== PERIODIC_V && !(summary.smoothness && summary.smoothness.periodic_stutter !== undefined);
+      if (needP) {
         const t = readTrimmedFt(dir);
-        if (t) { ext.periodic_stutter = detectPeriodicStutter(t.ft); fs.writeFileSync(extPath, JSON.stringify(ext)); }
+        if (t) { ext.periodic_stutter = detectPeriodicStutter(t.ft); ext.periodic_v = PERIODIC_V; fs.writeFileSync(extPath, JSON.stringify(ext)); }
       }
     } catch (_) {}
     // v6.11.0: AutoFPS dynamic-TLOD trace backfill — for tagged flights whose sidecar doesn't exist
