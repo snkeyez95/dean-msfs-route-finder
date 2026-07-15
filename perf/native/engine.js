@@ -209,6 +209,9 @@ function fileSession(opts) {
     // flight-context tags (v6.9.0): flown with online traffic (vatsim/batc) and/or AutoFPS (absent = offline, fixed TLOD)
     ...(settings.online_traffic ? { online_traffic: settings.online_traffic } : {}),
     ...(settings.autofps_active ? { autofps_active: true } : {}),
+    // graphics-settings fingerprint (v6.12.0 Settings A/B): hash of the curated watch keys — a change
+    // between consecutive flights = a before/after card. Full snapshot lives in summary.settings.graphics.
+    ...(settings.gfx_fp ? { gfx_fp: settings.gfx_fp } : {}),
     // scenery attribution (v6.3.8): dep/arr ICAO + whether each is a 3rd-party scenery the user owns
     ...(settings.dep_icao ? { dep_icao: settings.dep_icao } : {}),
     ...(settings.arr_icao ? { arr_icao: settings.arr_icao } : {}),

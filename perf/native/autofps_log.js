@@ -95,4 +95,43 @@ function readSidecar(sessionDir) {
   catch (_) { return null; }
 }
 
-module.exports = { defaultLogDir, findLogs, parseTrace, traceStats, buildTrace, writeSidecar, readSidecar, LINE_RE };
+// v6.12.0 (live overlay perf strip): CURRENT TLOD — tail today's daily log (last ~4 KB, reverse-scan
+// for the newest UpdateVariables line; falls back to yesterday's file right after midnight rotation).
+// Returns {tlod, ageS} when the newest sample is fresher than maxAgeS, else null. Cheap enough for a
+// 5s tick; read-only on AutoFPS's files.
+function tailLatest(logDir, maxAgeS) {
+  try {
+    const dir = logDir || defaultLogDir();
+    if (!dir) return null;
+    const now = Date.now() / 1000;
+    for (const t of [now, now - 86400]) {                       // today, then yesterday (midnight edge)
+      const d = new Date(t * 1000);
+      const name = 'MSFS_AutoFPS' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.log';
+      const p = path.join(dir, name);
+      let st; try { st = fs.statSync(p); } catch (_) { continue; }
+      let text;
+      try {
+        const fd = fs.openSync(p, 'r');
+        try {
+          const len = Math.min(st.size, 4096);
+          const buf = Buffer.alloc(len);
+          fs.readSync(fd, buf, 0, len, st.size - len);
+          text = buf.toString('utf8');
+        } finally { fs.closeSync(fd); }
+      } catch (_) { continue; }
+      const lines = text.split(/\r?\n/);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const m = LINE_RE.exec(lines[i]);
+        if (!m) continue;
+        const ts = new Date(m[1] + 'T' + m[2]).getTime() / 1000;
+        if (!isFinite(ts)) continue;
+        const age = now - ts;
+        if (age > (maxAgeS || 60)) return null;                 // newest sample is stale → AutoFPS idle
+        return { tlod: Math.round(parseFloat(m[4])), ageS: Math.round(age) };
+      }
+    }
+    return null;
+  } catch (_) { return null; }
+}
+
+module.exports = { defaultLogDir, findLogs, parseTrace, traceStats, buildTrace, writeSidecar, readSidecar, tailLatest, LINE_RE };

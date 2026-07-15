@@ -13,6 +13,9 @@ const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
 const { startPresentmon, stopPresentmon, findPresentmon, killStrayPresentmon, TARGET_PROCESS } = require('./presentmon.js');
 const { readSettings } = require('./settings.js');
+const gfxWatch = require('./gfx_watch.js');
+const { LiveFrametimeTail, writePerfLive, clearPerfLive } = require('./live_stats.js');
+const { tailLatest: autofpsTailLatest } = require('./autofps_log.js');
 const { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, vatsimConnected, fetchVatsimPilots } = require('./sysinfo.js');
 const { fileSession } = require('./engine.js');
 
@@ -101,6 +104,16 @@ async function runAutoCapture(opts) {
     texture_quality: fresh.texture_quality, usercfg_found: fresh.usercfg_found,
   };
   settings.aircraft = await resolveAircraft(armed.handle, opts);
+  // SETTINGS A/B (v6.12.0): snapshot the WHOLE {Graphics} block at capture start ("silent data") +
+  // a short fingerprint over the curated watch keys. A fingerprint change between consecutive
+  // flights = the user changed a setting = a before/after card. Single snapshot by design (Dean
+  // avoids mid-flight settings changes; the sim only re-reads UserCfg at launch anyway).
+  try {
+    if (fresh.usercfg_found) {
+      const g = gfxWatch.readAllGraphics(fs.readFileSync(opts.usercfgPath, 'utf8'));
+      if (g) { settings.graphics = g; settings.gfx_fp = gfxWatch.fingerprint(g); }
+    }
+  } catch (_) {}
   // SETTINGS LAB tag: consume the pending marker written by labNext at launch time. Consumed HERE
   // (at actual capture start) so an armed-but-never-flown launch can never tag a later flight.
   try {
@@ -123,7 +136,12 @@ async function runAutoCapture(opts) {
     const out = require('child_process').spawnSync('tasklist', ['/NH'], { encoding: 'utf8', timeout: 15000 }).stdout || '';
     const low = out.toLowerCase();
     const vpilotRunning = low.includes('vpilot'), batc = low.includes('beyondatc');
-    if (low.includes('autofps')) settings.autofps_active = true;
+    if (low.includes('autofps')) {
+      settings.autofps_active = true;
+      // v6.12.0: AutoFPS's TLOD envelope lives in ITS config, not UserCfg — snapshot min/max/target
+      // so a cap change (e.g. Max TLOD 800→700) fingerprints as a settings change like any other.
+      try { const ac = gfxWatch.readAutofpsCfg(); if (ac) settings.autofps_cfg = ac; } catch (_) {}
+    }
     // vPilot running ≠ on VATSIM (Dean 2026-07-10: left open as a companion but never connected). If a
     // CID is set, CONFIRM the connection via the live datafeed; the tag is dropped ONLY when the feed
     // positively says NOT connected. No CID / feed unreachable → fall back to process-presence (best-
@@ -215,6 +233,28 @@ async function runAutoCapture(opts) {
     ]);
   }, 1000);
 
+  // v6.12.0 LIVE PERF STRIP: every 5s, tail the growing PresentMon CSV (rolling ~60s window) and
+  // publish a tiny perf_live.json (atomic tmp+rename) the app attaches to the VATSIM overlay state.
+  // All fields nullable; any failure is silent — the capture itself is never disturbed.
+  const liveTail = new LiveFrametimeTail(tmpCsv);
+  const liveIv = setInterval(() => {
+    try {
+      liveTail.poll();
+      const sn = liveTail.snapshot();
+      const vNow = vram.latest();
+      let tlod = settings.tlod != null ? settings.tlod : null;   // fixed-TLOD flights: the launch value
+      if (settings.autofps_active) { const t = autofpsTailLatest(null, 60); tlod = t ? t.tlod : null; }
+      writePerfLive(opts.dataRoot, {
+        v: 1, ts: Date.now(),
+        ft_avg: sn.ft_avg, ft_p99: sn.ft_p99,
+        cpu_busy_avg: sn.cpu_busy_avg, gpu_busy_avg: sn.gpu_busy_avg,
+        gpu_util_pct: vram.latestUtil(),
+        vram_pct: (vNow != null && vram.totalMb) ? Math.round(vNow / vram.totalMb * 100) : null,
+        tlod,
+      });
+    } catch (_) {}
+  }, 5000);
+
   await waitForCaptureEnd(proc, sampler, say);
 
   // End-of-capture anchor for the tail trim: the last moment the sim was provably ALIVE (last
@@ -223,6 +263,7 @@ async function runAutoCapture(opts) {
   const captureEndTs = Math.min(Date.now() / 1000, sampler.lastAliveTs() || Infinity);
 
   clearInterval(tick);
+  clearInterval(liveIv); clearPerfLive(opts.dataRoot);   // strip disappears from the overlay at capture end
   if (trafficIv) clearInterval(trafficIv);
   stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop();
   await sleep(1000);                            // CSV flush grace

@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.11.7</div>
+  <div class="tname">A Better Route Planner &mdash; v6.12.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.11.7</div>
+    <div class="sb-ver">v6.12.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3872,7 +3872,7 @@ function qlBtnHtml(dep,arr,acType){
   // Launch + Capture can warn when its aircraft/scenery isn't activated (Dean 2026-07-12).
   const ctx=(dep&&arr)?("'"+dep+"','"+arr+"','"+(acType||'')+"'"):'';
   return`<button class="btn bg bsm" onclick="quickLaunchAll(${ctx})">&#9889; Quick Launch</button>`
-    +`<button class="btn bg bsm" style="border-color:var(--acc);color:var(--acc)" onclick="launchAndCapture(${ctx})" title="One click: set the next benchmark TLOD for this SimBrief aircraft (or a Settings Lab experiment once your benchmark is complete; nothing once it's done and the Lab is off), close your apps, launch companions + MSFS, and capture — apps reopen after the sim. Open in SimBrief first.">&#128640; Launch + Capture</button>`;
+    +`<button class="btn bg bsm" style="border-color:var(--acc);color:var(--acc)" onclick="launchAndCapture(${ctx})" title="One click: set the next benchmark TLOD for this SimBrief aircraft (nothing once your benchmark is complete — you fly your own settings and Settings A/B watches), close your apps, launch companions + MSFS, and capture — apps reopen after the sim. Open in SimBrief first.">&#128640; Launch + Capture</button>`;
 }
 
 async function quickLaunchAll(dep,arr,acType){
@@ -3926,7 +3926,7 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" onclick="perfShowDashboard()" title="Back to the combined dashboard">&#128202; Dashboard</button>'
     +'<button class="btn bg bsm" onclick="perfShowCompare()" title="Compare your flights grouped by sim version, GPU driver, aircraft, or TLOD — see whether the numbers actually change">&#9878; Compare</button>'
     +'<button class="btn bg bsm" onclick="perfShowBaseline()" title="One blended TLOD that keeps both PMDG and Fenix smooth — your recommended global setting">&#127919; Baseline</button>'
-    +'<button class="btn bg bsm" onclick="perfShowLab()" title="Settings Lab findings — what each experiment actually did to your smoothness, judged against your normal flight-to-flight variation">&#129514; Lab</button>'
+    +'<button class="btn bg bsm" onclick="perfShowAB()" title="Settings A/B — the app watches the graphics settings you change between flights and shows honest before/after comparisons, judged against your normal flight-to-flight variation">&#129514; Settings A/B</button>'
     +'<button class="btn bg bsm" onclick="perfShowScenery()" title="Rank which airports cost the most ground (taxi) performance — measured against your typical ground for the same plane, so the aircraft isn&#39;t blamed for the scenery">&#128748; Scenery</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
@@ -3934,14 +3934,12 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" id="perf-cov-btn" onclick="perfToggleCov()" title="Hide the &lsquo;Coverage &amp; what to fly next&rsquo; tracker now your 24-flight benchmark is complete — reversible; click again to bring it back if you re-baseline after a driver or sim update">'+(S.cfg.perfHideCoverage?'&#127919; Show coverage':'&#127919; Hide coverage')+'</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
     +'</div>'
-    +'<div id="lab-panel"></div>'
     +'<iframe id="perf-frame" referrerpolicy="no-referrer" onload="perfPostTheme()" style="width:100%;height:calc(100vh - 168px);border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2)"></iframe>'
     +'<div id="perf-compare" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
     +'<div id="perf-baseline" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
     +'<div id="perf-lab" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>'
     +'<div id="perf-scenery" style="display:none;height:calc(100vh - 168px);overflow:auto;border:1px solid var(--sep);border-radius:var(--r);background:var(--bg2);padding:18px"></div>';
   perfShowDashboard();
-  renderLabPanel();   // Settings Lab (Phase 9) — async, fills #lab-panel
 }
 function perfTheme(){ return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'; }
 function perfPostTheme(){ const fr=document.getElementById('perf-frame'); if(fr&&fr.contentWindow){ try{ fr.contentWindow.postMessage({cfxSetTheme:perfTheme()},'*'); }catch(e){} } perfApplyCovHide(); }
@@ -4186,19 +4184,10 @@ function renderCompare(){
     +'<span style="font-size:12px;color:var(--ink3);margin-left:6px">holding</span>'+sel('cmp-fac',_cmpState.fAircraft,acOpts)+sel('cmp-ftl',_cmpState.fTlod,tlOpts)
     +'</div>'
     +'<div style="font-size:12px;color:var(--ink3);margin-bottom:14px">'+flights.length+' of '+all.length+' flights · '+groups.length+' group'+(groups.length!==1?'s':'')+' · averages per group. Hold aircraft + TLOD constant for a clean sim/driver comparison.</div>';
-  // Lab tie-in: grouping by experiment gets each experiment's verdict chip (judged vs baseline
-  // noise in the Lab, which raw group means here can't tell you) + a jump to the full finding.
+  // (v6.12.0: the retired Settings Lab's verdict chips are gone — historic experiment-tagged flights
+  // still group here by their tag; passive before/after analysis lives in 🧪 Settings A/B.)
   if(dim==='experiment'){
-    if(_labReport&&_labReport.ok){
-      const chips=_labReport.experiments.filter(e=>e.done>0).map(e=>{ const v=_LABV[e.verdict]||_LABV.collecting;
-        return '<span title="'+esc(e.sentence||'')+'" style="font-size:10px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:2px 7px">'+v.t+' · '+esc(e.label)+'</span>'; }).join(' ');
-      if(chips) html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+chips
-        +'<a href="#" onclick="perfShowLab();return false" style="font-size:11px;color:var(--acc)">open Lab for charts &#8594;</a></div>';
-    }else if(!_labRptLoading){
-      _labRptLoading=true;
-      window.api.perfLabReport().then(r=>{ _labReport=r; _labRptLoading=false; if(_cmpState.dim==='experiment')renderCompare(); }).catch(()=>{ _labRptLoading=false; });
-      html+='<div style="font-size:11px;color:var(--ink3);margin-bottom:14px">Loading Lab verdicts&hellip;</div>';
-    }
+    html+='<div style="font-size:11px;color:var(--ink3);margin-bottom:14px">Flights tagged by the retired Settings Lab. Ongoing settings analysis now lives in 🧪 Settings A/B — it watches the changes you make yourself.</div>';
   }
   // R4 version verdict card: when grouping by driver/sim, judge the two versions on MATCHED cells vs
   // the noise band (honest — raw group means above can't tell a real change from flight-to-flight noise).
@@ -4341,7 +4330,7 @@ function _afpsEnvCard(d, rec, recKnown){
   let inner;
   if(e.state==='collecting'){
     inner='<div style="font-size:12px;color:var(--ink3)">Collecting &mdash; '+e.n+'/2 clean AutoFPS flights with a TLOD trace so far.'
-      +(e.lab?(' '+e.lab+' AutoFPS flight'+(e.lab>1?'s were':' was')+' a Settings Lab experiment (changed graphics settings) &mdash; excluded from this math. Tip: uncheck the Lab while flying AutoFPS; the two confound each other.'):' Fly with AutoFPS running and this fills in.')
+      +(e.lab?(' '+e.lab+' AutoFPS flight'+(e.lab>1?'s were':' was')+' a (retired) Settings Lab experiment &mdash; excluded from this math.'):' Fly with AutoFPS running and this fills in.')
       +'</div>';
   } else {
     const col=e.verdict==='raise'?'#46c46a':(e.verdict==='lower'?'var(--acc)':'var(--ink1)');
@@ -4442,13 +4431,15 @@ function renderBaseline(){
   }
   bl.innerHTML=h;
 }
-// ── SETTINGS LAB (Phase 9) UI ────────────────────────────────────────────────
-// Checkbox is GREYED until the 24-flight benchmark completes (cov.ready). Checked = the Lab takes
-// the pre-launch slot on Launch + Capture (one experiment per flight, alternating with baseline
-// control flights). Unchecked = nothing runs, full manual control; un-checking restores settings.
-// Verdicts + charts are computed by perf/native/lab_report.js (child process) — deltas judged
-// against ±1 standard deviation of your baseline flights, so "no effect" is a real, honest result.
-let _labReport=null,_labStatus=null,_labFlights=null,_labRptLoading=false;
+// ── SETTINGS A/B (v6.12.0 — the passive Lab replacement) ────────────────────
+// The old Settings Lab WROTE experiment values pre-launch — a model that fundamentally clashes with
+// AutoFPS (which drives TLOD/clouds itself). Settings A/B just WATCHES: every capture snapshots the
+// graphics settings (curated ~10-key watch list, gfx_watch.js); when consecutive flights differ, a
+// before/after card appears — deltas judged against ±1σ of the before-run flights, the same honesty
+// device the Lab used. Fixed-TLOD and AutoFPS flights live in separate lanes (never pooled); the
+// AutoFPS lane also fingerprints the AutoFPS Min/Max TLOD config, so a cap change gets a card too.
+// lab.js/lab_report.js stay in the repo, dormant.
+let _abData=null,_abWatch=null;
 const _LABV={
   free:      {c:'var(--grn)', bg:'rgba(50,215,75,.10)',  t:'FREE UPGRADE'},
   saves:     {c:'#4ea1ff',    bg:'rgba(10,132,255,.10)', t:'REAL IMPROVEMENT'},
@@ -4458,66 +4449,16 @@ const _LABV={
   collecting:{c:'var(--ink3)',bg:'var(--bg)',            t:'COLLECTING'},
   'awaiting-control':{c:'var(--ink3)',bg:'var(--bg)',    t:'AWAITING BASELINE'}
 };
-// One-line status strip on the Performance tab — the depth lives in the 🧪 Lab view.
-async function renderLabPanel(){
-  const el=document.getElementById('lab-panel'); if(!el)return;
-  let flights=[],st=null;
-  try{ const r=await window.api.perfCompareData(); flights=(r&&r.ok&&r.flights)||[]; }catch(e){}
-  try{ st=await window.api.perfLabStatus(); }catch(e){}
-  if(!document.getElementById('lab-panel'))return;
-  _labStatus=st; _labFlights=flights;
-  const cov=_blCompute(flights).coverage;
-  const on=!!S.cfg.labMode, gated=!cov.ready;
-  let inner='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:'+(gated?'var(--ink3)':'var(--ink1)')+';cursor:'+(gated?'not-allowed':'pointer')+'" title="'+(gated?('Unlocks when the '+cov.total+'-flight benchmark completes (currently '+cov.filled+'/'+cov.total+'). Until then auto-TLOD owns the pre-launch slot.'):'One curated settings experiment per Launch + Capture flight, alternating with baseline control flights. Lab flights never touch your baseline math; settings are restored automatically.')+'">'
-    +'<input type="checkbox" '+(on?'checked':'')+(gated?' disabled':'')+' onchange="labToggle(this.checked)" style="accent-color:var(--acc);width:15px;height:15px">'
-    +'🧪 Settings Lab</label>';
-  if(gated){
-    inner+='<span style="font-size:11px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">unlocks at '+cov.total+'/'+cov.total+' — currently '+cov.filled+'/'+cov.total+'</span>';
-  }else{
-    if(on&&st&&st.ok){
-      const nx=st.next||{};
-      inner+='<span style="font-size:11px;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">next flight: '
-        +(nx.mode==='experiment'?('EXPERIMENT — '+esc(nx.label||nx.id)):nx.mode==='control'?'CONTROL (baseline config)':'queue complete — review findings')+'</span>';
-    }
-    if(st&&st.ok){
-      inner+='<span style="font-size:13px;letter-spacing:3px;line-height:1">'+st.queue.map(q=>{
-        const full=q.need!=null&&q.done>=q.need;
-        const c=full?'var(--grn)':(q.done>0?'var(--acc)':'var(--ink4)');
-        if(q.na&&!q.done)return '<span title="'+esc(q.label)+' — not applicable: your settings already match the test value" style="color:var(--ink4)">&#215;</span>';
-        return '<span title="'+esc(q.label)+' — '+q.done+(q.need!=null?('/'+q.need):'')+' flight'+(q.done!==1?'s':'')+'" style="color:'+c+'">'+(full?'&#9679;':(q.done>0?'&#9684;':'&#9675;'))+'</span>';
-      }).join('')+'</span>';
-    }
-  }
-  inner+='<button class="btn bg bsm" onclick="perfShowLab()" style="margin-left:auto" title="Findings: what each experiment did to your smoothness, with charts">open Lab &#8594;</button></div>';
-  el.innerHTML='<div class="api-pan" style="margin-bottom:10px;padding:8px 14px">'+inner+'</div>';
-}
-async function labToggle(on){
-  if(!on){
-    let r=null; try{ r=await window.api.perfLabNext({disable:true}); }catch(e){}
-    S.cfg.labMode=false; window.api.saveConfig(S.cfg);
-    alert('Settings Lab off — you have full manual control.'+(r&&r.restored?('\n'+r.restored+' setting(s) restored to your baseline values.'):''));
-  }else{
-    S.cfg.labMode=true; window.api.saveConfig(S.cfg);
-  }
-  renderLabPanel();
-}
-async function labManual(id){
-  let r=null; try{ r=await window.api.perfLabNext({manual:id}); }catch(e){ r={ok:false,msg:(e&&e.message)||'error'}; }
-  alert(r&&r.ok?(r.msg+'\n\nRemember to actually toggle the setting in the sim before flying — this only tags the flight for analysis.'):('Could not tag: '+((r&&r.msg)||'unknown')));
-  renderLabPanel();
-}
-// ── THE LAB VIEW — finding cards ─────────────────────────────────────────────
-async function perfShowLab(){
+// ── THE SETTINGS A/B VIEW ────────────────────────────────────────────────────
+async function perfShowAB(){
   _perfHideViews();
   const lb=document.getElementById('perf-lab'); if(!lb)return; lb.style.display='block';
-  lb.innerHTML='<div style="font-size:13px;color:var(--ink3)">Building findings&hellip; first open reads your raw flight logs to build chart caches (up to a minute) — instant after that.</div>';
-  try{ const r=await window.api.perfCompareData(); _labFlights=(r&&r.ok&&r.flights)||[]; }catch(e){ _labFlights=_labFlights||[]; }
-  try{ _labStatus=await window.api.perfLabStatus(); }catch(e){}
-  try{ _labReport=await window.api.perfLabReport(); }catch(e){ _labReport={ok:false,error:(e&&e.message)||'error'}; }
-  renderLabView();
+  lb.innerHTML='<div style="font-size:13px;color:var(--ink3)">Reading your flights&hellip;</div>';
+  let r; try{ r=await window.api.perfCompareData(); }catch(e){ r=null; }
+  _abData=(r&&r.ok&&Array.isArray(r.flights))?r.flights:[];
+  _abWatch=(r&&r.gfxWatch)||null;
+  renderAB();
 }
-function labOpen(encFolder){ if(_labReport&&_labReport.sessionsDir)window.api.perfOpenPath(_labReport.sessionsDir+'\\'+decodeURIComponent(encFolder)+'\\report.html'); }
 function _labNum(x,dec){ return (x==null||isNaN(x))?'—':Number(x).toFixed(dec); }
 // Diverging delta bar drawn OVER the shaded ±1σ "normal variation" band — the honesty device.
 function _labDeltaRow(d){
@@ -4539,78 +4480,179 @@ function _labDeltaRow(d){
     +'<span style="flex:0 0 168px;font-size:11px;font-family:\'JetBrains Mono\',monospace;color:'+txtCol+'">'+sign+_labNum(d.delta,d.dec)+(d.unit?' '+d.unit:'')+tag+'</span>'
     +'</div>';
 }
-function renderLabView(){
-  const lb=document.getElementById('perf-lab'); if(!lb)return;
-  const cov=_blCompute(_labFlights||[]).coverage;
-  const st=_labStatus, adopts=(st&&st.adoptions)||{};
-  let h='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">'
-    +'<span style="font-size:15px;font-weight:700;color:var(--ink1)">🧪 Settings Lab — findings</span>';
-  if(st&&st.ok&&st.queue){
-    h+='<select onchange="if(this.value){labManual(this.value);this.value=\'\'}" style="margin-left:auto;background:var(--bg);color:var(--ink2);border:1px solid var(--sep);border-radius:6px;padding:3px 6px;font-size:11px"><option value="">Manual tag&hellip;</option>'
-      +st.queue.filter(q=>q.manual).map(q=>'<option value="'+esc(q.id)+'">'+esc(q.label)+'</option>').join('')+'</select>';
-  }
-  h+='</div>';
-  h+='<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Each card = one setting tested on real flights against your own baseline. Deltas are judged against the shaded band — your normal flight-to-flight variation — so a bar inside the band honestly means <b>no effect</b>, not a hidden win. Orange chart lines = experiment flights, grey = baseline flights, x-axis = % of flight so different routes overlay fairly.</div>';
-  if(!cov.ready){
-    h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6"><b>Locked until the '+cov.total+'-flight benchmark completes ('+cov.filled+'/'+cov.total+').</b> The Lab needs your full baseline first — it&rsquo;s the yardstick every experiment is measured against. Keep flying benchmark flights; this unlocks by itself.</div>';
-  }
-  if(!_labReport||!_labReport.ok){
-    h+='<div style="font-size:12px;color:var(--ink3)">'+(_labReport&&_labReport.error?('Could not build the report: '+esc(_labReport.error)):'No findings yet.')+'</div>';
-    lb.innerHTML=h; return;
-  }
-  const svgVars='--grid:var(--sep);--border:var(--sep2);--text-faint:var(--ink3);--target:var(--ink3);--bad:#e0823c;--lab-exp:var(--acc);--lab-ctrl:var(--ink3)';
-  for(const e of _labReport.experiments){
-    // not-applicable: this experiment's test value equals the user's own baseline (nothing to measure)
-    const naQ=st&&st.ok&&st.queue?(st.queue.find(q=>q.id===e.id)||{}):{};
-    if(naQ.na&&!e.done){
-      h+='<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;margin-bottom:14px;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-        +'<span style="font-size:10px;font-weight:800;letter-spacing:.09em;font-family:\'JetBrains Mono\',monospace;color:var(--ink4);border:1px solid var(--ink4);border-radius:5px;padding:2px 8px">NOT APPLICABLE</span>'
-        +'<span style="font-size:13px;font-weight:700;color:var(--ink3)">'+esc(e.label)+'</span>'
-        +'<span style="font-size:11px;color:var(--ink3)">your settings already sit at the test value — nothing to measure; skipped automatically</span></div>';
-      continue;
-    }
-    const v=_LABV[e.verdict]||_LABV.collecting;
-    const ad=adopts[e.id];
-    const hasData=e.deltas&&e.deltas.length;
-    h+='<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;margin-bottom:14px;overflow:hidden">';
-    // verdict banner
-    h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:'+v.bg+';border-bottom:1px solid var(--sep)">'
-      +'<span style="font-size:10px;font-weight:800;letter-spacing:.09em;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:2px 8px">'+v.t+'</span>'
-      +'<span style="font-size:13px;font-weight:700;color:var(--ink1)">'+esc(e.label)+'</span>'
-      +(e.manual?'<span style="font-size:10px;color:var(--ink3)">(manual toggle)</span>':'')
-      +(e.preliminary&&hasData?'<span style="font-size:10px;color:var(--acc);font-family:\'JetBrains Mono\',monospace">preliminary — '+e.done+'/'+e.need+' flights</span>':'')
-      +(ad?'<span style="margin-left:auto;font-size:11px;color:var(--grn);font-family:\'JetBrains Mono\',monospace">&#10003; adopted '+new Date(ad.ts).toLocaleDateString()+' <a href="#" onclick="labApply(\''+esc(e.id)+'\',true);return false" style="color:var(--ink3);margin-left:6px">un-apply</a></span>'
-        :((e.verdict==='free'||e.verdict==='saves')&&!e.manual?'<button class="btn bg bsm" style="margin-left:auto;border-color:'+v.c+';color:'+v.c+'" onclick="labApply(\''+esc(e.id)+'\',false)" title="Write this value to UserCfg.opt (backed up first) and keep it as your new baseline">Apply this setting</button>':''))
-      +'</div>';
-    h+='<div style="padding:12px 16px">';
-    h+='<div style="font-size:12.5px;color:var(--ink1);line-height:1.6;margin-bottom:8px">'+esc(e.sentence||'')+'</div>';
-    h+='<div style="font-size:11px;color:var(--ink3);line-height:1.6;margin-bottom:'+(hasData?'12':'2')+'px"><b>Why we tested:</b> '+esc(e.hypothesis||'')+'</div>';
-    if(hasData){
-      h+='<div style="margin-bottom:12px">'+e.deltas.map(_labDeltaRow).join('')+'</div>';
-      h+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;'+svgVars+'">'
-        +'<div style="flex:1;min-width:280px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:4px">Arrival taxi — where stutter lives</div>'+(e.svgGround||'')+'</div>'
-        +'<div style="flex:1;min-width:280px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:4px">Full flight</div>'+(e.svgFull||'')+'</div>'
-        +'</div>';
-      const chip=(f,isExp)=>'<a href="#" onclick="labOpen(\''+encodeURIComponent(f.folder)+'\');return false" title="Open this flight&rsquo;s report" style="text-decoration:none;font-size:10px;font-family:\'JetBrains Mono\',monospace;color:'+(isExp?'var(--acc)':'var(--ink3)')+';border:1px solid '+(isExp?'var(--acc)':'var(--sep)')+';border-radius:5px;padding:1px 7px">'+esc(f.aircraft||'?')+' '+esc(String(f.session_id||'').replace(/^\d{4}-/,''))+'</a>';
-      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;color:var(--ink3)">'
-        +'<span style="color:var(--acc)">experiment:</span>'+e.flights.exp.map(f=>chip(f,true)).join('')
-        +'<span style="margin-left:8px">vs baseline:</span>'+e.flights.ctrl.map(f=>chip(f,false)).join('')
-        +'<span style="margin-left:8px">(noise band from '+(e.poolN||0)+' baseline flights)</span></div>';
-    }
-    h+='</div></div>';
-  }
-  h+='<div style="font-size:11px;color:var(--ink3);margin-top:4px">Verdicts firm up at 2 flights per experiment. &ldquo;Apply this setting&rdquo; backs up UserCfg.opt first and becomes your new Lab baseline — un-apply any time. For a narrative deep-dive, ask in chat.</div>';
-  lb.innerHTML=h;
+// A/B metric set: judged metrics decide the verdict; info metrics (GPU work / balance) are shown
+// with the band but never colored — GPU busy RISING is Dean's goal, not a regression.
+const _abMetrics=[
+  {k:'p99_ft_ms',        label:'P99 frametime',    unit:'ms',  dec:2, judge:true},
+  {k:'stutter_pct',      label:'Stutter',          unit:'%',   dec:2, judge:true},
+  {k:'felt_stutter_hr',  label:'Felt stutters/hr', unit:'/hr', dec:1, judge:true},
+  {k:'peak_vram_mb',     label:'Peak VRAM',        unit:'MB',  dec:0, judge:true},
+  {k:'avg_vram_mb',      label:'Avg VRAM',         unit:'MB',  dec:0, judge:false, info:true},
+  {k:'avg_gpu_busy_ms',  label:'Avg GPU busy',     unit:'ms',  dec:2, judge:false, info:true},
+  {k:'_gpu_ratio',       label:'GPU/CPU balance',  unit:'&times;', dec:2, judge:false, info:true},
+  {k:'autofps_tlod_med', label:'TLOD median (flown)', unit:'', dec:0, judge:false, info:true, afps:true},
+  {k:'autofps_at_cap_pct',label:'Time at TLOD cap',unit:'%',   dec:0, judge:false, info:true, afps:true},
+];
+function _abVal(f,k){
+  if(k==='_gpu_ratio')return (f.avg_gpu_busy_ms!=null&&f.avg_cpu_busy_ms>0)?f.avg_gpu_busy_ms/f.avg_cpu_busy_ms:null;
+  return (f[k]!=null&&!isNaN(f[k]))?f[k]:null;
 }
-async function labApply(id,undo){
-  const e=((_labReport&&_labReport.experiments)||[]).find(x=>x.id===id);
-  const what=e?e.label:id;
-  if(!confirm(undo?('Un-apply "'+what+'" and restore your previous value?\n\nMSFS must be closed.')
-    :('Apply this permanently?\n\n'+what+'\n\nWrites the value to UserCfg.opt (backed up first) and makes it your new baseline going forward. MSFS must be closed.')))return;
-  let r=null; try{ r=await window.api.perfLabApply({id:id,undo:!!undo}); }catch(e2){ r={ok:false,msg:(e2&&e2.message)||'error'}; }
-  alert(r&&r.ok?('✓ '+r.msg+(undo?'':'\n\nFuture Lab control flights keep this value.')):('Could not apply: '+((r&&r.msg)||'unknown')));
-  try{ _labStatus=await window.api.perfLabStatus(); }catch(e3){}
-  renderLabView(); renderLabPanel();
+function _abVramTotal(){ const t=(_abData||[]).map(f=>f.total_vram_mb).filter(v=>v!=null); return t.length?Math.max(...t):12288; }
+function _abDisp(w,v){
+  if(v==null)return '—';
+  if(w.fmt==='pct')return Math.round(v*100)+'%';
+  if(w.fmt==='enum'){ if(v===-1)return 'Off'; const l=w.labels&&w.labels[v]; return l?(v+' · '+l):String(v); }
+  return String(v);
+}
+// Lane split (fixed-TLOD vs AutoFPS — never pooled) + consecutive same-fingerprint runs. In the
+// AutoFPS lane the fingerprint also carries the AutoFPS Min/Max TLOD, so a cap change = a run break.
+function _abRuns(flights){
+  const fl=(flights||[]).filter(f=>!f.excluded&&!f.experiment&&f.gfx_fp).slice()
+    .sort((a,b)=>String(a.timestamp||'').localeCompare(String(b.timestamp||'')));
+  const runsOf=(arr,isA)=>{
+    const key=f=>isA?(f.gfx_fp+'|'+(f.autofps_cfg?(f.autofps_cfg.min+'-'+f.autofps_cfg.max):'?')):f.gfx_fp;
+    const runs=[];
+    for(const f of arr){ const k=key(f);
+      if(runs.length&&runs[runs.length-1].key===k)runs[runs.length-1].flights.push(f);
+      else runs.push({key:k,flights:[f]});
+    }
+    return runs;
+  };
+  return { fixed:runsOf(fl.filter(f=>!f.autofps_active),false), autofps:runsOf(fl.filter(f=>!!f.autofps_active),true) };
+}
+// What actually changed at a run boundary (per-key diff over the watch list + AutoFPS cap).
+function _abChanges(before,after,isA){
+  const a=before.flights[before.flights.length-1], b=after.flights[0], out=[];
+  for(const w of (_abWatch||[])){
+    const va=a.gfx?a.gfx[w.id]:null, vb=b.gfx?b.gfx[w.id]:null;
+    if(va!==vb)out.push(esc(w.label)+' '+esc(_abDisp(w,va))+' &rarr; '+esc(_abDisp(w,vb)));
+  }
+  if(isA){
+    const fa=a.autofps_cfg?(a.autofps_cfg.min+'&ndash;'+a.autofps_cfg.max):'?';
+    const fb=b.autofps_cfg?(b.autofps_cfg.min+'&ndash;'+b.autofps_cfg.max):'?';
+    if(fa!==fb)out.push('AutoFPS TLOD range '+fa+' &rarr; '+fb);
+  }
+  return out.length?out:['settings changed (per-key detail unavailable on these flights)'];
+}
+// One before/after card: means, ±1σ band from the BEFORE run, verdict.
+function _abCard(before,after,isA){
+  const bn=before.flights.length, an=after.flights.length;
+  const collecting=bn<2||an<2;
+  const cap=0.9*_abVramTotal();
+  const rows=[]; let anyWorse=false,anyBetter=false,gpuUp=false,vramCap=false;
+  for(const m of _abMetrics){
+    if(m.afps&&!isA)continue;
+    const bv=before.flights.map(f=>_abVal(f,m.k)).filter(v=>v!=null);
+    const av=after.flights.map(f=>_abVal(f,m.k)).filter(v=>v!=null);
+    if(!bv.length||!av.length)continue;
+    const mean=x=>x.reduce((p,q)=>p+q,0)/x.length;
+    const bm=mean(bv), am=mean(av), delta=am-bm;
+    const sigma=bv.length>=2?_pstdev(bv):null;
+    const beyond=(sigma!=null&&sigma>0)?Math.abs(delta)>sigma:false;
+    if(!collecting&&beyond){
+      if(m.judge){ if(delta>0)anyWorse=true; else anyBetter=true; }
+      if(m.k==='avg_gpu_busy_ms'&&delta>0)gpuUp=true;
+    }
+    if(m.k==='peak_vram_mb'&&am>cap)vramCap=true;
+    rows.push({label:m.label,delta,sigma,within:m.info?null:((sigma!=null&&sigma>0)?!beyond:null),
+      expMean:am,ctrlMean:bm,unit:m.unit,dec:m.dec,pct:(bm&&beyond)?Math.round(delta/bm*100):null});
+  }
+  let verdict, sentence;
+  if(collecting){ verdict='collecting'; sentence='Collecting — needs at least 2 flights on each side ('+bn+' before / '+an+' after). Keep flying; this firms up by itself.'; }
+  else if(anyWorse&&anyBetter){ verdict='mixed'; sentence='Trade-off: some metrics improved and others got worse, both beyond your normal flight-to-flight variation.'; }
+  else if(anyWorse||vramCap){ verdict='costs'; sentence=(anyWorse?'This change made things measurably worse — worth reverting.':'Smoothness held, but peak VRAM crossed the 90% safety ceiling.'); }
+  else if(anyBetter){ verdict='saves'; sentence='Real improvement — beyond your normal flight-to-flight variation. Keep it.'; }
+  else if(gpuUp&&!vramCap){ verdict='free'; sentence='Free upgrade — the GPU took the extra work while VRAM and smoothness held. Keep it.'; }
+  else { verdict='noeffect'; sentence='No measurable effect — everything stayed within your normal flight-to-flight variation.'; }
+  if(vramCap&&verdict!=='costs')sentence+=' (Watch it: peak VRAM is over the 90% ceiling.)';
+  return {verdict,sentence,rows,bn,an};
+}
+function _abMix(flights){
+  const acs=[...new Set(flights.map(f=>f.aircraft||'?'))];
+  const tr=[...new Set(flights.map(f=>f.online_traffic||'offline'))];
+  return acs.join('/')+' · '+tr.join('/');
+}
+// TLOD↔VRAM dots (AutoFPS lane): x = peak TLOD actually reached (trace), y = peak VRAM, with the
+// 90%-of-card line — the visual answer to "what does raising the cap cost in VRAM". Seeds from ALL
+// AutoFPS flights with a trace (retroactive — the cap SETTING is only known from v6.12.0 forward).
+function _abTlodVramSvg(afpsFlights){
+  const pts=(afpsFlights||[]).filter(f=>f.autofps_tlod_max!=null&&f.peak_vram_mb!=null);
+  if(pts.length<2)return '';
+  const total=_abVramTotal(), cap=0.9*total;
+  const W=480,H=180,L=52,R=14,T=12,B=26;
+  let xmin=Math.min(...pts.map(p=>p.autofps_tlod_max)), xmax=Math.max(...pts.map(p=>p.autofps_tlod_max));
+  if(xmax-xmin<50){ xmin-=25; xmax+=25; }
+  const ymin=Math.max(0,Math.min(...pts.map(p=>p.peak_vram_mb),cap)*0.92), ymax=total;
+  const X=v=>L+(v-xmin)/(xmax-xmin)*(W-L-R), Y=v=>T+(1-(v-ymin)/(ymax-ymin))*(H-T-B);
+  let s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;background:var(--bg);border:1px solid var(--sep);border-radius:8px">';
+  s+='<line x1="'+L+'" y1="'+Y(cap)+'" x2="'+(W-R)+'" y2="'+Y(cap)+'" stroke="#e0823c" stroke-dasharray="4 3" stroke-width="1"/>';
+  s+='<text x="'+(W-R-4)+'" y="'+(Y(cap)-4)+'" text-anchor="end" font-size="9" fill="#e0823c">90% of card ('+Math.round(cap)+' MB)</text>';
+  for(const p of pts) s+='<circle cx="'+X(p.autofps_tlod_max)+'" cy="'+Y(p.peak_vram_mb)+'" r="4" fill="var(--acc)" opacity="0.85"><title>'+esc(p.session_id||'')+' — peak TLOD '+p.autofps_tlod_max+', peak VRAM '+p.peak_vram_mb+' MB</title></circle>';
+  s+='<text x="'+L+'" y="'+(H-8)+'" font-size="9" fill="var(--ink3)">TLOD '+Math.round(xmin)+'</text>';
+  s+='<text x="'+(W-R)+'" y="'+(H-8)+'" text-anchor="end" font-size="9" fill="var(--ink3)">TLOD '+Math.round(xmax)+'</text>';
+  s+='<text x="4" y="'+(T+8)+'" font-size="9" fill="var(--ink3)">'+Math.round(ymax)+' MB</text>';
+  s+='<text x="4" y="'+(H-B)+'" font-size="9" fill="var(--ink3)">'+Math.round(ymin)+' MB</text>';
+  s+='</svg>';
+  return s;
+}
+function renderAB(){
+  const lb=document.getElementById('perf-lab'); if(!lb)return;
+  const lanes=_abRuns(_abData||[]);
+  const anySnap=(_abData||[]).some(f=>f.gfx_fp&&!f.excluded&&!f.experiment);
+  let h='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<span style="font-size:15px;font-weight:700;color:var(--ink1)">🧪 Settings A/B</span>'
+    +'<span style="font-size:11px;color:var(--ink3)">passive — it watches the settings you change, nothing is written</span></div>'
+    +'<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Every capture snapshots your MSFS graphics settings. Change something between flights and a before/after card appears — deltas judged against the shaded band (your normal flight-to-flight variation from the before-side flights), so a bar inside the band honestly means <b>no effect</b>. Fixed-TLOD and AutoFPS flights are compared in separate lanes, never against each other.</div>';
+  if(!anySnap){
+    h+='<div style="background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.35);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.6"><b>Watching begins with your next flight.</b> Older flights predate the settings snapshot, so there&rsquo;s nothing to compare yet. Fly once, change a setting below, fly again — the first card appears at 2 flights per side.</div>';
+  }
+  const laneDefs=[{id:'fixed',title:'Fixed-TLOD flights'},{id:'autofps',title:'AutoFPS flights'}];
+  for(const ld of laneDefs){
+    const runs=lanes[ld.id];
+    if(!runs.length)continue;
+    const cur=runs[runs.length-1], curD=String((cur.flights[0]||{}).timestamp||'').slice(0,10);
+    h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:14px 0 6px">'+ld.title
+      +' <span style="text-transform:none;letter-spacing:0">— current config since '+esc(curD)+' ('+cur.flights.length+' flight'+(cur.flights.length!==1?'s':'')+')</span></div>';
+    if(runs.length<2){
+      h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">No settings change detected in this lane yet — cards appear when one does.</div>';
+    }
+    for(let i=runs.length-2;i>=0;i--){
+      const before=runs[i], after=runs[i+1], isA=ld.id==='autofps';
+      const c=_abCard(before,after,isA), v=_LABV[c.verdict]||_LABV.collecting;
+      const when=String((after.flights[0]||{}).timestamp||'').slice(0,10);
+      h+='<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;margin-bottom:14px;overflow:hidden">'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:'+v.bg+';border-bottom:1px solid var(--sep)">'
+        +'<span style="font-size:10px;font-weight:800;letter-spacing:.09em;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:2px 8px">'+v.t+'</span>'
+        +'<span style="font-size:13px;font-weight:700;color:var(--ink1)">'+esc(when)+' — '+_abChanges(before,after,isA).join(' · ')+'</span>'
+        +'<span style="margin-left:auto;font-size:10px;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">'+c.bn+' before / '+c.an+' after</span>'
+        +'</div><div style="padding:12px 16px">'
+        +'<div style="font-size:12.5px;color:var(--ink1);line-height:1.6;margin-bottom:10px">'+esc(c.sentence)+'</div>'
+        +(c.rows.length?('<div style="margin-bottom:10px">'+c.rows.map(_labDeltaRow).join('')+'</div>'):'')
+        +'<div style="font-size:10px;color:var(--ink3)">before: '+esc(_abMix(before.flights))+' &nbsp;·&nbsp; after: '+esc(_abMix(after.flights))+' &nbsp;·&nbsp; noise band = ±1σ of the before-side flights</div>'
+        +'</div></div>';
+    }
+    if(ld.id==='autofps'){
+      const svg=_abTlodVramSvg((_abData||[]).filter(f=>f.autofps_active&&!f.excluded));
+      if(svg) h+='<div style="margin-bottom:14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:4px">TLOD &harr; VRAM — what the cap costs (each dot = one AutoFPS flight)</div>'+svg+'</div>';
+    }
+  }
+  // The watch-list legend (Dean's ask: "a small reference so I remember what's monitored").
+  if(_abWatch&&_abWatch.length){
+    const latest=(_abData||[]).filter(f=>f.gfx).sort((a,b)=>String(a.timestamp||'').localeCompare(String(b.timestamp||''))).pop();
+    h+='<div style="margin-top:18px;border-top:1px solid var(--sep);padding-top:12px">'
+      +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:6px">Watched settings — changes to these get a card</div>'
+      +'<table style="border-collapse:collapse;font-size:11px">'
+      +_abWatch.map(w=>{
+        const v=latest&&latest.gfx?latest.gfx[w.id]:null;
+        return '<tr><td style="padding:2px 14px 2px 0;color:var(--ink2)">'+esc(w.label)+'</td>'
+          +'<td style="padding:2px 14px 2px 0;color:var(--ink3);font-family:\'JetBrains Mono\',monospace">'+esc(w.key)+'</td>'
+          +'<td style="padding:2px 0;color:var(--ink1);font-family:\'JetBrains Mono\',monospace">'+esc(_abDisp(w,v))+'</td></tr>';
+      }).join('')
+      +'</table>'
+      +'<div style="font-size:10px;color:var(--ink3);margin-top:6px;line-height:1.5">Numerals are what UserCfg.opt stores; the word beside an enum is the in-sim label (calibrated live: clouds 1 = Medium — the raw numeral is always shown so a label can never hide the real value). TLOD, texture and traffic are deliberately not watched (machine-driven or VRAM/CPU levers). The AutoFPS Min/Max TLOD range is watched separately in the AutoFPS lane.</div>'
+      +'</div>';
+  }
+  lb.innerHTML=h;
 }
 
 // ── SETUP ASSISTANT (Phase 10) ───────────────────────────────────────────────
@@ -4783,7 +4825,7 @@ function bwizRender(){
   if(s===0){
     h='<div style="font-size:19px;font-weight:800;color:var(--ink0);letter-spacing:-.02em;margin-bottom:8px">🎯 Find your ideal graphics settings</div>'
       +'<div style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:14px">ABRP can measure your real flights and recommend the one Terrain-LOD setting that keeps your heaviest planes smooth with VRAM headroom — no guesswork, your own data.<br><br>'
-      +'<b>How it works:</b> you just fly normally with Launch + Capture. Before each flight, the app sets the next test value automatically; after enough flights it hands you the answer (and unlocks the Settings Lab for deeper experiments).</div>'
+      +'<b>How it works:</b> you just fly normally with Launch + Capture. Before each flight, the app sets the next test value automatically; after enough flights it hands you the answer (and Settings A/B keeps watching any changes you make after that).</div>'
       +_wizFoot(_wizBtn('Not now','bwizClose()')+_wizBtn('Set it up &#8594;','bwizNext()',true));
   }
   if(s===1){
@@ -4814,7 +4856,7 @@ function bwizRender(){
       +_wizFoot(_wizBtn('&#8592; Back','bwizNext(-1)')+(_bwizTlods().length?_wizBtn('Next &#8594;','bwizNext()',true):'<span style="font-size:11px;color:var(--ink3)">enter valid TLOD numbers (10–400)</span>'));
   }
   if(s===3){
-    h=_wizHead(3,3,'Confirm your benchmark','This becomes the plan behind auto-TLOD, the progress tracker, the Baseline recommendation, and the Settings Lab unlock.')
+    h=_wizHead(3,3,'Confirm your benchmark','This becomes the plan behind auto-TLOD, the progress tracker, and the Baseline recommendation.')
       +'<div style="background:var(--bg2);border:1px solid var(--sep);border-radius:9px;padding:14px 16px;font-size:12.5px;line-height:2;margin-bottom:8px">'
       +'<div><b>Aircraft:</b> '+_bwiz.sel.map(x=>esc(x.label)).join(' &amp; ')+'</div>'
       +'<div><b>TLOD steps:</b> '+_bwizTlods().join(' / ')+'</div>'
@@ -4834,7 +4876,7 @@ function bwizSave(){
   bwizClose();
   alert('Benchmark plan saved — '+S.cfg.benchmark.aircraft.map(a=>a.label).join(' & ')+', '+
     (S.cfg.benchmark.aircraft.length*S.cfg.benchmark.tlods.length*S.cfg.benchmark.perCell)+' flights.\n\nUse Launch + Capture on any route card; the Performance tab tracks progress.');
-  try{ if(document.getElementById('perf-baseline'))renderBaseline(); renderLabPanel(); }catch(e){}
+  try{ if(document.getElementById('perf-baseline'))renderBaseline(); }catch(e){}
 }
 
 async function perfExportCfx(){
@@ -4904,8 +4946,7 @@ async function launchAndCapture(dep,arr,acType){
   const closeApps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
   const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path);
   const msg=warn+'Launch a clean benchmark flight?\n\nThis will, in order:\n'
-    +(S.cfg.labMode?'1. Apply your next Settings Lab experiment for your SimBrief aircraft (or set the next benchmark TLOD if the grid still has gaps)\n'
-                    :'1. Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete — your current settings are left alone)\n')
+    +'1. Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete — your current settings are left alone)\n'
     +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
     +(comps.length?('3. Launch your '+comps.length+' companion app'+(comps.length>1?'s':'')+'\n'):'')
     +'4. Launch MSFS and start the performance capture\n\n'
@@ -4928,13 +4969,8 @@ async function launchAndCapture(dep,arr,acType){
       if(!confirm(why+'\n\nContinue launching anyway with TLOD as-is?'))return;
     }
   }
-  // 1b) SETTINGS LAB: once the benchmark is complete and the Lab box is checked, the Lab takes over
-  // the pre-launch write slot auto-TLOD just vacated — applies the next experiment value or
-  // restores baseline for a control flight (all backup+readback verified in lab.js).
-  let lab=null;
-  if(S.cfg.labMode&&prep&&!prep.set){
-    try{ lab=await window.api.perfLabNext({aircraft:prep.aircraft}); }catch(e){ lab={ok:false,msg:(e&&e.message)||'error'}; }
-  }
+  // (v6.12.0: the Settings Lab's pre-launch write slot is retired — Settings A/B passively watches
+  // whatever you fly instead. Nothing is written to UserCfg here anymore post-benchmark.)
   // 2) Close the checked background apps (reopen on sim-close via the watcher).
   if(closeApps.length){ try{ await window.api.flightCloseApps(closeApps); }catch(e){} }
   // 3) Launch companion apps.
@@ -4944,10 +4980,7 @@ async function launchAndCapture(dep,arr,acType){
   // 5) Arm the capture (waits for your takeoff roll).
   let cap; try{ cap=await window.api.perfStartCapture(); }catch(e){ cap={ok:false}; }
   const setLine = (prep&&prep.set) ? ('&#10003; TLOD '+prep.tlod+' set for '+esc(prep.aircraft||''))
-    : (lab&&lab.ok&&lab.mode==='experiment') ? ('🧪 '+esc(lab.msg||''))
-    : (lab&&lab.ok) ? ('🧪 '+esc(lab.msg||''))
-    : (lab&&!lab.ok) ? ('&#9888; Lab error: '+esc(lab.msg||'unknown')+' — flying as-is')
-    : (prep&&prep.reason==='coverage-complete') ? ('&#10003; Benchmark complete — TLOD left at your setting')
+    : (prep&&prep.reason==='coverage-complete') ? ('&#10003; Benchmark complete — flying your own settings (Settings A/B is watching)')
     : ('&bull; TLOD left unchanged');
   // Non-blocking summary (was a third alert to dismiss) — MSFS launch no longer waits on a click.
   flightToast('<b>Clean flight launching 🚀</b><br>'+setLine
@@ -7619,5 +7652,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.11.7</div>
+  pointer-events:none;">v6.12.0</div>
 </body></html>

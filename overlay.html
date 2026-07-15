@@ -21,6 +21,9 @@
   .next{ font-size:11.5px; color:#b9bbc0; margin-top:8px; font-variant-numeric:tabular-nums; display:none; }
   .also{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
   .cur{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
+  /* v6.12.0: minimal live perf strip (RTSS-style) — one mono line, only while a capture is recording. */
+  .perf{ font-size:10px; color:#9a9da3; margin-top:8px; padding-top:7px; border-top:1px solid rgba(122,125,132,0.25);
+         font-family:'JetBrains Mono','Consolas',monospace; font-variant-numeric:tabular-nums; white-space:nowrap; display:none; }
 </style></head><body>
 <div id="dot" class="off" title="VATSIM frequency helper — click to expand"></div>
 <div id="panel">
@@ -33,12 +36,24 @@
   <div class="next" id="next"></div>
   <div class="also" id="also"></div>
   <div class="cur" id="cur"></div>
+  <div class="perf" id="perf"></div>
 </div>
 <script>
   const dot=document.getElementById('dot'), panel=document.getElementById('panel');
   const st=document.getElementById('st'), atis=document.getElementById('atis'), freq=document.getElementById('freq'),
         who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), also=document.getElementById('also'), cur=document.getElementById('cur'),
-        klabel=document.getElementById('klabel');
+        klabel=document.getElementById('klabel'), perfEl=document.getElementById('perf');
+  // v6.12.0: compact live perf line — fields simply skipped when null (offline / no data yet).
+  function perfLine(q){
+    if(!q) return '';
+    const parts=[];
+    if(q.ft_avg!=null) parts.push(q.ft_avg.toFixed(1)+'ms'+(q.ft_p99!=null?(' · p99 '+q.ft_p99.toFixed(1)):''));
+    if(q.cpu_busy_avg!=null||q.gpu_busy_avg!=null) parts.push('CPU '+(q.cpu_busy_avg!=null?q.cpu_busy_avg.toFixed(1):'—')+' / GPU '+(q.gpu_busy_avg!=null?q.gpu_busy_avg.toFixed(1):'—')+'ms');
+    const gv=[]; if(q.gpu_util_pct!=null)gv.push('GPU '+q.gpu_util_pct+'%'); if(q.vram_pct!=null)gv.push('VRAM '+q.vram_pct+'%');
+    if(gv.length) parts.push(gv.join(' · '));
+    if(q.tlod!=null) parts.push('TLOD '+q.tlod);
+    return parts.join('  |  ');
+  }
   let expanded=false, collapseTimer=null, statusTimer=null, curIgnore=true;
 
   // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note). ONE persistent AudioContext,
@@ -94,12 +109,13 @@
   if(window.api&&window.api.onOverlayState) window.api.onOverlayState(function(p){
     p=p||{};
     if(!p.live){ dot.className='off'; freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
-      atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; return; }
+      atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; perfEl.style.display='none'; return; }
     dot.classList.remove('off');   // live — keep any pulse
     freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
     atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
     nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
     also.textContent=p.also||''; also.style.display=p.also?'block':'none';
+    const pl=perfLine(p.perf); perfEl.textContent=pl; perfEl.style.display=pl?'block':'none';
     // On-frequency: the header confirms ("ON FREQUENCY ✓" green + green number) and the redundant
     // "you're tuned to X" line is dropped. Otherwise it instructs ("Frequency to be on") and shows
     // what you're currently on so the gap is obvious.

@@ -123,8 +123,9 @@ out explicitly if so rather than silently averaging over it:
   SIDECAR in the session folder — the REAL dynamic TLOD AutoFPS applied, parsed from its own log at
   file time (samples `[t_rel_s, tlod, olod, agl, vram%]` every ~10s, anchored to
   `recording_wall_start`) plus `stats` {tlod_med/p10/p90/min/max, pct_at_cap, n}. So for an AutoFPS
-  flight the honest TLOD is the sidecar's **effective median/range** (the report chip shows
-  "AutoFPS (eff. 200, 125–200)"), never the launch value. perf-compare-data surfaces
+  flight the honest TLOD is the sidecar's **observed median/range** (the report chip reads
+  "AutoFPS (flew 125–200, median 200)" as of v6.11.7 — observed trace values, NOT the configured
+  range; the configured range lives in `settings.autofps_cfg` from v6.12.0 on), never the launch value. perf-compare-data surfaces
   `autofps_tlod_med/p90/max` + `autofps_at_cap_pct`; the report chart draws the trace as a green step
   line, clipped to the trimmed chart window (no teardown samples). No sidecar = the AutoFPS daily log
   was gone before backfill — say "trace unavailable", don't guess. VATSIM flights also log
@@ -134,6 +135,23 @@ out explicitly if so rather than silently averaging over it:
   Min/Max range from `pct_at_cap` (≥70% at cap + all smoothness/VRAM limits intact → suggest raising
   Max; ≤20% → ceiling isn't limiting; any rough flight blocks a raise; needs ≥2 traced flights else
   "collecting") — match that logic in chat. The fixed-TLOD baseline quarantine is unchanged.
+- **SETTINGS A/B — graphics snapshot + GPU balance (v6.12.0, replaces the Settings Lab):** every
+  capture stores `settings.graphics` (the WHOLE flat {Graphics} block as `'Graphics/Section/Key'`
+  numbers + `'Video/PrimaryScaling'`) and `settings.gfx_fp` — a fingerprint over a curated 10-key
+  watch list (render scale, clouds, lights, SSAO, SSR, contact shadows, shadow size, water FFT,
+  windshield, particles; TLOD/texture/traffic deliberately excluded). AutoFPS flights also store
+  `settings.autofps_cfg` {min, max, target} from AutoFPS's own config. perf-compare-data surfaces
+  per flight: `gfx` (watched values; enum sections report -1 = Off), `gfx_fp`, `autofps_cfg`, plus
+  the retroactive GPU balance trio `avg_gpu_busy_ms` / `avg_cpu_busy_ms` / `gpu_bound_pct` (from
+  summary.smoothness — populated on ALL telemetry-era flights), and a top-level `gfxWatch` metadata
+  list (labels + explicit numeral→in-sim-label maps; clouds 1 = Medium is live-calibrated — always
+  quote the numeral beside the label). The app's 🧪 Settings A/B view groups consecutive same-
+  fingerprint flights into runs PER LANE (fixed-TLOD vs AutoFPS, never pooled; the AutoFPS lane's
+  fingerprint also includes min–max TLOD, so a cap change is a boundary) and judges each boundary's
+  before/after means against ±1σ of the BEFORE-side flights — verdicts: COSTS/SAVES/TRADE-OFF/NO
+  EFFECT, FREE UPGRADE when avg GPU busy rose beyond σ while smoothness+VRAM held (Dean's goal:
+  load the half-idle GPU without adding VRAM), COLLECTING under 2 flights per side. Match that
+  method in chat; flights with `gfx: null` predate the snapshot — never infer their settings.
 - **Flight duration** - a 47-minute hop and a 125-minute flight aren't directly comparable for VRAM
   creep; normalize the framing ("no creep over 2 hours" is a stronger claim than over 45 minutes).
 

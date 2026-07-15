@@ -1310,6 +1310,9 @@ ipcMain.handle('perf-list-sessions', () => {
 // Per-flight metrics for the Compare view. Reads index.json + each flight's summary.json (avg_vram
 // lives there; index.json only carries peak). Reads only the tiny summaries, so Compare survives raw
 // frametimes.csv cleanup. Returns a flat array of flight metric records.
+// v6.12.0 Settings A/B: watch metadata + per-flight subset come from the ONE module (no label maps
+// re-declared in the renderer). Lazy require — perfDir() is hoisted, resolved at call time.
+function _gfxWatchMod(){ return require(path.join(perfDir(), 'native', 'gfx_watch.js')); }
 ipcMain.handle('perf-compare-data', () => {
   try {
     const sdir    = path.join(USER_DATA, 'Sessions');
@@ -1330,6 +1333,10 @@ ipcMain.handle('perf-compare-data', () => {
       // v6.11.0: AutoFPS effective-TLOD trace stats (from the autofps_trace.json sidecar) + VATSIM
       // 40nm traffic peak/avg (from summary settings) — the envelope card + traffic analytics inputs.
       let afps = null, traffic_peak = null, traffic_avg = null;
+      // v6.12.0 Settings A/B: curated graphics-watch values + fingerprint + AutoFPS cfg snapshot +
+      // GPU/CPU balance (avg busy ms + gpu-bound % — computed by stats.js since day one, never surfaced).
+      let gfx = null, gfx_fp = s.gfx_fp || null, autofps_cfg = null,
+          avg_gpu_busy = null, avg_cpu_busy = null, gpu_bound = null;
       try {
         const folder = (s.folder || '').replace(/\//g, '\\');
         const fdir = folder ? path.join(sdir, folder) : null;
@@ -1348,6 +1355,16 @@ ipcMain.handle('perf-compare-data', () => {
           if (sj && sj.smoothness && sj.smoothness.duration_seconds != null) duration_seconds = sj.smoothness.duration_seconds;
           const tm = sj && sj.smoothness && sj.smoothness.trim_method;
           if (tm === 'brake' || tm === 'movement') groundTruthTrim = true;
+          if (sj && sj.settings) {
+            if (!gfx_fp && sj.settings.gfx_fp) gfx_fp = sj.settings.gfx_fp;
+            if (sj.settings.graphics) { try { gfx = _gfxWatchMod().watchValues(sj.settings.graphics); } catch(_){} }
+            if (sj.settings.autofps_cfg) autofps_cfg = sj.settings.autofps_cfg;
+          }
+          if (sj && sj.smoothness) {
+            avg_gpu_busy = sj.smoothness.avg_gpu_busy_ms ?? null;
+            avg_cpu_busy = sj.smoothness.avg_cpu_busy_ms ?? null;
+            gpu_bound    = sj.smoothness.gpu_bound_pct ?? null;
+          }
           const ph = sj && sj.smoothness && sj.smoothness.phases;
           if (ph && (ph.dep_taxi || ph.arr_taxi)) { dep_taxi = ph.dep_taxi || null; arr_taxi = ph.arr_taxi || null; }
         }
@@ -1396,11 +1413,16 @@ ipcMain.handle('perf-compare-data', () => {
         // group labels for the AutoFPS dimension.
         online_traffic: s.online_traffic || 'offline',
         autofps_mode: s.autofps_active ? 'autofps' : 'fixed tlod',
+        // v6.12.0 Settings A/B: watched-settings values + fingerprint (null = flight predates the
+        // snapshot), AutoFPS TLOD envelope, and the GPU/CPU balance trio (retroactive — from summary).
+        gfx, gfx_fp, autofps_cfg,
+        avg_gpu_busy_ms: avg_gpu_busy, avg_cpu_busy_ms: avg_cpu_busy, gpu_bound_pct: gpu_bound,
         excluded: s.excluded || null,
         route: s.route || null
       };
     });
-    return { ok:true, flights };
+    let gfxWatch = null; try { gfxWatch = _gfxWatchMod().watchMeta(); } catch(_){}
+    return { ok:true, flights, gfxWatch };
   } catch (e) {
     LOG.error('perf-compare-data failed: ' + e.message);
     return { ok:false, reason:e.message, flights:[] };
@@ -2287,9 +2309,23 @@ ipcMain.handle('overlay-show', () => {
   return {ok:true};
 });
 // Push live recommendation state to the overlay each poll (dot/panel render + auto-expand on new-rec).
+// v6.12.0: reads the capture engine's perf_live.json (written every 5s while recording; staleness-
+// gated) and rides it along as payload.perf — the overlay's minimal RTSS-style strip. Zero new IPC;
+// the LATC poll's 5s cadence is the clock.
+function readPerfLive(){
+  try{
+    const j = JSON.parse(fs.readFileSync(path.join(USER_DATA, 'perf_live.json'), 'utf8'));
+    if(!j || !j.ts || (Date.now() - j.ts) > 15000) return null;
+    return j;
+  }catch(_){ return null; }
+}
 ipcMain.handle('overlay-state', (_, payload) => {
   if(_cleanupDone || !overlayWin || overlayWin.isDestroyed()) return {ok:false};
-  try{ overlayWin.webContents.send('overlay-state', payload||{}); }catch(_){}
+  try{
+    payload = payload || {};
+    payload.perf = readPerfLive();
+    overlayWin.webContents.send('overlay-state', payload);
+  }catch(_){}
   return {ok:true};
 });
 // The overlay renderer toggles click-through: false while the cursor is over the dot/panel, true otherwise.

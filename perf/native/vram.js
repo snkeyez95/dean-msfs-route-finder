@@ -17,6 +17,7 @@ class VramSampler {
   constructor(intervalMs = 1000) {
     this.interval = intervalMs;
     this.samples = [];          // memory.used in MiB, one per tick
+    this.utilPct = null;        // v6.12.0: latest utilization.gpu % (free extra column, live-strip only)
     this.totalMb = null;
     this.available = false;
     this._proc = null;
@@ -32,8 +33,10 @@ class VramSampler {
 
   start() {
     if (!this.available || this._proc) return;
+    // v6.12.0: utilization.gpu added to the SAME query (free column, no extra process) — feeds the
+    // live overlay perf strip. summarize() reads only the memory samples, so its output is unchanged.
     this._proc = spawn(this._exe,
-      ['--query-gpu=memory.used', '--format=csv,noheader,nounits', '--loop-ms=' + this.interval],
+      ['--query-gpu=memory.used,utilization.gpu', '--format=csv,noheader,nounits', '--loop-ms=' + this.interval],
       { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });   // stderr ignored: an unread pipe can wedge the child
     this._proc.stdout.on('data', (d) => {
       this._buf += d.toString();
@@ -41,14 +44,17 @@ class VramSampler {
       while ((nl = this._buf.indexOf('\n')) >= 0) {
         const line = this._buf.slice(0, nl).trim();
         this._buf = this._buf.slice(nl + 1);
-        const v = parseInt(line, 10);
+        const parts = line.split(',');
+        const v = parseInt(parts[0], 10);
         if (Number.isFinite(v)) this.samples.push(v);
+        if (parts.length > 1) { const u = parseInt(parts[1], 10); if (Number.isFinite(u)) this.utilPct = u; }
       }
     });
     this._proc.on('error', () => {});   // if it dies, we just have fewer samples (summarize handles it)
   }
 
   latest() { return this.samples.length ? this.samples[this.samples.length - 1] : null; }
+  latestUtil() { return this.utilPct; }   // GPU core utilization % (null until the first sample)
 
   stop() {
     if (this._proc) { try { this._proc.kill(); } catch (_) {} this._proc = null; }
