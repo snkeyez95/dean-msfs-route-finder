@@ -16,6 +16,7 @@ const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { buildSessionsNavJs, INDEX_CSV_FIELDS } = require('./index_writer.js');
 const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
+const { detectPeriodicStutter } = require('./periodicity.js');
 
 const HEAD_TRIM_S = 5;
 // vatsim_traffic (v6.11.0) = VATSIM pilots within 40nm of own ship (vPilot's default injection
@@ -136,6 +137,9 @@ function fileSession(opts) {
   // v6.9.1/6.9.5: record which end-trim path won so a validation flight is provable at a glance
   // ('brake'/'movement' = a ground-truth anchor drove it; 'teardown' = frametime-shape fallback).
   smoothness.trim_method = trimMethod;
+  // v6.12.1: periodic-stutter classification (engine-overload signature vs one-off hitches) — the
+  // ResetXPDR-style cadence test over the full trimmed frametimes. Null = flight too short.
+  try { smoothness.periodic_stutter = detectPeriodicStutter(ft); } catch (_) {}
   // per-phase VRAM (peak/avg) from the just-written telemetry, merged into the frametime phase stats
   // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
   try {

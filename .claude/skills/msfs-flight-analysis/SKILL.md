@@ -235,6 +235,24 @@ FL340 in cruise"); if not, the mm:ss timestamp alone tells you spawn vs cruise v
   telemetry join**: did `sys_cpu_pct` jump, or `top_proc` name something (Windows Defender, a
   download, Plex)? This is exactly the "another process grabbed a core" case.
 
+### Periodic vs aperiodic — "would lowering TLOD fix it?" (v6.12.1)
+
+Every flight now carries a `periodic_stutter` classification (new flights: `summary.smoothness`;
+older flights: the `phases_ext.json` sidecar; perf-compare-data: `periodic_episodes` +
+`periodic_spikes`). Method (mirrors the AutoFPS app's engine-overload detector, run over ABRP's
+FULL frametime record): spikes = frames > max(25ms, 1.8× the local 10-second median) with
+multi-frame hitches coalesced; a PERIODIC episode = ≥4 spikes marching at a 0.7–1.8s cadence with
+near-zero interval variation (std ≤ ~0.16s). Interpretation rules:
+- **Periodic episodes** = the MSFS graphics-engine overload signature → TLOD/OLOD too high for the
+  scene; lowering it CLEARS this stutter. Say where ("36 spikes at ~1.2s during 54–55 min").
+- **Aperiodic spikes** = one-off scenery-streaming / addon main-thread hitches → lowering TLOD
+  would NOT have helped (the KLAS arrival-taxi case classifies aperiodic, matching the CPU-bound
+  streaming diagnosis).
+- **Significance gate:** a lone 4-spike run can be chance — only call it engine overload when
+  the worst episode has ≥6 spikes or total periodic spikes ≥8; otherwise say "too short to call."
+- Real-data anchor: the 2026-06-13/14 Fenix EGLL flights (pre-rBAR-fix) show 350+ periodic spikes
+  at ~1.2s — the textbook positive; most of Dean's flights are aperiodic.
+
 ### The microstutter tell
 
 `MsAnimationError` (large magnitude) flags a hitch the *sim* felt even when frametime looks clean -

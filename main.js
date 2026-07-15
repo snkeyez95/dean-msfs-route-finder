@@ -1337,6 +1337,9 @@ ipcMain.handle('perf-compare-data', () => {
       // GPU/CPU balance (avg busy ms + gpu-bound % — computed by stats.js since day one, never surfaced).
       let gfx = null, gfx_fp = s.gfx_fp || null, autofps_cfg = null,
           avg_gpu_busy = null, avg_cpu_busy = null, gpu_bound = null;
+      // v6.12.1: periodic-stutter classification (engine-overload signature) — summary for new
+      // flights, phases_ext sidecar for backfilled old ones.
+      let periodic = null;
       try {
         const folder = (s.folder || '').replace(/\//g, '\\');
         const fdir = folder ? path.join(sdir, folder) : null;
@@ -1364,6 +1367,7 @@ ipcMain.handle('perf-compare-data', () => {
             avg_gpu_busy = sj.smoothness.avg_gpu_busy_ms ?? null;
             avg_cpu_busy = sj.smoothness.avg_cpu_busy_ms ?? null;
             gpu_bound    = sj.smoothness.gpu_bound_pct ?? null;
+            if (sj.smoothness.periodic_stutter !== undefined) periodic = sj.smoothness.periodic_stutter;
           }
           const ph = sj && sj.smoothness && sj.smoothness.phases;
           if (ph && (ph.dep_taxi || ph.arr_taxi)) { dep_taxi = ph.dep_taxi || null; arr_taxi = ph.arr_taxi || null; }
@@ -1387,6 +1391,7 @@ ipcMain.handle('perf-compare-data', () => {
             // teardown-corrected metrics win over the shutdown-inflated summary values
             if (corrected && e.spike_count != null) spike_count = e.spike_count;
             if (e.perceptible_count != null && (corrected || perceptible_count == null)) perceptible_count = e.perceptible_count;
+            if (periodic === null && e.periodic_stutter !== undefined) periodic = e.periodic_stutter;
           } catch(_){} }
         }
       } catch(_){}
@@ -1417,6 +1422,9 @@ ipcMain.handle('perf-compare-data', () => {
         // snapshot), AutoFPS TLOD envelope, and the GPU/CPU balance trio (retroactive — from summary).
         gfx, gfx_fp, autofps_cfg,
         avg_gpu_busy_ms: avg_gpu_busy, avg_cpu_busy_ms: avg_cpu_busy, gpu_bound_pct: gpu_bound,
+        // v6.12.1: periodic-stutter classification — episodes of engine-overload cadence vs one-off hitches
+        periodic_episodes: (periodic && periodic.episodes) ? periodic.episodes.length : (periodic ? 0 : null),
+        periodic_spikes: periodic ? (periodic.spikes_periodic ?? 0) : null,
         excluded: s.excluded || null,
         route: s.route || null
       };

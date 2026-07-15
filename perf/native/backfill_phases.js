@@ -20,9 +20,11 @@ const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
 
+const { detectPeriodicStutter } = require('./periodicity.js');
+
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
-const REPORT_V = 'afps-observed-label'; // marker: bump to force a one-time report.html regen for ALL flights (v6.11.7: TLOD chip now says "flew min–max, median N" — observed trace values, not the configured AutoFPS range)
+const REPORT_V = 'periodic-stutter'; // marker: bump to force a one-time report.html regen for ALL flights (v6.12.1: verdict now classifies spikes as periodic engine-overload vs one-off streaming hitches)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -95,6 +97,8 @@ function regenReport(dir, summary, ext, tpSet) {
     const sm = summary.smoothness || {};
     const phases = (ext && ext.phases) || sm.phases || null;
     const stats = Object.assign({}, sm, corrMetrics(ft), phases ? { phases } : {});   // corrected max/spike; does NOT touch summary.json
+    // v6.12.1: the regenerated verdict needs the periodicity classification (summary first, sidecar for old flights)
+    if (stats.periodic_stutter === undefined && ext && ext.periodic_stutter !== undefined) stats.periodic_stutter = ext.periodic_stutter;
     const dep_icao = (ext && ext.dep_icao) || (summary.settings && summary.settings.dep_icao) || routeIcaos(summary).dep_icao;
     const arr_icao = (ext && ext.arr_icao) || (summary.settings && summary.settings.arr_icao) || routeIcaos(summary).arr_icao;
     const settings = Object.assign({}, summary.settings, {
@@ -124,6 +128,16 @@ function runBackfill(sessionsDir, tpIcaos) {
     // EVERY flight (originals untouched). Also covers the pre-v6.3.8 5-phase split (computeExt).
     const { ext, wrote } = backfillCorrection(dir, summary, extPath);
     if (wrote) corrected++; else if (ext) skipped++; else noData++;
+    // v6.12.1: periodic-stutter classification backfill — one-time per flight (gated on the field's
+    // absence), from the same teardown-trimmed frametimes. Sidecar only; raw logs untouched. New
+    // captures carry it in summary.smoothness; the sidecar covers every older flight. MUST run
+    // BEFORE regenReport so the regenerated verdict picks it up.
+    try {
+      if (ext && !('periodic_stutter' in ext) && !(summary.smoothness && summary.smoothness.periodic_stutter !== undefined)) {
+        const t = readTrimmedFt(dir);
+        if (t) { ext.periodic_stutter = detectPeriodicStutter(t.ft); fs.writeFileSync(extPath, JSON.stringify(ext)); }
+      }
+    } catch (_) {}
     // v6.11.0: AutoFPS dynamic-TLOD trace backfill — for tagged flights whose sidecar doesn't exist
     // yet, recover the trace from AutoFPS's surviving daily logs. Anchor = summary.timestamp (second-
     // resolution, a few s before recordingWallStart — fine for a 10s-cadence step line). Log gone →

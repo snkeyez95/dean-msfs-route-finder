@@ -161,12 +161,35 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   else insight = 'VRAM-limited — peaked at ' + floatRepr(vpk) + '% (' + floatRepr(headGB) + ' GB left). A higher TLOD risks running dry.';
   const maxSpike = g(stats, 'max_ft_ms'), stutN2 = g(stats, 'stutter_count') || 0, fc2 = g(stats, 'frame_count') || 0;
   const spikeTxt = (maxSpike != null) ? ('Worst single frame ' + floatRepr(maxSpike) + ' ms · ' + thousands(stutN2) + ' stutter' + (stutN2 !== 1 ? 's' : '') + ' across ' + thousands(fc2) + ' frames') : '';
+  // v6.12.1: periodic-stutter classification — the "would lowering TLOD fix it?" line. Periodic
+  // (metronomic cadence, ResetXPDR-style test) = engine overload → TLOD/OLOD is the lever. Aperiodic
+  // = one-off streaming/main-thread hitches → TLOD won't help. Only speaks when there's a story.
+  let periodicTxt = '';
+  const ps = g(stats, 'periodic_stutter');
+  // Significance gate: a lone 4-spike run can be chance alignment among many one-off hitches
+  // (real-data sweep 2026-07-14 showed several). Only a sustained pattern gets the red call-out.
+  const psStrong = ps && ps.episodes && ps.episodes.length && (ps.spikes_periodic >= 8 || ps.episodes[0].spikes >= 6);
+  if (psStrong) {
+    const w = ps.episodes[0];
+    const mm = s => Math.round(s / 60);
+    periodicTxt = '<div style="font-size:11.5px;color:var(--bad);margin-top:9px;line-height:1.55">&#9889; Periodic stutter detected — ' +
+      ps.episodes.length + ' episode' + (ps.episodes.length !== 1 ? 's' : '') + ', ' + ps.spikes_periodic +
+      ' spikes marching ~' + floatRepr(w.interval_s) + 's apart (worst ' + w.spikes + ' spikes at ' + mm(w.start_s) + '–' + mm(w.end_s) + ' min, ' +
+      floatRepr(w.spike_ms) + ' ms vs ' + floatRepr(w.base_ms) + ' ms baseline). This is the MSFS engine-overload signature — lowering TLOD/OLOD for that phase clears it.</div>';
+  } else if (ps && ps.episodes && ps.episodes.length) {
+    periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Spike pattern: mostly one-off (' + ps.spikes_total +
+      ' hitches); ' + ps.episodes.length + ' brief periodic run' + (ps.episodes.length !== 1 ? 's' : '') + ' too short to call engine overload.</div>';
+  } else if (ps && ps.spikes_total >= 5) {
+    periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Spike pattern: aperiodic (' + ps.spikes_total +
+      ' one-off hitches, no repeating cadence) — scenery streaming / main-thread work, not the TLOD-overload signature. Lowering TLOD would not have helped.</div>';
+  }
   const verdictHtml = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">' +
     '<div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px">Verdict</div>' +
     '<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:25px;font-weight:700;color:' + gcol + '">' + gword + '</span>' +
     '<span style="font-size:13px;color:var(--text-dim);font-family:Consolas,monospace">P99 ' + (p99v != null ? floatRepr(p99v) : '—') + ' ms</span></div>' +
     '<div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:9px">' + insight + '</div>' +
     (spikeTxt ? '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;font-family:Consolas,monospace">' + spikeTxt + '</div>' : '') +
+    periodicTxt +
     '</div>';
 
   return `<!DOCTYPE html>
