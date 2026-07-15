@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('api', {
   overlayShow:        ()    => ipcRenderer.invoke('overlay-show'),
   overlayState:       (o)   => ipcRenderer.invoke('overlay-state', o||{}),
   overlaySetIgnore:   (o)   => ipcRenderer.invoke('overlay-set-ignore', o||{}),
+  overlayMove:        (o)   => ipcRenderer.invoke('overlay-move', o||{}),
   overlayToast:       (o)   => ipcRenderer.invoke('overlay-toast', o||{}),
   overlayHide:        ()    => ipcRenderer.invoke('overlay-hide'),
   onOverlayToast:     (cb)  => ipcRenderer.on('overlay-toast', (_, p) => cb(p)),

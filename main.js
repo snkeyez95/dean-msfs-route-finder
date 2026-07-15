@@ -145,6 +145,7 @@ let _perfAllowClose = false;
 // a saved position on a monitor that's since been unplugged would strand the window — only restore a
 // position that still lands on a connected display.
 const WIN_STATE = path.join(USER_DATA, 'window_state.json');
+const OVERLAY_POS = path.join(USER_DATA, 'overlay_pos.json');   // v6.11.6: user-dragged overlay dot position (Dean: default top-right sat on the PMDG overhead light switches)
 const WIN_DEFAULT = { width:1440, height:980, minW:1100, minH:700 };
 function loadWindowState(){
   try{
@@ -2257,8 +2258,18 @@ function overlayEnsure(){
   const { screen } = require('electron');
   // Big enough (transparent) to hold the dot AND its expanded panel; only the dot/panel are painted.
   const wa=screen.getPrimaryDisplay().workArea, W=360, H=250, m=14;
+  // Restore the user-dragged position when saved + still on a connected display (off-screen guard,
+  // same idea as the main window's restore); else default to top-right.
+  let ox=wa.x+wa.width-W-m, oy=wa.y+m;
+  try{
+    const pos=JSON.parse(fs.readFileSync(OVERLAY_POS,'utf8'));
+    if(pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)){
+      const d=screen.getDisplayMatching({x:pos.x,y:pos.y,width:W,height:H}).workArea;
+      if(pos.x>=d.x-W+80 && pos.x<=d.x+d.width-80 && pos.y>=d.y-10 && pos.y<=d.y+d.height-80){ ox=pos.x; oy=pos.y; }
+    }
+  }catch(_){}
   overlayWin=new BrowserWindow({
-    width:W, height:H, x: wa.x+wa.width-W-m, y: wa.y+m,
+    width:W, height:H, x: ox, y: oy,
     frame:false, transparent:true, alwaysOnTop:true, skipTaskbar:true, resizable:false, movable:false,
     minimizable:false, maximizable:false, focusable:false, hasShadow:false, show:false,
     webPreferences:{ preload: path.join(__dirname,'preload.js'), contextIsolation:true, nodeIntegration:false, autoplayPolicy:'no-user-gesture-required' }   // v6.11.2: the overlay is shown inactive + click-through so it never gets a user gesture; without this the chime's AudioContext can start suspended and stay silent
@@ -2282,6 +2293,22 @@ ipcMain.handle('overlay-state', (_, payload) => {
   return {ok:true};
 });
 // The overlay renderer toggles click-through: false while the cursor is over the dot/panel, true otherwise.
+// v6.11.6: drag-to-move the overlay dot. {dx,dy} nudges the window (clamped to the display's work
+// area so the panel can never land off-screen); {save:true} persists the spot for next launch.
+ipcMain.handle('overlay-move', (_, o) => {
+  if(_cleanupDone || !overlayWin || overlayWin.isDestroyed()) return {ok:false};
+  try{
+    const { screen } = require('electron');
+    if(o && o.save){ const [sx,sy]=overlayWin.getPosition(); writeFileAtomic(OVERLAY_POS, JSON.stringify({x:sx,y:sy})); return {ok:true, saved:true}; }
+    const [x,y]=overlayWin.getPosition(), [w,h]=overlayWin.getSize();
+    let nx=x+((o&&o.dx)||0), ny=y+((o&&o.dy)||0);
+    const wa=screen.getDisplayMatching({x:nx,y:ny,width:w,height:h}).workArea;
+    nx=Math.min(Math.max(nx,wa.x), wa.x+wa.width-w);
+    ny=Math.min(Math.max(ny,wa.y), wa.y+wa.height-h);
+    overlayWin.setPosition(Math.round(nx), Math.round(ny));
+    return {ok:true};
+  }catch(e){ return {ok:false}; }
+});
 ipcMain.handle('overlay-set-ignore', (_, o) => {
   try{ if(overlayWin && !overlayWin.isDestroyed()) overlayWin.setIgnoreMouseEvents(!!(o&&o.ignore), {forward:true}); }catch(_){}
   return {ok:true};

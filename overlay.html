@@ -60,7 +60,35 @@
   // Auto-open the panel for `ms`, then collapse to the dot and pulse it so a missed alert is still visible.
   function autoExpand(ms){ expand(); clearTimeout(collapseTimer); collapseTimer=setTimeout(function(){ collapse(); dot.classList.add('pulse'); }, ms||20000); }
 
-  dot.addEventListener('click', function(){ clearTimeout(collapseTimer); if(expanded){ collapse(); } else { expand(); dot.classList.remove('pulse'); } });
+  // Click = toggle panel. Click-HOLD-drag = move the whole overlay anywhere on screen (v6.11.6 —
+  // the default top-right spot sat on the PMDG overhead light switches). Pointer capture keeps the
+  // drag alive even when the window lags behind the cursor; <5px of travel still counts as a click.
+  let dragPid=null, dragLast=null, dragDist=0, draggingNow=false;
+  dot.addEventListener('pointerdown', function(e){
+    if(e.button!==0) return;
+    dragPid=e.pointerId; dragLast={x:e.screenX,y:e.screenY}; dragDist=0; draggingNow=false;
+    try{ dot.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  dot.addEventListener('pointermove', function(e){
+    if(dragPid===null || e.pointerId!==dragPid) return;
+    const dx=e.screenX-dragLast.x, dy=e.screenY-dragLast.y;
+    if(!dx && !dy) return;
+    dragDist+=Math.abs(dx)+Math.abs(dy);
+    if(dragDist>5){
+      draggingNow=true; setIgnore(false);
+      dragLast={x:e.screenX,y:e.screenY};
+      try{ window.api.overlayMove({dx:dx, dy:dy}); }catch(err){}
+    }
+  });
+  function endDrag(e){
+    if(dragPid===null || (e.pointerId!==undefined && e.pointerId!==dragPid)) return;
+    const wasDrag=draggingNow; dragPid=null; draggingNow=false;
+    try{ dot.releasePointerCapture(e.pointerId); }catch(err){}
+    if(wasDrag){ try{ window.api.overlayMove({save:true}); }catch(err){} }
+    else { clearTimeout(collapseTimer); if(expanded){ collapse(); } else { expand(); dot.classList.remove('pulse'); } }
+  }
+  dot.addEventListener('pointerup', endDrag);
+  dot.addEventListener('pointercancel', endDrag);
 
   // Live recommendation state — pushed every ~5s from the app. Fields are pre-formatted strings.
   if(window.api&&window.api.onOverlayState) window.api.onOverlayState(function(p){
@@ -97,6 +125,7 @@
   function inRect(x,y,el){ const r=el.getBoundingClientRect(); return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom; }
   function setIgnore(ig){ if(ig===curIgnore)return; curIgnore=ig; try{ window.api.overlaySetIgnore({ignore:ig}); }catch(e){} }
   document.addEventListener('mousemove', function(e){
+    if(draggingNow) return;   // mid-drag the window lags the cursor — never flip click-through back on
     const overDot = inRect(e.clientX,e.clientY,dot);
     const overPanel = panel.classList.contains('show') && inRect(e.clientX,e.clientY,panel);
     setIgnore(!(overDot||overPanel));

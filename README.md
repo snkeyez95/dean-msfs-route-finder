@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.11.5
+# A Better Route Planner — v6.11.6
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.11.6  MOVABLE OVERLAY DOT. The VATSIM overlay dot (and its panel) can now be dragged anywhere on screen — click and HOLD the dot, drag it where you want, release; the spot is remembered across sessions. A plain click still opens/closes the panel. The default top-right corner sat directly on the PMDG 737's overhead panel light switches, so clicking the dot was flipping cockpit switches underneath it.
+
 v6.11.5  MY AIRPORTS SORTED + GROUPED BY REGION. The airport list used to appear in scan order, which made a specific airport hard to find. It's now sorted alphabetically by ICAO code and split into region sections by the leading letter — K — United States, C — Canada, E — Europe (North), L — Europe (South) & Mediterranean, O — Middle East, M — Mexico & Central America, S — South America, and so on. Airports still needing a manual ICAO gather in an "Unmatched" section at the bottom.
 
 v6.11.4  DRAG-AND-DROP SCENERY + GSX VARIANT PICKER. My Airports now has a drop zone — drag a scenery folder or a .zip/.rar/.7z straight in and it's copied into your library and scanned automatically (a wrapping archive folder is flattened so the airport lands at the top level; already-installed folders are skipped). And the GSX profile importer no longer silently overwrites: when a dropped archive contains the same profile filename in two subfolders (a "normal" vs "winter" variant pack — which previously installed whichever sorted last, so you could end up on winter without knowing), it now detects the collision and asks which variant to install.
