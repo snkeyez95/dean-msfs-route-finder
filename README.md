@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.6
+# A Better Route Planner — v6.13.7
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.7  HOVER TRACKS FINER. The chart hover snapped to the nearest spike everywhere, so fine mouse moves hopped between spikes (~0.8 min jumps) even on smooth stretches. It now snaps ONLY when there is a genuine hitch to grab (a nearby frametime >=33 ms and clearly taller than where the cursor sits); on smooth stretches the readout follows the cursor continuously. Reports regenerate once on next launch.
+
 v6.13.6  FLIGHT REPORT HOVER, REBUILT. The chart hover was rebuilt from scratch. Move the mouse over either frametime chart and you get: a bright crosshair at that instant, a coloured BULLSEYE sitting on EACH line (blue = frametime, amber = moving average, green = TLOD, grey = altitude) so you can read every line at once, the same crosshair + dot at the same time on the other chart, and a readout box listing every value. The cursor SNAPS to the tallest frametime within a few pixels, so you actually grab the spike you are pointing at instead of the sample next to it. Chart.js’s built-in tooltip is replaced entirely, so both charts behave identically. All reports regenerate once on next launch.
 
 v6.13.5  FLIGHT REPORT CHARTS: FULL WIDTH + SYNCED HOVER. The per-flight report is re-laid-out: both frametime charts now span the full window width, and the Metrics + Verdict box moved to a full-width panel beneath them (freeing the old left column). Hovering is much easier: a crosshair + a dot ON the line follows your cursor, hovering EITHER chart marks the same instant on BOTH, the reference labels (16.67 / 33.3 ms) moved to the right edge so they no longer sit on the data, and the tooltip now always draws on top of them (it used to get painted over). The verdict spike/periodic text got more contrast. All reports regenerate once on next launch.

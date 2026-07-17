@@ -238,16 +238,19 @@
     })();
     // Unified hover wiring (Dean 2026-07-17, rebuilt). Mousemove over EITHER chart sets the shared
     // HOVER.x and redraws BOTH, so the crosshair + bullseyes line up on the same instant everywhere.
-    // Over the frametime chart the cursor SNAPS to the tallest frametime within a few pixels, so you
-    // grab the spike you're pointing at instead of the sample beside it.
+    // Over the frametime chart the cursor snaps to a nearby frametime SPIKE — but ONLY when there's a
+    // genuine hitch to grab: the window's peak must be ≥33 ms AND clearly taller (>1.4×) than the
+    // frametime right under the cursor. On smooth stretches nothing qualifies, so the readout tracks
+    // the cursor continuously instead of hopping between spikes (Dean 2026-07-18 — the ~0.8 min jump).
     (function(){var linked=[chart,avgChart].filter(Boolean);if(!linked.length)return;
       var raf=0;var RAF=window.requestAnimationFrame||function(f){return setTimeout(f,16);};
       function redraw(){if(raf)return;raf=RAF(function(){raf=0;linked.forEach(function(c){c.draw();});});}
       function snapX(src,px){var xs=src.scales.x,xv=xs.getValueForPixel(px);
-        if(src===chart&&rawT.length){var win=7,
+        if(src===chart&&rawT.length){var win=6,
           i0=nearIdxX(rawT,xs.getValueForPixel(px-win)),i1=nearIdxX(rawT,xs.getValueForPixel(px+win)),
           best=null,bt=-1;for(var i=Math.max(0,i0);i<=i1&&i<rawT.length;i++){if(rawT[i].t>bt){bt=rawT[i].t;best=rawT[i].x;}}
-          if(best!=null)xv=best;}
+          var cur=nearestAt(rawTasXY,xv)||0;
+          if(best!=null&&bt>=33&&bt>cur*1.4)xv=best;}   // snap only to a real spike, else stay continuous
         return xv;}
       linked.forEach(function(src){
         src.canvas.addEventListener('mousemove',function(ev){

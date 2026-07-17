@@ -25,7 +25,7 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const REPORT_V = 'unified-hover'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.6: rebuilt hover — one shared inspected time, coloured bullseye on every line, big crosshair, spike-snapping, custom readout box; both charts move together)
+const REPORT_V = 'hover-snap-tune'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.7: hover snap only grabs a genuine spike >=33ms+1.4x local, so smooth stretches track the cursor continuously instead of hopping)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
