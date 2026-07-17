@@ -55,6 +55,12 @@
     return parts.join('  |  ');
   }
   let expanded=false, collapseTimer=null, statusTimer=null, curIgnore=true;
+  // UNREAD state (Dean 2026-07-16): an alert must keep flagging itself until you actually LOOK at it.
+  // The pulse used to live only as a CSS class, and the not-live branch below did `dot.className='off'`
+  // — which wiped every class, so one stale position sample (a momentary 'connecting' blip) silently
+  // erased an unread alert you'd never seen. Held as real state now; only opening the panel clears it.
+  let unread=false;
+  function setUnread(u){ unread=u; dot.classList.toggle('pulse', u); }
 
   // Aviation cabin "bong" — the seatbelt-sign chime (hi note then lo note). ONE persistent AudioContext,
   // resumed each call: a fresh context per beep in a click-through window that never gets a user gesture
@@ -70,10 +76,10 @@
     tone(1046.5,0,0.5); tone(830.6,0.26,0.62);   // C6 → G#5
   }catch(e){} }
 
-  function expand(){ expanded=true; panel.classList.add('show'); dot.classList.remove('pulse'); }
+  function expand(){ expanded=true; panel.classList.add('show'); setUnread(false); }   // you're looking at it → read
   function collapse(){ expanded=false; panel.classList.remove('show'); }
   // Auto-open the panel for `ms`, then collapse to the dot and pulse it so a missed alert is still visible.
-  function autoExpand(ms){ expand(); clearTimeout(collapseTimer); collapseTimer=setTimeout(function(){ collapse(); dot.classList.add('pulse'); }, ms||20000); }
+  function autoExpand(ms){ expand(); clearTimeout(collapseTimer); collapseTimer=setTimeout(function(){ collapse(); setUnread(true); }, ms||20000); }
 
   // Click = toggle panel. Click-HOLD-drag = move the whole overlay anywhere on screen (v6.11.6 —
   // the default top-right spot sat on the PMDG overhead light switches). Pointer capture keeps the
@@ -100,7 +106,7 @@
     const wasDrag=draggingNow; dragPid=null; draggingNow=false;
     try{ dot.releasePointerCapture(e.pointerId); }catch(err){}
     if(wasDrag){ try{ window.api.overlayMove({save:true}); }catch(err){} }
-    else { clearTimeout(collapseTimer); if(expanded){ collapse(); } else { expand(); dot.classList.remove('pulse'); } }
+    else { clearTimeout(collapseTimer); if(expanded){ collapse(); } else { expand(); } }   // expand() clears unread
   }
   dot.addEventListener('pointerup', endDrag);
   dot.addEventListener('pointercancel', endDrag);
@@ -108,9 +114,13 @@
   // Live recommendation state — pushed every ~5s from the app. Fields are pre-formatted strings.
   if(window.api&&window.api.onOverlayState) window.api.onOverlayState(function(p){
     p=p||{};
-    if(!p.live){ dot.className='off'; freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
+    // NOT live: grey the dot but PRESERVE the unread pulse — a connection blip must never silently
+    // clear an alert you haven't seen (classList.add, never className=, which wiped 'pulse').
+    if(!p.live){ dot.classList.add('off'); dot.classList.toggle('pulse', unread);
+      freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
       atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; perfEl.style.display='none'; return; }
-    dot.classList.remove('off');   // live — keep any pulse
+    dot.classList.remove('off');
+    dot.classList.toggle('pulse', unread);   // re-assert every poll: unread survives blips + re-renders
     freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
     atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
     nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
@@ -124,7 +134,9 @@
     else{ klabel.textContent='Frequency to be on'; klabel.style.color=''; freq.style.color='';
       cur.textContent=p.cur||''; cur.style.display=p.cur?'block':'none'; }
     // New recommended frequency: pop open (+chime) if enabled, else just pulse the dot to flag it.
-    if(p.isNewRec){ if(p.pop!==false){ autoExpand(20000); if(p.sound) beep(); } else { dot.classList.add('pulse'); } }
+    // New recommendation: pop + chime (then the auto-collapse marks it unread), or just flag it unread
+    // if popping is off. Either way it keeps flagging until you open the panel.
+    if(p.isNewRec){ if(p.pop!==false){ autoExpand(20000); if(p.sound) beep(); } else { setUnread(true); } }
   });
 
   // Status blips unrelated to frequency (performance-logging started, connection lost) — shown briefly at

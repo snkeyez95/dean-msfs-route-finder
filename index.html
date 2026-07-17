@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.12.6</div>
+  <div class="tname">A Better Route Planner &mdash; v6.12.7</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.12.6</div>
+    <div class="sb-ver">v6.12.7</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6787,22 +6787,38 @@ function recommendFreq(pos, controllers, dbMap, route, prevField){
     const a=latcAirportForCallsign(c.callsign, dbMap); if(!a) return false;
     return gcDist(pos.lat,pos.lon,a.lat,a.lon) <= ((c.tier==='CTR'||c.tier==='FSS')?500:200);
   }).map(c=>({callsign:c.callsign,freq:c.freq,tier:c.tier}));
+  // Your dep/arr fields + the low gate — needed by BOTH the top-down promotion below and the
+  // field-of-interest logic under it, so they're resolved once, here, before either.
+  const onGround=!!pos.onGround;
+  const low = onGround || pos.agl==null || pos.agl<LATC_CTAF_AGL;
+  const depApt = route&&route.dep ? dbMap.get(String(route.dep).toUpperCase()) : null;
+  const arrApt = route&&route.arr ? dbMap.get(String(route.arr).toUpperCase()) : null;
   // TOP-DOWN promotion (v6.11.2, Dean 2026-07-13 KLAS): a field Tower with NOTHING online above it (no
   // APP/CTR covering you) provides top-down service — you'd call it well outside the pattern, at altitude.
   // The near-field+low gate (7nm/4000ft) is right ONLY when a higher tier sits above it (stops Tower
   // sticking as you climb past it). When Tower is the highest online position, extend it to a top-down
   // range at any altitude so a lone inbound Tower actually gets recommended (LAS_E_TWR @11,500' was hidden).
+  //
+  // v6.12.7 — DIRECTION-AWARE (Dean 2026-07-16, KMIA→KMCO at cruise still "on" MIA_N_TWR). That 30nm/any-
+  // altitude range was tuned for a lone INBOUND tower; applied to the field you just LEFT it kept the
+  // departure tower live to 30nm at FL200+. Real world and VATSIM both release you shortly after takeoff
+  // ("frequency change approved"), so an OUTBOUND lone tower uses the same gate the departure field ring
+  // uses 15 lines below — LATC_CTAF_NM + low — whichever comes first. Arrival (and pattern, where
+  // dep===arr) keeps the full top-down range.
   const _higherCovers = enr.some(c=>(c.tier==='APP'||c.tier==='CTR'||c.tier==='FSS') && c.covers);
-  if(!_higherCovers){ for(const c of enr){ if(c.tier==='TWR' && !c.covers && c.apt && c.dist!=null && c.dist<=LATC_TWR_TOPDOWN_NM){ c.covers=true; c.topdown=true; } } }
+  if(!_higherCovers){
+    for(const c of enr){
+      if(c.tier!=='TWR' || c.covers || !c.apt || c.dist==null) continue;
+      const outbound = !!(depApt && c.apt.icao===depApt.icao) && !(arrApt && c.apt.icao===arrApt.icao);
+      const ok = outbound ? (c.dist<=LATC_CTAF_NM && low) : (c.dist<=LATC_TWR_TOPDOWN_NM);
+      if(ok){ c.covers=true; c.topdown=true; }
+    }
+  }
   // FIELD OF INTEREST = your DEP/ARR field (route-aware), NOT the nearest random field you overfly
   // (Dean 2026-07-12: enroute over the dense US northeast it kept latching CTAF onto KLWM etc.). Near
   // the DEP field counts only while low (release CTAF on climb-out); near the ARR field counts at any
   // altitude (engage on approach). No filed route → nearest field, still altitude-gated so it can't
   // stick on climb-out.
-  const onGround=!!pos.onGround;
-  const low = onGround || pos.agl==null || pos.agl<LATC_CTAF_AGL;
-  const depApt = route&&route.dep ? dbMap.get(String(route.dep).toUpperCase()) : null;
-  const arrApt = route&&route.arr ? dbMap.get(String(route.arr).toUpperCase()) : null;
   let near=null, nearDist=null, isDepField=false;
   if(depApt||arrApt){
     for(const [a,isDep] of [[depApt,true],[arrApt,false]]){ if(!a) continue; const d=gcDist(pos.lat,pos.lon,a.lat,a.lon); if(nearDist==null||d<nearDist){ nearDist=d; near=a; isDepField=isDep; } }
@@ -6919,12 +6935,22 @@ function latcNextUp(rec, seq){
       return Object.assign({}, nx, { downroute, noEnr: downroute && !seq.some(x=>x.leg==='enr') });
     }
   }
-  // Planning aid (Dean 2026-07-13): on UNICOM inbound with a dark network, surface the ARRIVAL field's
-  // CTAF as "Next up" so you know what you'll switch to as you descend in — only US/VATPAC fields that
-  // actually use a field CTAF (its tower freq). Not downroute: you're already enroute with nothing
-  // between you and it, so it genuinely IS the next frequency you'll tune.
-  if(rec.tier==='UNICOM' && LATC.db){ const r=latcBriefRoute(); const a=(r&&r.arr)?LATC.db.get(String(r.arr).toUpperCase()):null;
-    if(a && a.twr && /^[KPY]/.test(a.icao)) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao, downroute:false, noEnr:false}; }
+  // On UNICOM, the rec isn't a sequence entry, so the lookup above always misses and we land here.
+  if(rec.tier==='UNICOM'){
+    // v6.12.7 — ATC AHEAD BEATS CTAF (Dean 2026-07-16, KMIA→KMCO): MCO_E_DEP was online at 124.800 and
+    // sitting IN the sequence, yet the overlay read "Next up: 118.450 CTAF" — telling him to call CTAF
+    // at a controlled field, i.e. acting as if KMCO had nobody. The CTAF aid below is for a genuinely
+    // DARK network (its own stated intent); it must not fire while the arrival is staffed. So: offer the
+    // next real ATC on the arrival leg first, and only fall through to CTAF when there is none.
+    const nextAtc=(seq||[]).find(x=>x.leg==='arr' && x.kind==='atc' && (x.tier==='APP'||x.tier==='TWR'||x.tier==='GND'));
+    if(nextAtc) return Object.assign({}, nextAtc, {downroute:false, noEnr:false});
+    // Planning aid (Dean 2026-07-13): on UNICOM inbound with a dark network, surface the ARRIVAL field's
+    // CTAF as "Next up" so you know what you'll switch to as you descend in — only US/VATPAC fields that
+    // actually use a field CTAF (its tower freq). Not downroute: you're already enroute with nothing
+    // between you and it, so it genuinely IS the next frequency you'll tune.
+    if(LATC.db){ const r=latcBriefRoute(); const a=(r&&r.arr)?LATC.db.get(String(r.arr).toUpperCase()):null;
+      if(a && a.twr && /^[KPY]/.test(a.icao)) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao, downroute:false, noEnr:false}; }
+  }
   return null;
 }
 // Label + optional context for the next-frequency line, shared by the overlay and the Live ATC card.
@@ -7051,7 +7077,12 @@ function latcOverlayToast(type,title,sub,ms){ const v=vCfg(); if(!v.overlay.enab
 function latcCheckToasts(){
   const rec=(LATC.status==='live')?latcCurrentRec():null; if(!rec)return;
   // freq-change now drives the persistent overlay panel's auto-expand (latcPushOverlay), not a toast.
-  const cur=new Set([rec.callsign, ...(rec.others||[]).map(o=>o.callsign)].filter(Boolean));
+  // v6.12.7 — this diffed the RECOMMENDATION set, so it announced "New controller online" whenever YOU
+  // moved into someone's airspace (Dean 2026-07-16: crossing into the Orlando TRACON fired it for
+  // MCO_E_DEP, which had been online for an hour). Diff the route's ONLINE positions instead — the
+  // enriched sequence is exactly that, already scoped to your dep/arr fields + the Centers you cross,
+  // and memoized on the feed timestamp. It only changes when the NETWORK changes, never when you move.
+  const cur=new Set(latcSeqForNow().filter(x=>x.kind==='atc'&&x.callsign).map(x=>x.callsign));
   if(LATC._lastCtrl){ const nw=[...cur].filter(c=>!LATC._lastCtrl.has(c)); if(nw.length) latcOverlayToast('newController', nw.length>1?(nw.length+' new controllers online'):'New controller online', nw.slice(0,2).join(', ')); }
   LATC._lastCtrl=cur;
   // Route-aware handoff prompt: airborne, look ahead along the route for the next different controller and
@@ -7679,5 +7710,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.12.6</div>
+  pointer-events:none;">v6.12.7</div>
 </body></html>
