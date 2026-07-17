@@ -95,10 +95,21 @@ function readSidecar(sessionDir) {
   catch (_) { return null; }
 }
 
-// v6.12.0 (live overlay perf strip): CURRENT TLOD — tail today's daily log (last ~4 KB, reverse-scan
-// for the newest UpdateVariables line; falls back to yesterday's file right after midnight rotation).
-// Returns {tlod, ageS} when the newest sample is fresher than maxAgeS, else null. Cheap enough for a
-// 5s tick; read-only on AutoFPS's files.
+// v6.12.0 (live overlay perf strip): CURRENT TLOD — tail today's daily log, reverse-scan for the
+// newest UpdateVariables line (falls back to yesterday's file right after midnight rotation).
+// Returns {tlod, ageS} when the newest sample is fresher than maxAgeS, else null. Read-only on
+// AutoFPS's files.
+//
+// v6.12.9 — WINDOW SIZE (Dean 2026-07-16: "TLOD was sometimes present and sometimes not"). The
+// window was 4 KB, chosen without measuring against a real Debug-level log. AutoFPS's own logLevel
+// defaults to Debug and test18/19 added expanded LogPlus diagnostics, so on Dean's actual log the
+// MEDIAN gap between two UpdateVariables lines is ~4.7 KB — bigger than the window itself. Measured
+// on his 9 MB 2026-07-16 log, polling just before each next TLOD line: 4 KB found one only 12.6% of
+// the time, 64 KB → 98.6%, 128 KB → 100%. Hence 128 KB. A re-read of the same tail every 5s is
+// served by the OS page cache, and only runs while a capture is recording.
+// Staleness (not window size) is what decides "AutoFPS isn't flying" — the window only has to be
+// big enough to FIND the last line; maxAgeS then judges whether it's still current.
+const TAIL_BYTES = 131072;
 function tailLatest(logDir, maxAgeS) {
   try {
     const dir = logDir || defaultLogDir();
@@ -113,7 +124,7 @@ function tailLatest(logDir, maxAgeS) {
       try {
         const fd = fs.openSync(p, 'r');
         try {
-          const len = Math.min(st.size, 4096);
+          const len = Math.min(st.size, TAIL_BYTES);
           const buf = Buffer.alloc(len);
           fs.readSync(fd, buf, 0, len, st.size - len);
           text = buf.toString('utf8');
