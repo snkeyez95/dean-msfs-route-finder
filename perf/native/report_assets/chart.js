@@ -73,7 +73,8 @@
       options:{responsive:true,maintainAspectRatio:false,animation:false,
         parsing:false,normalized:true,interaction:{mode:'index',axis:'x',intersect:false},
         scales:{
-          x:{type:'linear',title:{display:true,text:'minutes into flight',color:c.text},
+          x:{type:'linear',min:0,max:(CHART.total_min>0?CHART.total_min:undefined),
+            title:{display:true,text:'minutes into flight',color:c.text},
             grid:{color:c.grid},ticks:{color:c.faint,maxTicksLimit:12,
             callback:function(v){return v.toFixed(0);}}},
           yMs:{type:'linear',position:'left',min:0,max:100,

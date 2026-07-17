@@ -115,8 +115,16 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const mavgPoints = RC.rollingMeanSeries(meanPoints);
   let q1 = null, q3 = null;
   if(sortedFt && sortedFt.length){ const mm = sortedFt.length; q1 = pyRound(sortedFt[Math.trunc(mm * 0.25)], 2); q3 = pyRound(sortedFt[Math.min(Math.trunc(mm * 0.75), mm - 1)], 2); }
+  // v6.12.6: the x axis had no max, so Chart.js rounded up to the next tick and drew empty space past
+  // the end of the flight — it reads as "the capture stopped early" when the data is complete (Dean
+  // 2026-07-16: 45.2 min of data on an axis running to 50). Pin the axis to the real end. altitude/
+  // traffic can sit a few seconds past the frametime end (they're wall-clock sampled, frametime is
+  // summed render time), so use the largest plotted x, not just totalMin.
+  const _lastX = a => (a && a.length) ? a[a.length - 1][0] : 0;
+  const axisMax = Math.max(totalMin, _lastX(altPoints), _lastX(tlodPoints), _lastX(trafPoints));
   const chartJson = pyJson({ ft: ftPoints, mavg: mavgPoints, alt: altJson, target: TARGET_FRAMETIME_MS,
     stutter: pyRound(STUTTER_FRAMETIME_MS, 1), avg_fps: g(stats, 'avg_fps') ?? null, q1, q3,
+    total_min: pyRound(axisMax, 2),
     over_count: PInt(overCount), over_max: pyRound(overMax, 2),
     tlod: tlodPoints ? tlodPoints.map(([x, t]) => [x, PInt(t)]) : null,
     traffic: trafPoints ? trafPoints.map(([x, t]) => [x, PInt(t)]) : null });
