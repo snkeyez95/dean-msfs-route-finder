@@ -32,7 +32,15 @@
       borderColor:c.line,borderWidth:1,pointRadius:0,fill:false,tension:0,order:1});
     datasets.push({label:'Moving average',data:mavgData,yAxisID:'yMs',
       borderColor:c.amber,borderWidth:1.6,pointRadius:0,fill:false,tension:0.25,order:0});
-    var refLines={id:'tgt',afterDraw:function(ch){
+    // nearest sample INDEX in an {x,y} array (binary search on x) — shared by markers + sync
+    function nearIdxX(arr,xv){if(!arr||!arr.length)return -1;
+      if(xv<=arr[0].x)return 0;var hi=arr.length-1;if(xv>=arr[hi].x)return hi;
+      var lo=0;while(lo<hi){var m=(lo+hi)>>1;if(arr[m].x<xv)lo=m+1;else hi=m;}
+      var A=arr[Math.max(0,lo-1)],B=arr[lo];return (Math.abs(A.x-xv)<=Math.abs(B.x-xv))?Math.max(0,lo-1):lo;}
+    // Reference lines drawn in afterDatasetsDraw (i.e. BEFORE the tooltip) so the tooltip is always on
+    // top — the old afterDraw ran AFTER the tooltip and painted the labels over it (Dean 2026-07-17).
+    // Labels sit at the RIGHT edge, out of the way of the data start + where the tooltip usually is.
+    var refLines={id:'tgt',afterDatasetsDraw:function(ch){
       if(unit!=='ms')return;var sc=ch.scales.yMs;if(!sc)return;
       var a=ch.chartArea,x=ch.ctx;
       function line(val,col,lbl,dy){var y=sc.getPixelForValue(val);
@@ -40,9 +48,9 @@
         x.save();x.strokeStyle=col;x.setLineDash([5,4]);x.lineWidth=1;
         x.beginPath();x.moveTo(a.left,y);x.lineTo(a.right,y);x.stroke();x.setLineDash([]);
         x.font='bold 11.5px sans-serif';x.textAlign='left';
-        var tw=x.measureText(lbl).width,ty=y+(dy||-6);
-        x.fillStyle='rgba(15,15,17,0.72)';x.fillRect(a.left+3,ty-12,tw+9,16);
-        x.fillStyle=col;x.fillText(lbl,a.left+7,ty);x.restore();}
+        var tw=x.measureText(lbl).width,ty=y+(dy||-6),lx=a.right-tw-9;
+        x.fillStyle='rgba(15,15,17,0.72)';x.fillRect(lx-1,ty-12,tw+9,16);
+        x.fillStyle=col;x.fillText(lbl,lx+3,ty);x.restore();}
       line(CHART.target,colors().target,CHART.target+' ms target',14);
       if(CHART.stutter)line(CHART.stutter,colors().amber,CHART.stutter+' ms stutter',-6);}};
     var overCaret={id:'ovc',afterDatasetsDraw:function(ch){
@@ -62,12 +70,34 @@
       var A=arr[Math.max(0,lo-1)],B=arr[lo];
       return (Math.abs(A.x-xv)<=Math.abs(B.x-xv))?A.y:B.y;}
     function altAt(xv){return nearestAt(altData,xv);}
-    // vertical crosshair at the hovered point, tying the frametime + altitude readouts together
-    var crosshair={id:'xhair',afterDatasetsDraw:function(ch){
-      var tt=ch.tooltip;if(!tt||!tt.opacity||!tt.dataPoints||!tt.dataPoints.length)return;
-      var a=ch.chartArea,x=ch.ctx,px=tt.caretX;if(px<a.left||px>a.right)return;
-      x.save();x.strokeStyle=colors().faint;x.setLineDash([3,3]);x.lineWidth=1;x.globalAlpha=0.85;
-      x.beginPath();x.moveTo(px,a.top);x.lineTo(px,a.bottom);x.stroke();x.restore();}};
+    // Shared crosshair + on-line target dots. Draws when THIS chart is hovered (its tooltip) OR when
+    // the OTHER chart is hovered (ch._syncX) — so a hover on either chart marks the same instant on
+    // both (Dean 2026-07-17). markLabels = dataset labels to put a dot on. The dot sits on the real
+    // sample at that x so you can see exactly which point the readout refers to.
+    function makeCrosshair(markLabels){return {id:'xhair',afterDatasetsDraw:function(ch){
+      var xs=ch.scales.x;if(!xs)return;var a=ch.chartArea,x=ch.ctx;
+      var tt=ch.tooltip,xv=null;
+      if(tt&&tt.opacity&&tt.dataPoints&&tt.dataPoints.length)xv=tt.dataPoints[0].parsed.x;
+      else if(ch._syncX!=null)xv=ch._syncX;
+      if(xv==null)return;
+      var px=xs.getPixelForValue(xv);if(px<a.left-1||px>a.right+1)return;
+      x.save();
+      x.strokeStyle=colors().faint;x.setLineDash([3,3]);x.lineWidth=1;x.globalAlpha=0.85;
+      x.beginPath();x.moveTo(px,a.top);x.lineTo(px,a.bottom);x.stroke();
+      x.setLineDash([]);x.globalAlpha=1;
+      var ring=css('--panel','#242427');
+      markLabels.forEach(function(m){
+        var di=ch.data.datasets.findIndex(function(d){return d.label===m.label;});if(di<0)return;
+        var data=ch.data.datasets[di].data;var idx=nearIdxX(data,xv);if(idx<0)return;
+        var meta=ch.getDatasetMeta(di),el=meta.data[idx];if(!el)return;
+        if(el.y<a.top-3||el.y>a.bottom+3)return;
+        x.beginPath();x.arc(el.x,el.y,4.5,0,Math.PI*2);
+        x.fillStyle=m.color?m.color():colors().line;x.fill();
+        x.lineWidth=2;x.strokeStyle=ring;x.stroke();});
+      x.restore();}};}
+    var crosshair=makeCrosshair([
+      {label:'Frametime',color:function(){return colors().line;}},
+      {label:'Moving average',color:function(){return colors().amber;}}]);
     var chart=new Chart(document.getElementById('ftChart'),{
       type:'line',data:{datasets:datasets},plugins:[refLines,overCaret,crosshair],
       options:{responsive:true,maintainAspectRatio:false,animation:false,
@@ -165,19 +195,20 @@
       // and the 16.67ms target (which stays visible as the reference the line rides on).
       var ymax=hi*1.015;
       var ymin=Math.min(lo,tgt)-0.5;
-      var tgtLine={id:'avgtgt',afterDraw:function(ch){
+      var tgtLine={id:'avgtgt',afterDatasetsDraw:function(ch){   // before the tooltip → tooltip on top
         var sc=ch.scales.y;if(!sc)return;var a=ch.chartArea,x=ch.ctx;
         var y=sc.getPixelForValue(tgt);if(y<a.top||y>a.bottom)return;
         x.save();x.strokeStyle=colors().target;x.setLineDash([5,4]);x.lineWidth=1;
         x.beginPath();x.moveTo(a.left,y);x.lineTo(a.right,y);x.stroke();
         x.setLineDash([]);x.font='bold 11.5px sans-serif';x.textAlign='left';
-        var l2=tgt+' ms target',w2=x.measureText(l2).width;
-        x.fillStyle='rgba(15,15,17,0.72)';x.fillRect(a.left+3,y+2,w2+9,16);
-        x.fillStyle=colors().target;x.fillText(l2,a.left+7,y+14);x.restore();}};
+        var l2=tgt+' ms target',w2=x.measureText(l2).width,lx=a.right-w2-9;   // right edge, out of the way
+        x.fillStyle='rgba(15,15,17,0.72)';x.fillRect(lx-1,y+2,w2+9,16);
+        x.fillStyle=colors().target;x.fillText(l2,lx+3,y+14);x.restore();}};
+      var avgXhair=makeCrosshair([{label:'Moving average',color:function(){return colors().amber;}}]);
       return new Chart(el,{type:'line',
         data:{datasets:[{label:'Moving average',data:SM,borderColor:colors().amber,
           borderWidth:2,pointRadius:0,fill:false,tension:0.45,cubicInterpolationMode:'monotone'}]},
-        plugins:[tgtLine],
+        plugins:[tgtLine,avgXhair],
         options:{responsive:true,maintainAspectRatio:false,animation:false,
           parsing:false,normalized:true,interaction:{mode:'nearest',axis:'x',intersect:false},
           scales:{
@@ -193,6 +224,18 @@
               title:function(it){return it[0].parsed.x.toFixed(1)+' min';},
               label:function(it){return 'Avg: '+it.parsed.y.toFixed(1)+' ms';}}}}}});
     })();
+    // Synced hover (Dean 2026-07-17): hovering EITHER chart marks the same instant on BOTH. On
+    // mousemove over one, translate the cursor to a flight-minute and store it as _syncX on the other
+    // so its crosshair plugin draws a matching line + on-line dot. Cleared on mouseleave. Cheap: two
+    // charts, animation off — a draw() per move is sub-ms.
+    (function(){var linked=[chart,avgChart].filter(Boolean);if(linked.length<2)return;
+      linked.forEach(function(src){
+        src.canvas.addEventListener('mousemove',function(ev){
+          var xs=src.scales.x;if(!xs)return;
+          var r=src.canvas.getBoundingClientRect(),xv=xs.getValueForPixel(ev.clientX-r.left);
+          linked.forEach(function(o){if(o===src)return;if(o._syncX!==xv){o._syncX=xv;o.draw();}});});
+        src.canvas.addEventListener('mouseleave',function(){
+          linked.forEach(function(o){if(o===src)return;if(o._syncX!=null){o._syncX=null;o.draw();}});});});})();
     window.setChartUnit=function(u){unit=u;
       var tr=chart.data.datasets.find(function(d){return d.label==='Frametime';});
       var ov=chart.data.datasets[chart.data.datasets.length-1];

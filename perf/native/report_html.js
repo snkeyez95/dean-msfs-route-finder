@@ -201,12 +201,12 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
       ' ms baseline). This is the MSFS engine-overload signature — lowering TLOD/OLOD for that phase clears it.</div>';
   } else if (psWorst) {
     const w = psWorst;
-    periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Periodic stutter: <b>brief</b> — ' +
+    periodicTxt = '<div style="font-size:11px;margin-top:9px;line-height:1.55;color:var(--text-dim)">Periodic stutter: <b>brief</b> — ' +
       ps.episodes.length + ' short episode' + (ps.episodes.length !== 1 ? 's' : '') + ' at ~' + floatRepr(w.interval_s) + 's cadence, ' +
       Math.round(psInEp) + ' s total' + (psPct != null ? ' (' + floatRepr(psPct) + '% of the flight)' : '') +
       '. Real, but far too little to act on — the other ' + Math.max(ps.spikes_total - ps.spikes_periodic, 0) + ' hitches were one-off.</div>';
   } else if (ps && ps.spikes_total >= 5) {
-    periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Spike pattern: aperiodic (' + ps.spikes_total +
+    periodicTxt = '<div style="font-size:11px;margin-top:9px;line-height:1.55;color:var(--text-dim)">Spike pattern: aperiodic (' + ps.spikes_total +
       ' one-off hitches, no repeating cadence) — scenery streaming / main-thread work, not the TLOD-overload signature. Lowering TLOD would not have helped.</div>';
   }
   const verdictHtml = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">' +
@@ -214,7 +214,7 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
     '<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:25px;font-weight:700;color:' + gcol + '">' + gword + '</span>' +
     '<span style="font-size:13px;color:var(--text-dim);font-family:Consolas,monospace">P99 ' + (p99v != null ? floatRepr(p99v) : '—') + ' ms</span></div>' +
     '<div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:9px">' + insight + '</div>' +
-    (spikeTxt ? '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;font-family:Consolas,monospace">' + spikeTxt + '</div>' : '') +
+    (spikeTxt ? '<div style="font-size:11px;color:var(--text-dim);margin-top:9px;font-family:Consolas,monospace">' + spikeTxt + '</div>' : '') +
     periodicTxt +
     '</div>';
 
@@ -246,41 +246,41 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
 
   <div class="layout">
     <div class="panel">
-      <div class="panel-h">Metrics<button class="unit-btn" id="unitBtn" onclick="toggleUnit()">FPS</button></div>
-      <div class="metrics" id="metrics"></div>
-      ${verdictHtml}
-    </div>
-    <div class="rcol">
-      <div class="panel">
-        <div class="panel-h" id="graphTitle">Frametime over flight · ms (lower = smoother)
-          <span class="graph-ctrls">
-            <select class="yscale-sel" id="yScale" onchange="window.applyScale&&applyScale(this.value)">
-              <option value="100" selected>0-100 ms</option>
-              <option value="80">0-80 ms</option>
-              <option value="60">0-60 ms</option>
-              <option value="40">0-40 ms</option>
-              <option value="30">0-30 ms</option>
-              <option value="20">0-20 ms</option>
-              <option value="10">0-10 ms</option>
-              <option value="fit">Full fit</option>
-              <option value="iqr">Interquartile range</option>
-            </select>
-            <button class="unit-btn" id="zoomReset" onclick="resetZoom()">Reset zoom</button>
-          </span>
-        </div>
-        <div class="graph-wrap" style="height:300px;position:relative">
-          <canvas id="ftChart" role="img" aria-label="frametime over the flight, with altitude overlay"></canvas>
-          <div id="spikeBadge" class="spike-badge" style="display:none"></div>
-        </div>
-        <div class="chart-legend" id="chartLegend"></div>
-        <div class="graph-hint">Scroll to zoom · drag to pan · double-click to reset</div>
+      <div class="panel-h" id="graphTitle">Frametime over flight · ms (lower = smoother)
+        <span class="graph-ctrls">
+          <select class="yscale-sel" id="yScale" onchange="window.applyScale&&applyScale(this.value)">
+            <option value="100" selected>0-100 ms</option>
+            <option value="80">0-80 ms</option>
+            <option value="60">0-60 ms</option>
+            <option value="40">0-40 ms</option>
+            <option value="30">0-30 ms</option>
+            <option value="20">0-20 ms</option>
+            <option value="10">0-10 ms</option>
+            <option value="fit">Full fit</option>
+            <option value="iqr">Interquartile range</option>
+          </select>
+          <button class="unit-btn" id="zoomReset" onclick="resetZoom()">Reset zoom</button>
+        </span>
       </div>
-      <div class="panel">
-        <div class="panel-h">Frametime moving average · the smoothed trend you actually feel (ms)</div>
-        <div class="graph-wrap" style="height:150px;position:relative">
-          <canvas id="ftAvgChart" role="img" aria-label="moving-average frametime over the flight"></canvas>
-        </div>
-        <div class="graph-hint">A rolling average of frametime that filters out one-off spikes to show the typical smoothness at each point of the flight — plotted on its own tight scale so small drifts are visible. Flat and low = smooth.</div>
+      <div class="graph-wrap" style="height:320px;position:relative">
+        <canvas id="ftChart" role="img" aria-label="frametime over the flight, with altitude overlay"></canvas>
+        <div id="spikeBadge" class="spike-badge" style="display:none"></div>
+      </div>
+      <div class="chart-legend" id="chartLegend"></div>
+      <div class="graph-hint">Hover to read any point — both charts move together · scroll to zoom · drag to pan · double-click to reset</div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">Frametime moving average · the smoothed trend you actually feel (ms)</div>
+      <div class="graph-wrap" style="height:170px;position:relative">
+        <canvas id="ftAvgChart" role="img" aria-label="moving-average frametime over the flight"></canvas>
+      </div>
+      <div class="graph-hint">A rolling average of frametime that filters out one-off spikes to show the typical smoothness at each point of the flight — plotted on its own tight scale so small drifts are visible. Flat and low = smooth.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">Metrics &amp; verdict<button class="unit-btn" id="unitBtn" onclick="toggleUnit()">FPS</button></div>
+      <div class="mv-grid">
+        <div class="metrics" id="metrics"></div>
+        <div class="mv-verdict">${verdictHtml}</div>
       </div>
     </div>
   </div>

@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.4
+# A Better Route Planner — v6.13.5
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.5  FLIGHT REPORT CHARTS: FULL WIDTH + SYNCED HOVER. The per-flight report is re-laid-out: both frametime charts now span the full window width, and the Metrics + Verdict box moved to a full-width panel beneath them (freeing the old left column). Hovering is much easier: a crosshair + a dot ON the line follows your cursor, hovering EITHER chart marks the same instant on BOTH, the reference labels (16.67 / 33.3 ms) moved to the right edge so they no longer sit on the data, and the tooltip now always draws on top of them (it used to get painted over). The verdict spike/periodic text got more contrast. All reports regenerate once on next launch.
+
 v6.13.4  TELEMETRY sys_cpu SURVIVES A WINDOWS PERF-COUNTER GLITCH. On one flight the system-CPU column recorded blank for the whole capture, while the other telemetry (top process, RAM) recorded fine. Cause: Windows can transiently disable its Processor performance-counter at the moment the capture launches typeperf, which then silently omits it (it self-heals the next session). The sampler now derives system CPU from the Idle process (100 - idle) when the dedicated counter is missing - a different counter library that is not affected - so the column no longer goes blank, and it logs a one-line warning so a recurrence is visible immediately. No effect when the counter is healthy (the normal path is unchanged).
 
 v6.13.3  VATSIM ATIS SHOWS AUTOMATICALLY WHEN AVAILABLE. When a VATSIM controller is staffing a field’s ATIS, the weather card now defaults to it — you no longer have to click the VATSIM button every time. If you click back to real-world D-ATIS for a field, it stays on your choice for the rest of the session (a fresh launch defaults to VATSIM again). New Settings toggle under VATSIM → Behavior: “Auto-show VATSIM ATIS when a controller is staffing it” (on by default). No flash or double-fetch — VATSIM becomes the source before the card renders.
