@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.12.4</div>
+  <div class="tname">A Better Route Planner &mdash; v6.12.5</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.12.4</div>
+    <div class="sb-ver">v6.12.5</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6886,44 +6886,50 @@ function latcAtisFreq(icao, role){
 // "Next up" always agrees with the briefing card.
 function latcEnrichedSequence(depApt, arrApt, controllers, dbMap, stOpt){
   const seq=[];
-  const depAtis=depApt?latcAtisFreq(depApt.icao,'dep'):null; if(depAtis) seq.push({kind:'atis', tier:'ATIS', icao:depApt.icao, callsign:depAtis.callsign, freq:depAtis.freq});
+  // `leg` marks which part of the flight each entry belongs to (dep field / enroute / arr field) —
+  // it's what lets "Next up" tell an imminent handoff from something 40 minutes downroute.
+  const depAtis=depApt?latcAtisFreq(depApt.icao,'dep'):null; if(depAtis) seq.push({kind:'atis', tier:'ATIS', leg:'dep', icao:depApt.icao, callsign:depAtis.callsign, freq:depAtis.freq});
   const st=stOpt||latcFreqStack(depApt, arrApt, controllers, dbMap);
-  for(const x of st.dep) seq.push(Object.assign({kind:'atc'}, x));
-  for(const x of st.enr) seq.push(Object.assign({kind:'atc', tier:'CTR'}, x));
-  const arrAtis=arrApt?latcAtisFreq(arrApt.icao,'arr'):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
-  for(const x of st.arr) seq.push(Object.assign({kind:'atc'}, x));
+  for(const x of st.dep) seq.push(Object.assign({kind:'atc', leg:'dep'}, x));
+  for(const x of st.enr) seq.push(Object.assign({kind:'atc', tier:'CTR', leg:'enr'}, x));
+  const arrAtis=arrApt?latcAtisFreq(arrApt.icao,'arr'):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', leg:'arr', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
+  for(const x of st.arr) seq.push(Object.assign({kind:'atc', leg:'arr'}, x));
   // Uncontrolled arrival: a real CTAF (the field's tower freq) only in the VATSIM divisions that run it
   // (US K/P, Australia Y); everywhere else it's the universal 122.800 UNICOM — and must be LABELLED that
   // way, not "CTAF" (Dean 2026-07-10, SAEZ arrival showed "122.800 CTAF").
-  if(arrApt){ const useCtaf=!!(arrApt.twr&&/^[KPY]/.test(arrApt.icao)); seq.push({kind:'atc', tier:useCtaf?'CTAF':'UNICOM', callsign:null, freq:useCtaf?arrApt.twr:LATC_UNICOM}); }
+  if(arrApt){ const useCtaf=!!(arrApt.twr&&/^[KPY]/.test(arrApt.icao)); seq.push({kind:'atc', tier:useCtaf?'CTAF':'UNICOM', leg:'arr', callsign:null, freq:useCtaf?arrApt.twr:LATC_UNICOM}); }
   return seq;
 }
 // The sequence entry right after the one matching the current recommendation — for the "Next up"
 // display line. Returns null when the current rec isn't found in the planned sequence (a live top-down
 // substitute, or off the filed route) — honest: no next-up claimed rather than a guess.
+// Returns the next entry PLUS honesty flags for how to label it (Dean 2026-07-16): sitting at KMIA's
+// gate on Tower it read "Next up: KMCO_A_ATIS" — literally true (nothing else on the route is staffed)
+// but "Next up" reads as imminent when it's really 40 minutes and a whole departure away. So:
+//   downroute = the next entry is at the ARRIVAL field while you're still on the dep leg / enroute
+//               → the caller says "Later", not "Next up".
+//   noEnr     = downroute AND no Center is online anywhere on the route → the genuinely useful part:
+//               "there's no ATC at all between here and there". Derived from the seq's own legs.
 function latcNextUp(rec, seq){
   if(!rec) return null;
   if(seq && seq.length){
     const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<LATC_FREQ_TOL));
-    if(idx>=0 && idx+1<seq.length) return seq[idx+1];
+    if(idx>=0 && idx+1<seq.length){
+      const nx=seq[idx+1], downroute=nx.leg==='arr' && seq[idx].leg!=='arr';
+      return Object.assign({}, nx, { downroute, noEnr: downroute && !seq.some(x=>x.leg==='enr') });
+    }
   }
   // Planning aid (Dean 2026-07-13): on UNICOM inbound with a dark network, surface the ARRIVAL field's
   // CTAF as "Next up" so you know what you'll switch to as you descend in — only US/VATPAC fields that
-  // actually use a field CTAF (its tower freq). Display-only; never a standby target (latcNextActionable
-  // stays ATC-only).
+  // actually use a field CTAF (its tower freq). Not downroute: you're already enroute with nothing
+  // between you and it, so it genuinely IS the next frequency you'll tune.
   if(rec.tier==='UNICOM' && LATC.db){ const r=latcBriefRoute(); const a=(r&&r.arr)?LATC.db.get(String(r.arr).toUpperCase()):null;
-    if(a && a.twr && /^[KPY]/.test(a.icao)) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao}; }
+    if(a && a.twr && /^[KPY]/.test(a.icao)) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao, downroute:false, noEnr:false}; }
   return null;
 }
-// Same as latcNextUp but skips ATIS entries — for the look-ahead STANDBY target (ATIS is a "tune active
-// yourself" suggestion; ABRP never loads it into standby, only real ATC/CTAF frequencies you'll swap to).
-function latcNextActionable(rec, seq){
-  if(!rec || !seq || !seq.length) return null;
-  const idx=seq.findIndex(x => (rec.callsign && x.callsign===rec.callsign) || (!rec.callsign && !x.callsign && x.freq!=null && Math.abs(x.freq-rec.freq)<LATC_FREQ_TOL));
-  if(idx<0) return null;
-  for(let i=idx+1;i<seq.length;i++){ if(seq[i].kind!=='atis') return seq[i]; }
-  return null;
-}
+// Label + optional context for the next-frequency line, shared by the overlay and the Live ATC card.
+function latcNextUpLabel(n){ return n && n.downroute ? 'Later' : 'Next up'; }
+function latcNextUpNote(n){ return n && n.noEnr ? ' — no ATC enroute' : ''; }
 // Memoized frequency STACK for the current route (feed-ts + route key) — the expensive piece
 // (great-circle sampling × point-in-polygon over Center FIR polygons). Shared by the pre-flight
 // briefing card AND the enriched sequence below, so it's computed once per feed update instead of
@@ -7145,7 +7151,7 @@ function latcPushOverlay(){
     who:(rec.callsign?rec.callsign+' · ':'')+(rec.label||''),
     why:latcPlain(rec.why),
     atis:atis,
-    next: nextUp?('Next up: '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))):'',
+    next: nextUp?(latcNextUpLabel(nextUp)+': '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+latcNextUpNote(nextUp)):'',
     cur: (activeMhz!=null)?("you're tuned to "+latcFmt(activeMhz)):'',
     also: also,
     onFreq:onFreq,
@@ -7216,7 +7222,7 @@ function renderLiveAtc(){
     +'<div style="font-size:34px;font-weight:800;color:'+accent+';letter-spacing:-.02em;font-family:\'JetBrains Mono\',monospace">'+latcFmt(rec.freq)+'</div>'
     +'<div style="font-size:15px;font-weight:600;color:var(--ink1);margin-top:2px">'+(rec.callsign?esc(rec.callsign)+' &middot; ':'')+esc(rec.label)+'</div>'
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
-    +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">Next up: <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+'</div>':'')
+    +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">'+latcNextUpLabel(nextUp)+': <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+esc(latcNextUpNote(nextUp))+'</div>':'')
     ;
   // Read-only radio readout (v6.8.0): show what your ACTIVE radio is on + the next freq in the sequence.
   // Standby number dropped (unreliable on custom aircraft). ABRP never tunes — you dial it yourself.
@@ -7673,5 +7679,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.12.4</div>
+  pointer-events:none;">v6.12.5</div>
 </body></html>
