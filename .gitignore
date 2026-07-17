@@ -1,7 +1,10 @@
 node_modules/
 dist/
 dean_msfs_debug.log
-CLAUDE.md
+# CLAUDE.md is TRACKED (2026-07-16). It was ignored, so the file defining every standing rule for
+# this project had no backup — a drive failure would have taken it. It contains no secrets (paths +
+# working preferences), and it's excluded from the installer by build.files, so tracking it costs
+# nothing and makes it recoverable from GitHub.
 
 # perf engine runtime artifacts + flight data (data lives in %APPDATA%, never the repo)
 perf/Sessions/
@@ -10,7 +13,10 @@ perf/__pycache__/
 perf/*.log
 perf/_capture_tmp.csv
 perf/_prep_aircraft.txt
-perf/PresentMon-x64.exe
+# PresentMon-x64.exe is TRACKED (2026-07-16). It was ignored, which meant a fresh machine could
+# clone the repo and still not build a release (extraResources needs it). 906 KB, Intel's tool, and
+# it already ships inside every installer we publish — so tracking it changes nothing about
+# distribution and makes the build reproducible from a clean clone.
 # Retired Python engine binary: kept ON DISK as the dev-only fallback (nativePerfEngine:false),
 # no longer tracked or shipped (v6.0.0 runs the native Node engine). Regenerable via
 # perf/build_pyi/perf-engine.spec if ever needed.
