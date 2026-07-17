@@ -2283,6 +2283,11 @@ ipcMain.handle('vatsim-metar', async (_, o) => {
 // toasts (freq change / new controller / logging started) that fade after a few seconds. Renders over
 // borderless/windowed MSFS; exclusive fullscreen hides any external window (documented limitation).
 let overlayWin=null;
+// v6.12.8 (audit): tracks whether Live mode owns the overlay. A toast can legitimately arrive with
+// Live mode OFF ("logging started" on an offline flight) and create the window — but then nothing
+// ever tore it down, so the grey dot lingered on screen for the whole session. When a toast creates
+// the window without Live mode, it self-closes after the toast; overlay-show (Live on) cancels that.
+let _overlayWanted=false, _overlayTempTimer=null;
 function overlayEnsure(){
   if(overlayWin && !overlayWin.isDestroyed()) return overlayWin;
   const { screen } = require('electron');
@@ -2313,6 +2318,7 @@ function overlayEnsure(){
 // Eagerly show the persistent dot (called when Live mode turns on, if the overlay is enabled).
 ipcMain.handle('overlay-show', () => {
   if(_cleanupDone) return {ok:false};
+  _overlayWanted=true; clearTimeout(_overlayTempTimer);
   try{ const w=overlayEnsure(); w.showInactive(); }catch(e){ LOG.error('[Overlay] '+e.message); }
   return {ok:true};
 });
@@ -2359,8 +2365,16 @@ ipcMain.handle('overlay-set-ignore', (_, o) => {
 });
 ipcMain.handle('overlay-toast', (_, payload) => {
   if(_cleanupDone) return {ok:false};   // QA fix (2026-07-09): a toast arriving mid-quit must not RE-CREATE the overlay window before-quit just destroyed
-  try{ const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{}); }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
-ipcMain.handle('overlay-hide', () => { try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.close(); }catch(_){} overlayWin=null; return {ok:true}; });
+  try{
+    const w=overlayEnsure(); w.showInactive(); w.webContents.send('overlay-toast', payload||{});
+    // v6.12.8: toast with Live mode off → the window has no other owner; close it after the toast
+    // instead of leaving a permanent grey dot. Re-armed per toast; overlay-show cancels it.
+    if(!_overlayWanted){
+      clearTimeout(_overlayTempTimer);
+      _overlayTempTimer=setTimeout(()=>{ try{ if(!_overlayWanted && overlayWin && !overlayWin.isDestroyed()){ overlayWin.close(); overlayWin=null; } }catch(_){} }, ((payload&&payload.ms)||14000)+3000);
+    }
+  }catch(e){ LOG.error('[Overlay] '+e.message); } return {ok:true}; });
+ipcMain.handle('overlay-hide', () => { _overlayWanted=false; clearTimeout(_overlayTempTimer); try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.close(); }catch(_){} overlayWin=null; return {ok:true}; });
 
 
 

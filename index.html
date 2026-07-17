@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.12.7</div>
+  <div class="tname">A Better Route Planner &mdash; v6.12.8</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.12.7</div>
+    <div class="sb-ver">v6.12.8</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6657,20 +6657,23 @@ function _ptInGeom(lon,lat,g){ if(!g)return false; const polys=g.type==='MultiPo
 // id, else K+prefix (US centers connect as ZLA_CTR but VATSpy keys their boundary KZLA).
 function airspaceCovers(callsign, lat, lon){
   const a=_airspace; if(!a) return null;
-  const pfx=String(callsign||'').split('_')[0].toUpperCase();
-  let ids=a.prefixMap[pfx];
-  if(!ids||!ids.length){
-    // Match the base boundary AND any '-SUFFIX' segments: US Centers split into e.g. KZNY (oceanic),
-    // KZNY-W (domestic), KZNY-BDA (Bermuda) — checking only the base misses the domestic area entirely.
-    // Memoized per prefix on the loaded airspace (a handful of prefixes per session).
-    a._idCache=a._idCache||{};
-    if(a._idCache[pfx]===undefined){
-      const bases=[pfx]; if(pfx.length===3) bases.push('K'+pfx);
-      const out=[]; for(const id of Object.keys(a.boundaries)){ for(const b of bases){ if(id===b||id.startsWith(b+'-')){ out.push(id); break; } } }
-      a._idCache[pfx]=out;
-    }
-    ids=a._idCache[pfx];
+  const pfx=String(callsign||'').split('_')[0].toUpperCase(); if(!pfx) return null;
+  // Match the base boundary AND any '-SUFFIX' segments: US Centers split into e.g. KZNY (oceanic),
+  // KZNY-W (domestic), KZNY-BDA (Bermuda) — checking only the base misses the domestic area entirely.
+  // v6.12.8 (audit): the merge must ALSO run when the VATSpy prefix map HITS — the map lists only the
+  // base id (NY→KZNY), so a mapped prefix silently lost its segments: NY_CTR read "outside" over
+  // Pennsylvania (inside KZNY-W, the domestic area), and BIRD/OBBB/GULF/VABB provably lost real area
+  // the same way. Mapped ids stay authoritative; their '-SUFFIX' children are unioned in.
+  // Memoized per prefix on the loaded airspace (a handful of prefixes per session).
+  a._idCache=a._idCache||{};
+  if(a._idCache[pfx]===undefined){
+    const mapped=a.prefixMap[pfx]||[];
+    const bases=mapped.length?mapped.slice():[pfx].concat(pfx.length===3?['K'+pfx]:[]);
+    const out=mapped.slice();
+    for(const id of Object.keys(a.boundaries)){ if(out.indexOf(id)>=0) continue; for(const b of bases){ if(id===b||id.startsWith(b+'-')){ out.push(id); break; } } }
+    a._idCache[pfx]=out;
   }
+  const ids=a._idCache[pfx];
   if(!ids||!ids.length) return null;
   for(const id of ids){ if(_ptInGeom(lon,lat,a.boundaries[id])) return true; }
   return false;
@@ -6868,7 +6871,9 @@ function recommendFreq(pos, controllers, dbMap, route, prevField){
   // VATSIM CTAF is a US/VATPAC thing — a field's tower freq is the CTAF only in the divisions that run it
   // (US: K/P, Australia: Y). Everywhere else VATSIM uses the universal 122.800 unicom for uncontrolled fields.
   const ctaf = (apt && apt.twr && /^[KPY]/.test(apt.icao)) ? apt.twr : null;
-  return {found:false, tier:'CTAF', freq: ctaf||LATC_UNICOM, callsign:null, label: ctaf?('CTAF ('+apt.icao+')'):'UNICOM', why:(apt?('No confirmable ATC for '+apt.icao+' &mdash; use '+(ctaf?'CTAF (its tower frequency)':'UNICOM 122.800')):'No ATC nearby')+(verify.length?'. '+verify.length+' position'+(verify.length>1?'s':'')+' online may cover you top-down &mdash; verify':''), phase, apt, others:[], verify};
+  // v6.12.8 (audit I6): tier was hardcoded 'CTAF' even when the fallback was 122.800 — the label said
+  // UNICOM but the tier field lied, and latcNextUp's tier gate keyed off it. Tier now matches reality.
+  return {found:false, tier: ctaf?'CTAF':'UNICOM', freq: ctaf||LATC_UNICOM, callsign:null, label: ctaf?('CTAF ('+apt.icao+')'):'UNICOM', why:(apt?('No confirmable ATC for '+apt.icao+' &mdash; use '+(ctaf?'CTAF (its tower frequency)':'UNICOM 122.800')):'No ATC nearby')+(verify.length?'. '+verify.length+' position'+(verify.length>1?'s':'')+' online may cover you top-down &mdash; verify':''), phase, apt, others:[], verify};
 }
 
 // v6.6.1(A-rest): ATIS-first sequence + "Next up" + look-ahead standby (Dean 2026-07-09).
@@ -6935,21 +6940,29 @@ function latcNextUp(rec, seq){
       return Object.assign({}, nx, { downroute, noEnr: downroute && !seq.some(x=>x.leg==='enr') });
     }
   }
-  // On UNICOM, the rec isn't a sequence entry, so the lookup above always misses and we land here.
-  if(rec.tier==='UNICOM'){
+  // On UNICOM/CTAF with nobody online, the rec isn't a sequence entry, so the lookup above misses and
+  // we land here. v6.12.8 (audit): gate on !found, not tier==='UNICOM' — the near-field fallback used
+  // to stamp tier 'CTAF' regardless, so sitting at a DARK departure field with a staffed arrival
+  // (dark KMIA, MCO Approach online) showed no next-up at all.
+  if(!rec.found){
     // v6.12.7 — ATC AHEAD BEATS CTAF (Dean 2026-07-16, KMIA→KMCO): MCO_E_DEP was online at 124.800 and
     // sitting IN the sequence, yet the overlay read "Next up: 118.450 CTAF" — telling him to call CTAF
     // at a controlled field, i.e. acting as if KMCO had nobody. The CTAF aid below is for a genuinely
     // DARK network (its own stated intent); it must not fire while the arrival is staffed. So: offer the
     // next real ATC on the arrival leg first, and only fall through to CTAF when there is none.
     const nextAtc=(seq||[]).find(x=>x.leg==='arr' && x.kind==='atc' && (x.tier==='APP'||x.tier==='TWR'||x.tier==='GND'));
-    if(nextAtc) return Object.assign({}, nextAtc, {downroute:false, noEnr:false});
-    // Planning aid (Dean 2026-07-13): on UNICOM inbound with a dark network, surface the ARRIVAL field's
-    // CTAF as "Next up" so you know what you'll switch to as you descend in — only US/VATPAC fields that
-    // actually use a field CTAF (its tower freq). Not downroute: you're already enroute with nothing
-    // between you and it, so it genuinely IS the next frequency you'll tune.
+    if(nextAtc){
+      // From the DEPARTURE field that ATC is a whole departure away — label it "Later" (v6.12.5 honesty).
+      const r0=latcBriefRoute();
+      const atDep=!!(rec.apt && r0 && r0.dep && r0.dep!==r0.arr && rec.apt.icao===String(r0.dep).toUpperCase());
+      return Object.assign({}, nextAtc, {downroute:atDep, noEnr: atDep && !(seq||[]).some(x=>x.leg==='enr')});
+    }
+    // Planning aid (Dean 2026-07-13): inbound with a dark network, surface the ARRIVAL field's CTAF as
+    // "Next up" so you know what you'll switch to as you descend in — only US/VATPAC fields that
+    // actually use a field CTAF (its tower freq). Never offer the frequency you're already on (you may
+    // BE on that CTAF at the dark arrival — that would be a self-loop, not a next-up).
     if(LATC.db){ const r=latcBriefRoute(); const a=(r&&r.arr)?LATC.db.get(String(r.arr).toUpperCase()):null;
-      if(a && a.twr && /^[KPY]/.test(a.icao)) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao, downroute:false, noEnr:false}; }
+      if(a && a.twr && /^[KPY]/.test(a.icao) && Math.abs(a.twr-rec.freq)>=LATC_FREQ_TOL) return {kind:'atc', tier:'CTAF', callsign:null, freq:a.twr, ctaf:a.icao, downroute:false, noEnr:false}; }
   }
   return null;
 }
@@ -7163,11 +7176,17 @@ function latcPushOverlay(){
   // CTAF/UNICOM) or new ATC came online (CTAF/UNICOM → real ATC). That's not a boundary flicker, so skip
   // the 2-poll debounce and alert immediately — the CTAF handoff shouldn't wait until after takeoff.
   // Controller↔controller changes keep the debounce (edge-flicker lives there).
+  // v6.12.8 (audit A1): a found-flip caused purely by MOVEMENT (grazing a polygon boundary) looked
+  // identical to a sign-off and bypassed the debounce — proven 10 chimes in 10 polls skimming the MCO
+  // TRACON edge. Instant now ALSO requires the online set itself to have changed since the last poll;
+  // a boundary flicker (same network) takes the normal 2-poll debounce like any other change.
   const _curFound=!!rec.found;
-  if(LATC._prevFound!=null && LATC._prevFound!==_curFound && fkey!==LATC._lastStableKey){
+  const _netKey=(LATC.controllers||[]).filter(c=>c.facility!==0&&c.frequency!=='199.998').map(c=>c.callsign).sort().join('|');
+  const _netChanged=(LATC._prevNetKey!=null)&&(_netKey!==LATC._prevNetKey);
+  if(LATC._prevFound!=null && LATC._prevFound!==_curFound && _netChanged && fkey!==LATC._lastStableKey){
     isNewRec=true; LATC._lastStableKey=fkey; LATC._pendKey=null; LATC._pendCount=0;
   }
-  LATC._prevFound=_curFound;
+  LATC._prevFound=_curFound; LATC._prevNetKey=_netKey;
   // "Also online at your field" (Dean 2026-07-13, his cycling-card idea): field ATC positions online that
   // aren't the current pick — transparency so nothing live is hidden even when the pick is CTAF/UNICOM.
   let also='';
@@ -7198,7 +7217,7 @@ async function latcToggle(on,auto){
   LATC.on=on;
   S._vpilotAutoOn=!!(on&&auto);   // track whether the vPilot watcher started this session (so it only auto-stops its own)
   if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(vCfg().overlay.enabled){ try{ window.api.overlayShow(); }catch(e){} } if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
-  else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; LATC._lastStableKey=undefined; LATC._pendKey=null; LATC._pendCount=0; try{ window.api.overlayHide(); }catch(e){} }
+  else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; LATC._lastStableKey=undefined; LATC._pendKey=null; LATC._pendCount=0; LATC._prevFound=null; LATC._prevNetKey=null; try{ window.api.overlayHide(); }catch(e){} }
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
   renderLiveAtc(); updateVatsimHeader();
 }
@@ -7710,5 +7729,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.12.7</div>
+  pointer-events:none;">v6.12.8</div>
 </body></html>
