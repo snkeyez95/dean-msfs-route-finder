@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.8
+# A Better Route Planner — v6.13.9
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.9  HOVER: CLEANER DOTS. The hover now puts a bullseye only on the lines you actually trace — frametime, moving average, and TLOD. Altitude and VATSIM traffic are context: their values still appear in the readout box, but they no longer get a dot on their faint lines (which sat on compressed hidden axes, right by the red traffic dashes, and looked misplaced). Reports regenerate once on next launch.
+
 v6.13.8  HOVER: READ THE TLOD STEPS. The spike-snap now also checks where your cursor is VERTICALLY. Down among the frametime spikes it still snaps to grab a hitch; but up on the TLOD or altitude lines the nearest frametime spike is far below the cursor, so it tracks continuously — letting you step through every ~10-second TLOD change instead of getting yanked down to a frametime spike. Reports regenerate once on next launch.
 
 v6.13.7  HOVER TRACKS FINER. The chart hover snapped to the nearest spike everywhere, so fine mouse moves hopped between spikes (~0.8 min jumps) even on smooth stretches. It now snaps ONLY when there is a genuine hitch to grab (a nearby frametime >=33 ms and clearly taller than where the cursor sits); on smooth stretches the readout follows the cursor continuously. Reports regenerate once on next launch.

@@ -13,7 +13,7 @@ const chartSrc = fs.readFileSync(path.join(X.ROOT, 'perf', 'native', 'report_ass
 // ── structural markers (the v6.13.6 unified hover) ──
 T('shared inspected-time state (HOVER.x)', /var HOVER=\{x:null\}/.test(chartSrc));
 T('bullseye marker (outer ring + coloured ring + centre)', /function bullseye/.test(chartSrc));
-T('per-line markers incl. TLOD + Altitude', /add\('TLOD','yTlod'/.test(chartSrc) && /add\('Altitude','yAlt'/.test(chartSrc));
+T('bullseyes only the traced lines (frametime/mavg/TLOD, not the faint context lines)', /add\('TLOD','yTlod'/.test(chartSrc) && !/add\('Altitude'/.test(chartSrc));
 T('unified crosshair + readout plugins', /xhairPlugin/.test(chartSrc) && /readoutPlugin/.test(chartSrc));
 T('native Chart tooltip disabled (replaced)', /tooltip:\{enabled:false\}/.test(chartSrc));
 T('spike-snapping in the hover wiring', /function snapX/.test(chartSrc));

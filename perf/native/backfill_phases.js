@@ -25,7 +25,7 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const REPORT_V = 'hover-vgate'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.8: hover spike-snap also gated on vertical cursor proximity, so hovering the TLOD/altitude lines tracks continuously and reads every step)
+const REPORT_V = 'hover-declutter'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.9: hover bullseye only on the traced lines — frametime/mavg/TLOD; altitude + traffic are readout-only context, no dot on the faint lines)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 

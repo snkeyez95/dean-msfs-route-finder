@@ -88,10 +88,12 @@
       function add(label,axis,colf){var d=ds.find(function(z){return z.label===label;});
         if(d&&d.data&&d.data.length&&ch.scales[axis])out.push({data:d.data,axis:axis,color:colf});}
       if(ch===chart){
+        // Bullseye only the lines you actively TRACE (frametime, moving-average, TLOD). Altitude and
+        // VATSIM traffic are context — their value shows in the readout box, but a dot on those faint
+        // lines (on compressed hidden axes, near the red traffic dashes) just clutters (Dean 2026-07-18).
         add(unit==='fps'?'Avg FPS':'Frametime','yMs',function(){return colors().line;});
         add(unit==='fps'?'Avg FPS':'Moving average','yMs',function(){return colors().amber;});
         add('TLOD','yTlod',function(){return colors().target;});
-        add('Altitude','yAlt',function(){return colors().faint;});
       } else { add('Moving average','y',function(){return colors().amber;}); }
       return out;}
     var xhairPlugin={id:'xhair',afterDatasetsDraw:function(ch){
