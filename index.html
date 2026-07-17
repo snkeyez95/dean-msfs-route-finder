@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.13.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.13.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.13.2</div>
+    <div class="sb-ver">v6.13.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6368,9 +6368,22 @@ async function fetchDatis(icao,idx,side,prefix){
   // unless a VATSIM controller is staffing this field's ATIS). Independent of Live mode.
   let _vb=document.getElementById(prefix+'vbtn-'+side+'-'+idx);
   if(!_vb&&box.parentNode){ _vb=document.createElement('div'); _vb.id=prefix+'vbtn-'+side+'-'+idx; _vb.style.marginTop='4px'; box.parentNode.insertBefore(_vb, box.nextSibling); }
-  renderVatsimAtisBtn(icao,idx,side,prefix);
   // ensure the airport's runway list is loaded so runway tokens validate correctly
   try{await fetchRwyData(icao);}catch(e){}
+  // AUTO-DEFAULT to VATSIM ATIS (Dean 2026-07-17): if enabled AND a controller is staffing this
+  // field's ATIS AND it's not already applied AND the user hasn't manually reverted it this session,
+  // make VATSIM the source BEFORE the render below — so it just shows, no click needed. Set the cache
+  // INLINE (not via applyVatsimAtis, which would re-enter fetchDatis and race) so the cached.vatsim
+  // branch a few lines down uses it directly: no real-world fetch, no flash, no double render.
+  if(vCfg().autoAtis && vCfg().weatherButton){
+    const cur=S.datisCache[icao];
+    if(!(cur&&cur.vatsim) && !(S._vatsimReverted&&S._vatsimReverted[icao])){
+      await vatsimFeedGet();
+      if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+      if(vatsimAtisAvail(icao)){ const d=vatsimAtisData(icao); if(d)S.datisCache[icao]={data:d,ts:Date.now(),vatsim:true}; }
+    }
+  }
+  renderVatsimAtisBtn(icao,idx,side,prefix);   // after auto-apply, so it shows the ✓ (revert) state
   let data;
   const cached=S.datisCache[icao];
   // QA fix (2026-07-09): a VATSIM-applied ATIS is an EXPLICIT user choice — it must not silently expire
@@ -6501,7 +6514,7 @@ async function fetchDatis(icao,idx,side,prefix){
 // the fully-populated object so toggles can write straight to it.
 function vCfg(){
   if(!S.cfg.vatsim) S.cfg.vatsim={};
-  const v=S.cfg.vatsim, d={enabled:false,cid:'',weatherButton:true,autoStartVpilot:false};
+  const v=S.cfg.vatsim, d={enabled:false,cid:'',weatherButton:true,autoStartVpilot:false,autoAtis:true};
   for(const k in d) if(v[k]===undefined) v[k]=d[k];
   v.overlay=Object.assign({enabled:true,freqChange:true,newController:true,handoff:true,connectionLost:true,loggingStarted:true}, v.overlay||{});
   v.sound=Object.assign({freqChange:true,newController:false,handoff:false,connectionLost:false}, v.sound||{});
@@ -6530,6 +6543,7 @@ function renderVatsimSettings(){
   h+=hdr('Behavior');
   h+=row('Auto-start Live mode when vPilot is running', v.autoStartVpilot, "vSetAutoVpilot(this.checked)", '(links the pilot client to Live ATC)');
   h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
+  h+=row('Auto-show VATSIM ATIS when a controller is staffing it', v.autoAtis, "vSet('autoAtis',this.checked)", '(otherwise click the VATSIM button)');
   h+=hdr('Data <span style="color:var(--ink4)">(downloaded once, refresh per AIRAC)</span>');
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"><button class="btn bg bxs" onclick="latcRefreshDb()">Refresh airport database</button><button class="btn bg bxs" onclick="vRefreshAirspace()">Refresh airspace boundaries (VATSpy)</button><span id="vatsim-data-msg" style="font-size:11px;color:var(--ink3);align-self:center"></span></div>';
   el.innerHTML=h;
@@ -7189,8 +7203,11 @@ async function renderVatsimAtisBtn(icao,idx,side,prefix){
   if(vatsimAtisAvail(icao)) set('<button class="btn bg bxs" onclick="applyVatsimAtis(\''+icao+'\',\''+idx+'\',\''+side+'\',\''+prefix+'\')" style="color:var(--acc);border-color:var(--acc)" title="A VATSIM controller is staffing this field’s ATIS — use its active runway (also fills SimBrief)">&#128251; VATSIM ATIS</button>');
   else set('<button class="btn bg bxs" disabled style="opacity:.4" title="No VATSIM ATIS online for '+icao+'">VATSIM</button>');
 }
-function applyVatsimAtis(icao,idx,side,prefix){ const d=vatsimAtisData(icao); if(!d)return; S.datisCache[(icao||'').toUpperCase()]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
-function revertVatsimAtis(icao,idx,side,prefix){ delete S.datisCache[(icao||'').toUpperCase()]; fetchDatis(icao,idx,side,prefix); }
+function applyVatsimAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); const d=vatsimAtisData(icao); if(!d)return; if(S._vatsimReverted)delete S._vatsimReverted[icao]; S.datisCache[icao]={data:d,ts:Date.now(),vatsim:true}; fetchDatis(icao,idx,side,prefix); }
+// Manual revert = "I want real-world D-ATIS for this field." Remember it so auto-default doesn't
+// immediately re-apply VATSIM on the next render (session-scoped; a fresh launch defaults to VATSIM
+// again). Clicking Apply again clears the flag.
+function revertVatsimAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); if(!S._vatsimReverted)S._vatsimReverted={}; S._vatsimReverted[icao]=true; delete S.datisCache[icao]; fetchDatis(icao,idx,side,prefix); }
 async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); LATC.writable=!!r.writable; LATC.adapterLabel=r.adapterLabel||null; }catch(e){} latcCheckToasts(); renderLiveAtc(); latcPushOverlay(); updateVatsimHeader(); }
 // PMDG standby adapter (2026-07-11): the one sanctioned radio WRITE — explicit click, STANDBY only,
 // closed-loop knob walk in main.js with honest verify (the v6.7.0 no-auto-writes lesson stands).
@@ -7850,5 +7867,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.13.2</div>
+  pointer-events:none;">v6.13.3</div>
 </body></html>
