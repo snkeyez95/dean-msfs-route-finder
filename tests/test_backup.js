@@ -55,7 +55,23 @@ reset();
   T('the new flight is in the backup', read(path.join(DEST, 'Sessions', '2026-01-02', 'flightB', 'summary.json')) === '{"flight":"B"}');
 }
 
+// ── CapFrameX (regenerable derived export) is excluded ──────────────────────
+reset();
+{
+  fs.mkdirSync(path.join(APP, 'Sessions', 'CapFrameX'), {recursive:true});
+  fs.writeFileSync(path.join(APP, 'Sessions', 'CapFrameX', '2026-01-01_flightA.csv'), 'x'.repeat(9000));
+  const r = B.backupData(APP, DEST, () => {});
+  T('backup succeeds with a CapFrameX folder present', r.ok, r.error);
+  T('CapFrameX is NOT copied to the backup (regenerable duplicate)', !fs.existsSync(path.join(DEST, 'Sessions', 'CapFrameX')));
+  T('real flight logs are still copied', read(path.join(DEST, 'Sessions', '2026-01-01', 'flightA', 'summary.json')) === '{"flight":"A"}');
+}
+
 // ── status reflects reality ─────────────────────────────────────────────────
+reset();
+B.backupData(APP, DEST, () => {});
+fs.mkdirSync(path.join(APP, 'Sessions', '2026-01-02', 'flightB'), {recursive:true});
+fs.writeFileSync(path.join(APP, 'Sessions', '2026-01-02', 'flightB', 'summary.json'), '{"flight":"B"}');
+B.backupData(APP, DEST, () => {});
 {
   const st = B.backupStatus(APP, DEST);
   T('status: destination reachable', st.reachable === true);

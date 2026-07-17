@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.0
+# A Better Route Planner — v6.13.1
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.1  BACKUP SKIPS THE CAPFRAMEX EXPORTS. The Sessions\CapFrameX folder is a regenerable copy of your raw frame data in CapFrameX format (the app rebuilds it on demand) — a backup should hold originals, not rebuildable duplicates, so it is now excluded. Dropped the backup from 4.1 GB to 2.5 GB. (Dean deleted a stale 1.6 GB of these dev-era spot-check exports; this keeps a future re-export from bloating the backup again.)
+
 v6.13.0  BACKUP & RESTORE FOR YOUR FLIGHT LOGS. Your flight logs, settings and route database are the one thing GitHub can't hold — until now they lived in a single place on your C: drive, so a dead drive meant losing all of it (including the 24-flight benchmark). New panel at the top of Maintenance: it copies that data to another drive, automatically about 20 seconds after each flight files (incremental, so only the new flight moves — about a second). "Restore from backup" brings everything back on a fresh install; it shows you exactly what will change first, saves your current settings to a timestamped copy before overwriting, and never deletes a flight that isn't in the backup. Your live data is only ever read. A "Back up now" button, a folder picker, and an auto-on/off toggle round it out; the same job runs from tools\backup-data.js if the app won't start. Default backup folder: D:\Claude_ABRP_Log BU.
 
 v6.12.9  THE OVERLAY'S TLOD READING NO LONGER BLINKS. On AutoFPS flights the live perf strip showed the current TLOD only about half the time. The overlay reads it out of AutoFPS's own log file by looking at the last 4 KB and scanning back for the most recent reading — but AutoFPS logs at Debug level (and its newer test builds added more diagnostics), so on a real log the average gap between two TLOD readings is about 4.7 KB. Bigger than the window. Roughly half the time it was looking at a stretch of log with no reading in it and showing nothing. Measured against a real 9 MB log: the old 4 KB window found a reading 12.6% of the time in the worst case; a 128 KB window finds one 100% of the time. Costs 0.8 ms once every five seconds, and only while a capture is recording. Fixed-TLOD flights were never affected — they read the launch value directly.
