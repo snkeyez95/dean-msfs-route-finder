@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.3
+# A Better Route Planner — v6.13.4
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.4  TELEMETRY sys_cpu SURVIVES A WINDOWS PERF-COUNTER GLITCH. On one flight the system-CPU column recorded blank for the whole capture, while the other telemetry (top process, RAM) recorded fine. Cause: Windows can transiently disable its Processor performance-counter at the moment the capture launches typeperf, which then silently omits it (it self-heals the next session). The sampler now derives system CPU from the Idle process (100 - idle) when the dedicated counter is missing - a different counter library that is not affected - so the column no longer goes blank, and it logs a one-line warning so a recurrence is visible immediately. No effect when the counter is healthy (the normal path is unchanged).
+
 v6.13.3  VATSIM ATIS SHOWS AUTOMATICALLY WHEN AVAILABLE. When a VATSIM controller is staffing a field’s ATIS, the weather card now defaults to it — you no longer have to click the VATSIM button every time. If you click back to real-world D-ATIS for a field, it stays on your choice for the rest of the session (a fresh launch defaults to VATSIM again). New Settings toggle under VATSIM → Behavior: “Auto-show VATSIM ATIS when a controller is staffing it” (on by default). No flash or double-fetch — VATSIM becomes the source before the card renders.
 
 v6.13.2  ATIS RUNWAY PARSING READS SPELLED-OUT SIDES ("24 LEFT"). A VATSIM ATIS at LEBL said "RWY IN USE FOR DEPARTURES 24 LEFT" but the card showed RWY 20 with an "est. wind" tag — the ATIS's runway was ignored. The parser only understood "24L" / "24 L", so it read a bare "24", found no such runway at LEBL (which has 24L/24R, never plain 24), and fell back to a wind estimate. It now normalizes spelled-out sides — LEFT/RIGHT/CENTER/CENTRE → L/R/C — so "24 LEFT" reads as 24L and the ATIS's runway wins, for both departures and arrivals. Also fixed a related miss: "VIS 10KM" (visibility) was being treated as a "visual approach" cue, which could steal a runway's direction — visibility values no longer count as an arrival cue, while "VIS APCH" still does. Abbreviated forms (8L, RWY25R, plural "RWYS 8L, 8R") are unchanged.

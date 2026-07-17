@@ -12,7 +12,7 @@ const IGNORE = new Set(['_total', 'idle', 'system', 'secure system', 'memory com
                         'registry', 'flightsimulator2024', 'typeperf']);
 
 class TelemetrySampler {
-  constructor(selfNames = []) {
+  constructor(selfNames = [], log = null) {
     this.ncpu = os.cpus().length || 1;
     this.totalMemMb = Math.round(os.totalmem() / (1024 * 1024));
     this._proc = null;
@@ -20,6 +20,9 @@ class TelemetrySampler {
     this._procCols = null;      // {colIndex: instanceName}
     this._cpuCol = -1;
     this._memCol = -1;
+    this._idleCol = -1;         // \Process(Idle)\% Processor Time — the sys-cpu FALLBACK source
+    this._warnedNoCpu = false;
+    this._log = typeof log === 'function' ? log : (() => {});
     this._latest = [null, null, '', null];
     this._ignore = new Set([...IGNORE, ...selfNames.map(s => s.toLowerCase())]);
   }
@@ -53,14 +56,31 @@ class TelemetrySampler {
       this._procCols = {};
       for (let i = 1; i < cells.length; i++) {
         const c = cells[i]; let m;
-        if ((m = /\\Process\(([^)]*)\)\\% Processor Time/i.exec(c))) this._procCols[i] = m[1];
+        if ((m = /\\Process\(([^)]*)\)\\% Processor Time/i.exec(c))) {
+          this._procCols[i] = m[1];
+          if (/^idle$/i.test(m[1])) this._idleCol = i;   // remember Idle for the sys-cpu fallback
+        }
         else if (/\\Processor\(_Total\)\\% Processor Time/i.test(c)) this._cpuCol = i;
         else if (/\\Memory\\Available MBytes/i.test(c)) this._memCol = i;
+      }
+      // Windows can transiently disable the Processor counter library at typeperf launch (self-heals
+      // next session); typeperf then silently omits \Processor(_Total) from the header while the
+      // Process + Memory counters stay. When that happens, derive sys-cpu from the Idle process
+      // (100 − Idle%/ncpu) — a different counter library that isn't affected — so the column never
+      // goes blank. Warn once so a recurrence is visible in native_capture.log, not found weeks later.
+      if (this._cpuCol < 0) {
+        this._log(this._idleCol >= 0
+          ? '[telemetry] \\Processor(_Total) counter unavailable this session — deriving sys_cpu from Process(Idle) (Windows perf-counter glitch; usually self-heals)'
+          : '[telemetry] \\Processor(_Total) counter unavailable AND no Idle column — sys_cpu will be blank this session (run "lodctr /R" if it persists)');
       }
       return;
     }
     const num = i => { const v = parseFloat(cells[i]); return Number.isFinite(v) ? v : 0; };
-    const sysCpu = this._cpuCol >= 0 ? Math.round(num(this._cpuCol) * 10) / 10 : null;
+    let sysCpu = null;
+    if (this._cpuCol >= 0) sysCpu = Math.round(num(this._cpuCol) * 10) / 10;
+    else if (this._idleCol >= 0) {                       // fallback: 100 − idle-fraction
+      sysCpu = Math.round(Math.max(0, Math.min(100, 100 - num(this._idleCol) / this.ncpu)) * 10) / 10;
+    }
     let sysRam = null;
     if (this._memCol >= 0 && this.totalMemMb) {
       sysRam = Math.round((this.totalMemMb - num(this._memCol)) / this.totalMemMb * 1000) / 10;

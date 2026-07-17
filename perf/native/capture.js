@@ -178,7 +178,7 @@ async function runAutoCapture(opts) {
   // start capture
   const proc = startPresentmon(pmPath, tmpCsv, TARGET_PROCESS);
   const vram = new VramSampler(1000); vram.start();
-  const telem = new TelemetrySampler(['perf-engine', 'node']); telem.start();
+  const telem = new TelemetrySampler(['perf-engine', 'node'], say); telem.start();
   // Anchor IMMEDIATELY AFTER start_presentmon — Python sets _recording_wall_start right after the
   // spawn (py:3736 → 3759). Anchoring any earlier skews every frame-elapsed vs phase/telemetry
   // wall time by however long the metadata calls took (deep-review finding 6).
