@@ -250,10 +250,17 @@ near-zero interval variation (std ≤ ~0.16s). Interpretation rules:
 - **Aperiodic spikes** = one-off scenery-streaming / addon main-thread hitches → lowering TLOD
   would NOT have helped (the KLAS arrival-taxi case classifies aperiodic, matching the CPU-bound
   streaming diagnosis).
-- **Significance gate:** a lone 4-spike run can be chance — only call it engine overload when
-  the worst episode has ≥6 spikes or total periodic spikes ≥8; otherwise say "too short to call."
-- Real-data anchor: the 2026-06-13/14 Fenix EGLL flights (pre-rBAR-fix) show 350+ periodic spikes
-  at ~1.2s — the textbook positive; most of Dean's flights are aperiodic.
+- **Significance gate (v6.12.3 — judge IMPACT, never raw spike counts).** Compute the share of the
+  flight spent inside episodes: `sum(episode end_s − start_s) / smoothness.duration_seconds`. Call it
+  engine overload ONLY when that is **≥2%**, OR one single run lasted **≥60s**. Otherwise it's
+  "periodic stutter: brief — real, but too little to act on." Rationale: counting spikes made a 2h
+  flight with five 3-second bursts look identical to a 48-min flight that stuttered for 18% of itself.
+- Real-data anchor (all 34 flights, 2026-07-16): ONLY the two pre-rBAR-fix Fenix EGLL flights are
+  genuine overload — **18.55%** of flight (532s, worst run 70 spikes/91s, p99 27.79) and **10.13%**
+  (340s, worst 36/42s, p99 25.46). EVERY other flight with episodes is **≤0.49%** (next highest:
+  EGGD 07-07 one 19s run; Citation KASE-KSEA 0.27%). The 20× gap between those groups is where the
+  thresholds sit — so if a new flight lands between 0.5% and 2%, say so plainly rather than forcing
+  it into a bucket.
 
 ### The microstutter tell
 

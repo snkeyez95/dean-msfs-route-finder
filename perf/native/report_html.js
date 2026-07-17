@@ -166,19 +166,37 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   // = one-off streaming/main-thread hitches → TLOD won't help. Only speaks when there's a story.
   let periodicTxt = '';
   const ps = g(stats, 'periodic_stutter');
-  // Significance gate: a lone 4-spike run can be chance alignment among many one-off hitches
-  // (real-data sweep 2026-07-14 showed several). Only a sustained pattern gets the red call-out.
-  const psStrong = ps && ps.episodes && ps.episodes.length && (ps.spikes_periodic >= 8 || ps.episodes[0].spikes >= 6);
+  // SIGNIFICANCE GATE (v6.12.3 — recalibrated against 34 real flights). The old gate counted raw
+  // spikes, so a 2h flight with five 3-second bursts got the SAME red "engine overload" banner as a
+  // 48-minute flight that spent 18% of itself stuttering. Judge instead by how much of the flight was
+  // actually AFFECTED: the share of flight time inside periodic episodes, OR one run sustained long
+  // enough to wreck a leg on its own. Dean's real data splits cleanly — the two genuine overload
+  // flights sit at 10.1% / 18.6% of flight (worst runs 42s / 91s, and their p99+consistency are
+  // visibly worse); EVERY other flight with episodes is <=0.5%. Thresholds sit inside that 20x gap.
+  const PS_PCT_SIG = 2.0, PS_SUSTAINED_S = 60;
+  const psDur = g(stats, 'duration_seconds') || 0;
+  let psWorst = null, psPct = null, psInEp = 0;
+  if (ps && ps.episodes && ps.episodes.length) {
+    psWorst = ps.episodes[0];                     // periodicity.js sorts episodes worst-first (spike count)
+    psInEp = ps.episodes.reduce((a, e) => a + (e.end_s - e.start_s), 0);
+    psPct = psDur ? pyRound(psInEp / psDur * 100, 2) : null;
+  }
+  const psWorstS = psWorst ? (psWorst.end_s - psWorst.start_s) : 0;
+  const psStrong = !!psWorst && (((psPct != null) && psPct >= PS_PCT_SIG) || psWorstS >= PS_SUSTAINED_S);
   if (psStrong) {
-    const w = ps.episodes[0];
-    const mm = s => Math.round(s / 60);
-    periodicTxt = '<div style="font-size:11.5px;color:var(--bad);margin-top:9px;line-height:1.55">&#9889; Periodic stutter detected — ' +
-      ps.episodes.length + ' episode' + (ps.episodes.length !== 1 ? 's' : '') + ', ' + ps.spikes_periodic +
-      ' spikes marching ~' + floatRepr(w.interval_s) + 's apart (worst ' + w.spikes + ' spikes at ' + mm(w.start_s) + '–' + mm(w.end_s) + ' min, ' +
-      floatRepr(w.spike_ms) + ' ms vs ' + floatRepr(w.base_ms) + ' ms baseline). This is the MSFS engine-overload signature — lowering TLOD/OLOD for that phase clears it.</div>';
-  } else if (ps && ps.episodes && ps.episodes.length) {
-    periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Spike pattern: mostly one-off (' + ps.spikes_total +
-      ' hitches); ' + ps.episodes.length + ' brief periodic run' + (ps.episodes.length !== 1 ? 's' : '') + ' too short to call engine overload.</div>';
+    const w = psWorst, mm = s => Math.round(s / 60);
+    periodicTxt = '<div style="font-size:11.5px;color:var(--bad);margin-top:9px;line-height:1.55">&#9889; Periodic stutter — ' +
+      (psPct != null ? floatRepr(psPct) + '% of this flight' : ps.spikes_periodic + ' spikes') +
+      ' (' + Math.round(psInEp) + ' s across ' + ps.episodes.length + ' episode' + (ps.episodes.length !== 1 ? 's' : '') +
+      ', marching ~' + floatRepr(w.interval_s) + 's apart; worst run ' + w.spikes + ' spikes over ' + Math.round(psWorstS) + ' s at ' +
+      mm(w.start_s) + '–' + mm(w.end_s) + ' min, ' + floatRepr(w.spike_ms) + ' ms vs ' + floatRepr(w.base_ms) +
+      ' ms baseline). This is the MSFS engine-overload signature — lowering TLOD/OLOD for that phase clears it.</div>';
+  } else if (psWorst) {
+    const w = psWorst;
+    periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Periodic stutter: <b>brief</b> — ' +
+      ps.episodes.length + ' short episode' + (ps.episodes.length !== 1 ? 's' : '') + ' at ~' + floatRepr(w.interval_s) + 's cadence, ' +
+      Math.round(psInEp) + ' s total' + (psPct != null ? ' (' + floatRepr(psPct) + '% of the flight)' : '') +
+      '. Real, but far too little to act on — the other ' + Math.max(ps.spikes_total - ps.spikes_periodic, 0) + ' hitches were one-off.</div>';
   } else if (ps && ps.spikes_total >= 5) {
     periodicTxt = '<div style="font-size:11px;color:var(--text-faint);margin-top:9px;line-height:1.55">Spike pattern: aperiodic (' + ps.spikes_total +
       ' one-off hitches, no repeating cadence) — scenery streaming / main-thread work, not the TLOD-overload signature. Lowering TLOD would not have helped.</div>';
