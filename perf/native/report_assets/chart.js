@@ -9,6 +9,7 @@
     var unit='ms';
     var scaleMode='100';
     var rawT=CHART.ft.map(function(p){return {x:p[0],t:p[1]};});
+    var rawTasXY=rawT.map(function(p){return {x:p.x,y:p.t};});   // true (uncapped) frametime for the hover readout
     var dataMax=0,xmin=rawT[0].x,xmax=rawT[rawT.length-1].x;
     rawT.forEach(function(p){if(p.t>dataMax)dataMax=p.t;});
     var curCeil=100;
@@ -70,36 +71,66 @@
       var A=arr[Math.max(0,lo-1)],B=arr[lo];
       return (Math.abs(A.x-xv)<=Math.abs(B.x-xv))?A.y:B.y;}
     function altAt(xv){return nearestAt(altData,xv);}
-    // Shared crosshair + on-line target dots. Draws when THIS chart is hovered (its tooltip) OR when
-    // the OTHER chart is hovered (ch._syncX) — so a hover on either chart marks the same instant on
-    // both (Dean 2026-07-17). markLabels = dataset labels to put a dot on. The dot sits on the real
-    // sample at that x so you can see exactly which point the readout refers to.
-    function makeCrosshair(markLabels){return {id:'xhair',afterDatasetsDraw:function(ch){
-      var xs=ch.scales.x;if(!xs)return;var a=ch.chartArea,x=ch.ctx;
-      var tt=ch.tooltip,xv=null;
-      if(tt&&tt.opacity&&tt.dataPoints&&tt.dataPoints.length)xv=tt.dataPoints[0].parsed.x;
-      else if(ch._syncX!=null)xv=ch._syncX;
-      if(xv==null)return;
-      var px=xs.getPixelForValue(xv);if(px<a.left-1||px>a.right+1)return;
+    // ── Unified hover (Dean 2026-07-17, rebuilt from scratch) ──────────────────────────────────────
+    // ONE shared inspected time (HOVER.x) drives everything: a crosshair, a coloured BULLSEYE on
+    // every line (so hovering the TLOD line marks the TLOD line, etc.), a readout box, and the SAME
+    // crosshair + bullseye at the same time on the other chart. The cursor SNAPS to the nearest
+    // frametime spike so you grab the hitch you're pointing at, not the sample beside it. Chart.js's
+    // own tooltip is turned off — this replaces it entirely, so both charts behave identically.
+    var HOVER={x:null};
+    var ringCol=function(){return css('--panel','#242427');};
+    function bullseye(x,px,py,col){                       // outer bg ring + coloured ring + filled centre
+      x.beginPath();x.arc(px,py,6.5,0,Math.PI*2);x.fillStyle=ringCol();x.fill();
+      x.lineWidth=2.2;x.strokeStyle=col;x.stroke();
+      x.beginPath();x.arc(px,py,2.7,0,Math.PI*2);x.fillStyle=col;x.fill();}
+    function markSeries(ch){                              // which lines to bullseye on this chart
+      var out=[],ds=ch.data.datasets;
+      function add(label,axis,colf){var d=ds.find(function(z){return z.label===label;});
+        if(d&&d.data&&d.data.length&&ch.scales[axis])out.push({data:d.data,axis:axis,color:colf});}
+      if(ch===chart){
+        add(unit==='fps'?'Avg FPS':'Frametime','yMs',function(){return colors().line;});
+        add(unit==='fps'?'Avg FPS':'Moving average','yMs',function(){return colors().amber;});
+        add('TLOD','yTlod',function(){return colors().target;});
+        add('Altitude','yAlt',function(){return colors().faint;});
+      } else { add('Moving average','y',function(){return colors().amber;}); }
+      return out;}
+    var xhairPlugin={id:'xhair',afterDatasetsDraw:function(ch){
+      if(HOVER.x==null)return;var xs=ch.scales.x;if(!xs)return;var a=ch.chartArea,x=ch.ctx;
+      var px=xs.getPixelForValue(HOVER.x);if(px<a.left-1||px>a.right+1)return;
       x.save();
-      x.strokeStyle=colors().faint;x.setLineDash([3,3]);x.lineWidth=1;x.globalAlpha=0.85;
+      x.strokeStyle=colors().text;x.setLineDash([4,3]);x.lineWidth=1;x.globalAlpha=0.5;
       x.beginPath();x.moveTo(px,a.top);x.lineTo(px,a.bottom);x.stroke();
       x.setLineDash([]);x.globalAlpha=1;
-      var ring=css('--panel','#242427');
-      markLabels.forEach(function(m){
-        var di=ch.data.datasets.findIndex(function(d){return d.label===m.label;});if(di<0)return;
-        var data=ch.data.datasets[di].data;var idx=nearIdxX(data,xv);if(idx<0)return;
-        var meta=ch.getDatasetMeta(di),el=meta.data[idx];if(!el)return;
-        if(el.y<a.top-3||el.y>a.bottom+3)return;
-        x.beginPath();x.arc(el.x,el.y,4.5,0,Math.PI*2);
-        x.fillStyle=m.color?m.color():colors().line;x.fill();
-        x.lineWidth=2;x.strokeStyle=ring;x.stroke();});
-      x.restore();}};}
-    var crosshair=makeCrosshair([
-      {label:'Frametime',color:function(){return colors().line;}},
-      {label:'Moving average',color:function(){return colors().amber;}}]);
+      markSeries(ch).forEach(function(m){var v=nearestAt(m.data,HOVER.x);if(v==null)return;
+        var py=ch.scales[m.axis].getPixelForValue(v);if(py<a.top-5||py>a.bottom+5)return;
+        bullseye(x,px,py,m.color());});
+      x.restore();}};
+    // readout box (over-flight chart only) — every line's value at the inspected time, colour-keyed.
+    var readoutPlugin={id:'readout',afterDraw:function(ch){
+      if(HOVER.x==null)return;var xs=ch.scales.x;if(!xs)return;var a=ch.chartArea,x=ch.ctx;
+      var px=xs.getPixelForValue(HOVER.x);if(px<a.left||px>a.right)return;
+      var rows=[{t:HOVER.x.toFixed(1)+' min into flight',bold:true,col:colors().text}];
+      var ftv=nearestAt(rawTasXY,HOVER.x);
+      if(unit==='fps'){ if(ftv!=null)rows.push({t:'FPS   '+(ftv?Math.round(1000/ftv):0),col:colors().line}); }
+      else { if(ftv!=null)rows.push({t:'Frametime   '+ftv.toFixed(1)+' ms',col:colors().line});
+        var mv=nearestAt(mavgData,HOVER.x); if(mv!=null)rows.push({t:'Moving avg   '+mv.toFixed(1)+' ms',col:colors().amber}); }
+      var tl=nearestAt(tlodData,HOVER.x); if(tl!=null)rows.push({t:'TLOD (AutoFPS)   '+Math.round(tl),col:colors().target});
+      var al=altAt(HOVER.x); if(al!=null)rows.push({t:'Altitude   '+Math.round(al).toLocaleString()+' ft',col:colors().faint});
+      var tf=nearestAt(trafData,HOVER.x); if(tf!=null)rows.push({t:'VATSIM ≤40nm   '+Math.round(tf),col:colors().bad});
+      x.save();x.font='12px sans-serif';var w=0;
+      rows.forEach(function(r){x.font=(r.bold?'bold ':'')+'12px sans-serif';w=Math.max(w,x.measureText(r.t).width);});
+      var padX=11,padY=8,lh=16.5,bw=w+padX*2,bh=rows.length*lh+padY*2;
+      var bx=px+16;if(bx+bw>a.right)bx=px-16-bw;if(bx<a.left+2)bx=a.left+2;
+      var by=a.top+8;
+      x.fillStyle='rgba(10,10,12,0.93)';x.strokeStyle=colors().grid;x.lineWidth=1;
+      if(x.roundRect){x.beginPath();x.roundRect(bx,by,bw,bh,6);x.fill();x.stroke();}
+      else{x.fillRect(bx,by,bw,bh);x.strokeRect(bx,by,bw,bh);}
+      x.textAlign='left';
+      rows.forEach(function(r,i){x.font=(r.bold?'bold ':'')+'12px sans-serif';x.fillStyle=r.col;
+        x.fillText(r.t,bx+padX,by+padY+i*lh+11);});
+      x.restore();}};
     var chart=new Chart(document.getElementById('ftChart'),{
-      type:'line',data:{datasets:datasets},plugins:[refLines,overCaret,crosshair],
+      type:'line',data:{datasets:datasets},plugins:[refLines,overCaret,xhairPlugin,readoutPlugin],
       options:{responsive:true,maintainAspectRatio:false,animation:false,
         parsing:false,normalized:true,interaction:{mode:'index',axis:'x',intersect:false},
         scales:{
@@ -122,23 +153,7 @@
             grid:{drawOnChartArea:false}}},
         plugins:{legend:{display:false},
           decimation:{enabled:true,algorithm:'lttb',samples:1500},
-          tooltip:{mode:'index',intersect:false,
-            filter:function(it){var l=it.dataset.label;return l!=='Altitude'&&l!=='TLOD'&&l!=='Traffic';},
-            callbacks:{
-            title:function(it){return it[0].parsed.x.toFixed(1)+' min into flight';},
-            label:function(it){
-              if(unit==='ms'){var t=(it.raw&&it.raw.t!=null)?it.raw.t:it.parsed.y;
-                return it.dataset.label+': '+t.toFixed(1)+' ms';}
-              return it.dataset.label+': '+it.parsed.y.toFixed(1)+' fps';},
-            afterBody:function(items){if(!items.length)return;
-              var xv=items[0].parsed.x,out=[];
-              var alt=altAt(xv);
-              if(alt!=null)out.push('Altitude: '+Math.round(alt).toLocaleString()+' ft');
-              var tl=nearestAt(tlodData,xv);
-              if(tl!=null)out.push('TLOD (AutoFPS): '+Math.round(tl));
-              var tf=nearestAt(trafData,xv);
-              if(tf!=null)out.push('VATSIM traffic ≤40nm: '+Math.round(tf));
-              return out.length?out:undefined;}}},
+          tooltip:{enabled:false},   // replaced by the unified hover (xhairPlugin + readoutPlugin) above
           zoom:{zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'},
             pan:{enabled:true,mode:'x'},limits:{x:{min:'original',max:'original'}}}}}});
     function bucketsAbove(ceil){var n=0;rawT.forEach(function(p){if(p.t>ceil)n++;});return n;}
@@ -204,11 +219,10 @@
         var l2=tgt+' ms target',w2=x.measureText(l2).width,lx=a.right-w2-9;   // right edge, out of the way
         x.fillStyle='rgba(15,15,17,0.72)';x.fillRect(lx-1,y+2,w2+9,16);
         x.fillStyle=colors().target;x.fillText(l2,lx+3,y+14);x.restore();}};
-      var avgXhair=makeCrosshair([{label:'Moving average',color:function(){return colors().amber;}}]);
       return new Chart(el,{type:'line',
         data:{datasets:[{label:'Moving average',data:SM,borderColor:colors().amber,
           borderWidth:2,pointRadius:0,fill:false,tension:0.45,cubicInterpolationMode:'monotone'}]},
-        plugins:[tgtLine,avgXhair],
+        plugins:[tgtLine,xhairPlugin],
         options:{responsive:true,maintainAspectRatio:false,animation:false,
           parsing:false,normalized:true,interaction:{mode:'nearest',axis:'x',intersect:false},
           scales:{
@@ -220,22 +234,25 @@
               grid:{color:colors().grid},ticks:{color:colors().faint}}},
           plugins:{legend:{display:false},
             decimation:{enabled:true,algorithm:'lttb',samples:800},
-            tooltip:{callbacks:{
-              title:function(it){return it[0].parsed.x.toFixed(1)+' min';},
-              label:function(it){return 'Avg: '+it.parsed.y.toFixed(1)+' ms';}}}}}});
+            tooltip:{enabled:false}}}});   // unified hover (xhairPlugin) draws the crosshair + dot
     })();
-    // Synced hover (Dean 2026-07-17): hovering EITHER chart marks the same instant on BOTH. On
-    // mousemove over one, translate the cursor to a flight-minute and store it as _syncX on the other
-    // so its crosshair plugin draws a matching line + on-line dot. Cleared on mouseleave. Cheap: two
-    // charts, animation off — a draw() per move is sub-ms.
-    (function(){var linked=[chart,avgChart].filter(Boolean);if(linked.length<2)return;
+    // Unified hover wiring (Dean 2026-07-17, rebuilt). Mousemove over EITHER chart sets the shared
+    // HOVER.x and redraws BOTH, so the crosshair + bullseyes line up on the same instant everywhere.
+    // Over the frametime chart the cursor SNAPS to the tallest frametime within a few pixels, so you
+    // grab the spike you're pointing at instead of the sample beside it.
+    (function(){var linked=[chart,avgChart].filter(Boolean);if(!linked.length)return;
+      var raf=0;var RAF=window.requestAnimationFrame||function(f){return setTimeout(f,16);};
+      function redraw(){if(raf)return;raf=RAF(function(){raf=0;linked.forEach(function(c){c.draw();});});}
+      function snapX(src,px){var xs=src.scales.x,xv=xs.getValueForPixel(px);
+        if(src===chart&&rawT.length){var win=7,
+          i0=nearIdxX(rawT,xs.getValueForPixel(px-win)),i1=nearIdxX(rawT,xs.getValueForPixel(px+win)),
+          best=null,bt=-1;for(var i=Math.max(0,i0);i<=i1&&i<rawT.length;i++){if(rawT[i].t>bt){bt=rawT[i].t;best=rawT[i].x;}}
+          if(best!=null)xv=best;}
+        return xv;}
       linked.forEach(function(src){
         src.canvas.addEventListener('mousemove',function(ev){
-          var xs=src.scales.x;if(!xs)return;
-          var r=src.canvas.getBoundingClientRect(),xv=xs.getValueForPixel(ev.clientX-r.left);
-          linked.forEach(function(o){if(o===src)return;if(o._syncX!==xv){o._syncX=xv;o.draw();}});});
-        src.canvas.addEventListener('mouseleave',function(){
-          linked.forEach(function(o){if(o===src)return;if(o._syncX!=null){o._syncX=null;o.draw();}});});});})();
+          var r=src.canvas.getBoundingClientRect();HOVER.x=snapX(src,ev.clientX-r.left);redraw();});
+        src.canvas.addEventListener('mouseleave',function(){if(HOVER.x!=null){HOVER.x=null;redraw();}});});})();
     window.setChartUnit=function(u){unit=u;
       var tr=chart.data.datasets.find(function(d){return d.label==='Frametime';});
       var ov=chart.data.datasets[chart.data.datasets.length-1];

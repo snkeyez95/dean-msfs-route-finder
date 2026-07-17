@@ -10,13 +10,15 @@ const T = X.runner('report chart script:');
 
 const chartSrc = fs.readFileSync(path.join(X.ROOT, 'perf', 'native', 'report_assets', 'chart.js'), 'utf8');
 
-// ── structural markers (the v6.13.5 changes) ──
-T('shared crosshair factory present', /function makeCrosshair/.test(chartSrc));
-T('synced-hover wiring (_syncX + mousemove)', /_syncX/.test(chartSrc) && /addEventListener\('mousemove'/.test(chartSrc));
-T('reference lines draw before the tooltip (afterDatasetsDraw)', /refLines=\{id:'tgt',afterDatasetsDraw/.test(chartSrc));
-T('reference labels moved to the right edge', /a\.right-tw-9/.test(chartSrc));
-T('avg chart gets a crosshair too', /avgXhair/.test(chartSrc));
-T('on-line dot marker (arc + panel ring)', /x\.arc\(el\.x,el\.y/.test(chartSrc));
+// ── structural markers (the v6.13.6 unified hover) ──
+T('shared inspected-time state (HOVER.x)', /var HOVER=\{x:null\}/.test(chartSrc));
+T('bullseye marker (outer ring + coloured ring + centre)', /function bullseye/.test(chartSrc));
+T('per-line markers incl. TLOD + Altitude', /add\('TLOD','yTlod'/.test(chartSrc) && /add\('Altitude','yAlt'/.test(chartSrc));
+T('unified crosshair + readout plugins', /xhairPlugin/.test(chartSrc) && /readoutPlugin/.test(chartSrc));
+T('native Chart tooltip disabled (replaced)', /tooltip:\{enabled:false\}/.test(chartSrc));
+T('spike-snapping in the hover wiring', /function snapX/.test(chartSrc));
+T('hover redraws BOTH charts (rAF-coalesced)', /function redraw\(\)\{if\(raf\)return;/.test(chartSrc) && /linked\.forEach\(function\(c\)\{c\.draw\(\)\;\}\)/.test(chartSrc));
+T('reference labels at the right edge, before the tooltip', /a\.right-tw-9/.test(chartSrc) && /refLines=\{id:'tgt',afterDatasetsDraw/.test(chartSrc));
 
 // ── mock-execute: build both charts + fire the hover handlers ──
 const listeners = {};
