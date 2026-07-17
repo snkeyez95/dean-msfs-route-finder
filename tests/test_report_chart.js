@@ -17,6 +17,8 @@ T('per-line markers incl. TLOD + Altitude', /add\('TLOD','yTlod'/.test(chartSrc)
 T('unified crosshair + readout plugins', /xhairPlugin/.test(chartSrc) && /readoutPlugin/.test(chartSrc));
 T('native Chart tooltip disabled (replaced)', /tooltip:\{enabled:false\}/.test(chartSrc));
 T('spike-snapping in the hover wiring', /function snapX/.test(chartSrc));
+T('snap gated on a genuine spike (>=33ms + 1.4x local)', /bt>=33&&bt>cur\*1\.4/.test(chartSrc));
+T('snap gated on vertical cursor proximity (reads TLOD/alt continuously)', /Math\.abs\(spY-py\)<=45/.test(chartSrc));
 T('hover redraws BOTH charts (rAF-coalesced)', /function redraw\(\)\{if\(raf\)return;/.test(chartSrc) && /linked\.forEach\(function\(c\)\{c\.draw\(\)\;\}\)/.test(chartSrc));
 T('reference labels at the right edge, before the tooltip', /a\.right-tw-9/.test(chartSrc) && /refLines=\{id:'tgt',afterDatasetsDraw/.test(chartSrc));
 

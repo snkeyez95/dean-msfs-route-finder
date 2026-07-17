@@ -245,16 +245,21 @@
     (function(){var linked=[chart,avgChart].filter(Boolean);if(!linked.length)return;
       var raf=0;var RAF=window.requestAnimationFrame||function(f){return setTimeout(f,16);};
       function redraw(){if(raf)return;raf=RAF(function(){raf=0;linked.forEach(function(c){c.draw();});});}
-      function snapX(src,px){var xs=src.scales.x,xv=xs.getValueForPixel(px);
+      function snapX(src,px,py){var xs=src.scales.x,xv=xs.getValueForPixel(px);
         if(src===chart&&rawT.length){var win=6,
           i0=nearIdxX(rawT,xs.getValueForPixel(px-win)),i1=nearIdxX(rawT,xs.getValueForPixel(px+win)),
           best=null,bt=-1;for(var i=Math.max(0,i0);i<=i1&&i<rawT.length;i++){if(rawT[i].t>bt){bt=rawT[i].t;best=rawT[i].x;}}
           var cur=nearestAt(rawTasXY,xv)||0;
-          if(best!=null&&bt>=33&&bt>cur*1.4)xv=best;}   // snap only to a real spike, else stay continuous
+          if(best!=null&&bt>=33&&bt>cur*1.4){
+            // Snap ONLY when the cursor is near the spike VERTICALLY too. Up on the TLOD / altitude
+            // lines the nearest frametime spike is far below the cursor, so it tracks continuously —
+            // letting you read every ~10 s TLOD step instead of getting yanked down (Dean 2026-07-18).
+            var yMs=chart.scales.yMs,spY=yMs.getPixelForValue(Math.min(bt,curCeil));
+            if(py==null||Math.abs(spY-py)<=45)xv=best;}}
         return xv;}
       linked.forEach(function(src){
         src.canvas.addEventListener('mousemove',function(ev){
-          var r=src.canvas.getBoundingClientRect();HOVER.x=snapX(src,ev.clientX-r.left);redraw();});
+          var r=src.canvas.getBoundingClientRect();HOVER.x=snapX(src,ev.clientX-r.left,ev.clientY-r.top);redraw();});
         src.canvas.addEventListener('mouseleave',function(){if(HOVER.x!=null){HOVER.x=null;redraw();}});});})();
     window.setChartUnit=function(u){unit=u;
       var tr=chart.data.datasets.find(function(d){return d.label==='Frametime';});

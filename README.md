@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.7
+# A Better Route Planner — v6.13.8
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.8  HOVER: READ THE TLOD STEPS. The spike-snap now also checks where your cursor is VERTICALLY. Down among the frametime spikes it still snaps to grab a hitch; but up on the TLOD or altitude lines the nearest frametime spike is far below the cursor, so it tracks continuously — letting you step through every ~10-second TLOD change instead of getting yanked down to a frametime spike. Reports regenerate once on next launch.
+
 v6.13.7  HOVER TRACKS FINER. The chart hover snapped to the nearest spike everywhere, so fine mouse moves hopped between spikes (~0.8 min jumps) even on smooth stretches. It now snaps ONLY when there is a genuine hitch to grab (a nearby frametime >=33 ms and clearly taller than where the cursor sits); on smooth stretches the readout follows the cursor continuously. Reports regenerate once on next launch.
 
 v6.13.6  FLIGHT REPORT HOVER, REBUILT. The chart hover was rebuilt from scratch. Move the mouse over either frametime chart and you get: a bright crosshair at that instant, a coloured BULLSEYE sitting on EACH line (blue = frametime, amber = moving average, green = TLOD, grey = altitude) so you can read every line at once, the same crosshair + dot at the same time on the other chart, and a readout box listing every value. The cursor SNAPS to the tallest frametime within a few pixels, so you actually grab the spike you are pointing at instead of the sample next to it. Chart.js’s built-in tooltip is replaced entirely, so both charts behave identically. All reports regenerate once on next launch.
