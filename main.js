@@ -1812,6 +1812,88 @@ function nvcpBackupDir(){ return path.join(USER_DATA, 'nvidia_settings_backup');
 function nvcpTs(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes()); }
 function nvcpErr(e){ return (e && (e.code==='EPERM'||e.code==='EACCES')) ? 'Access denied — this needs ABRP running as Administrator.' : (e && e.message) || 'unknown error'; }
 
+// ── DATA BACKUP & RESTORE (v6.13.0) ─────────────────────────────────────────
+// Your flight logs, settings and route database are the only ABRP data GitHub can't hold — they
+// existed in exactly one place until now. Logic lives in lib/data_backup.js, shared with
+// tools/backup-data.js so the app and the CLI can never disagree.
+const _dataBackup = require('./lib/data_backup.js');
+function _backupCfg(){
+  try {
+    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+    return (c && c.backup) || {};
+  } catch(_){ return {}; }
+}
+function _backupDest(){ const b = _backupCfg(); return (b.dest && String(b.dest).trim()) || _dataBackup.DEFAULT_DEST; }
+// Record the outcome so the UI can show "last backed up ..." — and so a FAILING backup is visible
+// instead of silently doing nothing for months.
+function _backupRemember(res){
+  try {
+    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+    c.backup = Object.assign({}, c.backup, {
+      dest: _backupDest(), lastRun: Date.now(), lastOk: !!res.ok,
+      lastError: res.ok ? null : ((res.error || (res.errors || []).join('; ') || 'unknown').slice(0, 300)),
+      lastBytes: res.bytes || 0, lastFlights: res.flights || 0
+    });
+    writeFileAtomic(CFG, JSON.stringify(c, null, 2));
+  } catch(_){}
+}
+ipcMain.handle('data-backup-status', () => {
+  try {
+    const st = _dataBackup.backupStatus(USER_DATA, _backupDest());
+    return Object.assign({ ok:true }, st, _backupCfg());
+  } catch(e){ return { ok:false, error:e.message }; }
+});
+ipcMain.handle('data-backup-run', () => {
+  try {
+    // A capture writes into Sessions as it files; copying mid-write would grab a half-written flight.
+    // (Harmless — the next run fixes it — but better to just wait.)
+    if (isCaptureRunning()) return { ok:false, error:'A capture is armed or recording — back up once the flight has filed.' };
+    const res = _dataBackup.backupData(USER_DATA, _backupDest(), m => LOG.info('[BACKUP] ' + m));
+    _backupRemember(res);
+    LOG.info('[BACKUP] ' + (res.ok ? ('ok — ' + res.human + ', ' + res.flights + ' flight days -> ' + res.dest) : ('FAILED — ' + (res.error || res.errors.join('; ')))));
+    return res;
+  } catch(e){ return { ok:false, error:e.message }; }
+});
+ipcMain.handle('data-backup-preview-restore', () => {
+  try { return _dataBackup.restoreData(USER_DATA, _backupDest(), { dryRun:true }); }
+  catch(e){ return { ok:false, error:e.message }; }
+});
+ipcMain.handle('data-backup-restore', () => {
+  try {
+    if (isCaptureRunning()) return { ok:false, error:'A capture is armed or recording — restore once the flight has filed.' };
+    const res = _dataBackup.restoreData(USER_DATA, _backupDest(), {});
+    LOG.info('[RESTORE] ' + (res.ok ? ('ok — ' + res.flights + ' flight days now present; pre-restore copy: ' + (res.safetyCopy || 'none')) : ('FAILED — ' + (res.error || res.errors.join('; ')))));
+    return res;
+  } catch(e){ return { ok:false, error:e.message }; }
+});
+ipcMain.handle('data-backup-browse', async () => {
+  try {
+    const r = await dialog.showOpenDialog(win, { title:'Choose a backup folder', properties:['openDirectory'] });
+    if (r.canceled || !r.filePaths.length) return { ok:false, canceled:true };
+    const dest = r.filePaths[0];
+    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+    c.backup = Object.assign({}, c.backup, { dest });
+    writeFileAtomic(CFG, JSON.stringify(c, null, 2));
+    return { ok:true, dest };
+  } catch(e){ return { ok:false, error:e.message }; }
+});
+ipcMain.handle('data-backup-open', () => {
+  try { const d = _backupDest(); if (!fs.existsSync(d)) return { ok:false, error:'folder not found — is the drive connected?' };
+        shell.openPath(d); return { ok:true }; }
+  catch(e){ return { ok:false, error:e.message }; }
+});
+// Set the auto-after-flight flag with a read-modify-write on disk. Its own IPC (not save-config)
+// because save-config shallow-merges cfg.backup and would wipe the lastRun/lastOk fields
+// _backupRemember writes here.
+ipcMain.handle('data-backup-set-auto', (_, on) => {
+  try {
+    const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
+    c.backup = Object.assign({}, c.backup, { auto: !!on });
+    writeFileAtomic(CFG, JSON.stringify(c, null, 2));
+    return { ok:true };
+  } catch(e){ return { ok:false, error:e.message }; }
+});
+
 ipcMain.handle('nvcp-status', () => {
   try {
     const f0 = path.join(nvcpBackupDir(), 'nvdrsdb0.bin');

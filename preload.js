@@ -56,6 +56,13 @@ contextBridge.exposeInMainWorld('api', {
   perfLabReport:      ()    => ipcRenderer.invoke('perf-lab-report'),
   perfLabApply:       (a)   => ipcRenderer.invoke('perf-lab-apply', a||{}),
   perfArchiveRaw:     ()    => ipcRenderer.invoke('perf-archive-raw'),
+  dataBackupStatus:   ()    => ipcRenderer.invoke('data-backup-status'),   // v6.13.0: flight-log + settings backup
+  dataBackupRun:      ()    => ipcRenderer.invoke('data-backup-run'),
+  dataBackupPreview:  ()    => ipcRenderer.invoke('data-backup-preview-restore'),
+  dataBackupRestore:  ()    => ipcRenderer.invoke('data-backup-restore'),
+  dataBackupBrowse:   ()    => ipcRenderer.invoke('data-backup-browse'),
+  dataBackupOpen:     ()    => ipcRenderer.invoke('data-backup-open'),
+  dataBackupSetAuto:  (on)  => ipcRenderer.invoke('data-backup-set-auto', on),
   nvcpStatus:         ()    => ipcRenderer.invoke('nvcp-status'),
   nvcpBackup:         ()    => ipcRenderer.invoke('nvcp-backup'),
   nvcpRestore:        ()    => ipcRenderer.invoke('nvcp-restore'),

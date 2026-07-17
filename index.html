@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.12.9</div>
+  <div class="tname">A Better Route Planner &mdash; v6.13.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.12.9</div>
+    <div class="sb-ver">v6.13.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -821,7 +821,20 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <!-- ── TAB: MAINTENANCE ── -->
 <div class="pane" id="pane-maintenance"><div class="scroll">
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">MSFS Maintenance</div>
-  <div style="font-size:12px;color:var(--ink3);font-family:'Inter',sans-serif;margin-bottom:20px">Cache cleaners, NVIDIA settings backup, ABRP setup backup, and flight-log storage.</div>
+  <div style="font-size:12px;color:var(--ink3);font-family:'Inter',sans-serif;margin-bottom:20px">Flight-log backup, cache cleaners, NVIDIA settings backup, and flight-log storage.</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">&#128190; Backup &amp; Restore</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Your flight logs, settings and route database are the one thing GitHub can&rsquo;t hold &mdash; they live in a single place on your C: drive. This copies them to another drive, automatically after each flight. <b>Restore</b> brings everything back on a fresh install. Your live data is only ever read; the backup is additive &mdash; nothing is ever deleted.</div>
+    <div id="backup-status" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-bottom:10px;line-height:1.7">Loading&hellip;</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn bp bsm" id="backup-run-btn" onclick="backupRunUi()">&#128190; Back up now</button>
+      <button class="btn bg bsm" onclick="backupRestoreUi()">&#8630; Restore from backup&hellip;</button>
+      <button class="btn bg bsm" onclick="backupBrowseUi()">Change folder&hellip;</button>
+      <button class="btn bg bsm" onclick="window.api.dataBackupOpen()">Open folder</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);cursor:pointer;margin-left:auto"><input type="checkbox" id="backup-auto" onchange="backupSetAuto(this.checked)" style="accent-color:var(--acc);width:15px;height:15px"> Auto after each flight</label>
+    </div>
+    <div id="backup-result" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-top:8px;line-height:1.6"></div>
+  </div>
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-t">ABRP Setup Backup</div>
     <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Export everything that defines this install &mdash; all settings + your route registry + the 20,000-route snapshot &mdash; as one .zip. Import restores it on a fresh install or new PC (your current setup is backed up first, automatically). Flight logs are separate; archive them below.</div>
@@ -1453,7 +1466,7 @@ function sw(t){
   if(t==='companions')renderCompanionsPane();
   if(t==='perf')renderPerfPane();
   if(t==='settings'){renderFlightApps();enhanceSettingsSections();renderVatsimSettings();}
-  if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();}
+  if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();renderBackupPanel();}
   if(t==='liveatc')renderLiveAtc();
 }
 
@@ -5019,6 +5032,25 @@ async function updateCaptureBadge(){
   // in-sim overlay confirmation when recording begins (independent of VATSIM Live mode)
   const nowRec=active&&s&&s.state==='recording';
   if(nowRec && LATC._capWasRec===false) latcOverlayToast('loggingStarted','Performance capture recording','logging this flight');
+  // v6.13.0 — AUTO-BACKUP: recording just STOPPED, so a flight has (almost) finished filing. The
+  // flight most likely to be lost is the one you just flew, and it exists in exactly one place until
+  // this runs. Wait 20s for the engine to write summary/report/sidecars, then copy. Incremental, so
+  // only the new flight moves (~1s). If the app is closed before it fires, the next flight or the
+  // manual button catches up — the backup is additive, nothing is ever missed permanently.
+  if(!nowRec && LATC._capWasRec===true && !LATC._backupQueued){
+    LATC._backupQueued=true;
+    setTimeout(async()=>{
+      try{
+        const st=await window.api.dataBackupStatus();
+        if(st && st.auto===false){ LATC._backupQueued=false; return; }   // user turned it off
+        const r=await window.api.dataBackupRun();
+        if(r && r.ok) RLOG('[Backup] flight backed up — '+r.human+' at '+r.dest);
+        else RLOG('[Backup] auto-backup failed: '+((r&&(r.error||(r.errors||[]).join('; ')))||'unknown'));
+        if(document.getElementById('backup-status')) renderBackupPanel();
+      }catch(e){ RLOG('[Backup] auto-backup error '+((e&&e.message)||e)); }
+      LATC._backupQueued=false;
+    }, 20000);
+  }
   if(typeof LATC!=='undefined') LATC._capWasRec=nowRec;
 }
 
@@ -5394,6 +5426,84 @@ function openMaintenance(){
 }
 // ── NVIDIA Control Panel backup/restore ──────────────────────────────────────
 // ── SETUP BACKUP + FLIGHT-LOG STORAGE (Maintenance tab) ─────────────────────
+// ── Backup & Restore (v6.13.0) ──────────────────────────────────────────────
+function _bkAgo(ts){
+  if(!ts) return 'never';
+  const m=Math.round((Date.now()-ts)/60000);
+  if(m<1) return 'just now'; if(m<60) return m+' min ago';
+  const h=Math.round(m/60); if(h<24) return h+' hr'+(h>1?'s':'')+' ago';
+  const d=Math.round(h/24); return d+' day'+(d>1?'s':'')+' ago';
+}
+async function renderBackupPanel(){
+  const el=document.getElementById('backup-status'); if(!el)return;
+  let s; try{ s=await window.api.dataBackupStatus(); }catch(e){ s=null; }
+  if(!s||!s.ok){ el.innerHTML='<span style="color:var(--red)">Couldn’t read backup status'+(s&&s.error?': '+esc(s.error):'')+'</span>'; return; }
+  const auto=document.getElementById('backup-auto'); if(auto) auto.checked=(s.auto!==false);
+  const dest=esc(s.dest||'');
+  let line;
+  if(!s.reachable){
+    line='<span style="color:var(--amber)">⚠ Backup drive not found</span> &mdash; <span style="color:var(--ink3)">'+dest+'</span><br><span style="font-size:11px;color:var(--ink3)">Connect the drive (or pick another folder) and press Back up now.</span>';
+  } else {
+    const behind=s.behind>0;
+    const lastLine = s.lastRun
+      ? ((s.lastOk===false?'<span style="color:var(--red)">last backup FAILED</span> '+ (s.lastError?('<span style="font-size:11px;color:var(--ink3)">('+esc(s.lastError)+')</span>'):'') :'Last backed up <b>'+_bkAgo(s.lastRun)+'</b>'))
+      : 'Not backed up yet';
+    line = lastLine
+      + ' &middot; <b>'+s.backedUpFlights+'</b> flight day'+(s.backedUpFlights===1?'':'s')+' &middot; '+esc(s.humanBackedUp)
+      + '<br><span style="font-size:11px;color:'+(behind?'var(--amber)':'var(--ink3)')+'">'
+      + (behind?('↳ '+s.behind+' new file'+(s.behind>1?'s':'')+' not yet copied — press Back up now'):('↳ up to date with your '+s.liveFlights+' flight day'+(s.liveFlights===1?'':'s')))
+      + '</span><br><span style="font-size:11px;color:var(--ink4)">'+dest+'</span>';
+  }
+  el.innerHTML=line;
+}
+async function backupRunUi(){
+  const btn=document.getElementById('backup-run-btn'), res=document.getElementById('backup-result');
+  if(btn){ btn.disabled=true; btn.textContent='Backing up…'; }
+  if(res) res.textContent='';
+  let r; try{ r=await window.api.dataBackupRun(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(btn){ btn.disabled=false; btn.innerHTML='&#128190; Back up now'; }
+  if(res) res.innerHTML = r&&r.ok
+    ? ('<span style="color:var(--grn)">✓ '+(r.changed?'Backed up':'Already up to date')+' — '+esc(r.human)+', '+r.flights+' flight day'+(r.flights===1?'':'s')+' ('+r.seconds+'s)</span>')
+    : ('<span style="color:var(--red)">Backup failed: '+esc((r&&(r.error||(r.errors||[]).join('; ')))||'unknown')+'</span>');
+  renderBackupPanel();
+}
+async function backupRestoreUi(){
+  if((typeof _arRunning!=='undefined'&&_arRunning)){ alert('A route refresh is running — let it finish, then restore.'); return; }
+  const res=document.getElementById('backup-result');
+  let p; try{ p=await window.api.dataBackupPreview(); }catch(e){ p={ok:false,error:(e&&e.message)||'error'}; }
+  if(!p||!p.ok){ if(res)res.innerHTML='<span style="color:var(--red)">Can’t restore: '+esc((p&&p.error)||'unknown')+'</span>'; return; }
+  const v=p.preview;
+  if(v.addFiles===0 && v.overwriteFiles===0 && v.settingsOverwritten.length===0){
+    alert('Nothing to restore — your data already matches the backup.'); return;
+  }
+  const msg='Restore from backup?\n\n'
+    +'This will:\n'
+    +'  • add '+v.addFiles+' file(s) not currently here ('+v.humanAdd+')\n'
+    +'  • overwrite '+v.overwriteFiles+' flight file(s) that differ\n'
+    +(v.settingsOverwritten.length?('  • replace these settings files: '+v.settingsOverwritten.join(', ')+'\n'):'')
+    +'\nBackup has '+v.flightsInBackup+' flight day(s); you currently have '+v.flightsLive+'.\n\n'
+    +'Your current settings are saved to a timestamped copy first, so this is reversible. '
+    +'No flight is ever deleted.\n\nProceed?';
+  if(!confirm(msg)) return;
+  if(res) res.textContent='Restoring…';
+  let r; try{ r=await window.api.dataBackupRestore(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.ok){
+    alert('Restore complete — '+r.flights+' flight day(s) now present.'
+      +(r.safetyCopy?('\n\nYour previous settings were saved to:\n'+r.safetyCopy):'')
+      +'\n\nABRP will reload.');
+    location.reload();
+  } else if(res) res.innerHTML='<span style="color:var(--red)">Restore failed: '+esc((r&&(r.error||(r.errors||[]).join('; ')))||'unknown')+'</span>';
+}
+async function backupBrowseUi(){
+  let r; try{ r=await window.api.dataBackupBrowse(); }catch(e){ r=null; }
+  if(r&&r.canceled) return;
+  if(r&&r.ok) renderBackupPanel();
+}
+async function backupSetAuto(on){
+  // Dedicated IPC (not saveConfig): saveConfig shallow-merges cfg.backup and would wipe the
+  // lastRun/lastOk fields main.js records after each backup.
+  try{ if(!S.cfg.backup)S.cfg.backup={}; S.cfg.backup.auto=!!on; await window.api.dataBackupSetAuto(!!on); }catch(e){}
+}
 async function setupExportUi(){
   const el=document.getElementById('setup-bk-result');
   let r; try{ r=await window.api.setupExport(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
@@ -7729,5 +7839,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.12.9</div>
+  pointer-events:none;">v6.13.0</div>
 </body></html>
