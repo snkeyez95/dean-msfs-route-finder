@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.12.3</div>
+  <div class="tname">A Better Route Planner &mdash; v6.12.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.12.3</div>
+    <div class="sb-ver">v6.12.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6071,6 +6071,15 @@ function parseWind(m){
 }
 
 function getRunways(icao){return RWY_HDGS[icao]||S.rwyCache[icao]||null;}
+// Runway IDs arrive in two paddings and MUST be compared canonically (Dean 2026-07-16, KMIA):
+// the runway data (RWY_HDGS + aviationweather.gov's rwyCache) zero-pads single digits ("08L"),
+// while US D-ATIS/VATSIM ATIS text never does ("DEPG RWYS 8L, 8R"). An exact === compare threw
+// every single-digit US runway away — the token was rejected as "not a real runway", the whole
+// parse came back empty, and the card silently kept the previous source's runway. Same flaw
+// silently zeroed xwind()/tailwindComp() (find by ===). Two-digit runways were never affected,
+// which is why this hid for so long. Canonical form = drop the leading zero: 08L→8L, 09→9, 12→12.
+function normRwy(id){return String(id==null?'':id).toUpperCase().trim().replace(/^0+(?=\d)/,'');}
+function sameRwy(a,b){return normRwy(a)===normRwy(b);}
 
 function bestRwy(icao,dir,spd){
   const rwys=getRunways(icao);
@@ -6086,7 +6095,7 @@ function bestRwy(icao,dir,spd){
 
 function xwind(icao,rwyId,dir,spd){
   const rwys=getRunways(icao);if(!rwys||dir==='VRB')return 0;
-  const r=rwys.find(x=>x.r===rwyId);if(!r)return 0;
+  const r=rwys.find(x=>sameRwy(x.r,rwyId));if(!r)return 0;
   const diff=((parseInt(dir)-r.h+360)%360),angle=diff>180?360-diff:diff;
   return Math.round(spd*Math.sin(angle*Math.PI/180));
 }
@@ -6095,7 +6104,7 @@ function xwind(icao,rwyId,dir,spd){
 // null when the wind is variable or we have no heading for that runway (can't judge).
 function tailwindComp(icao,rwyId,dir,spd){
   const rwys=getRunways(icao);if(!rwys||dir==='VRB')return null;
-  const r=rwys.find(x=>x.r===rwyId);if(!r)return null;
+  const r=rwys.find(x=>sameRwy(x.r,rwyId));if(!r)return null;
   const diff=((parseInt(dir)-r.h+360)%360),angle=diff>180?360-diff:diff;
   return -Math.round(spd*Math.cos(angle*Math.PI/180));
 }
@@ -6128,7 +6137,7 @@ async function fetchRwyData(icao){
 function datisValidRwy(icao,tok){
   const rwys=getRunways(icao);
   if(!rwys)return true; // no list to check against → accept
-  return rwys.some(r=>r.r===tok);
+  return rwys.some(r=>sameRwy(r.r,tok));
 }
 // Proximity classification: assign each runway token to whichever cue word
 // (arrival vs departure) sits nearest before it. Robust for combined ATIS where
@@ -6162,7 +6171,7 @@ function extractRunways(text,icao,direction){
   if(out.length===0){
     const ownHas=direction==='arr'?hasArr:hasDep, oppHas=direction==='arr'?hasDep:hasArr;
     if(ownHas&&!oppHas){
-      let r;const rre=/\bRWY\s*(\d{1,2}[LRC]?)/g;
+      let r;const rre=/\bRWYS?\s*(\d{1,2}[LRC]?)/g;   // RWYS? — the plural ("DEPG RWYS 8L, 8R") blocked the old \bRWY\s* fallback outright
       while((r=rre.exec(t))!==null){
         const tok=r[1],n=parseInt(tok,10);
         if(/\b(TURN\s?OFF|TURNOFF|EXIT|CLSD|CLOSED)\b/.test(t.slice(r.index, r.index+34)))continue;
@@ -6338,6 +6347,18 @@ async function fetchDatis(icao,idx,side,prefix){
       rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag"'+(isVatsim?' style="color:var(--grn);border-color:var(--grn)"':'')+'>'+(isVatsim?'VATSIM':'D-ATIS')+'</span>';
     }
     rwyEl.innerHTML=rwyHtml;
+  }else if(rwyEl){
+    // NO RUNWAY FROM THIS ATIS. Never leave the field as-is: it may still be showing a DIFFERENT
+    // source's runway wearing that source's badge (Dean 2026-07-16 — an unparseable VATSIM ATIS at
+    // KMIA left the real-world D-ATIS's "RWY 12 · D-ATIS" on screen while the VATSIM text plainly
+    // said 8L/8R). Say what we actually know: the live-wind estimate, honestly labelled, or nothing.
+    const m=await fetchMetarObj(icao);
+    if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+    const w=m?parseWind(m.rawOb||''):null;
+    const best=w?bestRwy(icao,w.dir,w.spd):null;
+    rwyEl.innerHTML=(best&&best!=='Check ATIS')
+      ? 'RWY '+esc(best)+' <span class="datis-tag" title="This '+(isVatsim?'VATSIM ATIS':'D-ATIS')+' does not state an active runway — estimated from the current METAR wind. Verify on ATIS.">&#9889; est. wind</span>'
+      : 'Check ATIS';
   }
   const icon=isVatsim?'&#128251;':(isArr?'&#128757;':'&#128745;'); // 📻 VATSIM / 🛬 / 🛫
   const verb=(isVatsim?'VATSIM ':'')+(isArr?'Landing':'Departure');
@@ -7652,5 +7673,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.12.3</div>
+  pointer-events:none;">v6.12.4</div>
 </body></html>
