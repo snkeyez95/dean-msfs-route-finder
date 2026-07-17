@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.1
+# A Better Route Planner — v6.13.2
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.2  ATIS RUNWAY PARSING READS SPELLED-OUT SIDES ("24 LEFT"). A VATSIM ATIS at LEBL said "RWY IN USE FOR DEPARTURES 24 LEFT" but the card showed RWY 20 with an "est. wind" tag — the ATIS's runway was ignored. The parser only understood "24L" / "24 L", so it read a bare "24", found no such runway at LEBL (which has 24L/24R, never plain 24), and fell back to a wind estimate. It now normalizes spelled-out sides — LEFT/RIGHT/CENTER/CENTRE → L/R/C — so "24 LEFT" reads as 24L and the ATIS's runway wins, for both departures and arrivals. Also fixed a related miss: "VIS 10KM" (visibility) was being treated as a "visual approach" cue, which could steal a runway's direction — visibility values no longer count as an arrival cue, while "VIS APCH" still does. Abbreviated forms (8L, RWY25R, plural "RWYS 8L, 8R") are unchanged.
+
 v6.13.1  BACKUP SKIPS THE CAPFRAMEX EXPORTS. The Sessions\CapFrameX folder is a regenerable copy of your raw frame data in CapFrameX format (the app rebuilds it on demand) — a backup should hold originals, not rebuildable duplicates, so it is now excluded. Dropped the backup from 4.1 GB to 2.5 GB. (Dean deleted a stale 1.6 GB of these dev-era spot-check exports; this keeps a future re-export from bloating the backup again.)
 
 v6.13.0  BACKUP & RESTORE FOR YOUR FLIGHT LOGS. Your flight logs, settings and route database are the one thing GitHub can't hold — until now they lived in a single place on your C: drive, so a dead drive meant losing all of it (including the 24-flight benchmark). New panel at the top of Maintenance: it copies that data to another drive, automatically about 20 seconds after each flight files (incremental, so only the new flight moves — about a second). "Restore from backup" brings everything back on a fresh install; it shows you exactly what will change first, saves your current settings to a timestamped copy before overwriting, and never deletes a flight that isn't in the backup. Your live data is only ever read. A "Back up now" button, a folder picker, and an auto-on/off toggle round it out; the same job runs from tools\backup-data.js if the app won't start. Default backup folder: D:\Claude_ABRP_Log BU.

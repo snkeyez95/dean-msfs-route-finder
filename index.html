@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.13.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.13.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.13.1</div>
+    <div class="sb-ver">v6.13.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6252,11 +6252,22 @@ function datisValidRwy(icao,tok){
 // Proximity classification: assign each runway token to whichever cue word
 // (arrival vs departure) sits nearest before it. Robust for combined ATIS where
 // one sentence mixes both, e.g. "ARRIVALS TO RWY 34L AND DEPARTURES TO RWY 34R".
+// Normalise ATIS runway wording so the parser sees one canonical token:
+//   "RWY25R" → "RWY 25R"   and   "24 LEFT/RIGHT/CENTER/CENTRE" → "24L/24R/24C"
+// Spelled-out sides are the norm on many European VATSIM ATIS (Dean 2026-07-17, LEBL: "RWY IN USE
+// FOR DEPARTURES 24 LEFT" was read as bare "24", rejected as not a real runway [LEBL has 24L/24R,
+// never plain 24], and the card fell back to a wind estimate instead of the ATIS's 24L).
+function normAtisRwyWords(text){
+  return (text||'').toUpperCase()
+    .replace(/\bRWY(S?)(\d)/g,'RWY$1 $2')
+    .replace(/\b(\d{1,2})\s+(LEFT|RIGHT|CENT(?:ER|RE))\b/g,(m,n,w)=>n+w[0]);   // w[0]: L / R / C
+}
 function extractRunways(text,icao,direction){
-  // normalise "RWY25R" → "RWY 25R" so the runway number is a separate token
-  const t=(text||'').toUpperCase().replace(/\bRWY(S?)(\d)/g,'RWY$1 $2');
+  const t=normAtisRwyWords(text);
   const cues=[];let m;
-  const arrRe=/(LANDING|LDG|ARRIVAL|ARR|APPROACH|APCH|APP|ILS|VISUAL|VIS|RNP|RNAV|VECTOR)/g;
+  // VIS(?!\s*\d): "VIS APCH" is a visual-approach cue, but "VIS 10KM" / "VIS 9999" is VISIBILITY —
+  // matching it created a phantom arrival cue that disabled the single-direction fallback (LEBL).
+  const arrRe=/(LANDING|LDG|ARRIVAL|ARR|APPROACH|APCH|APP|ILS|VISUAL|VIS(?!\s*\d)|RNP|RNAV|VECTOR)/g;
   while((m=arrRe.exec(t))!==null)cues.push({pos:m.index,type:'arr'});
   const depRe=/(DEPARTURE|DEPARTING|DEPG|DEPS|DEP|TKOF|TAKE\s?OFF)/g;   // TAKE\s?OFF covers intl ATIS "TAKE OFF RWY 03R" (Athens etc.) + "TAKEOFF"
   while((m=depRe.exec(t))!==null)cues.push({pos:m.index,type:'dep'});
@@ -6299,7 +6310,7 @@ function extractApproach(text){
   return null;
 }
 function datisPlainBullets(text){
-  const t=(text||'').toUpperCase().replace(/\bRWY(S?)(\d)/g,'RWY$1 $2');const b=[];
+  const t=normAtisRwyWords(text);const b=[];
   // closed runways — keyword must sit right after the runway (avoids spanning into
   // unrelated "TWY … CLSD" notes in period-less text like LFPG)
   let m,re=/\bRWY\s*(\d{1,2}[LRC]?)\s+(?:CL(?:OSE|S)D|CLOSED)\b/g;
@@ -7839,5 +7850,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.13.1</div>
+  pointer-events:none;">v6.13.2</div>
 </body></html>
