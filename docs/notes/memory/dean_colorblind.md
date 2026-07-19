@@ -15,5 +15,4 @@ indistinguishable to him.
 
 **How to apply:** when adding chart lines or color-coded UI, never let hue be the only cue — pair
 color with a pattern (dashed vs solid), shape, or label. Prefer blue/yellow/magenta/teal separations
-over green-vs-red/orange/purple. Fixed in v6.13.12: VRAM line = magenta + dashed vs TLOD solid
-green. Ask Dean to confirm any new color pairing looks distinct to him.
+over green-vs-red/orange/purple. Also: Dean vetoed dashed lines (bad visual) — fix with COLOR, blue-family vs green. Gotcha found in v6.13.13: the theme var --vram is AMBER (metrics bar) — never reuse it for chart lines; the chart line uses --vram-line (blue-violet #6a7dff). Ask Dean to confirm any new color pairing looks distinct to him.
