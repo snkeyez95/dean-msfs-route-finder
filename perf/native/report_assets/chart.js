@@ -24,7 +24,9 @@
     // v6.13.11: VRAM used (MB, every flight) + busiest-core load (%, AutoFPS flights only), toggleable.
     var vramData=(CHART.vram&&CHART.vram.length)?CHART.vram.map(function(p){return {x:p[0],y:p[1]};}):null;
     var cpuData=(CHART.cpu&&CHART.cpu.length)?CHART.cpu.map(function(p){return {x:p[0],y:p[1]};}):null;
-    var vramCol=function(){return css('--vram','#b07ae6');};   // purple
+    // Colour-blind-safe pairing (Dean 2026-07-18, red-green CB: VRAM's purple read the same as TLOD's
+    // green): VRAM = bright magenta AND dashed — two cues, so the hue never has to carry it alone.
+    var vramCol=function(){return css('--vram','#e668c4');};   // magenta
     var cpuCol=function(){return css('--cpu','#2fb6a8');};     // teal
     var c=colors();
     var datasets=[];
@@ -36,7 +38,7 @@
       borderColor:c.bad,borderWidth:1,borderDash:[2,3],pointRadius:0,fill:false,tension:0.3,order:2,spanGaps:true});}
     // VRAM + busiest-core start HIDDEN (the chart is already busy) — one click on their chip shows them.
     if(vramData){datasets.push({label:'VRAM',data:vramData,yAxisID:'yVram',hidden:true,
-      borderColor:vramCol(),borderWidth:1.2,pointRadius:0,fill:false,tension:0.25,order:3,spanGaps:true});}
+      borderColor:vramCol(),borderWidth:1.4,borderDash:[7,4],pointRadius:0,fill:false,tension:0.25,order:3,spanGaps:true});}
     if(cpuData){datasets.push({label:'Busiest core',data:cpuData,yAxisID:'yCpu',hidden:true,
       borderColor:cpuCol(),borderWidth:1.2,pointRadius:0,fill:false,tension:0.25,order:3,spanGaps:true});}
     datasets.push({label:'Frametime',data:buildMs(),yAxisID:'yMs',

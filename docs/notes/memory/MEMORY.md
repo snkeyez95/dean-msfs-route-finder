@@ -12,3 +12,4 @@
 - [Validate before shipping](work-discipline-validate-before-ship.md) — don't make Dean the test harness; prove fixes in the real runtime, diagnose with data, don't rapid-fire untested guesses
 - [Optimize code & data](optimize-code-and-data.md) — Dean wants ongoing attention to efficiency (redundant fetches, polling, unbounded growth), flag + log opportunities, not just "it works"
 - [Reset report style](reset_report_style.md) — Dean values the logged-data-backed, laid-out, detailed debrief style; a report in this style hit ResetXPDR's Test19 notes; may ask to reference it
+- [Dean is red-green colorblind](dean_colorblind.md) — never let hue be the only cue on charts/UI; pair color with pattern; avoid green-vs-red/orange/purple pairings
