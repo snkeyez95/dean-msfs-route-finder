@@ -109,6 +109,9 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   // share the altitude windowing, so they inherit the tail-trim guarantee (no quit/park samples drawn).
   const tlodPoints = RC.chartTlodSeries(sessionDir, totalMin);
   const trafPoints = RC.chartTrafficSeries(sessionDir, totalMin);
+  // v6.13.11: VRAM used (MB, every flight) + busiest-core load (%, AutoFPS flights only) as toggleable lines.
+  const vramPoints = RC.chartVramSeries(sessionDir, totalMin);
+  const domPoints = RC.chartDomSeries(sessionDir, totalMin);
   let overCount = 0; for(const v of chartFt) if(v > 100.0) overCount++;
   let overMax = g(stats, 'max_ft_ms');
   if(overMax == null) { overMax = 0.0; for(const v of ftInOrder) if(v > overMax) overMax = v; }
@@ -121,13 +124,15 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   // traffic can sit a few seconds past the frametime end (they're wall-clock sampled, frametime is
   // summed render time), so use the largest plotted x, not just totalMin.
   const _lastX = a => (a && a.length) ? a[a.length - 1][0] : 0;
-  const axisMax = Math.max(totalMin, _lastX(altPoints), _lastX(tlodPoints), _lastX(trafPoints));
+  const axisMax = Math.max(totalMin, _lastX(altPoints), _lastX(tlodPoints), _lastX(trafPoints), _lastX(vramPoints), _lastX(domPoints));
   const chartJson = pyJson({ ft: ftPoints, mavg: mavgPoints, alt: altJson, target: TARGET_FRAMETIME_MS,
     stutter: pyRound(STUTTER_FRAMETIME_MS, 1), avg_fps: g(stats, 'avg_fps') ?? null, q1, q3,
     total_min: pyRound(axisMax, 2),
     over_count: PInt(overCount), over_max: pyRound(overMax, 2),
     tlod: tlodPoints ? tlodPoints.map(([x, t]) => [x, PInt(t)]) : null,
-    traffic: trafPoints ? trafPoints.map(([x, t]) => [x, PInt(t)]) : null });
+    traffic: trafPoints ? trafPoints.map(([x, t]) => [x, PInt(t)]) : null,
+    vram: vramPoints ? vramPoints.map(([x, v]) => [x, PInt(v)]) : null,
+    cpu: domPoints ? domPoints.map(([x, d]) => [x, PInt(d)]) : null });
   const phaseHtml = RC.phaseBarsHtml(g(stats, 'phases'), {
     dep_icao: g(settings, 'dep_icao'), arr_icao: g(settings, 'arr_icao'),
     dep_scenery: g(settings, 'dep_scenery'), arr_scenery: g(settings, 'arr_scenery') });

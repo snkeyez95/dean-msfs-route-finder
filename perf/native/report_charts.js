@@ -185,6 +185,39 @@ function chartTrafficSeries(sessionDir, totalMin){
   return out.length ? out : null;
 }
 
+// v6.13.11: VRAM used (MB) as a chart series — from the telemetry vram_mb column, exact
+// chartAltitudeSeries windowing (same tail-trim guarantee). Present on every telemetry-era flight.
+function chartVramSeries(sessionDir, totalMin){
+  const tel = readTelemetry(sessionDir);
+  if(!tel) return null;
+  const out = [];
+  for(const r of tel){
+    const v = r.vram_mb;
+    if(v == null) continue;
+    const x = (r.wall_ms - HEAD_TRIM_S * 1000.0) / 60000.0;
+    if(x < 0 || x > totalMin + 0.5) continue;
+    out.push([pyRound(x, 4), Math.trunc(v)]);
+  }
+  return out.length ? out : null;
+}
+
+// v6.13.11: busiest-core load (%) from the AutoFPS trace sidecar's 6th field (Dom — the bottleneck
+// core, e.g. 73% on core #0). AutoFPS flights only, and only when the trace was built by v2+ of the
+// parser (older sidecars have a 5-field tuple → no CPU line). Same window as chartTlodSeries.
+function chartDomSeries(sessionDir, totalMin){
+  let side; try { side = JSON.parse(fs.readFileSync(path.join(sessionDir, 'autofps_trace.json'), 'utf8')); } catch(e){ return null; }
+  if(!side || !Array.isArray(side.samples) || !side.samples.length) return null;
+  const out = [];
+  for(const s of side.samples){
+    const tRel = Array.isArray(s) ? s[0] : null, dom = (Array.isArray(s) && s.length > 5) ? s[5] : null;
+    if(tRel == null || dom == null) continue;
+    const x = (tRel - HEAD_TRIM_S) / 60.0;
+    if(x < 0 || x > totalMin + 0.5) continue;
+    out.push([pyRound(x, 4), Math.trunc(dom)]);
+  }
+  return out.length ? out : null;
+}
+
 function readTelemetry(sessionDir){
   const p = path.join(sessionDir, 'telemetry.csv');
   if(!fs.existsSync(p)) return null;
@@ -221,4 +254,4 @@ function chartAltitudeSeries(sessionDir, totalMin){
   return out.length ? out : null;
 }
 
-module.exports = { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, displayRoute, readTelemetry, chartAltitudeSeries, chartTlodSeries, chartTrafficSeries, fmt };
+module.exports = { readChronological, svgPerfLine, chartFrametimeSeries, rollingMeanSeries, varianceBins, phaseBarsHtml, displayRoute, readTelemetry, chartAltitudeSeries, chartTlodSeries, chartTrafficSeries, chartVramSeries, chartDomSeries, fmt };

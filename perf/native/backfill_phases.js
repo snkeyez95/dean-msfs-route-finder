@@ -25,7 +25,7 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const REPORT_V = 'hover-declutter'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.9: hover bullseye only on the traced lines — frametime/mavg/TLOD; altitude + traffic are readout-only context, no dot on the faint lines)
+const REPORT_V = 'vram-cpu-lines'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.11: toggleable per-series checkboxes + VRAM line (every flight) + busiest-core line (AutoFPS, from trace v2))
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -147,7 +147,15 @@ function runBackfill(sessionsDir, tpIcaos) {
     // resolution, a few s before recordingWallStart — fine for a 10s-cadence step line). Log gone →
     // skip silently. MUST run BEFORE regenReport so the regenerated chart picks the trace up.
     try {
-      if (summary.settings && summary.settings.autofps_active && !fs.existsSync(path.join(dir, 'autofps_trace.json'))) {
+      // Rebuild when the sidecar is missing OR is the old v1 schema (5-field samples, no busiest-core
+      // Dom field) — v6.13.11 adds the CPU line, and existing AutoFPS flights get it if their log survives.
+      let needTrace = false;
+      const tracePath = path.join(dir, 'autofps_trace.json');
+      if (summary.settings && summary.settings.autofps_active) {
+        if (!fs.existsSync(tracePath)) needTrace = true;
+        else { try { const tj = JSON.parse(fs.readFileSync(tracePath, 'utf8')); if (!tj || !(tj.v >= 2)) needTrace = true; } catch (_) { needTrace = true; } }
+      }
+      if (needTrace) {
         const anchor = new Date(String(summary.timestamp)).getTime() / 1000;
         if (isFinite(anchor)) {
           let durS = (summary.smoothness && summary.smoothness.duration_seconds) || 0;

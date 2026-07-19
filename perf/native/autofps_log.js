@@ -12,7 +12,9 @@ const fs = require('fs'), path = require('path');
 
 // GPU/VRAM are absent when GPU-Z isn't running — optional groups. Timestamps are LOCAL time
 // (same machine + clock as the capture, so local Date parsing maps them to epoch exactly).
-const LINE_RE = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\.\d+\s+\[\w+\]\s+\[\s*LODController:UpdateVariables\s*\].*?\bFPS:([\d.]+).*?\bTLOD:([\d.]+).*?\bOLOD:([\d.]+).*?\bAGL:(-?[\d.]+)(?:.*?\bVRAM:([\d.]+)%)?/;
+// m: [1]date [2]time [3]FPS [4]TLOD [5]OLOD [6]AGL [7]VRAM% [8]Dom% (busiest-core load — the
+// bottleneck core; AutoFPS logs it as "Dom:73%(#0)"). VRAM + Dom are optional (older AutoFPS builds).
+const LINE_RE = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\.\d+\s+\[\w+\]\s+\[\s*LODController:UpdateVariables\s*\].*?\bFPS:([\d.]+).*?\bTLOD:([\d.]+).*?\bOLOD:([\d.]+).*?\bAGL:(-?[\d.]+)(?:.*?\bVRAM:([\d.]+)%)?(?:.*?\bDom:([\d.]+)%)?/;
 
 function defaultLogDir() {
   if (process.env.ABRP_AUTOFPS_LOG_DIR) return process.env.ABRP_AUTOFPS_LOG_DIR;
@@ -44,7 +46,8 @@ function parseTrace(text, t0, t1) {
     const t = new Date(m[1] + 'T' + m[2]).getTime() / 1000;   // local-time parse (same machine/clock)
     if (!isFinite(t) || t < t0 - 5 || t > t1 + 5) continue;
     out.push({ t, tlod: Math.round(parseFloat(m[4])), olod: Math.round(parseFloat(m[5])),
-      agl: Math.round(parseFloat(m[6])), vram: m[7] != null ? Math.round(parseFloat(m[7])) : null });
+      agl: Math.round(parseFloat(m[6])), vram: m[7] != null ? Math.round(parseFloat(m[7])) : null,
+      dom: m[8] != null ? Math.round(parseFloat(m[8])) : null });
   }
   return out;
 }
@@ -82,8 +85,10 @@ function buildTrace(logDir, t0, t1) {
 function writeSidecar(sessionDir, anchorEpoch, t0, t1, logDir) {
   const tr = buildTrace(logDir, t0, t1);
   if (!tr) return false;
-  const payload = { v: 1, recording_wall_start: Math.round(anchorEpoch * 1000) / 1000,
-    samples: tr.samples.map(s => [Math.round((s.t - anchorEpoch) * 10) / 10, s.tlod, s.olod, s.agl, s.vram]),
+  // v2: sample tuple gains a 6th field — dom (busiest-core %). Chart consumers read [0..4] as before;
+  // [5] is the CPU-bottleneck line (null on older AutoFPS builds that don't log Dom).
+  const payload = { v: 2, recording_wall_start: Math.round(anchorEpoch * 1000) / 1000,
+    samples: tr.samples.map(s => [Math.round((s.t - anchorEpoch) * 10) / 10, s.tlod, s.olod, s.agl, s.vram, s.dom]),
     stats: tr.stats };
   try { fs.writeFileSync(path.join(sessionDir, 'autofps_trace.json'), JSON.stringify(payload)); return true; }
   catch (_) { return false; }

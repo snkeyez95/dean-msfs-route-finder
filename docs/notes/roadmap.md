@@ -2025,6 +2025,29 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **✅ v6.13.11 — frametime chart: per-series toggle chips + VRAM line + busiest-core line (Dean
+  2026-07-18, awaiting release.bat).** Every charted line got a clickable chip (show/hide, persisted
+  in localStorage 'cfxSeriesHidden'); NEW VRAM(MB, every flight, from telemetry) + busiest-core %
+  (AutoFPS flights, from the trace's new v2 6th field = AutoFPS log's `Dom:NN%(#N)` — the bottleneck
+  core, since overall sys_cpu spreads across cores and reads idle). autofps_log LINE_RE captures Dom;
+  writeSidecar bumped v:1→v:2 (6-field tuple [t,tlod,olod,agl,vram,dom]); backfill regenerates v1→v2
+  traces when the AutoFPS log survives (REPORT_V 'vram-cpu-lines' → one-time report regen). Both new
+  lines DEFAULT HIDDEN. chartVramSeries/chartDomSeries in report_charts. 26/26 test_chart_lines +
+  real-data smoke (LBPD-LFMD: 847/847 samples carry Dom, busiest-core to 81% while overall CPU ~30%,
+  VRAM peak 11790 matches summary). Dean picked "busiest-core (Dom)" over per-frame MsCPUBusy.
+- **AutoFPS FEEDBACK-REQUEST candidates for ResetXPDR (from LBPD-LFMD deep-dive 2026-07-18 — NOT
+  reported yet; Dean's Max-TLOD-500 change makes them moot for HIM, so only send if he wants):**
+  (1) VRAM correction OVERSHOOTS — at the 96% VRAM guard (LTD flag) AutoFPS drops TLOD 600→300s
+  instead of trimming to hold ~90%, so VRAM falls to 72-80% and it ramps back to 600 → sawtooth
+  hunting against the VRAM wall (proven: 35 LTD hits = every VRAM≥96% moment; the cruise TLOD
+  variability Dean saw). A damped controller that LEARNS the TLOD that parks VRAM at target and
+  dwells there would kill the oscillation. (2) FPS-priority cuts TLOD on CPU-bound stalls where the
+  GPU is 40% idle (own-goal) — it already logs GPU%/Dom, so it could gate FPS-driven TLOD cuts on
+  actually-GPU-bound. Reset already built this gating for periodic-spike detection; extend to the
+  general FPS path. See [[reset_report_style]].
+- **AutoFPS envelope card — real example ready (parked feature, roadmap v6.11.0 §6):** the LBPD-LFMD
+  flight is a textbook "you spent 39% of airborne time VRAM-limited at Max TLOD 600 — try 500" case
+  for the parked envelope-recommendation card. Build when Dean wants it.
 - **🔍 FULL VATSIM/OVERLAY AUDIT (Fable, 2026-07-16) — CLOSED items shipped as v6.12.8 (8e2f51c),
   OPEN items below.** Method: Dean's copy/paste audit prompt → 45,056-cell ATC combination matrix
   (KMIA→KMCO + LGAV→LGKR, invariants I1–I10 over real polygons), alert poll-sequence stress A1–A8,

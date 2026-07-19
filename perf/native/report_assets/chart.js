@@ -21,6 +21,11 @@
     // pre-windowed server-side to the trimmed chart span (no quit/park samples exist in the data).
     var tlodData=(CHART.tlod&&CHART.tlod.length)?CHART.tlod.map(function(p){return {x:p[0],y:p[1]};}):null;
     var trafData=(CHART.traffic&&CHART.traffic.length)?CHART.traffic.map(function(p){return {x:p[0],y:p[1]};}):null;
+    // v6.13.11: VRAM used (MB, every flight) + busiest-core load (%, AutoFPS flights only), toggleable.
+    var vramData=(CHART.vram&&CHART.vram.length)?CHART.vram.map(function(p){return {x:p[0],y:p[1]};}):null;
+    var cpuData=(CHART.cpu&&CHART.cpu.length)?CHART.cpu.map(function(p){return {x:p[0],y:p[1]};}):null;
+    var vramCol=function(){return css('--vram','#b07ae6');};   // purple
+    var cpuCol=function(){return css('--cpu','#2fb6a8');};     // teal
     var c=colors();
     var datasets=[];
     if(altData){datasets.push({label:'Altitude',data:altData,yAxisID:'yAlt',
@@ -29,6 +34,11 @@
       borderColor:c.target,borderWidth:1.4,pointRadius:0,fill:false,stepped:'before',order:2,spanGaps:true});}
     if(trafData){datasets.push({label:'Traffic',data:trafData,yAxisID:'yTraf',
       borderColor:c.bad,borderWidth:1,borderDash:[2,3],pointRadius:0,fill:false,tension:0.3,order:2,spanGaps:true});}
+    // VRAM + busiest-core start HIDDEN (the chart is already busy) — one click on their chip shows them.
+    if(vramData){datasets.push({label:'VRAM',data:vramData,yAxisID:'yVram',hidden:true,
+      borderColor:vramCol(),borderWidth:1.2,pointRadius:0,fill:false,tension:0.25,order:3,spanGaps:true});}
+    if(cpuData){datasets.push({label:'Busiest core',data:cpuData,yAxisID:'yCpu',hidden:true,
+      borderColor:cpuCol(),borderWidth:1.2,pointRadius:0,fill:false,tension:0.25,order:3,spanGaps:true});}
     datasets.push({label:'Frametime',data:buildMs(),yAxisID:'yMs',
       borderColor:c.line,borderWidth:1,pointRadius:0,fill:false,tension:0,order:1});
     datasets.push({label:'Moving average',data:mavgData,yAxisID:'yMs',
@@ -119,6 +129,8 @@
       var tl=nearestAt(tlodData,HOVER.x); if(tl!=null)rows.push({t:'TLOD (AutoFPS)   '+Math.round(tl),col:colors().target});
       var al=altAt(HOVER.x); if(al!=null)rows.push({t:'Altitude   '+Math.round(al).toLocaleString()+' ft',col:colors().faint});
       var tf=nearestAt(trafData,HOVER.x); if(tf!=null)rows.push({t:'VATSIM ≤40nm   '+Math.round(tf),col:colors().bad});
+      var vr=nearestAt(vramData,HOVER.x); if(vr!=null)rows.push({t:'VRAM   '+Math.round(vr).toLocaleString()+' MB',col:vramCol()});
+      var cp=nearestAt(cpuData,HOVER.x); if(cp!=null)rows.push({t:'Busiest core   '+Math.round(cp)+'%',col:cpuCol()});
       x.save();x.font='12px sans-serif';var w=0;
       rows.forEach(function(r){x.font=(r.bold?'bold ':'')+'12px sans-serif';w=Math.max(w,x.measureText(r.t).width);});
       var padX=11,padY=8,lh=16.5,bw=w+padX*2,bh=rows.length*lh+padY*2;
@@ -152,6 +164,11 @@
             grid:{drawOnChartArea:false}},
           yTraf:{type:'linear',position:'right',display:false,min:0,
             max:trafData?Math.max(4,Math.max.apply(null,trafData.map(function(p){return p.y;}))*1.3):10,
+            grid:{drawOnChartArea:false}},
+          yVram:{type:'linear',position:'right',display:false,min:0,
+            max:vramData?Math.max.apply(null,vramData.map(function(p){return p.y;}))*1.12:12288,
+            grid:{drawOnChartArea:false}},
+          yCpu:{type:'linear',position:'right',display:false,min:0,max:100,
             grid:{drawOnChartArea:false}}},
         plugins:{legend:{display:false},
           decimation:{enabled:true,algorithm:'lttb',samples:1500},
@@ -166,15 +183,47 @@
           b.textContent=cnt+' frame'+(cnt>1?'s':'')+' \u003e '+Math.round(curCeil)
             +' ms \u00b7 max '+CHART.over_max.toFixed(1)+' ms';return;}}
       b.style.display='none';}
+    // v6.13.11: the legend is now a row of CLICKABLE toggle chips — one per charted line (Dean's ask).
+    // Clicking a chip shows/hides that dataset (and its own right-hand axis), state remembered in
+    // localStorage. Data-driven off the live datasets so it tracks the fps/ms unit rename automatically.
+    function chipColor(d){var cc=colors();
+      if(d.label==='Frametime')return cc.line; if(d.label==='Avg FPS')return cc.target;
+      if(d.label==='Moving average')return cc.amber; if(d.label==='TLOD')return cc.target;
+      if(d.label==='Traffic')return cc.bad; if(d.label==='Altitude')return cc.faint;
+      if(d.label==='VRAM')return vramCol(); if(d.label==='Busiest core')return cpuCol(); return cc.text;}
+    function chipName(d){
+      if(d.label==='Frametime')return unit==='fps'?'FPS':'Frame time';
+      if(d.label==='TLOD')return 'TLOD (AutoFPS)'; if(d.label==='Traffic')return 'VATSIM traffic';
+      if(d.label==='Busiest core')return 'Busiest core (AutoFPS)'; return d.label;}
+    // First run (no saved key) → the two new lines start hidden; everything else shown. After any
+    // toggle the saved list is authoritative for EVERY series (so a line you turn ON stays on too).
+    function seriesHidden(){try{var v=localStorage.getItem('cfxSeriesHidden');
+      if(v==null)return ['VRAM','Busiest core'];
+      return JSON.parse(v)||[];}catch(e){return ['VRAM','Busiest core'];}}
     function renderLegend(){var el=document.getElementById('chartLegend');if(!el)return;
-      var cc=colors();
-      var a=(unit==='ms')?['Frame time',cc.line]:['FPS',cc.line];
-      var bb=(unit==='ms')?['Moving average',cc.amber]:['Avg FPS',cc.target];
-      var h='<span class="lg"><span class="sw" style="background:'+a[1]+'"></span>'+a[0]+'</span>'
-        +'<span class="lg"><span class="sw" style="background:'+bb[1]+'"></span>'+bb[0]+'</span>';
-      if(tlodData)h+='<span class="lg"><span class="sw" style="background:'+cc.target+'"></span>TLOD (AutoFPS)</span>';
-      if(trafData)h+='<span class="lg"><span class="sw" style="background:'+cc.bad+'"></span>VATSIM traffic</span>';
+      var h='';
+      chart.data.datasets.forEach(function(d){
+        var col=chipColor(d),off=!!d.hidden,
+          sw=off?('background:transparent;box-shadow:inset 0 0 0 1.6px '+col):('background:'+col);
+        h+='<span class="lg" role="button" tabindex="0" title="click to show/hide" '
+          +'style="cursor:pointer;user-select:none;opacity:'+(off?'0.45':'1')
+          +'" onclick="window.toggleSeries(\''+d.label.replace(/'/g,"")+'\')">'
+          +'<span class="sw" style="'+sw+'"></span>'+chipName(d)+'</span>';});
       el.innerHTML=h;}
+    window.toggleSeries=function(label){
+      var d=chart.data.datasets.find(function(z){return z.label===label;});if(!d)return;
+      d.hidden=!d.hidden;
+      var ax=chart.options.scales[d.yAxisID];                 // hide the secondary axis with its line
+      if(ax&&d.yAxisID!=='yMs')ax.display=!d.hidden;
+      var hid=seriesHidden().filter(function(x){return x!==label;});
+      if(d.hidden)hid.push(label);
+      try{localStorage.setItem('cfxSeriesHidden',JSON.stringify(hid));}catch(e){}
+      renderLegend();chart.update();};
+    function applyHidden(){var hid=seriesHidden();
+      chart.data.datasets.forEach(function(d){
+        d.hidden=hid.indexOf(d.label)>=0;
+        var ax=chart.options.scales[d.yAxisID];
+        if(ax&&d.yAxisID!=='yMs')ax.display=!d.hidden;});}
     window.applyScale=function(mode){scaleMode=mode;window.__yscale=mode;
       try{localStorage.setItem('cfxYScale',mode);}catch(e){}
       if(unit!=='ms')return;
@@ -192,7 +241,7 @@
       var pick=ok(q)?q:(ok(ls)?ls:'100');
       scaleMode=pick;window.__yscale=pick;
       var s0=document.getElementById('yScale');if(s0)s0.value=pick;})();
-    applyScale(scaleMode);renderLegend();
+    applyHidden();applyScale(scaleMode);renderLegend();
     var avgChart=(function(){
       var el=document.getElementById('ftAvgChart');
       if(!el||!mavgData.length)return null;
@@ -291,6 +340,8 @@
         else if(d.label==='Avg FPS')d.borderColor=cc.target;
         else if(d.label==='TLOD')d.borderColor=cc.target;
         else if(d.label==='Traffic')d.borderColor=cc.bad;
+        else if(d.label==='VRAM')d.borderColor=vramCol();
+        else if(d.label==='Busiest core')d.borderColor=cpuCol();
         else d.borderColor=cc.faint;});
       ['x','yMs','yAlt'].forEach(function(k){var s=chart.options.scales[k];if(!s)return;
         if(s.grid&&s.grid.color)s.grid.color=cc.grid;

@@ -11,3 +11,4 @@
 - [PowerShell 5.1 not 7](powershell_51_not_7.md) — ABRP spawns PS 5.1; validate PS logic in powershell.exe, keep data handling in Node (the bug that cost 3 reopen rounds)
 - [Validate before shipping](work-discipline-validate-before-ship.md) — don't make Dean the test harness; prove fixes in the real runtime, diagnose with data, don't rapid-fire untested guesses
 - [Optimize code & data](optimize-code-and-data.md) — Dean wants ongoing attention to efficiency (redundant fetches, polling, unbounded growth), flag + log opportunities, not just "it works"
+- [Reset report style](reset_report_style.md) — Dean values the logged-data-backed, laid-out, detailed debrief style; a report in this style hit ResetXPDR's Test19 notes; may ask to reference it
