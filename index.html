@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.13.9</div>
+  <div class="tname">A Better Route Planner &mdash; v6.13.10</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.13.9</div>
+    <div class="sb-ver">v6.13.10</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -7333,7 +7333,10 @@ function latcPushOverlay(){
       if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
       const a=latcAirportForCallsign(c.callsign, LATC.db); if(a && a.icao===fi) list.push(latcTierLabel(tr)+' '+latcFmt(fr)); }
     if(list.length) also='Also at '+fi+': '+list.slice(0,3).join(' · '); }
-  try{ window.api.overlayState({
+  // Overlay self-heal (Dean 2026-07-18): if the overlay window ever dies while Live mode is on (it went
+  // away during flight prep), main.js returns {ok:false, gone:true}. Re-create it on the next poll so the
+  // dot comes back on its own — no need to toggle Live off/on. Gated on the desktop overlay being enabled.
+  try{ Promise.resolve(window.api.overlayState({
     live:true,
     freq:latcFmt(rec.freq),
     who:(rec.callsign?rec.callsign+' · ':'')+(rec.label||''),
@@ -7346,7 +7349,7 @@ function latcPushOverlay(){
     isNewRec:isNewRec,
     pop:(v.overlay.freqChange!==false),        // auto-expand the panel on a new freq (Dean: default on)
     sound:(v.sound&&v.sound.freqChange!==false) // chime on a new freq (default on)
-  }); }catch(e){}
+  })).then(r=>{ if(r&&r.gone&&v.overlay.enabled){ try{ window.api.overlayShow(); }catch(e){} } }).catch(()=>{}); }catch(e){}
   // Update the field-mode sticky ONCE per poll (this is the last LATC call in latcPoll), so next poll's
   // recommendFreq gets the hysteresis hint. enroute = not in field mode.
   LATC._fieldMode = (rec.phase!=='enroute');
@@ -7354,6 +7357,10 @@ function latcPushOverlay(){
 async function latcToggle(on,auto){
   LATC.on=on;
   S._vpilotAutoOn=!!(on&&auto);   // track whether the vPilot watcher started this session (so it only auto-stops its own)
+  // Manual-off suppression (Dean 2026-07-18): a MANUAL Live-off (no `auto` flag) means "I want it off"
+  // — suppress the vPilot watcher from auto-restarting it until vPilot cycles. The watcher's OWN
+  // auto-stop passes auto=true, so it never suppresses (a vPilot restart re-arms cleanly).
+  if(on) S._vpilotSuppress=false; else if(!auto) S._vpilotSuppress=true;
   if(on){ await window.api.liveAtcStart(); latcEnsureDb(); airspaceLoad(); await latcFetchFeed(); if(vCfg().overlay.enabled){ try{ window.api.overlayShow(); }catch(e){} } if(LATC.posIv)clearInterval(LATC.posIv); LATC.posIv=setInterval(latcPoll,5000); latcPoll(); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.feedIv=setInterval(latcFetchFeed,30000); }
   else{ await window.api.liveAtcStop(); if(LATC.posIv)clearInterval(LATC.posIv); if(LATC.feedIv)clearInterval(LATC.feedIv); LATC.posIv=LATC.feedIv=null; LATC.status='off'; LATC.pos=null; LATC._lastStableKey=undefined; LATC._pendKey=null; LATC._pendCount=0; LATC._prevFound=null; LATC._prevNetKey=null; try{ window.api.overlayHide(); }catch(e){} }
   try{ vCfg().enabled=on; window.api.saveConfig(S.cfg); }catch(e){}
@@ -7372,8 +7379,11 @@ async function isVpilotRunning(){
 async function vpilotWatch(){
   if(!vCfg().autoStartVpilot) return;
   const running=await isVpilotRunning();
-  if(running && !S._vpilotPrev && !LATC.on){ RLOG('[VATSIM] vPilot detected — starting Live ATC'); latcToggle(true,true); }
-  else if(!running && S._vpilotPrev && LATC.on && S._vpilotAutoOn){ RLOG('[VATSIM] vPilot closed — stopping Live ATC'); latcToggle(false); }
+  // Re-arm on STATE, not just the appear-EDGE (Dean 2026-07-18): a vPilot restart that closes+reopens
+  // within one 20s poll shows no edge, so the old `!S._vpilotPrev` gate left Live ATC + the overlay
+  // off. Start whenever vPilot is running, Live is off, and the user didn't manually suppress it.
+  if(running && !LATC.on && !S._vpilotSuppress){ RLOG('[VATSIM] vPilot running — starting Live ATC'); latcToggle(true,true); }
+  else if(!running){ if(LATC.on && S._vpilotAutoOn){ RLOG('[VATSIM] vPilot closed — stopping Live ATC'); latcToggle(false,true); } S._vpilotSuppress=false; }   // vPilot gone → clear suppression for the next cycle (auto-stop passes auto=true so it never suppresses)
   S._vpilotPrev=running;
 }
 function startVpilotWatch(){ stopVpilotWatch(); if(!vCfg().autoStartVpilot)return; S._vpilotPrev=false; S._vpilotIv=setInterval(vpilotWatch,20000); vpilotWatch(); }
@@ -7867,5 +7877,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.13.9</div>
+  pointer-events:none;">v6.13.10</div>
 </body></html>

@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.9
+# A Better Route Planner — v6.13.10
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.10 OVERLAY DOT SELF-HEALS. If vPilot restarts (closes and reopens), Live mode and the overlay dot now come back on their own instead of staying off — the watcher re-arms on state, not just the launch moment. And if the dot's window ever dies mid-flight while Live mode is on, it recreates itself on the next poll. A Live-off you did by hand is still respected: the watcher won't fight it until vPilot cycles.
 v6.13.9  HOVER: CLEANER DOTS. The hover now puts a bullseye only on the lines you actually trace — frametime, moving average, and TLOD. Altitude and VATSIM traffic are context: their values still appear in the readout box, but they no longer get a dot on their faint lines (which sat on compressed hidden axes, right by the red traffic dashes, and looked misplaced). Reports regenerate once on next launch.
 
 v6.13.8  HOVER: READ THE TLOD STEPS. The spike-snap now also checks where your cursor is VERTICALLY. Down among the frametime spikes it still snaps to grab a hitch; but up on the TLOD or altitude lines the nearest frametime spike is far below the cursor, so it tracks continuously — letting you step through every ~10-second TLOD change instead of getting yanked down to a frametime spike. Reports regenerate once on next launch.

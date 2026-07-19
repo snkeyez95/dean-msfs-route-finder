@@ -2416,7 +2416,12 @@ function readPerfLive(){
   }catch(_){ return null; }
 }
 ipcMain.handle('overlay-state', (_, payload) => {
-  if(_cleanupDone || !overlayWin || overlayWin.isDestroyed()) return {ok:false};
+  if(_cleanupDone) return {ok:false};
+  // Self-heal (Dean 2026-07-18): if the overlay window died (renderer crash, OS kill) while Live mode
+  // is still on, tell the renderer so it re-shows — the dot recreates on the next 5s poll instead of
+  // staying gone until Live is toggled. Only when the push carries a LIVE state (an off state means
+  // Live mode is being torn down — don't resurrect the window then).
+  if(!overlayWin || overlayWin.isDestroyed()) return { ok:false, gone: !!(payload && payload.live) };
   try{
     payload = payload || {};
     payload.perf = readPerfLive();
