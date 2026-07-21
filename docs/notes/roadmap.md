@@ -2025,6 +2025,28 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **✅ FIXED v6.13.14 (2026-07-20) — LIVE-ATC DEPARTURE vs APPROACH.** Added latcTermRole (callsign
+  last-segment _DEP/_APP) + latcPosLabel; fieldPos takes a per-leg termRole (dep→DEP, arr→APP, fall
+  back to the other if only it's online); recommendFreq's APP pick prefers the role matching isDepField;
+  all label render sites (rec, next-up, brief chips, also-list, others, verify — overlay + card) use
+  latcPosLabel so a _DEP reads "Departure". NEW test_vatsim_depapp.js 17/17 (helpers + real-polygon
+  KMIA-dep→MIA_DEP / KMCO-arr→MCO_APP / lone-_APP fallback); full board 15 suites green incl. the 45k
+  ATC matrix still clean. Awaiting release.bat + Dean live re-verify at a field with split DEP/APP.
+  Original report:
+- **🐛 LIVE-ATC: DEPARTURE vs APPROACH not distinguished — recommends _APP when departing (Dean
+  2026-07-20, live at KORD).** On a KORD departure with BOTH CHI_B_DEP 128.575 AND CHI_Z_APP 119.000
+  online, the overlay's "Next up" said CHI_Z_APP (Approach) — should have been CHI_B_DEP (Departure).
+  ROOT CAUSE (verified in code): VATSIM gives DEP and APP the SAME facility code (5), and
+  `LATC_TIER={…5:'APP'…}` (index.html:6574) collapses both into one 'APP' tier — ABRP has NO concept
+  of Departure; latcTierLabel even labels _DEP as "Approach". So with both online it just picks one
+  (grabbed the _APP). FIX: disambiguate by CALLSIGN SUFFIX (_DEP vs _APP), not facility code — on the
+  DEPARTURE leg/climbout prefer a `_DEP` controller for the terminal handoff (fall back to _APP); on
+  ARRIVAL prefer `_APP` (fall back to _DEP); only-one-online works both (top-down, unchanged). Threads
+  through: fieldPos (6639 dep vs 6640 arr — pass a preferred-suffix per leg), recommendFreq terminal
+  pick (~6899 APP tier), latcFreqStack dep vs arr sequence (~6771), latcNextUp (~7081); + a label
+  helper so a _DEP position reads "Departure" not "Approach". TEST (VATSIM desk suite): dep field w/
+  both _DEP+_APP online → dep sequence + next-up pick _DEP; arr field w/ both → pick _APP; only _APP
+  online → both legs use it. Renderer-only. See [[work-discipline-validate-before-ship]].
 - **✅ v6.13.11 — frametime chart: per-series toggle chips + VRAM line + busiest-core line (Dean
   2026-07-18, awaiting release.bat).** Every charted line got a clickable chip (show/hide, persisted
   in localStorage 'cfxSeriesHidden'); NEW VRAM(MB, every flight, from telemetry) + busiest-core %
@@ -2035,16 +2057,39 @@ until its replacement ships.
   lines DEFAULT HIDDEN. chartVramSeries/chartDomSeries in report_charts. 26/26 test_chart_lines +
   real-data smoke (LBPD-LFMD: 847/847 samples carry Dom, busiest-core to 81% while overall CPU ~30%,
   VRAM peak 11790 matches summary). Dean picked "busiest-core (Dom)" over per-frame MsCPUBusy.
-- **AutoFPS FEEDBACK-REQUEST candidates for ResetXPDR (from LBPD-LFMD deep-dive 2026-07-18 — NOT
-  reported yet; Dean's Max-TLOD-500 change makes them moot for HIM, so only send if he wants):**
-  (1) VRAM correction OVERSHOOTS — at the 96% VRAM guard (LTD flag) AutoFPS drops TLOD 600→300s
-  instead of trimming to hold ~90%, so VRAM falls to 72-80% and it ramps back to 600 → sawtooth
-  hunting against the VRAM wall (proven: 35 LTD hits = every VRAM≥96% moment; the cruise TLOD
-  variability Dean saw). A damped controller that LEARNS the TLOD that parks VRAM at target and
-  dwells there would kill the oscillation. (2) FPS-priority cuts TLOD on CPU-bound stalls where the
-  GPU is 40% idle (own-goal) — it already logs GPU%/Dom, so it could gate FPS-driven TLOD cuts on
-  actually-GPU-bound. Reset already built this gating for periodic-spike detection; extend to the
-  general FPS path. See [[reset_report_style]].
+- **✅ AutoFPS FEEDBACK — REPORTED + ANSWERED by ResetXPDR (AVSIM, 2026-07-18/19). Both points are
+  now settled by the author; do NOT re-raise.** Dean posted the LBPD-LFMD recap + log; Reset replied:
+  (1) VRAM hunting — REFUTED our mechanism with a log breakdown (fuller reply, AVSIM pg 294). At 96%
+  AutoFPS only HOLDS (caps TLOD at current, but FPS<target can still lower it); it only REDUCES at 98%.
+  Of the 35 LTD hits: **32 were Holds, only 3 were Reduces.** Tracing the 3 reduces in Dean's log, the
+  TLOD drop caused SPECIFICALLY by VRAM Reduce was just 20 / 60 / 100 (two of three had FPS already
+  below target, so TLOD was falling anyway); **every other TLOD reduction in the flight was FPS-driven.**
+  So our "the VRAM limiter is hunting against the wall = the cause of the cruise sawtooth" framing was
+  OVERSTATED — we read 35 LTD flags as 35 reductions when 32 were benign holds. Reset's real diagnosis:
+  the cruise TLOD swings were **periodic scenery streaming overloading the CPU (not GPU) → FPS under
+  target → FPS-driven TLOD cuts** — i.e. episodic CPU load via the FPS mechanism, NOT the VRAM guard.
+  Fix = lower TLOD Max (Dean already did, 600→500). LESSON: don't equate an LTD/VRAM-limited sample
+  count with reductions — most are holds (matters for how we word the envelope card's "% VRAM-limited"
+  below). Reset is STILL making two changes FROM Dean's report: (a) replace the vague **LTD** log/UI
+  term with **HLD** / **RED** (hold vs reduce) so state is legible; (b) TEMPER reduction size, possibly
+  NON-LINEARLY, to cut overshoot (Dean's "drops deep into the 300s" observation). (2) CPU-driven TLOD
+  drop — Reset REFUTED our "own-goal" read: he found our exact log example, noted it was preceded by a
+  burst of (non-periodic but FPS-reducing) frametime spikes, and the ~⅓ TLOD cut stopped the frametime
+  rot immediately + recovered to a lower sustainable TLOD → app responded appropriately. TLOD
+  reductions DO alleviate CPU-driven drops too (his VR experience; most common on the ground at complex
+  airports). So point (2) is closed as correct-behavior, not a bug. Standing ask from Reset: if a REAL
+  periodic-spike episode hits a future flight, drop that log on his GitHub with a one-liner so he can
+  confirm the recovery fix holds. See [[reset_report_style]].
+  ✅ STANDING ASK FULFILLED (AVSIM pg 294, ~2026-07-20): Dean posted a KASE→KSEA Citation flight
+  (TMax 700, offline) where periodic-spike detection fired FOR REAL at normal settings — ABRP's own
+  full-flight periodicity pass independently confirmed 5 episodes @ 0.98–1.02s cadence, std 0.00–0.04s.
+  Reset acknowledged (comment 5798345): "I received your log on github… will respond on github."
+  ⏳ AWAITING Reset's GitHub reply on a NEW bug the flight exposed: **SRed accumulates then never
+  releases in level cruise** — SRed built to 384 during the VRAM-overflow climb (Vred @98–99%), then
+  froze; TLOD pinned at 316 (700−384) for ~80 min of cruise despite VRAM back to 74–78% + GPU ~44%
+  (ample headroom). Open questions Dean raised for Reset: is recovery VS-scaled (so VS≈0 cruise → ~0
+  recovery)? and should spike accumulation be suppressed while VRAM limiting is active (both limiters
+  reacted to the same overflow; the VRAM one released, the spike one didn't). Watch GitHub for his fix.
 - **AutoFPS envelope card — real example ready (parked feature, roadmap v6.11.0 §6):** the LBPD-LFMD
   flight is a textbook "you spent 39% of airborne time VRAM-limited at Max TLOD 600 — try 500" case
   for the parked envelope-recommendation card. Build when Dean wants it.

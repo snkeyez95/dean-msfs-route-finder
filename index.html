@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.13.13</div>
+  <div class="tname">A Better Route Planner &mdash; v6.13.14</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.13.13</div>
+    <div class="sb-ver">v6.13.14</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6578,6 +6578,12 @@ const LATC_TWR_TOPDOWN_NM=30;   // v6.11.2 (Dean 2026-07-13, KLAS): when Tower i
 const LATC_CTAF_NM=15, LATC_CTAF_AGL=4000;   // v6.10.8 (Dean's KBOS→CYYZ): DEPARTURE field ring — near it only while low (release CTAF on climb-out)
 const LATC_ARR_NM=30, LATC_FIELD_HYST=5;   // v6.11.2: ARRIVAL field ring is wider (approaches legitimately swing you 15-30nm out — RNAV to KLAS via LAPIN @15.8nm). Distance hysteresis: once in field mode the exit ring gains LATC_FIELD_HYST so a boundary graze can't thrash the rec
 function latcTierLabel(t){ return {DEL:'Clearance/Delivery',GND:'Ground',TWR:'Tower',APP:'Approach',CTR:'Center',FSS:'Radio/FSS',UNICOM:'UNICOM',CTAF:'CTAF'}[t]||t; }
+// VATSIM gives DEPARTURE and APPROACH the SAME facility code (5 → 'APP' tier), so the only way to tell
+// them apart is the callsign's last segment (CHI_B_DEP vs CHI_Z_APP). Departing you want _DEP, arriving
+// you want _APP. Default 'APP' when there's no _DEP suffix (a lone approach works both, top-down).
+function latcTermRole(callsign){ return String(callsign||'').toUpperCase().split('_').pop()==='DEP' ? 'DEP' : 'APP'; }
+// Position label that distinguishes Departure from Approach (both live under the 'APP' tier).
+function latcPosLabel(tier, callsign){ return (tier==='APP' && latcTermRole(callsign)==='DEP') ? 'Departure' : latcTierLabel(tier); }
 function latcHz(mhz){ return Math.round(mhz*1e6); }
 function latcFmt(mhz){ return (Math.round(mhz*1000)/1000).toFixed(3); }
 // Controllers carry no lat/lon — geo-locate a field position from its callsign: "LAS_TWR" → KLAS (K+3),
@@ -6630,14 +6636,22 @@ function _latcOnline(controllers){
 // crossings are great-circle-approximate (not the exact filed airway path) — labelled as such in the UI.
 function latcFreqStack(depApt, arrApt, controllers, dbMap){
   const on=_latcOnline(controllers), st={dep:[], enr:[], arr:[], enrouteGap:false};
-  const fieldPos=(apt,order)=>{ const res=[];
-    for(const tier of order){ for(const c of on){ if(c.tier!==tier) continue; let belongs=false;
-      if(tier==='APP'){ const tc=traconCovers(c.callsign,apt.lat,apt.lon); if(tc===true) belongs=true; else if(tc===null){ const a=latcAirportForCallsign(c.callsign,dbMap); belongs=!!(a&&a.icao===apt.icao); } }
-      else { const a=latcAirportForCallsign(c.callsign,dbMap); belongs=!!(a&&a.icao===apt.icao); }
-      if(belongs && !res.some(x=>x.callsign===c.callsign)) res.push({tier,callsign:c.callsign,freq:c.freq}); } }
+  const fieldPos=(apt,order,termRole)=>{ const res=[];
+    for(const tier of order){ const belong=[];
+      for(const c of on){ if(c.tier!==tier) continue; let belongs=false;
+        if(tier==='APP'){ const tc=traconCovers(c.callsign,apt.lat,apt.lon); if(tc===true) belongs=true; else if(tc===null){ const a=latcAirportForCallsign(c.callsign,dbMap); belongs=!!(a&&a.icao===apt.icao); } }
+        else { const a=latcAirportForCallsign(c.callsign,dbMap); belongs=!!(a&&a.icao===apt.icao); }
+        if(belongs && !belong.some(x=>x.callsign===c.callsign)) belong.push(c); }
+      // DEP and APP share facility 5. On the DEP field the terminal handoff is DEPARTURE; on the ARR field
+      // it's APPROACH. When both are online prefer the role matching this leg; fall back to the other if
+      // it's the only one up (a lone _APP still works a departure top-down). Keeps the arrivals-into-your-
+      // dep-field _APP out of your outbound flow, and vice-versa.
+      let chosen=belong;
+      if(tier==='APP' && belong.length>1){ const m=belong.filter(c=>latcTermRole(c.callsign)===termRole); if(m.length) chosen=m; }
+      for(const c of chosen) if(!res.some(x=>x.callsign===c.callsign)) res.push({tier,callsign:c.callsign,freq:c.freq}); }
     return res; };
-  if(depApt) st.dep=fieldPos(depApt,['DEL','GND','TWR','APP']);
-  if(arrApt) st.arr=fieldPos(arrApt,['APP','TWR','GND']);
+  if(depApt) st.dep=fieldPos(depApt,['DEL','GND','TWR','APP'],'DEP');
+  if(arrApt) st.arr=fieldPos(arrApt,['APP','TWR','GND'],'APP');
   if(depApt&&arrApt){
     const samples=gcSamples(depApt.lat,depApt.lon,arrApt.lat,arrApt.lon,40); let lastKey=null;
     for(const [la,lo] of samples){ let cover=null;
@@ -6765,9 +6779,9 @@ function latcRenderBrief(){
   if(!st){ body='<div style="font-size:12px;color:var(--ink3)">Loading airport data for '+esc(r.dep)+' → '+esc(r.arr)+'…</div>'; }
   else {
     const depTwr=depApt.twr, arrTwr=arrApt.twr;
-    const depItems=st.dep.map(x=>chip(latcTierLabel(x.tier),x.callsign,x.freq)).join('');
+    const depItems=st.dep.map(x=>chip(latcPosLabel(x.tier,x.callsign),x.callsign,x.freq)).join('');
     const enrItems=st.enr.map(x=>chip('Center',x.callsign,x.freq)).join('')+(st.enrouteGap?'<span style="font-size:11px;color:var(--ink3);margin-left:4px">+ stretches with no Center online → UNICOM '+latcFmt(LATC_UNICOM)+'</span>':'');
-    const arrItems=st.arr.map(x=>chip(latcTierLabel(x.tier),x.callsign,x.freq)).join('');
+    const arrItems=st.arr.map(x=>chip(latcPosLabel(x.tier,x.callsign),x.callsign,x.freq)).join('');
     body=seg('Departure &mdash; '+esc(r.dep), depItems, 'No ATC online &mdash; '+(depTwr?('CTAF '+latcFmt(depTwr)):('UNICOM '+latcFmt(LATC_UNICOM))))
        + seg('Enroute (great-circle estimate)', enrItems, 'No Center online along your route &mdash; UNICOM '+latcFmt(LATC_UNICOM))
        + seg('Arrival &mdash; '+esc(r.arr), arrItems, 'No ATC online &mdash; '+(arrTwr?('CTAF '+latcFmt(arrTwr)):('UNICOM '+latcFmt(LATC_UNICOM))));
@@ -6992,14 +7006,19 @@ function recommendFreq(pos, controllers, dbMap, route, prevField){
   }
   for(let i=floorI;i<pref.length;i++){
     const tier=pref[i];
-    const cands=enr.filter(c=>c.tier===tier && c.covers && (owns(tier) ? (apt&&c.apt&&c.apt.icao===apt.icao) : true));
+    let cands=enr.filter(c=>c.tier===tier && c.covers && (owns(tier) ? (apt&&c.apt&&c.apt.icao===apt.icao) : true));
+    // DEP vs APP (same facility 5): departing → prefer the _DEP position, arriving → prefer _APP. isDepField
+    // is which field you're closest to (dep early in the flight, arr late). Fall back to the other role if
+    // it's the only one online. Without this, both cover and the sort just grabbed whichever the feed
+    // listed first — recommending Approach on a departure (Dean 2026-07-20, KORD: CHI_B_DEP vs CHI_Z_APP).
+    if(tier==='APP' && cands.length>1){ const want=isDepField?'DEP':'APP'; const m=cands.filter(c=>latcTermRole(c.callsign)===want); if(m.length) cands=m; }
     if(cands.length){
       const pick=cands.slice().sort((a,b)=>((a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist)))[0], walked=i>floorI;
       const why = walked
         ? (apt?apt.icao:'The field')+'&rsquo;s '+pref.slice(floorI,i).join('/')+' '+(i-floorI>1?'are':'is')+' offline &mdash; '+esc(pick.callsign)+' covers you top-down'
         : (pick.topdown ? esc(pick.callsign)+' covers you top-down &mdash; no Approach or Center online' : esc(pick.callsign)+' is online and covers you');
       const others=enr.filter(c=>c!==pick && c.covers).sort((a,b)=>((a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist))).slice(0,4);
-      return {found:true, tier, freq:pick.freq, callsign:pick.callsign, label:latcTierLabel(tier), why, phase, apt, others, verify};
+      return {found:true, tier, freq:pick.freq, callsign:pick.callsign, label:latcPosLabel(tier, pick.callsign), why, phase, apt, others, verify};
     }
   }
   if(!nearField) return {found:false, tier:'UNICOM', freq:LATC_UNICOM, callsign:null, label:'UNICOM', why:verify.length?('No ATC covers your area &mdash; UNICOM 122.800. '+verify.length+' nearby position'+(verify.length>1?'s':'')+' we couldn&rsquo;t place precisely &mdash; verify'):'No ATC in your area &mdash; UNICOM 122.800', phase, apt:null, others:[], verify};
@@ -7331,7 +7350,7 @@ function latcPushOverlay(){
   if(rec.apt && rec.apt.icao){ const fi=rec.apt.icao, curCs=(rec.callsign||''), list=[];
     for(const c of (LATC.controllers||[])){ if(c.facility===0)continue; const tr=LATC_TIER[c.facility], fr=parseFloat(c.frequency);
       if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
-      const a=latcAirportForCallsign(c.callsign, LATC.db); if(a && a.icao===fi) list.push(latcTierLabel(tr)+' '+latcFmt(fr)); }
+      const a=latcAirportForCallsign(c.callsign, LATC.db); if(a && a.icao===fi) list.push(latcPosLabel(tr,c.callsign)+' '+latcFmt(fr)); }
     if(list.length) also='Also at '+fi+': '+list.slice(0,3).join(' · '); }
   // Overlay self-heal (Dean 2026-07-18): if the overlay window ever dies while Live mode is on (it went
   // away during flight prep), main.js returns {ok:false, gone:true}. Re-create it on the next poll so the
@@ -7342,7 +7361,7 @@ function latcPushOverlay(){
     who:(rec.callsign?rec.callsign+' · ':'')+(rec.label||''),
     why:latcPlain(rec.why),
     atis:atis,
-    next: nextUp?(latcNextUpLabel(nextUp)+': '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+latcNextUpNote(nextUp)):'',
+    next: nextUp?(latcNextUpLabel(nextUp)+': '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcPosLabel(nextUp.tier,nextUp.callsign))+latcNextUpNote(nextUp)):'',
     cur: (activeMhz!=null)?("you're tuned to "+latcFmt(activeMhz)):'',
     also: also,
     onFreq:onFreq,
@@ -7420,7 +7439,7 @@ function renderLiveAtc(){
     +'<div style="font-size:34px;font-weight:800;color:'+accent+';letter-spacing:-.02em;font-family:\'JetBrains Mono\',monospace">'+latcFmt(rec.freq)+'</div>'
     +'<div style="font-size:15px;font-weight:600;color:var(--ink1);margin-top:2px">'+(rec.callsign?esc(rec.callsign)+' &middot; ':'')+esc(rec.label)+'</div>'
     +'<div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">'+rec.why+'</div>'
-    +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">'+latcNextUpLabel(nextUp)+': <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcTierLabel(nextUp.tier))+esc(latcNextUpNote(nextUp))+'</div>':'')
+    +(nextUp?'<div style="font-size:12px;color:var(--ink3);margin-top:6px">'+latcNextUpLabel(nextUp)+': <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(nextUp.freq)+'</span> '+(nextUp.callsign?esc(nextUp.callsign)+' &middot; ':'')+esc(nextUp.kind==='atis'?'ATIS':latcPosLabel(nextUp.tier,nextUp.callsign))+esc(latcNextUpNote(nextUp))+'</div>':'')
     ;
   // Read-only radio readout (v6.8.0): show what your ACTIVE radio is on + the next freq in the sequence.
   // Standby number dropped (unreliable on custom aircraft). ABRP never tunes — you dial it yourself.
@@ -7433,7 +7452,7 @@ function renderLiveAtc(){
   { if(rec.apt&&rec.apt.icao){ const fi=rec.apt.icao, curCs=(rec.callsign||''), list=[];
       for(const c of (LATC.controllers||[])){ if(c.facility===0)continue; const tr=LATC_TIER[c.facility], fr=parseFloat(c.frequency);
         if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
-        const a=latcAirportForCallsign(c.callsign, LATC.db); if(a&&a.icao===fi) list.push(esc(latcTierLabel(tr))+' <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(fr)+'</span>'); }
+        const a=latcAirportForCallsign(c.callsign, LATC.db); if(a&&a.icao===fi) list.push(esc(latcPosLabel(tr,c.callsign))+' <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+latcFmt(fr)+'</span>'); }
       if(list.length) h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px">Also online at '+esc(fi)+': '+list.slice(0,3).join(' &middot; ')+'</div>';
   } }
   // PMDG standby adapter: shown ONLY when the loaded aircraft has a write adapter (main.js gates it).
@@ -7445,10 +7464,10 @@ function renderLiveAtc(){
   }
   h+='</div>';
   if(rec.others&&rec.others.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Also in range</div><div style="margin-bottom:14px">';
-    for(const c of rec.others) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+(c.dist!=null?' &middot; '+Math.round(c.dist)+' nm':'')+'</span></div>';
+    for(const c of rec.others) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcPosLabel(c.tier,c.callsign)+(c.dist!=null?' &middot; '+Math.round(c.dist)+' nm':'')+'</span></div>';
     h+='</div>'; }
   if(rec.verify&&rec.verify.length){ h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:6px">Online ATC we can&rsquo;t place precisely <span style="color:var(--ink4)">(Center/wide-area positions &mdash; verify which covers you; precise airspace maps come in a later update)</span></div><div style="margin-bottom:14px">';
-    for(const c of rec.verify.slice(0,6)) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcTierLabel(c.tier)+'</span></div>';
+    for(const c of rec.verify.slice(0,6)) h+='<div style="display:flex;gap:10px;font-size:12px;color:var(--ink2);padding:3px 0;border-top:1px solid var(--sep)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--acc);flex:0 0 130px">'+esc(c.callsign)+'</span><span style="flex:0 0 70px;font-family:\'JetBrains Mono\',monospace">'+latcFmt(c.freq)+'</span><span style="color:var(--ink3)">'+latcPosLabel(c.tier,c.callsign)+'</span></div>';
     h+='</div>'; }
   h+='<div style="font-size:11px;color:var(--ink4);line-height:1.6;border-top:1px solid var(--sep);padding-top:10px">Guidance, not gospel: coverage is approximated from each controller&rsquo;s published range and their airport&rsquo;s location. ABRP never transmits, and never touches your ACTIVE frequency &mdash; you dial that yourself. On the PMDG 737 the optional Set-standby button drives the radio&rsquo;s own knobs (standby only, verified). <a href="#" onclick="latcRefreshDb();return false" style="color:var(--acc)">Refresh airport database</a></div>';
   el.innerHTML=h;
@@ -7877,5 +7896,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.13.13</div>
+  pointer-events:none;">v6.13.14</div>
 </body></html>

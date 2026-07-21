@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.13
+# A Better Route Planner — v6.13.14
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.14 LIVE ATC: DEPARTURE vs APPROACH. When both a Departure (_DEP) and an Approach (_APP) controller are online at your field, the frequency helper now picks the right one for your phase — Departure when you're leaving, Approach when you're arriving — instead of treating them as interchangeable. VATSIM gives both the same facility code, so ABRP now tells them apart by callsign, and labels a Departure position "Departure" (not "Approach"). Caught live at KORD.
 v6.13.13 VRAM LINE: BLUE, SOLID. Root cause found — the chart line was inheriting the theme's AMBER --vram color (meant for the metrics-panel bar), and amber-vs-green is the classic red-green-colorblind confusable pair. The line now has its own dedicated color: solid blue-violet, no dash. Reports regenerate once on next launch.
 v6.13.12 VRAM LINE: COLORBLIND-SAFE. The VRAM line is now bright magenta AND dashed, so it can't be confused with the solid green TLOD line under red-green color vision — the pattern tells them apart even where the hues don't. Reports regenerate once on next launch.
 v6.13.11 FRAMETIME CHART: TOGGLES + VRAM + BUSIEST-CORE LINES. Every line on the "frametime over flight" chart now has a clickable chip under it — click to show/hide, and your choices are remembered. Two new lines: VRAM used in MB (every flight) and, on AutoFPS flights, the busiest CPU core's load (AutoFPS's "Dom" reading — the real bottleneck core, unlike overall CPU% which spreads across all cores and looks idle). Both start hidden so the chart stays clean; one click brings them in. Existing AutoFPS flights pick up the busiest-core line automatically if their AutoFPS log still exists. Reports regenerate once on next launch.

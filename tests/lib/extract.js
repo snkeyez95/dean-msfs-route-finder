@@ -55,7 +55,7 @@ return {
   latcNextUpLabel, latcNextUpNote,
   airspaceCovers, traconCovers, vgCovers, _vgAt, _vgPosFor, latcAirportForCallsign,
   latcNearestAirport, latcBriefRoute, latcRenderBrief, vatsimAtisData, vatsimAtisAvail,
-  latcTierLabel, latcFmt, latcPlain, LATC, LATC_TIER, vCfg,
+  latcTierLabel, latcTermRole, latcPosLabel, latcFmt, latcPlain, LATC, LATC_TIER, vCfg,
   setAirspace: a => { _airspace = a; }, getAirspace: () => _airspace,
   setFeed: f => { _vFeed = f; }, getFeed: () => _vFeed,
   setS: s => { S = s; }, getS: () => S,
