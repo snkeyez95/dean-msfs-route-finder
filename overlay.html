@@ -54,7 +54,7 @@
     if(q.tlod!=null) parts.push('TLOD '+q.tlod);
     return parts.join('  |  ');
   }
-  let expanded=false, collapseTimer=null, statusTimer=null, curIgnore=true;
+  let expanded=false, collapseTimer=null, collapseAt=0, statusTimer=null, curIgnore=true;
   // UNREAD state (Dean 2026-07-16): an alert must keep flagging itself until you actually LOOK at it.
   // The pulse used to live only as a CSS class, and the not-live branch below did `dot.className='off'`
   // — which wiped every class, so one stale position sample (a momentary 'connecting' blip) silently
@@ -79,7 +79,11 @@
   function expand(){ expanded=true; panel.classList.add('show'); setUnread(false); }   // you're looking at it → read
   function collapse(){ expanded=false; panel.classList.remove('show'); }
   // Auto-open the panel for `ms`, then collapse to the dot and pulse it so a missed alert is still visible.
-  function autoExpand(ms){ expand(); clearTimeout(collapseTimer); collapseTimer=setTimeout(function(){ collapse(); setUnread(true); }, ms||20000); }
+  // EXTEND-ONLY (Dean 2026-07-20): the collapse deadline only ever moves LATER, never earlier — so a
+  // routine 5s screen update (or a shorter new-rec pop) can't cut a longer handoff alert short. The alert
+  // was disappearing when the dot collapsed because a later autoExpand kept resetting the timer downward.
+  function autoExpand(ms){ expand(); const until=Date.now()+(ms||20000); if(until<=collapseAt) return; collapseAt=until;
+    clearTimeout(collapseTimer); collapseTimer=setTimeout(function(){ collapse(); setUnread(true); collapseAt=0; }, ms||20000); }
 
   // Click = toggle panel. Click-HOLD-drag = move the whole overlay anywhere on screen (v6.11.6 —
   // the default top-right spot sat on the PMDG overhead light switches). Pointer capture keeps the
