@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.13.18</div>
+  <div class="tname">A Better Route Planner &mdash; v6.14.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.13.18</div>
+    <div class="sb-ver">v6.14.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -700,6 +700,14 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
         <div id="ar-last-refresh"></div>
         <div id="ar-next-refresh"></div>
       </div>
+    </div>
+    <div id="max-routes-wrap" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--sep)">
+      <label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink2)" title="How many routes the app keeps in Plan a Flight. Raise it for more variety (filled instantly from your snapshot); lower it to trim down — trimmed routes stay safe in the snapshot.">
+        Max routes to keep
+        <input class="api-inp" type="number" id="max-routes-inp" min="500" max="20000" step="500" style="width:110px;flex:none">
+        <button class="btn bg bsm" onclick="onMaxRoutesApply()">Apply</button>
+      </label>
+      <div id="max-routes-st" style="margin-top:5px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);line-height:1.7"></div>
     </div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin:24px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">VATSIM Live ATC</div>
@@ -2004,6 +2012,8 @@ function startNetworkCountdown(sec,page){
 let _arTimer=null,_arInterval=null;
 function updateAutoRefreshInfo(){
   const cb=document.getElementById('auto-refresh-cb'),info=document.getElementById('auto-refresh-info');
+  const mri=document.getElementById('max-routes-inp');
+  if(mri&&document.activeElement!==mri)mri.value=routeCap();   // v6.14.0: reflect the saved cap
   if(!cb||!info)return;
   cb.checked=!!S.cfg.autoRefreshEnabled;
   info.style.display=S.cfg.autoRefreshEnabled?'block':'none';
@@ -2060,6 +2070,33 @@ async function runAutoRefresh(){
     if(_dot)_dot.style.display='none';
     updateAutoRefreshInfo();  // refresh "Last/Next refresh" display
   }
+}
+async function onMaxRoutesApply(){
+  const inp=document.getElementById('max-routes-inp'),st=document.getElementById('max-routes-st');
+  const raw=parseInt(inp&&inp.value,10);
+  const cap=Math.max(500,Math.min(20000,isNaN(raw)?5000:raw));
+  if(inp)inp.value=cap;
+  S.cfg.maxRoutes=cap;
+  await window.api.saveConfig(S.cfg);
+  const before=Object.keys(S.routeRegistry).length;
+  let msg;
+  if(before>cap){
+    pruneRegistry();
+    const cut=before-Object.keys(S.routeRegistry).length;
+    await window.api.siSaveRegistry(S.routeRegistry);
+    msg='Cap set to '+cap.toLocaleString()+' — trimmed '+cut.toLocaleString()+' route'+(cut!==1?'s':'')+' (they stay safe in your snapshot).';
+  }else if(before<cap){
+    const added=backfillFromSnapshot();
+    if(added)await window.api.siSaveRegistry(S.routeRegistry);
+    const after=Object.keys(S.routeRegistry).length;
+    msg='Cap set to '+cap.toLocaleString()+' — restored '+added.toLocaleString()+' route'+(added!==1?'s':'')+' from snapshot ('+after.toLocaleString()+' total'
+      +(after<cap?' — snapshot has no more that match your library; refreshes will keep filling':'')+').';
+  }else{
+    msg='Cap set to '+cap.toLocaleString()+' — registry already there.';
+  }
+  if(st)st.textContent=msg;
+  RLOG('[SI] maxRoutes → '+cap+': '+msg);
+  renderRoutes();updateStats();updateSnapshotInfo();
 }
 function onAutoRefreshToggle(){
   const cb=document.getElementById('auto-refresh-cb');
@@ -2435,7 +2472,15 @@ function processPage(routes){
   }
 }
 
-function pruneRegistry(){
+// v6.14.0: the registry cap is user-configurable (Settings → Route Data Source → "Max routes to
+// keep"). Clamped 500–20,000 — 20k is the snapshot ceiling, so backfill can always supply the cap.
+function routeCap(){
+  const n=parseInt(S.cfg.maxRoutes,10);
+  return Math.max(500,Math.min(20000,isNaN(n)?5000:n));
+}
+function pruneRegistry(rand){
+  rand=rand||Math.random;   // injectable so tests can seed the rotation deterministically
+  const cap=routeCap();
   const cutoff=new Date(Date.now()-21*24*60*60*1000).toISOString();
   // ACTIVE-FLIGHT PROTECTION (2026-07-02): an auto-refresh's prune deleted KFLL-MMUN ten minutes
   // after Dean SimBriefed it (last_seen 29d > the 21-day cutoff) — his flight plan vanished from
@@ -2449,9 +2494,17 @@ function pruneRegistry(){
     if(r.last_seen<cutoff){ if(isProtected(r)){shielded++;continue;} delete S.routeRegistry[id]; }
   }
   const keys=Object.keys(S.routeRegistry);
-  if(keys.length>5000){
-    keys.sort((a,b)=>S.routeRegistry[a].last_seen.localeCompare(S.routeRegistry[b].last_seen));
-    let excess=keys.length-5000;
+  if(keys.length>cap){
+    // ROTATION (v6.14.0): a full refresh stamps everything it sees within the same day, and the old
+    // stable sort meant the SAME routes survived every prune while the rest of SI's dataset never
+    // rotated in. Sort by DAY-granular last_seen (genuinely older routes still evict first) but
+    // SHUFFLE within a day, so each refresh keeps a different mix at the cap.
+    const tie=new Map();for(const id of keys)tie.set(id,rand());
+    keys.sort((a,b)=>{
+      const da=S.routeRegistry[a].last_seen.slice(0,10),db=S.routeRegistry[b].last_seen.slice(0,10);
+      return da<db?-1:da>db?1:(tie.get(a)-tie.get(b));
+    });
+    let excess=keys.length-cap;
     for(const id of keys){
       if(excess<=0)break;
       if(isProtected(S.routeRegistry[id])){shielded++;continue;}   // cap-prune skips active flights too
@@ -2460,7 +2513,39 @@ function pruneRegistry(){
   }
   if(shielded)RLOG('[SI] prune: shielded '+shielded+' route(s) on recently-SimBriefed pairs');
   const size=JSON.stringify(S.routeRegistry).length;
-  if(size>2*1024*1024)RLOG('WARNING: routeRegistry exceeds 2MB ('+Math.round(size/1024)+'KB)');
+  const warnAt=Math.max(2*1024*1024,cap*1024);   // scale the nag with a deliberately large cap
+  if(size>warnAt)RLOG('WARNING: routeRegistry exceeds '+Math.round(warnAt/1024/1024)+'MB ('+Math.round(size/1024)+'KB)');
+}
+
+// v6.14.0: when the cap is RAISED, fill the gap instantly from the never-pruned snapshot instead of
+// waiting up to 8 hours for the next refresh. Candidates must still touch the CURRENT library (same
+// membership test as processPage); most-recent day first, shuffled within a day (matches the
+// prune's rotation). Returns how many routes were added.
+function backfillFromSnapshot(rand){
+  rand=rand||Math.random;
+  const cap=routeCap();
+  let n=Object.keys(S.routeRegistry).length;
+  if(n>=cap)return 0;
+  const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
+  const cands=[];
+  for(const[id,r] of Object.entries(S.routeRegistrySnapshot)){
+    if(S.routeRegistry[id])continue;
+    if(!allLib.has(r.departure_airport)&&!allLib.has(r.arrival_airport))continue;
+    cands.push(id);
+  }
+  const tie=new Map();for(const id of cands)tie.set(id,rand());
+  cands.sort((a,b)=>{
+    const da=S.routeRegistrySnapshot[a].last_seen.slice(0,10),db=S.routeRegistrySnapshot[b].last_seen.slice(0,10);
+    return da<db?1:da>db?-1:(tie.get(a)-tie.get(b));   // newest day first
+  });
+  let added=0;
+  for(const id of cands){
+    if(n>=cap)break;
+    S.routeRegistry[id]={...S.routeRegistrySnapshot[id]};
+    n++;added++;
+  }
+  if(added)RLOG('[SI] backfill from snapshot: +'+added+' route(s), registry now '+n+'/'+cap);
+  return added;
 }
 
 function mergeIntoSnapshot(srcRegistry){
@@ -2714,7 +2799,7 @@ async function fetchSIRoutes({autoMode=false}={}){
   await window.api.siSaveRegistry(S.routeRegistry);
   S.cfg.siLastFetch=new Date().toISOString();
   const cnt=Object.keys(S.routeRegistry).length;
-  // "New" = route ids never seen before this refresh. At the 5,000 cap the NET change is always 0
+  // "New" = route ids never seen before this refresh. At the cap the NET change is always 0
   // (new ones rotate in, least-recently-seen rotate out) — reporting net looked like a stalled
   // system (Dean 2026-07-06). Report the churn honestly instead.
   const newRoutes=_siNewSeen;
@@ -2724,7 +2809,7 @@ async function fetchSIRoutes({autoMode=false}={}){
   updateAutoRefreshInfo();  // repaint Last/Next refresh after any refresh (manual or auto)
   stopRlCountdown();siShowFetchPanel(false);if(btn)btn.disabled=false;
   const wStr=rateLimitWaits>0?' — '+rateLimitWaits+' rate limit wait'+(rateLimitWaits!==1?'s':''):'';
-  setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' new route'+(newRoutes!==1?'s':'')+(rotated?' ('+rotated.toLocaleString()+' rotated out — registry at its 5,000 cap)':' added')+wStr+'.','var(--grn)');
+  setSt('✅ Last refresh: just now — '+newRoutes.toLocaleString()+' new route'+(newRoutes!==1?'s':'')+(rotated?' ('+rotated.toLocaleString()+' rotated out — registry at its '+routeCap().toLocaleString()+' cap)':' added')+wStr+'.','var(--grn)');
   RLOG('fetchSIRoutes complete: registry='+cnt+' new='+newRoutes+' rotatedOut='+rotated+' rateLimitWaits='+rateLimitWaits);
   if(autoMode)RLOG('[SI] Auto-refresh complete: '+newRoutes+' new route(s)'+(rotated?', '+rotated+' rotated out at cap':''));
   const _snapBefore=Object.keys(S.routeRegistrySnapshot).length;
@@ -7924,5 +8009,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.13.18</div>
+  pointer-events:none;">v6.14.0</div>
 </body></html>

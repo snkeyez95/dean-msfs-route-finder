@@ -1,5 +1,75 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## 🎚️ v6.14.0 — CONFIGURABLE ROUTE CAP + SNAPSHOT BACKFILL + ROTATION (Dean 2026-07-21, plan-approved)
+
+### Context
+The in-app route registry is hard-capped at 5,000 (two inline `5000` literals in `pruneRegistry()`,
+index.html:2452/2454). Dean wants a GUI numeric input in the Route Data Source section to set the cap
+himself: increase → registry grows; decrease → trims newest-kept/oldest-out as today. He also asked
+whether anything encourages VARIABILITY in which routes are kept. Exploration answer: **no** — every
+refresh fetches all ~140+ pages in fixed order, stamps everything seen with last_seen, and cap-prunes
+oldest-first with a STABLE tie-break, so effectively the SAME ~5,000 survive refresh after refresh
+while the rest of SI's dataset never rotates in. Dean's locked decisions (AskUserQuestion 2026-07-21):
+**instant backfill from the 20k snapshot on increase** (not wait-for-refresh) + **rotation at the cap**
+(shuffle among equally-fresh routes each prune so the kept mix varies; SimBriefed pairs stay protected).
+
+### Key facts (verified by exploration 2026-07-21)
+- pruneRegistry (index.html:2438-2464): 21-day age prune → cap prune sorted ascending by last_seen,
+  protected = recentSimBriefRoutes pairs (order-insensitive sorted-join key). Called from the SI
+  refresh (:2713) + two community-import handlers (:7841/:7907). 2 MB serialized-size warn at :2462.
+- mergeIntoSnapshot (:2466-2480): snapshot = accumulate-only 20k superset, never pruned — the backfill
+  source. Snapshot is intentionally frozen at 20k (Dean 2026-07-06 decision, unchanged here).
+- Refresh fetches ALL pages regardless of cap and prunes ONCE at the end (:2713) — so a raised cap
+  backfills naturally on refresh too; no fetch-loop changes needed.
+- Config pattern: `S.cfg.<field>` + `await window.api.saveConfig(S.cfg)` (cookie save :2087-2090 is
+  the closest template). main.js save-config merges arbitrary fields — NO main-process changes.
+- Registry/snapshot live in routeRegistry.json / routeSnapshot.json (main.js:570-571, atomic writes);
+  no cap enforced at load time — an over-cap file trims at next pruneRegistry.
+- "New routes" churn reporting at :2717-2727 references the 5,000 cap in user-facing text.
+
+### Build steps (all index.html + version files)
+1. **Config + GUI**: `S.cfg.maxRoutes` (default 5000; clamp 500–20,000 — 20k = the snapshot ceiling,
+   so the cap can never exceed what backfill could supply). Numeric input row "Max routes to keep"
+   in the Route Data Source panel (after #auto-refresh-wrap, ~:703) + Apply button + a result line.
+   Handler `onMaxRoutesApply()`: read → clamp → write cfg → saveConfig → then branch:
+   - **new cap < current registry count** → call pruneRegistry() immediately + siSaveRegistry +
+     renderRoutes; report "trimmed X routes (still in your snapshot)".
+   - **new cap > count** → `backfillFromSnapshot()` (step 3) + save + render; report "+X routes
+     restored from snapshot" (honest partial message if the snapshot can't fill the gap).
+2. **pruneRegistry cap + ROTATION** (:2438-2464): `const cap=Math.max(500,Math.min(20000,
+   +S.cfg.maxRoutes||5000))` replaces both literals. Rotation: cap-prune sort key becomes
+   **day-granular last_seen (`last_seen.slice(0,10)`) + random tie-break** — routes from the same
+   refresh (all same day) shuffle, so a different subset survives each prune; genuinely older routes
+   still evict first. Protected-pair shielding unchanged. Make the shuffle injectable
+   (`pruneRegistry(rand=Math.random)`) so tests can seed it deterministically.
+3. **`backfillFromSnapshot()`** (new, beside mergeIntoSnapshot): candidates = snapshot IDs not in
+   the registry that still pass the CURRENT library filter (dep or arr in the user's library — reuse
+   the same membership test processPage uses at :2412-2416; skip re-checking aircraft type, already
+   filtered at ingest). Order candidates by the same day-bucket+shuffle key (prefer recent, rotate
+   within buckets), add `{...r}` copies until the registry reaches cap. Returns count added.
+4. **Dynamic user-facing text**: the ":2727 churn line" ("registry at its 5,000 cap") + any other
+   5,000 strings in the refresh reporting → use the live cap value. Scale the size warn (:2462):
+   threshold = max(2 MB, cap × 1 KB) so a deliberately large cap doesn't nag.
+5. **Version/docs**: v6.14.0 (package.json + index.html title/sb-ver/footer + README changelog).
+   Roadmap/memory sync via `node tools\sync-notes.js`.
+
+### Tests (tests/ — repo, per the scratchpad-loss rule)
+New `tests/test_route_cap.js` using tests/lib/extract.js `grab()` to pull the REAL pruneRegistry /
+mergeIntoSnapshot / backfillFromSnapshot out of index.html with a small S/cfg stub:
+(a) cap honors S.cfg.maxRoutes (prune to 3000, to 8000-no-op, absent→5000 default, clamp 500/20000);
+(b) decrease trims oldest day-bucket first + protected pairs shielded (the KFLL→MMUN regression);
+(c) rotation — with a seeded rand, two prunes over 100 same-day routes at cap 50 keep DIFFERENT sets;
+with rand fixed, deterministic (injectability proof); older-day routes always evict before newer;
+(d) backfill — adds only missing IDs, stops exactly at cap, honors the library filter, copies not
+references, honest count when snapshot < gap; (e) full-board regression: `node tests\run_all.js`.
+
+### Verification (live, Dean)
+Settings → Route Data Source → set 8,000 → "+~3,000 restored from snapshot" and Plan a Flight
+instantly shows more routes; set 3,000 → trim message + count drops; next auto-refresh reports churn
+against the new cap and holds it. Watch item (not a blocker): renderRoutes/getRoutes re-filter the
+full registry per render — fine at 5k, keep an eye on UI snappiness at 15–20k.
+
+
 ## 🗺️ MASTER REMAINING LIST (consolidated 2026-07-02 — Dean asked "are you tracking all of it")
 > The single source of truth for what's left. Every item below has its full blueprint elsewhere in
 > this file (section named in parens). Update this list as items complete.
@@ -2025,6 +2095,23 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **🔗 Fenix installer "phantom update" triggered by ABRP aircraft-junction re-creation (Dean 2026-07-21,
+  diagnosed end-to-end).** Fenix installer repeatedly shows "Update v2.4.0.4720" (the SAME version already
+  installed, April 15) for the A320/A319-321 BASE packs (not liveries — that guess was wrong). PROVEN
+  benign no-op: before/after fingerprint = identical version, byte-for-byte identical size (A320 2076
+  files / 4,052,199,107 bytes), files untouched (April-15 mtimes, not rewritten). ROOT CAUSE isolated by
+  Dean's experiment: update-with-junction-up → installer satisfied; deactivate → "not installed";
+  RE-ACTIVATE (fresh junction) → re-flags all 2076 files. So RE-CREATING the ABRP aircraft symlink is the
+  trigger — the installer ties its "verified/current" state to the specific folder/reparse-point, and a
+  fresh junction (new creation stamp) makes it no longer recognize its own deployment → full re-verify.
+  Fenix lives in Documents\MSFS\Aircraft\Fenix (library), symlinked into Community\fnx-aircraft-320 etc.
+  on activation; the updater deploys THROUGH the junction (writes land in the library). a32x-common
+  "not owned or available" = red herring (update completes fine). POSSIBLE FIX (Dean asked): a
+  "keep aircraft linked between sessions" option so ABRP doesn't tear down aircraft junctions on quit —
+  persistent junction → installer never re-flags → nag stops (and saves re-activating each session).
+  Need to confirm whether ABRP currently auto-removes aircraft junctions on quit (cleanupActivationsOnQuit
+  — scenery does; check if aircraft do too) vs Dean deactivating manually. Harmless either way; build the
+  toggle only if Dean wants it.
 - **✅ FIXED v6.13.18 (2026-07-20) — arrival stuck on Center, wouldn't hand down to Approach.** Dean
   inbound KDTW, 30nm out, tuned to CLE_48_CTR, DTW_F1_APP online + covering — overlay stayed on Center.
   NOT a polygon failure (probed: DTW TRACON covers to ~40nm NW, he was inside at 30nm). ROOT CAUSE: the
