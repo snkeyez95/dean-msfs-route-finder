@@ -2025,6 +2025,12 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **✅ FIXED v6.13.15 (2026-07-20) — handoff overlay alert lingered too briefly.** Dean saw the "~3 min
+  from Chicago Center" handoff toast but it "went away too quickly." Cause: latcCheckToasts fired the
+  handoff toast (index.html:7266) with NO ms arg → overlay.html default 14s (overlay.html:147), and it
+  only fires ONCE per handoff (_handoffKey guard). Bumped to 30000ms. The dot keeps pulsing (unread)
+  after collapse, so a missed alert stays flagged. Not desk-testable (overlay = DOM/IPC); Dean verifies
+  live. POSSIBLE FOLLOW-UP if 30s still gets missed: a second, closer-in reminder (~2 min / ≤10nm).
 - **✅ FIXED v6.13.14 (2026-07-20) — LIVE-ATC DEPARTURE vs APPROACH.** Added latcTermRole (callsign
   last-segment _DEP/_APP) + latcPosLabel; fieldPos takes a per-leg termRole (dep→DEP, arr→APP, fall
   back to the other if only it's online); recommendFreq's APP pick prefers the role matching isDepField;

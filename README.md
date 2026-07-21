@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.14
+# A Better Route Planner — v6.13.15
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.15 LIVE ATC: handoff alert lingers longer. The "you're ~N min from your next controller" pop-up now stays up 30 seconds (was 14) so you have time to read it and prep the switch. After it collapses, the dot keeps pulsing until you open it, so a missed alert is still flagged.
 v6.13.14 LIVE ATC: DEPARTURE vs APPROACH. When both a Departure (_DEP) and an Approach (_APP) controller are online at your field, the frequency helper now picks the right one for your phase — Departure when you're leaving, Approach when you're arriving — instead of treating them as interchangeable. VATSIM gives both the same facility code, so ABRP now tells them apart by callsign, and labels a Departure position "Departure" (not "Approach"). Caught live at KORD.
 v6.13.13 VRAM LINE: BLUE, SOLID. Root cause found — the chart line was inheriting the theme's AMBER --vram color (meant for the metrics-panel bar), and amber-vs-green is the classic red-green-colorblind confusable pair. The line now has its own dedicated color: solid blue-violet, no dash. Reports regenerate once on next launch.
 v6.13.12 VRAM LINE: COLORBLIND-SAFE. The VRAM line is now bright magenta AND dashed, so it can't be confused with the solid green TLOD line under red-green color vision — the pattern tells them apart even where the hues don't. Reports regenerate once on next launch.
