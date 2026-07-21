@@ -36,13 +36,14 @@
   <div class="next" id="next"></div>
   <div class="also" id="also"></div>
   <div class="cur" id="cur"></div>
+  <div class="also" id="atisnote"></div>
   <div class="perf" id="perf"></div>
 </div>
 <script>
   const dot=document.getElementById('dot'), panel=document.getElementById('panel');
   const st=document.getElementById('st'), atis=document.getElementById('atis'), freq=document.getElementById('freq'),
         who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), also=document.getElementById('also'), cur=document.getElementById('cur'),
-        klabel=document.getElementById('klabel'), perfEl=document.getElementById('perf');
+        klabel=document.getElementById('klabel'), perfEl=document.getElementById('perf'), atisnote=document.getElementById('atisnote');
   // v6.12.0: compact live perf line — fields simply skipped when null (offline / no data yet).
   function perfLine(q){
     if(!q) return '';
@@ -122,13 +123,14 @@
     // clear an alert you haven't seen (classList.add, never className=, which wiped 'pulse').
     if(!p.live){ dot.classList.add('off'); dot.classList.toggle('pulse', unread);
       freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
-      atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; perfEl.style.display='none'; return; }
+      atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; atisnote.style.display='none'; perfEl.style.display='none'; return; }
     dot.classList.remove('off');
     dot.classList.toggle('pulse', unread);   // re-assert every poll: unread survives blips + re-renders
     freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
     atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
     nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
     also.textContent=p.also||''; also.style.display=p.also?'block':'none';
+    atisnote.textContent=p.atisNote||''; atisnote.style.display=p.atisNote?'block':'none';
     const pl=perfLine(p.perf); perfEl.textContent=pl; perfEl.style.display=pl?'block':'none';
     // On-frequency: the header confirms ("ON FREQUENCY ✓" green + green number) and the redundant
     // "you're tuned to X" line is dropped. Otherwise it instructs ("Frequency to be on") and shows

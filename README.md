@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.16
+# A Better Route Planner — v6.13.17
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.17 LIVE ATC: honest wording + ATIS demoted to a footnote. Two arrival fixes (caught inbound to Detroit): (1) the panel no longer claims a field's Tower/Approach are "offline" when they're actually online but just not covering you yet — it now says "aren't covering you here"; (2) the "Next up" line points at your next controller (Approach), not the ATIS — the arrival ATIS now shows as a small footnote instead of hogging the headline.
 v6.13.16 LIVE ATC: overlay alerts can't be cut short. The panel's auto-collapse deadline now only ever moves later, never earlier — so a routine 5-second screen refresh (or a shorter new-frequency pop) can no longer collapse the dot out from under a longer handoff alert before its time is up.
 v6.13.15 LIVE ATC: handoff alert lingers longer. The "you're ~N min from your next controller" pop-up now stays up 30 seconds (was 14) so you have time to read it and prep the switch. After it collapses, the dot keeps pulsing until you open it, so a missed alert is still flagged.
 v6.13.14 LIVE ATC: DEPARTURE vs APPROACH. When both a Departure (_DEP) and an Approach (_APP) controller are online at your field, the frequency helper now picks the right one for your phase — Departure when you're leaving, Approach when you're arriving — instead of treating them as interchangeable. VATSIM gives both the same facility code, so ABRP now tells them apart by callsign, and labels a Departure position "Departure" (not "Approach"). Caught live at KORD.

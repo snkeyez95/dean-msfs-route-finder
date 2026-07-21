@@ -20,6 +20,34 @@ T("latcPosLabel('APP','CHI_Z_APP') = Approach", sb.latcPosLabel('APP','CHI_Z_APP
 T("latcPosLabel('TWR','ORD_S_TWR') = Tower (non-terminal untouched)", sb.latcPosLabel('TWR','ORD_S_TWR') === 'Tower');
 T("latcPosLabel('CTR','CHI_35_CTR') = Center", sb.latcPosLabel('CTR','CHI_35_CTR') === 'Center');
 
+// ── next-up skips ATIS (pure, no data) ───────────────────────────────────────
+console.log('\nnext-up skips ATIS (KDTW inbound):');
+{
+  const seqA=[
+    {kind:'atc', tier:'CTR', leg:'enr', callsign:'CLE_48_CTR', freq:119.875},
+    {kind:'atis', tier:'ATIS', leg:'arr', callsign:'KDTW_ATIS', freq:133.675},
+    {kind:'atc', tier:'APP', leg:'arr', callsign:'DTW_F1_APP', freq:126.225},
+  ];
+  const nu=sb.latcNextUp({found:true, callsign:'CLE_48_CTR', freq:119.875}, seqA);
+  T('Center → next-up skips the ATIS, points at Approach', nu && nu.callsign==='DTW_F1_APP', nu&&(nu.kind+':'+nu.callsign));
+  T('  …flagged downroute → labelled "Later"', nu && nu.downroute===true && sb.latcNextUpLabel(nu)==='Later');
+
+  const seqB=[
+    {kind:'atc', tier:'CTR', leg:'enr', callsign:'CLE_48_CTR', freq:119.875},
+    {kind:'atis', tier:'ATIS', leg:'arr', callsign:'KDTW_ATIS', freq:133.675},
+    {kind:'atc', tier:'CTAF', leg:'arr', callsign:null, freq:118.450},
+  ];
+  const nu2=sb.latcNextUp({found:true, callsign:'CLE_48_CTR', freq:119.875}, seqB);
+  T('dark arrival → skips ATIS to the CTAF/UNICOM (ATIS not lost — it is a footnote)', nu2 && nu2.tier==='CTAF' && Math.abs(nu2.freq-118.450)<0.005, nu2&&nu2.tier);
+
+  const seqC=[
+    {kind:'atc', tier:'GND', leg:'dep', callsign:'MIA_GND', freq:121.800},
+    {kind:'atc', tier:'TWR', leg:'dep', callsign:'MIA_TWR', freq:118.300},
+  ];
+  const nu3=sb.latcNextUp({found:true, callsign:'MIA_GND', freq:121.800}, seqC);
+  T('no ATIS in the way → normal next-up (Ground → Tower)', nu3 && nu3.callsign==='MIA_TWR', nu3&&nu3.callsign);
+}
+
 // ── against real polygons: the actual pick ───────────────────────────────────
 if(!X.haveRealData()){ console.log('\n(pick tests skipped — needs airspace.json + airport_db.json)'); process.exit(T.done() ? 1 : 0); }
 sb.setAirspace(X.loadAirspace());

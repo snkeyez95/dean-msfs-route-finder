@@ -2025,6 +2025,16 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **✅ FIXED v6.13.17 (2026-07-20) — Live ATC arrival: false "offline" + ATIS hogging next-up.** Dean
+  inbound KDTW on Cleveland Center while DTW_F1_APP(126.225)+DTW_E_DEP(132.025) online: (1) panel said
+  "KDTW's TWR/APP are offline" — false; they were online, just not covering him yet. recommendFreq why
+  now "aren't/isn't covering you here" (the walked top-down branch). (2) "Later" showed KDTW_ATIS as the
+  next-up; latcNextUp now SKIPS atis-kind entries → points at the next controller (Approach); a dark
+  arrival falls through to CTAF/UNICOM (ATIS not lost). (3) NEW arrival-ATIS FOOTNOTE (atisNote payload
+  + overlay.html .atisnote element + in-app card arrAtisNote) shown airborne when the arr field is the
+  field of interest — low-key, not the lead. ("Two Approach" = DTW_E_DEP mislabel, already fixed
+  v6.13.14 — ships together.) test_vatsim_depapp.js +4 next-up cases (21/21); full board 15 green, matrix
+  clean. Awaiting release.bat + live re-verify.
 - **✅ FIXED v6.13.15 (2026-07-20) — handoff overlay alert lingered too briefly.** Dean saw the "~3 min
   from Chicago Center" handoff toast but it "went away too quickly." Cause: latcCheckToasts fired the
   handoff toast (index.html:7266) with NO ms arg → overlay.html default 14s (overlay.html:147), and it
