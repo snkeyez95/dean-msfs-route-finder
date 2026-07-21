@@ -93,6 +93,18 @@ console.log('\nlive recommendation:');
   const only = [{callsign:'MIA_APP', facility:5, frequency:'124.850', visual_range:0}];
   const rFb = sb.recommendFreq(depPos, only, db, {dep:'KMIA', arr:'KMCO'}, false);
   T('lone _APP at dep field → still picked (graceful fallback)', rFb.found && rFb.callsign === 'MIA_APP', rFb.callsign);
+
+  // ARRIVAL DESCENT (Dean 2026-07-20, KDTW): tuned to Center, now inside the arrival TRACON. The active-
+  // radio "floor" must NOT pin you to Center — it should let you descend Center → Approach. (Bug: the
+  // floor only moved the rec FORWARD in tier, which is right on climb-out but blocks the arrival descent.)
+  T('sanity — ZMA_CTR covers KMCO (scenario is valid)', sb.airspaceCovers('ZMA_CTR', kmco.lat, kmco.lon) === true);
+  const onCtr = {lat:kmco.lat, lon:kmco.lon, agl:9000, alt:9000, onGround:false, comActiveMhz:132.450};
+  const ctrApp = [
+    {callsign:'ZMA_CTR', facility:6, frequency:'132.450', visual_range:0},
+    {callsign:'MCO_APP', facility:5, frequency:'121.100', visual_range:0},
+  ];
+  const rDesc = sb.recommendFreq(onCtr, ctrApp, db, {dep:'KMIA', arr:'KMCO'}, false);
+  T('descending into KMCO on Center, inside Approach airspace → advances to MCO_APP (not stuck on Center)', rDesc.found && rDesc.callsign === 'MCO_APP', rDesc.callsign);
 }
 
 process.exit(T.done() ? 1 : 0);

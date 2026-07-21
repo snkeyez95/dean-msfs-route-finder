@@ -2025,6 +2025,19 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **✅ FIXED v6.13.18 (2026-07-20) — arrival stuck on Center, wouldn't hand down to Approach.** Dean
+  inbound KDTW, 30nm out, tuned to CLE_48_CTR, DTW_F1_APP online + covering — overlay stayed on Center.
+  NOT a polygon failure (probed: DTW TRACON covers to ~40nm NW, he was inside at 30nm). ROOT CAUSE: the
+  active-radio FLOOR in recommendFreq (index.html ~6987) — floorI = furthest pref-index covering position
+  matching your active freq, loop starts there so the rec "only moves forward." Airborne pref is
+  ['TWR','APP','CTR','FSS'] (ascending tier), so on CLIMB forward=higher index (correct: don't fall back
+  to Tower). But on ARRIVAL you descend Center→Approach→Tower = DECREASING index, and the floor pinned
+  floorI at CTR, skipping APP entirely. FIX: apply the floor only when `onGround || isDepField` (ground
+  taxi + climb-out); on the airborne arrival descent (!onGround && arr is field of interest) floorI stays
+  0 so top-down naturally picks Approach when in its TRACON, Tower when near+low. Departure floor fixes
+  (stuck-on-Delivery-after-pushback, stuck-on-Tower-at-3700ft) preserved (isDepField=true on climb).
+  test_vatsim_depapp.js: TDD'd — new arrival-descent case FAILED on old code (ZMA_CTR), PASSES after
+  (MCO_APP); 23/23. Full board 15 green, ATC matrix (which exercises the dep floor) still clean.
 - **✅ FIXED v6.13.17 (2026-07-20) — Live ATC arrival: false "offline" + ATIS hogging next-up.** Dean
   inbound KDTW on Cleveland Center while DTW_F1_APP(126.225)+DTW_E_DEP(132.025) online: (1) panel said
   "KDTW's TWR/APP are offline" — false; they were online, just not covering him yet. recommendFreq why

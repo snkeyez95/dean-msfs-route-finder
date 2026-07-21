@@ -1,4 +1,4 @@
-# A Better Route Planner — v6.13.17
+# A Better Route Planner — v6.13.18
 
 A Windows Electron desktop app for Microsoft Flight Simulator 2024. Scans your 3rd-party scenery folder, detects installed airports by ICAO code, fetches real scheduled airline routes via SayIntentions.AI, and provides flight planning tools powered by live weather.
 
@@ -301,6 +301,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.13.18 LIVE ATC: arrival hand-down to Approach fixed. The recommendation could get stuck on Center as you descended into a staffed Approach's airspace — the "don't recommend a lower tier than you're already on" rule (correct on climb-out) was wrongly blocking the normal Center → Approach → Tower descent. It now applies only on the ground and on departure, so arrivals hand down correctly. (Caught inbound to Detroit: 30nm out, inside Detroit Approach's airspace, still showing Cleveland Center.)
 v6.13.17 LIVE ATC: honest wording + ATIS demoted to a footnote. Two arrival fixes (caught inbound to Detroit): (1) the panel no longer claims a field's Tower/Approach are "offline" when they're actually online but just not covering you yet — it now says "aren't covering you here"; (2) the "Next up" line points at your next controller (Approach), not the ATIS — the arrival ATIS now shows as a small footnote instead of hogging the headline.
 v6.13.16 LIVE ATC: overlay alerts can't be cut short. The panel's auto-collapse deadline now only ever moves later, never earlier — so a routine 5-second screen refresh (or a shorter new-frequency pop) can no longer collapse the dot out from under a longer handoff alert before its time is up.
 v6.13.15 LIVE ATC: handoff alert lingers longer. The "you're ~N min from your next controller" pop-up now stays up 30 seconds (was 14) so you have time to read it and prep the switch. After it collapses, the dot keeps pulsing until you open it, so a missed alert is still flagged.
