@@ -1,5 +1,106 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## 🌄 v6.15.0 — SCENIC APPROACHES MODE (Challenging ⟷ Scenic toggle, wind-gated, real routes) (Dean 2026-07-22, plan-approved)
+
+### Context
+Dean rarely uses the Challenging Approaches tab and wants to make it worth opening: add a second mode,
+**Scenic**, alongside Challenging — community-known gorgeous, runway-specific approaches (often RNAV).
+He supplied a 20-airport starter list (`~/Downloads/top-20-scenic-approaches.md`); expand to ~35–40,
+each with the specific scenic runway + a VERIFIED magnetic heading. The section keeps its airport-first
+browse UI but Scenic mode adds: (a) real-world flights INTO the scenic airport, short/med-haul only,
+free-route fallback; (b) a hard WIND GATE — a scenic approach is only shown when current wind favors
+its required runway (no meaningful tailwind, ≤5 kt), so you're never sent to fly RNAV 10L in a tailwind.
+Dean's locked answers (AskUserQuestion 2026-07-22): **hide** unfavorable-wind airports; **library
+short/med first, free-route fallback**; **~35–40 verified**; **favor = tailwind ≤5 kt**.
+
+### Key facts (verified by exploration 2026-07-22, all index.html)
+- Curated data: `const CH=[…]` (:1217-1238), 20 entries `{icao,name,city,lat,lon,rwy,approach,diff,cat,
+  desc,bestwind,worstwind,inMSFS,note,pay,free,yt,sv}`. Precedent: hardcoded curated aviation reference
+  is allowed (SKILL classifies Challenging Approaches + RWY_HDGS as shared reference, NOT a rule-#3
+  personal-setup leak).
+- Renderers: `buildChSB()` (:7629 left list, applies max-time filter), `renderCD(idx)` (:7708 detail
+  card), `chRoutesHTML(ch)` (:7665 — routes arriving at ch.icao from library deps, fleet-flyable, sorted
+  by distance_nm, cap 10), `fetchChMetar(ch)` (:7800 live METAR + wind advisory vs ch.rwy), dep select
+  `buildChDepSelect()` (:7600). Tab wired at sw() (:1470 `if(t==='challenges')buildChDepSelect()`);
+  pane `#pane-challenges` (:647); filter row (:650-661) holds the Max-Time chips.
+- Wind primitives (REUSE VERBATIM): `parseWind(m)` (:6273 → `{dir,spd,gust}`), `tailwindComp(icao,rwy,
+  dir,spd)` (:6311 → +tailwind/−headwind kt, or null on VRB/no-heading), `bestRwy` (:6290), consts
+  `TAILWIND_MAX_KT=5` (:6007). The D-ATIS cross-check (:6543-6552) already implements exactly the gate:
+  `tw = tailwindComp(...); favorable = tw!=null && tw<=TAILWIND_MAX_KT`.
+- Heading data gap: `RWY_HDGS` (:1159) is US/Europe-weighted and MISSING most scenic ICAOs (NZQN, LPMA,
+  LGKR, TNCM…). `fetchRwyData` (:6318, aviationweather.gov) is US-centric and unreliable abroad. →
+  Store the heading `h` ON each scenic entry; gate math uses `entry.h` directly, no DB dependency.
+- Live wind: `S.metarCache` (:1252, keyed by ICAO, `.rawOb`/`.wspd`/`.obsTime`), batch-filled by
+  `fetchMetarBatch` (:6240). VATSIM ATIS: `vatsimAtisData(icao)` (:7309, text only — active rwy via
+  `extractRunways`). Free-route synthetic card pattern: `renderFreeRouteResults()` (:3260-3331, builds a
+  card from just dep+arr: names, METAR, active runway via `fetchDatis(...,'fr')`, SimBrief/SkyVector).
+- Long-haul filter fields: `r.distance_nm` (nm) and `r.flight_length` (ENROUTE minutes; `blockLen()`
+  :2836 adds `BLOCK_PAD_MIN=25`). Max-Time chips already give a duration cap to reuse.
+
+### Design decisions (mine, from Dean's answers + the ramifications he asked me to think through)
+1. **Build it in the Challenging Approaches section as a Challenging⟷Scenic mode toggle** — his explicit
+   request, and every renderer (`buildChSB`/`renderCD`/`chRoutesHTML`/`fetchChMetar`) is reusable as-is.
+2. **Scenic data = a separate `CH_SCENIC` array** (not overloading `CH`), same shape + two new fields:
+   `h` (verified magnetic heading of the scenic rwy — the wind-gate input) and `scenery` (one-line why
+   it's gorgeous). ~35–40 entries expanded from Dean's list; all 737/A320-class fields. Corfu-style
+   runway-number slips in his source (his "Corfu 35" is really LGKR 34) get corrected during build.
+3. **Wind gate** `scenicFavorable(entry)`: read `S.metarCache[icao]` → `parseWind` → tailwind against
+   `entry.h` (copy `tailwindComp` math, but off the stored heading). Favorable iff **calm/variable/light
+   (VRB or spd<3) OR tailwind ≤ TAILWIND_MAX_KT**. If a VATSIM ATIS for the field is loaded and names an
+   active runway, that OVERRIDES (favorable iff it matches the scenic rwy) — real-world controller choice
+   wins; else METAR is the baseline. **Missing METAR ⇒ not-yet-judged, shown greyed "checking wind…",
+   not hidden** (a fetch-in-flight airport shouldn't vanish).
+4. **Hide unfavorable (Dean's pick)** in `buildChSB` when `S.chMode==='scenic'`. SAFETY: if the gate
+   hides everything, show a one-line note "No scenic approaches have favorable winds right now" — never a
+   blank pane. (This + the calm=favorable rule keeps the list from going empty on still days — the subtle
+   interaction in the raw spec: "hide unfavorable" + "tailwind≤5 only" would have hidden calm-wind
+   airports even though calm favors any runway. Fixed by treating calm/VRB as favorable.)
+5. **Routes into the scenic airport, short/med-haul, free-route fallback:** `scenicRoutesHTML(entry)` =
+   `chRoutesHTML` filtered by arrival===icao (drop the library-dep requirement so scenic airports you have
+   any route to still populate) AND `blockLen(flight_length) ≤ cap` (default 240 min, reuse the Max-Time
+   chips), sorted shortest first, cap ~8. If none qualify → render the free-route synthetic-card path
+   (reuse `renderFreeRouteResults`' builder) with the CH dep-select as origin, so Dean can fly it anyway.
+6. **Wind-gating the LIST needs wind for ALL scenic airports up front** → on entering Scenic mode,
+   one batched `fetchMetarBatch` over the ~40 scenic ICAOs (comma-joined, ≤400 cap, 30-min cache), then
+   `buildChSB`. Re-gate on METAR refresh.
+7. **Mode toggle:** `S.chMode` (persist `S.cfg.chMode`, default 'challenging'); a 2-chip `data-chmode`
+   pair in the filter row (mirror `setCT`); `setChMode(v)` toggles `.on`, saves, re-batches wind if
+   scenic, `buildChSB`. Restore at boot (~:1303 pattern). `buildChSB`/detail pick the source array by mode.
+
+### Ramifications considered (Dean's "really think through it" + his Plan-a-Flight ramble)
+- **Plan-a-Flight "Scenic routes" chip (his ramble — analyzed, DEFERRED not built):** technically doable
+  (a chip filtering the route list to arrivals whose ICAO is a favorable-wind scenic field, reusing
+  `CH_SCENIC` + `scenicFavorable`), and it'd live where Dean actually works. BUT the scenic VALUE is
+  airport+runway+approach-centric (the description, the specific gorgeous runway, the wind gate, the
+  free-route-if-missing), which doesn't fit a dense route ROW; and Plan a Flight only shows library
+  routes, so the free-route fallback he wants wouldn't apply. Verdict: build the two-mode section now
+  (self-contained, right home for curated approach content); log the Plan-a-Flight chip as a clean
+  phase-2 that reuses this exact data + gate. Not building it avoids bloating an already-busy tab.
+- **Heading accuracy is the linchpin** of the whole gate. Each `h` is verified at build (cross-checked,
+  not guessed); `rwy_number × 10` is an acceptable ±5-kt-gate fallback (a 5–10° error barely moves the
+  cos-based tailwind near the favorable direction), but I'll store real headings.
+- **Sparsity:** favorable-wind ∩ short-haul-route ∩ curated could be thin on some days — mitigated by the
+  empty-state note + calm=favorable + the free-route fallback (so an airport is never dropped merely for
+  lacking a library route).
+- **Overlap** with Challenging (LOWI/TNCM/LGSR) is fine — different modes, scenic entry emphasizes views.
+
+### Files / version
+index.html only: `CH_SCENIC` array; `S.chMode` + `setChMode` + chip pair in the filter row; mode-aware
+`buildChSB`/detail; `scenicFavorable` + batched wind fetch; `scenicRoutesHTML` (duration-capped) +
+free-route fallback; boot restore. Version v6.15.0 (package.json + index.html title/sb-ver/footer +
+README changelog). No main.js change.
+
+### Verification
+- Tests (tests/test_scenic.js, using extract.js `grab()`): (a) `scenicFavorable` math — a wind straight
+  down the scenic rwy = favorable; a 180°-opposite ≥6 kt = unfavorable; calm/VRB/<3 kt = favorable;
+  missing METAR = null (not-judged); VATSIM-active-rwy match overrides an unfavorable METAR. (b) every
+  `CH_SCENIC` entry has a numeric `h` and a `rwy` whose number×10 is within ~20° of `h` (catches a
+  fat-fingered heading). (c) duration filter drops a long-haul route, keeps a short one. Plus
+  `node tests\run_all.js` full board.
+- Live (Dean): Challenging tab → Scenic chip → list shows only favorable-wind scenic approaches with real
+  short-haul routes (or a free-route card); flip a card's airport whose wind opposes the scenic rwy →
+  it's hidden; toggle back to Challenging → original 20 unchanged.
+
 ## ▶️ v6.14.1 — PER-APP AUTO-START TOGGLE FOR COMPANION APPS (Dean 2026-07-22, plan-approved)
 
 ### Context

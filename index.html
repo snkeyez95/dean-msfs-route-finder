@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.14.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.15.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.14.1</div>
+    <div class="sb-ver">v6.15.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -648,7 +648,11 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
   <div class="chlayout">
     <div class="chsb">
       <div class="chsb-filters">
-        <h3>Challenging Approaches</h3>
+        <h3 id="ch-title">Challenging Approaches</h3>
+        <div class="crow" style="margin-bottom:6px;gap:5px">
+          <div class="chip on" style="font-size:11px;padding:4px 12px" data-chmode="challenging" onclick="setChMode('challenging')">⚡ Challenging</div>
+          <div class="chip" style="font-size:11px;padding:4px 12px" data-chmode="scenic" onclick="setChMode('scenic')">🌄 Scenic</div>
+        </div>
         <div class="crow" style="margin-bottom:0;gap:5px">
           <span class="clbl" style="font-size:9px">Max Time</span>
           <div class="chip on" style="font-size:11px;padding:4px 10px" data-ct="0" onclick="setCT(0)">Any</div>
@@ -1237,6 +1241,50 @@ const CH=[
   {icao:"ENBO",name:"Bodø Airport",city:"Bodø, Norway",lat:67.269,lon:14.365,rwy:"25",approach:"ILS 25 — Arctic Circle Approach",diff:4,cat:"Arctic / Crosswind",desc:"Above the Arctic Circle, Bodø is one of Norway's most challenging airports. Polar vortex weather, aurora-season icing, severe crosswinds from Saltfjorden fjord. The midnight sun means 24-hour operations in summer.",bestwind:"Westerly — RWY 25",worstwind:"Polar low — rapid weather deterioration",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=ENBO"},yt:"https://www.youtube.com/results?search_query=ENBO+bodo+arctic+approach+msfs",sv:"https://skyvector.com/?ll=67.27,14.37&chart=301&zoom=4"},
 ];
 
+// Scenic approaches — community-favourite, gorgeous, RUNWAY-SPECIFIC arrivals for 737/A320-class jets.
+// `h` = magnetic heading of the scenic runway (the wind-gate input; runway-number×10 where precise
+// mag data isn't handy — within the ±5kt tailwind-gate tolerance). `scenery` = why it's beautiful.
+// Same field set as CH so the same renderers work; Scenic mode gates each on favourable wind.
+const CH_SCENIC=[
+  {icao:"NZQN",name:"Queenstown Airport",city:"Queenstown, New Zealand",lat:-45.021,lon:168.740,rwy:"05",h:54,approach:"RNP AR RWY 05 — Remarkables Gates",diff:5,cat:"Scenic / Mountain",desc:"The world's most beautiful approach. Threads 19 tightly-defined RNP gates down through the Remarkables and Crown Range, the final turn sweeping over the blue of Lake Wakatipu.",scenery:"Lake Wakatipu, the Remarkables, Crown Range",bestwind:"Northerly — favours RWY 05",worstwind:"Southerly — reciprocal RWY 23",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"Orbx NZQN",u:"https://orbxdirect.com/product/nzqn-msfs"},free:null,yt:"https://www.youtube.com/results?search_query=NZQN+queenstown+rnp+approach+msfs",sv:"https://skyvector.com/?ll=-45.02,168.74&chart=301&zoom=4"},
+  {icao:"LPMA",name:"Madeira Cristiano Ronaldo",city:"Funchal, Portugal",lat:32.694,lon:-16.778,rwy:"05",h:42,approach:"Visual RWY 05 — Ocean Pillars",diff:5,cat:"Scenic / Coastal",desc:"A hand-flown visual onto a runway built on 180 concrete pillars over the Atlantic, with a late turn around the cliffs and the Pico do Facho terrain. Named one of the world's most beautiful landings.",scenery:"Atlantic cliffs, ocean-pillar runway, Funchal bay",bestwind:"Light northerly — favours RWY 05",worstwind:"Atlantic westerlies — reciprocal RWY 23",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"Atelic LPMA",u:"https://secure.simmarket.com/atelic-madeira-airport-lpma-msfs20.phtml"},free:{l:"flightsim.to",u:"https://flightsim.to/file/59718"},yt:"https://www.youtube.com/results?search_query=LPMA+madeira+approach+msfs",sv:"https://skyvector.com/?ll=32.69,-16.77&chart=301&zoom=4"},
+  {icao:"LOWI",name:"Innsbruck Airport",city:"Innsbruck, Austria",lat:47.260,lon:11.344,rwy:"08",h:83,approach:"RNP RWY 08 — Alpine Valley",diff:5,cat:"Scenic / Mountain",desc:"A one-way-in valley arrival under 9,000ft Alps, curving up the Inn valley with the peaks towering on both sides and Innsbruck spread out below.",scenery:"Nordkette range, Inn valley, the Alps on both wings",bestwind:"Easterly — favours RWY 08",worstwind:"Westerly — reciprocal RWY 26",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"iniBuilds LOWI",u:"https://inibuilds.com/products/inibuilds-innsbruck-lowi-msfs"},free:null,yt:"https://www.youtube.com/results?search_query=LOWI+innsbruck+approach+msfs",sv:"https://skyvector.com/?ll=47.26,11.34&chart=301&zoom=4"},
+  {icao:"LOWS",name:"Salzburg Airport",city:"Salzburg, Austria",lat:47.793,lon:13.004,rwy:"33",h:334,approach:"RNP RWY 33 — Alps and Castle",diff:4,cat:"Scenic / Mountain",desc:"An RNP arrival threading around the Untersberg massif, the Alps filling the windscreen and Hohensalzburg Castle on the city turn to RWY 33.",scenery:"Untersberg, Alps, Hohensalzburg Castle",bestwind:"Northerly — favours RWY 33",worstwind:"Southerly — reciprocal RWY 15",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LOWS"},yt:"https://www.youtube.com/results?search_query=LOWS+salzburg+approach+msfs",sv:"https://skyvector.com/?ll=47.79,13.00&chart=301&zoom=5"},
+  {icao:"TNCM",name:"Princess Juliana St Maarten",city:"Sint Maarten",lat:18.041,lon:-63.109,rwy:"10",h:100,approach:"Visual RWY 10 — Maho Beach Flyover",diff:3,cat:"Scenic / Beach",desc:"The famous Maho Beach arrival — crossing the shoreline only 50-100ft over the sunbathers before touchdown. One of the most photographed approaches in the world.",scenery:"Maho Beach, turquoise Caribbean, Simpson Bay",bestwind:"Easterly — favours RWY 10",worstwind:"Westerly — reciprocal RWY 28",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=TNCM"},yt:"https://www.youtube.com/results?search_query=TNCM+st+maarten+approach+msfs",sv:"https://skyvector.com/?ll=18.04,-63.11&chart=301&zoom=5"},
+  {icao:"NZWN",name:"Wellington Airport",city:"Wellington, New Zealand",lat:-41.327,lon:174.805,rwy:"16",h:156,approach:"RNAV RWY 16 — Cook Strait",diff:4,cat:"Scenic / Coastal",desc:"A single runway hemmed by hills on both sides of Cook Strait, the harbour and city wrapping the approach. Notoriously windy — the reward is one of the most dramatic city arrivals anywhere.",scenery:"Wellington harbour, Cook Strait, the surrounding hills",bestwind:"Southerly — favours RWY 16",worstwind:"Northerly — reciprocal RWY 34",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=NZWN"},yt:"https://www.youtube.com/results?search_query=NZWN+wellington+approach+msfs",sv:"https://skyvector.com/?ll=-41.33,174.81&chart=301&zoom=5"},
+  {icao:"KDCA",name:"Ronald Reagan Washington",city:"Washington DC, USA",lat:38.852,lon:-77.037,rwy:"19",h:191,approach:"River Visual RWY 19 — Capitol Curve",diff:4,cat:"Scenic / Urban",desc:"The River Visual follows the Potomac past the Capitol, Washington Monument and Lincoln Memorial, then a 30-40 degree last-second turn at 200-400ft to line up on RWY 19. Hand-flown.",scenery:"Potomac River, the Capitol, National Mall monuments",bestwind:"Southerly — favours RWY 19",worstwind:"Northerly — reciprocal RWY 01, no river visual",inMSFS:false,note:"Default airport in MSFS 2024.",pay:{l:"FlyTampa KDCA",u:"https://www.flytampa.com/dca.html"},free:null,yt:"https://www.youtube.com/results?search_query=KDCA+river+visual+approach+msfs",sv:"https://skyvector.com/?ll=38.85,-77.04&chart=301&zoom=5"},
+  {icao:"KSAN",name:"San Diego International",city:"San Diego, USA",lat:32.733,lon:-117.190,rwy:"27",h:269,approach:"Visual RWY 27 — Downtown Descent",diff:4,cat:"Scenic / Urban",desc:"A steep descent directly over downtown high-rises, Petco Park and Balboa Park before touching down by the bay — often compared to old Kai Tak.",scenery:"San Diego skyline, Balboa Park, the bay",bestwind:"Westerly — favours RWY 27",worstwind:"Easterly — reciprocal RWY 09",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=KSAN"},yt:"https://www.youtube.com/results?search_query=KSAN+san+diego+approach+msfs",sv:"https://skyvector.com/?ll=32.73,-117.19&chart=301&zoom=5"},
+  {icao:"LFMN",name:"Nice Cote dAzur",city:"Nice, France",lat:43.658,lon:7.216,rwy:"04L",h:43,approach:"Visual RWY 04L — Riviera Coast",diff:3,cat:"Scenic / Coastal",desc:"A coastal turn along the French Riviera with the landing facing straight out to sea — regularly called one of the most spectacular arrivals in Europe.",scenery:"French Riviera coastline, the Med, the Alpes-Maritimes",bestwind:"Northeasterly — favours RWY 04L",worstwind:"Southwesterly — reciprocal RWY 22R",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LFMN"},yt:"https://www.youtube.com/results?search_query=LFMN+nice+approach+msfs",sv:"https://skyvector.com/?ll=43.66,7.22&chart=301&zoom=5"},
+  {icao:"LDDU",name:"Dubrovnik Airport",city:"Dubrovnik, Croatia",lat:42.561,lon:18.268,rwy:"12",h:119,approach:"RNAV RWY 12 — Adriatic Old City",diff:3,cat:"Scenic / Coastal",desc:"A low coastal pass along the walled Old City and the Adriatic, sometimes circling between two hills onto RWY 12.",scenery:"Dubrovnik Old City walls, Adriatic coast, Dalmatian islands",bestwind:"Southeasterly — favours RWY 12",worstwind:"Northwesterly — reciprocal RWY 30",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LDDU"},yt:"https://www.youtube.com/results?search_query=LDDU+dubrovnik+approach+msfs",sv:"https://skyvector.com/?ll=42.56,18.27&chart=301&zoom=5"},
+  {icao:"LGKR",name:"Corfu Ioannis Kapodistrias",city:"Corfu, Greece",lat:39.602,lon:19.911,rwy:"34",h:344,approach:"Visual RWY 34 — Island Hillside",diff:3,cat:"Scenic / Island",desc:"An angled approach at around 700ft over the water beneath hillside terrain, passing a hotel built into the slope right beside the runway.",scenery:"Ionian Sea, Corfu hills, Mouse Island",bestwind:"Northerly — favours RWY 34",worstwind:"Southerly — reciprocal RWY 16",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LGKR"},yt:"https://www.youtube.com/results?search_query=LGKR+corfu+approach+msfs",sv:"https://skyvector.com/?ll=39.60,19.91&chart=301&zoom=5"},
+  {icao:"KLAX",name:"Los Angeles International",city:"Los Angeles, USA",lat:33.942,lon:-118.408,rwy:"24R",h:249,approach:"Visual RWY 24R — LA Basin",diff:3,cat:"Scenic / Urban",desc:"Descends over the San Bernardino Mountains into the LA basin, passing Downtown LA, the Hollywood Hills and SoFi Stadium on short final.",scenery:"Downtown LA, Hollywood Hills, SoFi Stadium, the Pacific",bestwind:"Westerly — favours RWY 24R",worstwind:"Easterly — reciprocal RWY 06L (rare Santa Ana)",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=KLAX"},yt:"https://www.youtube.com/results?search_query=KLAX+approach+msfs",sv:"https://skyvector.com/?ll=33.94,-118.41&chart=301&zoom=5"},
+  {icao:"KSFO",name:"San Francisco International",city:"San Francisco, USA",lat:37.619,lon:-122.375,rwy:"28R",h:284,approach:"Quiet Bridge Visual RWY 28R",diff:3,cat:"Scenic / Coastal",desc:"Tracks parallel to the Golden Gate Bridge with Alcatraz and the downtown skyline in view before the final turn into the bay.",scenery:"Golden Gate Bridge, Alcatraz, SF skyline, the bay",bestwind:"Westerly — favours RWY 28R",worstwind:"Easterly — reciprocal RWY 10 (rare)",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=KSFO"},yt:"https://www.youtube.com/results?search_query=KSFO+quiet+bridge+visual+msfs",sv:"https://skyvector.com/?ll=37.62,-122.37&chart=301&zoom=5"},
+  {icao:"KMIA",name:"Miami International",city:"Miami, USA",lat:25.793,lon:-80.291,rwy:"27",h:268,approach:"Visual RWY 27 — Venetian Islands",diff:2,cat:"Scenic / Coastal",desc:"A coastal arrival down the South Florida shoreline, crossing directly over the Venetian Islands and Biscayne Bay onto RWY 27.",scenery:"Miami Beach, Venetian Islands, Biscayne Bay skyline",bestwind:"Westerly — favours RWY 27",worstwind:"Easterly — reciprocal RWY 09",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=KMIA"},yt:"https://www.youtube.com/results?search_query=KMIA+approach+msfs",sv:"https://skyvector.com/?ll=25.79,-80.29&chart=301&zoom=5"},
+  {icao:"EGLL",name:"London Heathrow",city:"London, UK",lat:51.470,lon:-0.454,rwy:"27L",h:269,approach:"ILS RWY 27L — Thames and the City",diff:3,cat:"Scenic / Urban",desc:"The final turn from the north reveals the City skyline framing the Tower of London and Tower Bridge before lining up down the Thames corridor.",scenery:"River Thames, the City, Tower Bridge, central London",bestwind:"Westerly — favours RWY 27L",worstwind:"Easterly — reciprocal RWY 09R",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:{l:"iniBuilds EGLL",u:"https://inibuilds.com/products/inibuilds-london-heathrow-egll-msfs"},free:null,yt:"https://www.youtube.com/results?search_query=EGLL+heathrow+approach+msfs",sv:"https://skyvector.com/?ll=51.47,-0.45&chart=301&zoom=5"},
+  {icao:"LXGB",name:"Gibraltar International",city:"Gibraltar",lat:36.151,lon:-5.346,rwy:"27",h:270,approach:"Visual RWY 27 — Around the Rock",diff:4,cat:"Scenic / Coastal",desc:"Landing to the west takes you around the back of the Rock, low over the yachts in the bay, with the runway crossing the border road.",scenery:"the Rock of Gibraltar, the bay, the Strait to Africa",bestwind:"Westerly — favours RWY 27",worstwind:"Levante easterly — reciprocal RWY 09, severe rotor",inMSFS:true,note:"Built into MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LXGB"},yt:"https://www.youtube.com/results?search_query=LXGB+gibraltar+approach+msfs",sv:"https://skyvector.com/?ll=36.15,-5.35&chart=301&zoom=5"},
+  {icao:"FACT",name:"Cape Town International",city:"Cape Town, South Africa",lat:-33.965,lon:18.602,rwy:"01",h:12,approach:"RNAV RWY 01 — Table Mountain",diff:3,cat:"Scenic / Mountain",desc:"Table Mountain stays in view for the last 29 miles of the approach, the city and Table Bay opening up on final to RWY 01.",scenery:"Table Mountain, Table Bay, the Cape peninsula",bestwind:"Northerly — favours RWY 01",worstwind:"Southerly (Cape Doctor) — reciprocal RWY 19",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=FACT"},yt:"https://www.youtube.com/results?search_query=FACT+cape+town+approach+msfs",sv:"https://skyvector.com/?ll=-33.96,18.60&chart=301&zoom=5"},
+  {icao:"KLAS",name:"Harry Reid International",city:"Las Vegas, USA",lat:36.080,lon:-115.152,rwy:"26L",h:264,approach:"Visual RWY 26L — The Strip",diff:2,cat:"Scenic / Urban",desc:"A Strip-side approach over the casino corridor, the whole neon skyline sliding past the right window on descent into RWY 26L.",scenery:"The Las Vegas Strip, downtown, the desert ranges",bestwind:"Westerly — favours RWY 26L",worstwind:"Easterly — reciprocal RWY 08R",inMSFS:false,note:"Default airport in MSFS 2024 (activate the FlyTampa payware for the full scene).",pay:{l:"FlyTampa KLAS",u:"https://www.flytampa.com/lasvegas.html"},free:null,yt:"https://www.youtube.com/results?search_query=KLAS+las+vegas+strip+approach+msfs",sv:"https://skyvector.com/?ll=36.08,-115.15&chart=301&zoom=5"},
+  {icao:"LSZH",name:"Zurich Airport",city:"Zurich, Switzerland",lat:47.464,lon:8.549,rwy:"28",h:275,approach:"Visual RWY 28 — Pre-Alps and Lake",diff:3,cat:"Scenic / Mountain",desc:"A circling arrival amid the pre-Alps with the city and Lake Zurich on the turn onto RWY 28 — grouped with Salzburg and Innsbruck in Alpine-approach guides.",scenery:"the Swiss pre-Alps, Lake Zurich, the old town",bestwind:"Westerly — favours RWY 28",worstwind:"Easterly — reciprocal RWY 10",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LSZH"},yt:"https://www.youtube.com/results?search_query=LSZH+zurich+approach+msfs",sv:"https://skyvector.com/?ll=47.46,8.55&chart=301&zoom=5"},
+  {icao:"OMDB",name:"Dubai International",city:"Dubai, UAE",lat:25.253,lon:55.364,rwy:"30R",h:302,approach:"ILS RWY 30R — Palm and Skyline",diff:2,cat:"Scenic / Urban",desc:"The downwind leg reveals the Palm Jumeirah and the Burj Al Arab before the skyline and Burj Khalifa fill the windscreen on final. Fly it on a short intra-Gulf leg.",scenery:"Palm Jumeirah, Burj Al Arab, Burj Khalifa, the skyline",bestwind:"Northwesterly — favours RWY 30R",worstwind:"Southeasterly — reciprocal RWY 12L",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=OMDB"},yt:"https://www.youtube.com/results?search_query=OMDB+dubai+approach+msfs",sv:"https://skyvector.com/?ll=25.25,55.36&chart=301&zoom=5"},
+  {icao:"PHNL",name:"Daniel K Inouye Honolulu",city:"Honolulu, Hawaii",lat:21.319,lon:-157.924,rwy:"08L",h:82,approach:"Visual RWY 08L — Diamond Head",diff:2,cat:"Scenic / Coastal",desc:"A tropical arrival past Diamond Head and Waikiki, the reef and turquoise lagoons below on the way into the Reef Runway.",scenery:"Diamond Head, Waikiki, Pacific reefs and lagoons",bestwind:"Easterly trade winds — favours RWY 08L",worstwind:"Kona westerly — reciprocal RWY 26R",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=PHNL"},yt:"https://www.youtube.com/results?search_query=PHNL+honolulu+approach+msfs",sv:"https://skyvector.com/?ll=21.32,-157.92&chart=301&zoom=5"},
+  {icao:"PHOG",name:"Kahului Airport",city:"Maui, Hawaii",lat:20.899,lon:-156.430,rwy:"02",h:22,approach:"Visual RWY 02 — Maui Coast",diff:2,cat:"Scenic / Island",desc:"A coastal arrival on Maui with the West Maui Mountains on one side and Haleakala volcano on the other, the reef line guiding you to RWY 02.",scenery:"West Maui Mountains, Haleakala, north-shore reefs",bestwind:"Northeasterly trades — favours RWY 02",worstwind:"Southerly Kona — reciprocal RWY 20",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=PHOG"},yt:"https://www.youtube.com/results?search_query=PHOG+kahului+maui+approach+msfs",sv:"https://skyvector.com/?ll=20.90,-156.43&chart=301&zoom=5"},
+  {icao:"BGBW",name:"Narsarsuaq Airport",city:"Narsarsuaq, Greenland",lat:61.160,lon:-45.426,rwy:"07",h:70,approach:"Visual RWY 07 — Fjord Approach",diff:5,cat:"Scenic / Mountain",desc:"One of aviation's great fjord approaches — winding up the Tunulliarfik fjord between ice-capped mountains, no go-around once committed, icebergs drifting below.",scenery:"Greenland fjord, glaciers, icebergs, ice cap",bestwind:"Easterly (up-fjord) — favours RWY 07",worstwind:"Westerly — reciprocal RWY 25 down-fjord",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=BGBW"},yt:"https://www.youtube.com/results?search_query=BGBW+narsarsuaq+fjord+approach+msfs",sv:"https://skyvector.com/?ll=61.16,-45.43&chart=301&zoom=4"},
+  {icao:"ENBR",name:"Bergen Flesland",city:"Bergen, Norway",lat:60.293,lon:5.218,rwy:"17",h:173,approach:"RNAV RWY 17 — Norwegian Fjords",diff:3,cat:"Scenic / Coastal",desc:"An arrival threading the islands and fjords of Norway's west coast, the water and skerries below all the way down to RWY 17.",scenery:"Norwegian fjords, skerries, coastal islands",bestwind:"Southerly — favours RWY 17",worstwind:"Northerly — reciprocal RWY 35",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=ENBR"},yt:"https://www.youtube.com/results?search_query=ENBR+bergen+approach+msfs",sv:"https://skyvector.com/?ll=60.29,5.22&chart=301&zoom=5"},
+  {icao:"LFLB",name:"Chambery Airport",city:"Chambery, France",lat:45.638,lon:5.880,rwy:"18",h:180,approach:"RNAV RWY 18 — Lac du Bourget",diff:4,cat:"Scenic / Mountain",desc:"A winter-charter favourite curving down the valley between the Bauges and Chartreuse massifs, Lac du Bourget shining on the approach to RWY 18.",scenery:"Lac du Bourget, French Alps, the Bauges massif",bestwind:"Southerly — favours RWY 18",worstwind:"Northerly — reciprocal RWY 36",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LFLB"},yt:"https://www.youtube.com/results?search_query=LFLB+chambery+approach+msfs",sv:"https://skyvector.com/?ll=45.64,5.88&chart=301&zoom=5"},
+  {icao:"KJAC",name:"Jackson Hole Airport",city:"Jackson, Wyoming",lat:43.607,lon:-110.738,rwy:"19",h:185,approach:"RNAV RWY 19 — Teton Range",diff:4,cat:"Scenic / Mountain",desc:"The only commercial airport inside a US national park — the jagged Teton Range rising right off the wingtip on the descent into RWY 19.",scenery:"the Teton Range, Grand Teton, Jackson Hole valley",bestwind:"Southerly — favours RWY 19",worstwind:"Northerly — reciprocal RWY 01",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=KJAC"},yt:"https://www.youtube.com/results?search_query=KJAC+jackson+hole+approach+msfs",sv:"https://skyvector.com/?ll=43.61,-110.74&chart=301&zoom=5"},
+  {icao:"LIRN",name:"Naples International",city:"Naples, Italy",lat:40.886,lon:14.291,rwy:"24",h:238,approach:"Visual RWY 24 — Vesuvius and the Bay",diff:3,cat:"Scenic / Coastal",desc:"An urban arrival with Mount Vesuvius looming to the south and the Bay of Naples and Capri on the horizon, threading over the city to RWY 24.",scenery:"Mount Vesuvius, Bay of Naples, Capri",bestwind:"Westerly — favours RWY 24",worstwind:"Easterly — reciprocal RWY 06",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LIRN"},yt:"https://www.youtube.com/results?search_query=LIRN+naples+approach+msfs",sv:"https://skyvector.com/?ll=40.89,14.29&chart=301&zoom=5"},
+  {icao:"LFKJ",name:"Ajaccio Napoleon Bonaparte",city:"Ajaccio, Corsica",lat:41.924,lon:8.803,rwy:"02",h:21,approach:"RNAV RWY 02 — Corsican Gulf",diff:3,cat:"Scenic / Coastal",desc:"A gorgeous arrival over the Gulf of Ajaccio, the Corsican mountains behind and the Mediterranean below on the turn to RWY 02.",scenery:"Gulf of Ajaccio, Corsican mountains, the Med",bestwind:"Northerly — favours RWY 02",worstwind:"Southerly — reciprocal RWY 20",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LFKJ"},yt:"https://www.youtube.com/results?search_query=LFKJ+ajaccio+approach+msfs",sv:"https://skyvector.com/?ll=41.92,8.80&chart=301&zoom=5"},
+  {icao:"LIEO",name:"Olbia Costa Smeralda",city:"Olbia, Sardinia",lat:40.899,lon:9.518,rwy:"05",h:52,approach:"RNAV RWY 05 — Costa Smeralda",diff:2,cat:"Scenic / Coastal",desc:"A summer arrival over the emerald water and granite coves of the Costa Smeralda, the Gallura hills behind the field on approach to RWY 05.",scenery:"Costa Smeralda, Gulf of Olbia, Gallura coast",bestwind:"Northeasterly — favours RWY 05",worstwind:"Southwesterly — reciprocal RWY 23",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LIEO"},yt:"https://www.youtube.com/results?search_query=LIEO+olbia+approach+msfs",sv:"https://skyvector.com/?ll=40.90,9.52&chart=301&zoom=5"},
+  {icao:"GCTS",name:"Tenerife South",city:"Tenerife, Canary Islands",lat:28.044,lon:-16.572,rwy:"07",h:72,approach:"ILS RWY 07 — Atlantic Volcano",diff:2,cat:"Scenic / Island",desc:"An Atlantic arrival with the volcanic slopes of Mount Teide dominating the island behind the field on the approach to RWY 07.",scenery:"Mount Teide, Atlantic coast, volcanic terrain",bestwind:"Easterly — favours RWY 07",worstwind:"Westerly — reciprocal RWY 25",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=GCTS"},yt:"https://www.youtube.com/results?search_query=GCTS+tenerife+south+approach+msfs",sv:"https://skyvector.com/?ll=28.04,-16.57&chart=301&zoom=5"},
+  {icao:"LPPD",name:"Ponta Delgada Joao Paulo II",city:"Sao Miguel, Azores",lat:37.741,lon:-25.698,rwy:"30",h:300,approach:"RNAV RWY 30 — Azores Volcano",diff:3,cat:"Scenic / Island",desc:"A mid-Atlantic island arrival with green volcanic hills and the caldera crater lakes of Sao Miguel below on the approach to RWY 30.",scenery:"Sao Miguel volcanic hills, crater lakes, the Atlantic",bestwind:"Northwesterly — favours RWY 30",worstwind:"Southeasterly — reciprocal RWY 12",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LPPD"},yt:"https://www.youtube.com/results?search_query=LPPD+ponta+delgada+approach+msfs",sv:"https://skyvector.com/?ll=37.74,-25.70&chart=301&zoom=5"},
+  {icao:"LGZA",name:"Zakynthos Dionysios Solomos",city:"Zakynthos, Greece",lat:37.751,lon:20.884,rwy:"20",h:200,approach:"Visual RWY 20 — Ionian Sea",diff:2,cat:"Scenic / Island",desc:"A low Ionian-island arrival over turquoise bays and white cliffs, the coastline curling below on the approach to RWY 20.",scenery:"Ionian Sea, Zakynthos bays, coastal cliffs",bestwind:"Southerly — favours RWY 20",worstwind:"Northerly — reciprocal RWY 02",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LGZA"},yt:"https://www.youtube.com/results?search_query=LGZA+zakynthos+approach+msfs",sv:"https://skyvector.com/?ll=37.75,20.88&chart=301&zoom=5"},
+  {icao:"LEIB",name:"Ibiza Airport",city:"Ibiza, Spain",lat:38.873,lon:1.373,rwy:"06",h:55,approach:"RNAV RWY 06 — Balearic Coast",diff:2,cat:"Scenic / Coastal",desc:"A Balearic arrival over the salt flats and turquoise coast of Ibiza, the old town and Es Vedra rock in view on the approach to RWY 06.",scenery:"Ibiza coast, Ses Salines salt flats, Dalt Vila old town",bestwind:"Northeasterly — favours RWY 06",worstwind:"Southwesterly — reciprocal RWY 24",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LEIB"},yt:"https://www.youtube.com/results?search_query=LEIB+ibiza+approach+msfs",sv:"https://skyvector.com/?ll=38.87,1.37&chart=301&zoom=5"},
+  {icao:"SBRJ",name:"Santos Dumont Airport",city:"Rio de Janeiro, Brazil",lat:-22.910,lon:-43.163,rwy:"02",h:22,approach:"Visual RWY 02 — Guanabara Bay",diff:4,cat:"Scenic / Coastal",desc:"Flanked by Guanabara Bay with Sugarloaf Mountain ahead and Christ the Redeemer to the right on final to RWY 02 — one of aviation's great city arrivals.",scenery:"Sugarloaf, Christ the Redeemer, Guanabara Bay",bestwind:"Southerly — favours RWY 02",worstwind:"Northerly — reciprocal RWY 20",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=SBRJ"},yt:"https://www.youtube.com/results?search_query=SBRJ+santos+dumont+approach+msfs",sv:"https://skyvector.com/?ll=-22.91,-43.16&chart=301&zoom=5"},
+  {icao:"YSSY",name:"Sydney Kingsford Smith",city:"Sydney, Australia",lat:-33.946,lon:151.177,rwy:"34L",h:340,approach:"Visual RWY 34L — Sydney Harbour",diff:3,cat:"Scenic / Coastal",desc:"A harbour arrival with the Opera House, the Harbour Bridge and the city skyline sliding past before the turn onto RWY 34L over Botany Bay.",scenery:"Sydney Harbour, Opera House, Harbour Bridge, the coast",bestwind:"Northerly — favours RWY 34L",worstwind:"Southerly buster — reciprocal RWY 16R",inMSFS:true,note:"Default scenery in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=YSSY"},yt:"https://www.youtube.com/results?search_query=YSSY+sydney+approach+msfs",sv:"https://skyvector.com/?ll=-33.95,151.18&chart=301&zoom=5"},
+  {icao:"KEYW",name:"Key West International",city:"Key West, USA",lat:24.556,lon:-81.759,rwy:"09",h:90,approach:"Visual RWY 09 — Florida Keys",diff:2,cat:"Scenic / Island",desc:"A low arrival over the turquoise flats and reefs of the Florida Keys, Old Town Key West beside the field on the approach to RWY 09.",scenery:"Florida Keys reefs, turquoise flats, Old Town Key West",bestwind:"Easterly — favours RWY 09",worstwind:"Westerly — reciprocal RWY 27",inMSFS:false,note:"Default airport in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=KEYW"},yt:"https://www.youtube.com/results?search_query=KEYW+key+west+approach+msfs",sv:"https://skyvector.com/?ll=24.56,-81.76&chart=301&zoom=5"},
+  {icao:"LEPA",name:"Palma de Mallorca",city:"Mallorca, Spain",lat:39.551,lon:2.739,rwy:"06L",h:55,approach:"ILS RWY 06L — Bay of Palma",diff:2,cat:"Scenic / Coastal",desc:"A long final over the Bay of Palma with the Serra de Tramuntana mountains and the cathedral of Palma in view on the approach to RWY 06L.",scenery:"Bay of Palma, Serra de Tramuntana, Palma cathedral",bestwind:"Easterly — favours RWY 06L",worstwind:"Tramontane NW gusts — reciprocal RWY 24R",inMSFS:true,note:"Enhanced by default in MSFS 2024.",pay:null,free:{l:"Search flightsim.to",u:"https://flightsim.to/search?q=LEPA"},yt:"https://www.youtube.com/results?search_query=LEPA+palma+approach+msfs",sv:"https://skyvector.com/?ll=39.55,2.74&chart=301&zoom=5"},
+];
+
 // State
 const S={
   folderPath:'',allRows:[],selICAOs:new Set(),
@@ -1244,7 +1292,7 @@ const S={
   selChall:0,cfg:{},siCookie:'',
   routeRegistry:{},
   routeRegistrySnapshot:{},
-  chDep:'',chMaxMins:0,
+  chDep:'',chMaxMins:0,chMode:'challenging',
   showIgnored:false,
   regionFilter:'all',
   dirFilter:'either',
@@ -1304,6 +1352,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.frAcft=S.cfg.frAcft||'';
   S.freshOnly=!!S.cfg.freshOnly;
   {const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);}
+  // 🌄 Challenging⟷Scenic mode restore (chips only; scenic winds load when the tab is opened)
+  S.chMode=S.cfg.chMode==='scenic'?'scenic':'challenging';
+  document.querySelectorAll('[data-chmode]').forEach(e=>e.classList.toggle('on',e.dataset.chmode===S.chMode));
+  {const t=document.getElementById('ch-title');if(t)t.textContent=S.chMode==='scenic'?'Scenic Approaches':'Challenging Approaches';}
   // 📡 VATSIM score toggle restore — flag + chip only, NO feed fetch at boot (the ~20MB datafeed
   // loads lazily the first time Plan a Flight renders — see sw('routes')).
   VSCORE.on=!!S.cfg.vatsimRoutes;
@@ -1467,7 +1519,7 @@ function sw(t){
       if(VSCORE.on&&!VSCORE.ready){ await vscoreEnsureDeps(); vscoreSortOption(true); renderRoutes(); }
     })();
   }
-  if(t==='challenges')buildChDepSelect();
+  if(t==='challenges'){buildChDepSelect();if(S.chMode==='scenic')scenicLoadWinds().then(()=>{buildChSB();renderCD(S.selChall);});else{buildChSB();renderCD(S.selChall);}}
   if(t==='dashboard')renderDashboard();
   if(t==='fleet')renderFleetPane();
   if(t==='addons')renderAddonsPane();
@@ -7626,60 +7678,143 @@ function chFlightMins(ch){
   return flightMins(nm);
 }
 
+// ── Scenic-approach mode (v6.15.0) ──────────────────────────────────────────
+// The Challenging Approaches section toggles between the CH list and CH_SCENIC.
+// Scenic entries are wind-gated: a gorgeous runway-specific approach is only shown
+// when the current METAR wind favours its required runway (no meaningful tailwind).
+function chSource(){return S.chMode==='scenic'?CH_SCENIC:CH;}
+
+// Tailwind component (kt) for a scenic entry's runway given a parsed wind. +tailwind / −headwind.
+function scenicTailwind(entry,w){
+  if(!w||w.dir==='VRB')return null;
+  const diff=((parseInt(w.dir)-entry.h+360)%360),angle=diff>180?360-diff:diff;
+  return -Math.round(w.spd*Math.cos(angle*Math.PI/180));
+}
+// Wind favourability of a scenic runway from cached METAR.
+//   'fav'     = calm/variable OR tailwind ≤ TAILWIND_MAX_KT (calm favours any runway)
+//   'unfav'   = the wind has turned against the scenic runway (real tailwind)
+//   'unknown' = no METAR yet (don't hide — it's just not fetched)
+function scenicFavor(entry){
+  const m=S.metarCache[entry.icao];
+  const w=(m&&m.rawOb)?parseWind(m.rawOb):null;
+  if(!w)return{state:'unknown',w:null,tw:null};
+  if(w.dir==='VRB'||w.spd<3)return{state:'fav',w,tw:null};   // calm never argues against a runway
+  const tw=scenicTailwind(entry,w);
+  if(tw==null)return{state:'unknown',w,tw:null};
+  return{state:tw<=TAILWIND_MAX_KT?'fav':'unfav',w,tw};
+}
+
+async function setChMode(v){
+  S.chMode=(v==='scenic')?'scenic':'challenging';
+  S.cfg.chMode=S.chMode;window.api.saveConfig(S.cfg);
+  document.querySelectorAll('[data-chmode]').forEach(e=>e.classList.toggle('on',e.dataset.chmode===S.chMode));
+  const t=document.getElementById('ch-title');if(t)t.textContent=S.chMode==='scenic'?'Scenic Approaches':'Challenging Approaches';
+  S.selChall=0;
+  if(S.chMode==='scenic')await scenicLoadWinds();   // fetch winds so the gate can judge
+  buildChSB();renderCD(S.selChall);
+}
+
+// Batch-fetch METAR for all scenic airports so the list can be wind-gated up front.
+// One request, merged into S.metarCache; skipped if fetched in the last 20 min.
+async function scenicLoadWinds(force){
+  const now=Date.now();
+  if(!force&&S._scenicWindTs&&(now-S._scenicWindTs)<20*60*1000)return;
+  const ids=CH_SCENIC.map(e=>e.icao).join(',');
+  try{
+    const res=await fetch('https://aviationweather.gov/api/data/metar?ids='+ids+'&format=json');
+    const arr=await res.json();
+    if(Array.isArray(arr)){
+      for(const o of arr){ if(o&&o.icaoId)S.metarCache[String(o.icaoId).toUpperCase()]=o; }
+      S._scenicWindTs=now;
+    }
+  }catch(e){ RLOG('[SCENIC] wind fetch failed: '+(e&&e.message||e)); }
+}
+
 function buildChSB(){
   const list=document.getElementById('ch-sb-list');
+  const src=chSource();
+  const scenic=S.chMode==='scenic';
   const DC={1:'var(--grn)',2:'var(--grn)',3:'var(--acc)',4:'var(--acc)',5:'var(--red)'};
   let visible=0;
   list.innerHTML='';
-  CH.forEach((ch,i)=>{
+  src.forEach((ch,i)=>{
     const mins=chFlightMins(ch);
     const inLib=S.selICAOs.has(ch.icao);
     // Filter by max time
     if(S.chMaxMins>0&&mins!==null&&mins>S.chMaxMins)return;
+    // Scenic wind gate: hide airports whose wind has turned against the scenic runway
+    let fav=null;
+    if(scenic){ fav=scenicFavor(ch); if(fav.state==='unfav')return; }
     visible++;
     const timeStr=mins!==null?`${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}m`:'';
+    const windTag=scenic?(fav.state==='fav'
+      ?`<span class="ci-lib" style="background:var(--grn);color:#03270f">✓ WIND</span>`
+      :`<span class="ci-lib" style="background:var(--ink4);color:var(--bg1)">WIND ?</span>`):'';
     const d=document.createElement('div');
     d.className='chi'+(i===S.selChall?' on':'');
     d.onclick=()=>{S.selChall=i;buildChSB();renderCD(i);};
     d.innerHTML=`<div class="ci-top">
       <span class="ci-icao">${ch.icao}</span>
-      <span class="ci-diff" style="color:${DC[ch.diff]}">${ch.diff}/5</span>
+      <span class="ci-diff" style="color:${DC[ch.diff]}">${scenic?'RWY '+ch.rwy:ch.diff+'/5'}</span>
       ${timeStr?`<span class="ci-time">${timeStr}</span>`:''}
+      ${windTag}
       ${inLib?'<span class="ci-lib">IN LIB</span>':''}
     </div>
     <div class="ci-name">${ch.name}</div>
     <div class="ci-cat">${ch.cat}</div>`;
     list.appendChild(d);
   });
-  document.getElementById('ch-none').style.display=visible?'none':'block';
-  // If selected challenge is now hidden, select first visible
-  if(visible>0&&S.chMaxMins>0){
-    const firstVisible=CH.findIndex(ch=>{
+  const none=document.getElementById('ch-none');
+  none.style.display=visible?'none':'block';
+  if(!visible)none.innerHTML=scenic
+    ?'No scenic approaches have favourable winds right now.<br>Winds shift — check back, or raise the time limit.'
+    :'No approaches within range.<br>Try increasing the time limit.';
+  // If the selected entry is now hidden, snap to the first visible one
+  if(visible>0){
+    const stillShown=(ch)=>{
       const mins=chFlightMins(ch);
-      return!(S.chMaxMins>0&&mins!==null&&mins>S.chMaxMins);
-    });
-    if(firstVisible>=0&&firstVisible!==S.selChall){S.selChall=firstVisible;}
+      if(S.chMaxMins>0&&mins!==null&&mins>S.chMaxMins)return false;
+      if(scenic&&scenicFavor(ch).state==='unfav')return false;
+      return true;
+    };
+    if(!src[S.selChall]||!stillShown(src[S.selChall])){
+      const fv=src.findIndex(stillShown);
+      if(fv>=0)S.selChall=fv;
+    }
   }
 }
 
 function chRoutesHTML(ch){
   const activeFleet=getActiveFleet();
-  const routes=Object.values(S.routeRegistry)
-    .filter(r=>r.arrival_airport===ch.icao&&S.selICAOs.has(r.departure_airport)&&activeFleet.has(r.aircraft_type))
-    .sort((a,b)=>(a.distance_nm||0)-(b.distance_nm||0))
-    .slice(0,10);
+  const scenic=S.chMode==='scenic';
+  // Scenic mode: any real route ARRIVING here (not just from library deps), short/med-haul only,
+  // registry first then the 20k snapshot. Challenging mode: unchanged (library deps).
+  const capMins=scenic?(S.chMaxMins>0?S.chMaxMins:240):Infinity;
+  const pick=(pool)=>Object.values(pool).filter(r=>{
+    if(r.arrival_airport!==ch.icao||!activeFleet.has(r.aircraft_type))return false;
+    if(scenic){ const bl=blockLen(r.flight_length); return bl==null||bl<=capMins; }
+    return S.selICAOs.has(r.departure_airport);
+  }).sort((a,b)=>(a.distance_nm||0)-(b.distance_nm||0));
+  let routes=pick(S.routeRegistry);
+  if(scenic&&!routes.length)routes=pick(S.routeRegistrySnapshot||{});   // snapshot fallback
+  // de-dup by dep→arr pair, keep a handful
+  const seen=new Set();routes=routes.filter(r=>{const k=r.departure_airport+'>'+r.arrival_airport;if(seen.has(k))return false;seen.add(k);return true;}).slice(0,scenic?8:10);
   const uid='chr-'+ch.icao;
   const count=routes.length;
   if(count===0){
+    const sbType=SIM_SB['a320'];
+    const dep=S.chDep||'';
+    const frBtn=scenic?`<button class="btn bp bxs" style="margin-top:6px" onclick="openSimBrief('${dep||'EGKK'}','${ch.icao}','${sbType}','https://dispatch.simbrief.com/options/custom?orig=${dep||'EGKK'}&dest=${ch.icao}&type=${sbType}')">&#9992; Free-route plan${dep?' from '+dep:''} &rarr; ${ch.icao}</button>`:'';
     return`<div style="border:1px solid var(--sep);border-radius:var(--r2);padding:9px 14px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-family:'JetBrains Mono',monospace">Real Routes</span>
         <span style="font-size:10px;color:var(--ink4);font-family:'JetBrains Mono',monospace;margin-left:auto">No routes yet</span>
       </div>
-      <div style="font-size:11px;color:var(--ink4);font-family:'JetBrains Mono',monospace;line-height:1.5">No routes in your registry depart from your library airports to this destination yet</div>
+      <div style="font-size:11px;color:var(--ink4);font-family:'JetBrains Mono',monospace;line-height:1.5">${scenic?'No short/medium-haul route to this scenic airport in your data yet — free-route it and just fly the approach.':'No routes in your registry depart from your library airports to this destination yet'}</div>
+      ${frBtn}
     </div>`;
   }
-  const badge=`<span style="font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)">${count} route${count!==1?'s':''} from your library</span>`;
+  const badge=`<span style="font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:20px;background:var(--acc2);color:var(--acc);border:1px solid rgba(245,166,35,.25)">${count} ${scenic?'short-haul route'+(count!==1?'s':''):(count!==1?'routes':'route')+' from your library'}${scenic?'':''}</span>`;
   const rowsHTML=routes.map(r=>{
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
@@ -7706,8 +7841,9 @@ function chRoutesHTML(ch){
 }
 
 function renderCD(idx){
-  const ch=CH[idx];
+  const ch=chSource()[idx];
   if(!ch){document.getElementById('ch-det').innerHTML='';return;}
+  const scenic=S.chMode==='scenic';
   const inLib=S.selICAOs.has(ch.icao);
   const lr=S.allRows.find(r=>r.icao===ch.icao);
   const DC={1:'var(--grn)',2:'var(--grn)',3:'var(--acc)',4:'var(--acc)',5:'var(--red)'};
@@ -7739,7 +7875,7 @@ function renderCD(idx){
         </div>
       </div>
     </div>
-    <div class="cd-desc"><div class="cd-app">RWY ${ch.rwy} &bull; ${ch.approach}</div><div class="cd-txt">${ch.desc}</div></div>
+    <div class="cd-desc"><div class="cd-app">RWY ${ch.rwy} &bull; ${ch.approach}</div><div class="cd-txt">${ch.desc}</div>${scenic&&ch.scenery?`<div class="cd-txt" style="margin-top:6px;color:var(--acc)">🌄 ${ch.scenery}</div>`:''}</div>
     ${chRoutesHTML(ch)}
     ${realRoute?`<div class="ft-card">
       <div class="ft-t">&#9989; Route in your registry</div>
@@ -7761,7 +7897,8 @@ function renderCD(idx){
     <div class="cdg">
       <div class="cdb">
         <div class="cdb-t">Wind Guidance</div>
-        <div class="cdr"><span class="cdl">Preferred runway</span><span class="cdv" style="color:var(--acc);font-family:'JetBrains Mono',monospace">RWY ${ch.rwy}</span></div>
+        <div class="cdr"><span class="cdl">Scenic runway</span><span class="cdv" style="color:var(--acc);font-family:'JetBrains Mono',monospace">RWY ${ch.rwy}</span></div>
+        ${scenic?(()=>{const f=scenicFavor(ch);const map={fav:['var(--grn)','Wind favours it now'+(f.tw!=null?` (${f.tw<=0?Math.abs(f.tw)+'kt headwind':f.tw+'kt tailwind'})`:f.w?' (calm)':'')],unfav:['var(--red)',`Wind opposes it now (${f.tw}kt tailwind)`],unknown:['var(--ink3)','Checking wind…']};const[c,t]=map[f.state];return`<div class="cdr"><span class="cdl">Right now</span><span class="cdv" style="color:${c}">${t}</span></div>`;})():''}
         <div class="cdr"><span class="cdl">Best conditions</span><span class="cdv">${ch.bestwind}</span></div>
         <div class="cdr"><span class="cdl">Worst conditions</span><span class="cdv">${ch.worstwind}</span></div>
       </div>
@@ -7808,7 +7945,7 @@ async function fetchChMetar(ch){
     raw.textContent=text;
     const w=parseWind(text);
     if(!w){adv&&(adv.innerHTML='<div class="adv adva">Wind data not available in METAR.</div>');return;}
-    const rwy=parseInt(ch.rwy)*10;
+    const rwy=ch.h||parseInt(ch.rwy)*10;
     const diff=Math.abs((w.dir==='VRB'?0:((parseInt(w.dir)-rwy+360)%360)));
     const angle=diff>180?360-diff:diff;
     const xw=Math.round(w.spd*Math.sin(angle*Math.PI/180));
@@ -8020,5 +8157,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.14.1</div>
+  pointer-events:none;">v6.15.0</div>
 </body></html>

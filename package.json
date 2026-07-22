@@ -1,6 +1,6 @@
 {
   "name": "dean-msfs-route-finder",
-  "version": "6.14.1",
+  "version": "6.15.0",
   "description": "A Better Route Planner",
   "main": "main.js",
   "scripts": {
