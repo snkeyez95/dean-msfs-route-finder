@@ -1,5 +1,55 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## ▶️ v6.14.1 — PER-APP AUTO-START TOGGLE FOR COMPANION APPS (Dean 2026-07-22, plan-approved)
+
+### Context
+Companion Apps (Quick Launch) opens every app in the list when Dean launches MSFS. For a flight he
+wants to fly WITHOUT VATSIM, he currently has no way to stop vPilot from auto-starting short of
+deleting it and re-adding it later. He asked for a per-app enable/disable checkbox that PRECEDES the
+app row ("unless there's a better way?"). Verdict: his checkbox is the right approach — it mirrors
+the existing "close on sim exit" checkbox, keeps the skip state always visible, and is one click to
+toggle. Rejected the "auto-tie vPilot to Live-ATC being on" alternative: too implicit (he may want
+vPilot without Live ATC or vice-versa); an explicit toggle is safer.
+
+### Key facts (verified by exploration 2026-07-22, all in index.html unless noted)
+- Data model: `S.cfg.quickLaunchApps` = array of `{name, path, closeOnSimExit?}` (closeOnSimExit is
+  added lazily on first toggle — the same falsy-by-default idiom to reuse).
+- Renderer `renderQlAppList()` (:5415); each row built :5420-5427. The "close on sim exit" checkbox
+  (:5423) + its handler `toggleCompanionClose(idx)` (:5429) = the verbatim pattern to copy.
+- Add: `addQuickLaunchApp()` (:5659) pushes `{name, path}`. Remove: `removeQuickLaunchApp(idx)` (:5671).
+- Launch iteration (two skip points):
+  1. `quickLaunchAll()` loop (:3981-3985) — `for(const a of apps){ if(!a.path)continue; …launchApp }`.
+  2. `launchAndCapture()` pre-filter `comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path)` (:5045),
+     which ALSO feeds the confirm-dialog count (:5049) and the toast (:5086) — one place to filter.
+- Config save idiom everywhere: mutate `S.cfg.<field>` → `await window.api.saveConfig(S.cfg)` → re-render.
+- `closeOnSimExit` kill path (`main.js` flightReopenApps :1490) is INDEPENDENT of launch — killing a
+  never-launched app is a harmless no-op, so no main.js change is required.
+
+### Build (index.html only)
+1. **Default-on semantics (zero migration):** treat `a.autoStart!==false` as "enabled/launch". Old
+   2-field entries and newly-added ones default ON; only write `autoStart:false` when unchecked.
+2. **Leading enable checkbox** in `renderQlAppList()` row (:5420) — a checkbox BEFORE the name (Dean's
+   "precedes the app"), `checked` when `a.autoStart!==false`, `onchange="toggleCompanionAutoStart(${i})"`,
+   `title="Launch this app with MSFS (uncheck to skip it for a flight)"`. When disabled, dim the row
+   (e.g. `opacity:.5` on the name/path) so the skipped state reads at a glance.
+3. **`toggleCompanionAutoStart(idx)`** — copy `toggleCompanionClose` verbatim, flip `apps[idx].autoStart`
+   using `apps[idx].autoStart = apps[idx].autoStart===false` (so first click on a legacy entry sets
+   false), save, re-render.
+4. **Skip filter at both launch points:** add `if(a.autoStart===false)continue;` to the `quickLaunchAll`
+   loop (:3981) and change the `launchAndCapture` filter to
+   `.filter(a=>a&&a.path&&a.autoStart!==false)` (:5045) — the latter automatically corrects the
+   confirm-count + toast to only list apps that will actually open.
+5. **Version:** v6.14.1 (package.json + index.html title/sb-ver/footer + README changelog).
+
+### Verification
+- Live (Dean): uncheck vPilot → its row dims. Quick Launch (and Launch + Capture) → MSFS + the other
+  apps open, vPilot does NOT; the Launch+Capture confirm/toast lists only the apps that will open.
+  Re-check vPilot → it launches again. Confirm "close on sim exit" still works independently.
+- Regression: `node tests\run_all.js` (no logic these suites cover, but run per standing rule #7).
+  The skip predicate is a one-liner; a tiny inline assertion (`autoStart!==false` skips only explicit
+  false) can be added to a test if wanted, but the launch loops live inside renderer fns not sliced by
+  the harness — live-click is the real proof.
+
 ## 🎚️ v6.14.0 — CONFIGURABLE ROUTE CAP + SNAPSHOT BACKFILL + ROTATION (Dean 2026-07-21, plan-approved)
 
 ### Context

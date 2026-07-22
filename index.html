@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.14.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.14.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.14.0</div>
+    <div class="sb-ver">v6.14.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3980,12 +3980,13 @@ async function quickLaunchAll(dep,arr,acType){
   const apps=S.cfg.quickLaunchApps||[];
   for(const a of apps){
     if(!a.path)continue;
+    if(a.autoStart===false)continue;   // unchecked = skip this app for the flight (e.g. vPilot on a non-VATSIM flight)
     const res=await window.api.launchApp({path:a.path});
     if(res&&!res.ok)RLOG('[LAUNCH] App failed: '+a.name+': '+(res.error||'unknown'));
   }
-  // If any companion is flagged "close on sim exit", arm the sim-close watcher so it gets killed
-  // when the sim closes (Launch + Capture already arms the watcher itself).
-  if(apps.some(a=>a&&a.closeOnSimExit)){ try{ await window.api.flightWatchCompanions(); }catch(e){} }
+  // If any LAUNCHED companion is flagged "close on sim exit", arm the sim-close watcher so it gets
+  // killed when the sim closes (Launch + Capture already arms the watcher itself).
+  if(apps.some(a=>a&&a.closeOnSimExit&&a.autoStart!==false)){ try{ await window.api.flightWatchCompanions(); }catch(e){} }
   RLOG('[LAUNCH] Companion apps launched — starting MSFS in 5s');
   setTimeout(()=>launchMSFS(),5000);
 }
@@ -5042,7 +5043,7 @@ async function launchAndCapture(dep,arr,acType){
     if(missing.length)warn='⚠ You have NOT activated '+missing.join(' or ')+'.\nYou may spawn without it — use “Activate” on the route card first.\n\n';
   }
   const closeApps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
-  const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path);
+  const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path&&a.autoStart!==false);
   const msg=warn+'Launch a clean benchmark flight?\n\nThis will, in order:\n'
     +'1. Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete — your current settings are left alone)\n'
     +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
@@ -5418,8 +5419,9 @@ function renderQlAppList(){
   const apps=S.cfg.quickLaunchApps||[];
   if(!apps.length){list.innerHTML='<div style="font-size:12px;color:var(--ink3);font-family:\'Inter\',sans-serif">No apps configured yet.</div>';return;}
   list.innerHTML=apps.map((a,i)=>`<div style="display:flex;align-items:center;gap:6px">
-    <span style="flex:0 0 100px;font-size:12px;color:var(--ink1);font-family:'Inter',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.name}">${a.name}</span>
-    <span style="flex:1;font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.path}">${a.path}</span>
+    <input type="checkbox" ${a.autoStart!==false?'checked':''} onchange="toggleCompanionAutoStart(${i})" style="flex-shrink:0;cursor:pointer;accent-color:var(--acc)" title="Launch this app with MSFS (uncheck to skip it for a flight)">
+    <span style="flex:0 0 100px;font-size:12px;color:var(--ink1);font-family:'Inter',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${a.autoStart===false?'opacity:.45':''}" title="${a.name}">${a.name}</span>
+    <span style="flex:1;font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${a.autoStart===false?'opacity:.45':''}" title="${a.path}">${a.path}</span>
     <label style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink2);font-family:'Inter',sans-serif;cursor:pointer;white-space:nowrap" title="Automatically close this app when MSFS closes">
       <input type="checkbox" ${a.closeOnSimExit?'checked':''} onchange="toggleCompanionClose(${i})" style="cursor:pointer"> close on sim exit
     </label>
@@ -5430,6 +5432,15 @@ async function toggleCompanionClose(idx){
   const apps=S.cfg.quickLaunchApps||[];
   if(!apps[idx])return;
   apps[idx].closeOnSimExit=!apps[idx].closeOnSimExit;
+  S.cfg.quickLaunchApps=apps;
+  await window.api.saveConfig(S.cfg);
+  renderQlAppList();
+}
+async function toggleCompanionAutoStart(idx){
+  const apps=S.cfg.quickLaunchApps||[];
+  if(!apps[idx])return;
+  // default is ON (legacy entries have no flag) — first click on an enabled app writes false
+  apps[idx].autoStart=apps[idx].autoStart===false;
   S.cfg.quickLaunchApps=apps;
   await window.api.saveConfig(S.cfg);
   renderQlAppList();
@@ -8009,5 +8020,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.14.0</div>
+  pointer-events:none;">v6.14.1</div>
 </body></html>
