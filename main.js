@@ -1337,6 +1337,9 @@ ipcMain.handle('perf-compare-data', () => {
       // GPU/CPU balance (avg busy ms + gpu-bound % — computed by stats.js since day one, never surfaced).
       let gfx = null, gfx_fp = s.gfx_fp || null, autofps_cfg = null,
           avg_gpu_busy = null, avg_cpu_busy = null, gpu_bound = null;
+      // v6.15.1: a flight the sim exited mid-air (airborne, never landed) is tagged
+      // settings.notes='mid-flight session' by the engine — auto-exclude it from all analysis.
+      let midflight = false;
       // v6.12.1: periodic-stutter classification (engine-overload signature) — summary for new
       // flights, phases_ext sidecar for backfilled old ones.
       let periodic = null;
@@ -1359,6 +1362,7 @@ ipcMain.handle('perf-compare-data', () => {
           const tm = sj && sj.smoothness && sj.smoothness.trim_method;
           if (tm === 'brake' || tm === 'movement') groundTruthTrim = true;
           if (sj && sj.settings) {
+            if (/mid-flight session/i.test(sj.settings.notes || '')) midflight = true;
             if (!gfx_fp && sj.settings.gfx_fp) gfx_fp = sj.settings.gfx_fp;
             if (sj.settings.graphics) { try { gfx = _gfxWatchMod().watchValues(sj.settings.graphics); } catch(_){} }
             if (sj.settings.autofps_cfg) autofps_cfg = sj.settings.autofps_cfg;
@@ -1425,7 +1429,8 @@ ipcMain.handle('perf-compare-data', () => {
         // v6.12.1: periodic-stutter classification — episodes of engine-overload cadence vs one-off hitches
         periodic_episodes: (periodic && periodic.episodes) ? periodic.episodes.length : (periodic ? 0 : null),
         periodic_spikes: periodic ? (periodic.spikes_periodic ?? 0) : null,
-        excluded: s.excluded || null,
+        excluded: s.excluded || midflight || null,   // v6.15.1: auto-exclude mid-flight sim exits
+        midflight: midflight || null,
         route: s.route || null
       };
     });
