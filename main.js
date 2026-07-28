@@ -1219,10 +1219,26 @@ ipcMain.handle('get-world-map', () => {
     const W = 720, H = 340;
     const px = lon => (lon + 180) / 360 * W;
     const py = lat => (90 - lat) / 180 * H;
+    // ANTIMERIDIAN SPLIT (v6.15.4, Dean 2026-07-28). A ring that wraps past ±180° has consecutive
+    // points at lon +179.9 and -179.9, which project to opposite edges (x≈719 and x≈1). Joining them
+    // with 'L' streaks a horizontal bar across the ENTIRE map: 8 such segments existed — Russia/
+    // Chukotka (y≈35-47, the two visible streaks), Fiji (y≈201, a full 720px bar) and Antarctica
+    // (y≈329-340). When a step jumps more than half the map width it isn't a real coastline edge, so
+    // close the subpath and start a new one. NOTE: W/H and the viewBox are deliberately untouched —
+    // the dots in renderDashMap() project with the SAME W=720/H=340 math and must never desync.
     const ringsToPath = rings =>
-      rings.map(ring =>
-        'M' + ring.map(([lon, lat]) => px(lon).toFixed(1) + ',' + py(lat).toFixed(1)).join('L') + 'Z'
-      ).join('');
+      rings.map(ring => {
+        let d = '', prevX = null;
+        for (const [lon, lat] of ring) {
+          const x = px(lon), y = py(lat);
+          if (prevX === null || Math.abs(x - prevX) > W / 2) {
+            if (prevX !== null) d += 'Z';                 // close the piece we were drawing
+            d += 'M' + x.toFixed(1) + ',' + y.toFixed(1);
+          } else d += 'L' + x.toFixed(1) + ',' + y.toFixed(1);
+          prevX = x;
+        }
+        return d ? d + 'Z' : '';
+      }).join('');
     const land = topojson.feature(world, world.objects.land);
     const paths = [];
     const processGeom = g => {
