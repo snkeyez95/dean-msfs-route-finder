@@ -25,7 +25,7 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const REPORT_V = 'vram-line-blue'; // marker: bump to force a one-time report.html regen for ALL flights (v6.13.13: VRAM chart line solid blue-violet — it was inheriting the AMBER --vram theme var (metrics bar), amber-vs-green being the classic red-green-CB confusable pair; dash removed per Dean)
+const REPORT_V = 'chart-align-vram-label'; // marker: bump to force a one-time report.html regen for ALL flights (v6.15.3: the two charts now share an identical plot area so the hover bullseyes line up vertically, and the VRAM legend chip carries avg + peak MB)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 

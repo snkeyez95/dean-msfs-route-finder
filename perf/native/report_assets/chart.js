@@ -187,6 +187,24 @@
           b.textContent=cnt+' frame'+(cnt>1?'s':'')+' \u003e '+Math.round(curCeil)
             +' ms \u00b7 max '+CHART.over_max.toFixed(1)+' ms';return;}}
       b.style.display='none';}
+    // v6.15.3 (Dean 2026-07-28): the two charts must share an IDENTICAL plot area, or the hover
+    // bullseyes sit at different screen positions for the same instant. The frametime chart carries
+    // up to five right-hand axes (altitude/TLOD/traffic/VRAM/core) while the moving-average chart has
+    // none, so its plot area ran wider. Mirror the frametime chart's left+right gutters onto the
+    // average chart through afterFit; re-sync whenever the axis count or window size changes.
+    var _geo={l:0,r:0};
+    function _syncGeo(){
+      if(!chart||!chart.chartArea||typeof avgChart==='undefined'||!avgChart)return;
+      var l=Math.round(chart.chartArea.left),r=Math.round(chart.width-chart.chartArea.right);
+      if(l===_geo.l&&r===_geo.r)return;                       // no change → no update (no render loop)
+      _geo.l=l;_geo.r=r;avgChart.update('none');
+    }
+    // VRAM avg/peak for the legend chip (Dean's ask: put the range on the label itself).
+    var _vramStat=(function(){
+      if(!vramData||!vramData.length)return null;
+      var mx=0,su=0;for(var i=0;i<vramData.length;i++){var v=vramData[i].y;if(v>mx)mx=v;su+=v;}
+      return{peak:mx,avg:su/vramData.length};})();
+    function _mb(v){return Math.round(v).toLocaleString();}
     // v6.13.11: the legend is now a row of CLICKABLE toggle chips — one per charted line (Dean's ask).
     // Clicking a chip shows/hides that dataset (and its own right-hand axis), state remembered in
     // localStorage. Data-driven off the live datasets so it tracks the fps/ms unit rename automatically.
@@ -198,7 +216,10 @@
     function chipName(d){
       if(d.label==='Frametime')return unit==='fps'?'FPS':'Frame time';
       if(d.label==='TLOD')return 'TLOD (AutoFPS)'; if(d.label==='Traffic')return 'VATSIM traffic';
-      if(d.label==='Busiest core')return 'Busiest core (AutoFPS)'; return d.label;}
+      if(d.label==='Busiest core')return 'Busiest core (AutoFPS)';
+      if(d.label==='VRAM')return _vramStat
+        ?('VRAM (avg '+_mb(_vramStat.avg)+' · peak '+_mb(_vramStat.peak)+' MB)'):'VRAM';
+      return d.label;}
     // First run (no saved key) → the two new lines start hidden; everything else shown. After any
     // toggle the saved list is authoritative for EVERY series (so a line you turn ON stays on too).
     function seriesHidden(){try{var v=localStorage.getItem('cfxSeriesHidden');
@@ -222,7 +243,7 @@
       var hid=seriesHidden().filter(function(x){return x!==label;});
       if(d.hidden)hid.push(label);
       try{localStorage.setItem('cfxSeriesHidden',JSON.stringify(hid));}catch(e){}
-      renderLegend();chart.update();};
+      renderLegend();chart.update();_syncGeo();};   // axis count changed → re-match the lower chart
     function applyHidden(){var hid=seriesHidden();
       chart.data.datasets.forEach(function(d){
         d.hidden=hid.indexOf(d.label)>=0;
@@ -286,7 +307,14 @@
               callback:function(v){return v.toFixed(0);}}},
             y:{type:'linear',min:ymin,max:ymax,
               title:{display:true,text:'ms',color:colors().text},
-              grid:{color:colors().grid},ticks:{color:colors().faint}}},
+              grid:{color:colors().grid},ticks:{color:colors().faint},
+              afterFit:function(sc){if(_geo.l)sc.width=_geo.l;}},          // match the upper chart's left gutter
+            // invisible right-hand spacer mirroring the upper chart's stacked right axes, so both
+            // plot areas end at the same x and the hover dots line up (v6.15.3)
+            yPad:{type:'linear',position:'right',display:true,min:0,max:1,
+              ticks:{display:false},border:{display:false},
+              grid:{display:false,drawOnChartArea:false,drawTicks:false},
+              afterFit:function(sc){sc.width=_geo.r||0;}}},
           plugins:{legend:{display:false},
             decimation:{enabled:true,algorithm:'lttb',samples:800},
             tooltip:{enabled:false}}}});   // unified hover (xhairPlugin) draws the crosshair + dot
@@ -297,6 +325,9 @@
     // genuine hitch to grab: the window's peak must be ≥33 ms AND clearly taller (>1.4×) than the
     // frametime right under the cursor. On smooth stretches nothing qualifies, so the readout tracks
     // the cursor continuously instead of hopping between spikes (Dean 2026-07-18 — the ~0.8 min jump).
+    // Match the plot areas now that both charts exist, and again on any resize (v6.15.3).
+    _syncGeo();
+    try{ window.addEventListener('resize',function(){setTimeout(_syncGeo,60);}); }catch(e){}
     (function(){var linked=[chart,avgChart].filter(Boolean);if(!linked.length)return;
       var raf=0;var RAF=window.requestAnimationFrame||function(f){return setTimeout(f,16);};
       function redraw(){if(raf)return;raf=RAF(function(){raf=0;linked.forEach(function(c){c.draw();});});}
