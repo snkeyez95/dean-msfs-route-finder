@@ -1,4 +1,4 @@
-# AutoFPS 0.5.2.0-test25 — periodic spike protection: fires correctly, but recovery re-arms the trigger
+# AutoFPS 0.5.2.0-RC3 — periodic spike protection: fires correctly, but recovery re-arms the trigger
 
 Follow-up to your standing ask for a real periodic-spike episode. This one is a clean repro: **12
 separate periodic episodes over 16 minutes, 10.5% of the flight**, with your protection activating
@@ -13,7 +13,7 @@ aircraft** — so almost nothing competing for the main thread except terrain LO
 
 | | |
 |---|---|
-| AutoFPS | **0.5.2.0-test25** |
+| AutoFPS | **0.5.2.0-RC3** (auto-updated from test25 at 20:38:50, ~15 min before the flight) |
 | MSFS | 2024, 1.7.35.0 (Steam, DX12) |
 | GPU / driver | RTX 3080 Ti 12GB / 566.36 |
 | Mode | FSR3, frame gen 2× |
@@ -130,7 +130,7 @@ verification fired at 21:04:26. There are **zero** verification attempts in the 
 moment.
 
 To save you ruling things out: there are **no "RTSS buffer stale" messages anywhere in the flight**
-(so the test23 stale-buffer early-exit wasn't the cause), and no MSFS-not-active gating messages
+(so the stale-buffer early-exit added in test23 wasn't the cause), and no MSFS-not-active gating messages
 either. From the per-frame record the signature was unambiguous for ~100 s before protection
 engaged, so it looks threshold- rather than state-related.
 
