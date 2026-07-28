@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.15.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.15.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.15.1</div>
+    <div class="sb-ver">v6.15.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6954,7 +6954,14 @@ function _ptInGeom(lon,lat,g){ if(!g)return false; const polys=g.type==='MultiPo
 // id, else K+prefix (US centers connect as ZLA_CTR but VATSpy keys their boundary KZLA).
 function airspaceCovers(callsign, lat, lon){
   const a=_airspace; if(!a) return null;
-  const pfx=String(callsign||'').split('_')[0].toUpperCase(); if(!pfx) return null;
+  const _parts=String(callsign||'').toUpperCase().split('_');
+  const pfx=_parts[0]; if(!pfx) return null;
+  // SECTOR-SPECIFIC CALLSIGNS (v6.15.2, Dean 2026-07-28 KEYW-TNCM): a callsign naming ONE sector
+  // (MIA_N_CTR = Miami North) must use THAT sector's polygon, not the union below. The merge is
+  // right for a single-position Center (NY_CTR) but hands a sub-sector the whole ARTCC including
+  // oceanic: MIA_N_CTR kept "covering" him out to GMONI — inside KZMA-OCN but outside KZMA-N — so
+  // he was never released to UNICOM. Token = the middle segment(s) between prefix and position type.
+  const _seg=_parts.length>2?_parts.slice(1,-1).join('-'):'';
   // Match the base boundary AND any '-SUFFIX' segments: US Centers split into e.g. KZNY (oceanic),
   // KZNY-W (domestic), KZNY-BDA (Bermuda) — checking only the base misses the domestic area entirely.
   // v6.12.8 (audit): the merge must ALSO run when the VATSpy prefix map HITS — the map lists only the
@@ -6963,14 +6970,19 @@ function airspaceCovers(callsign, lat, lon){
   // the same way. Mapped ids stay authoritative; their '-SUFFIX' children are unioned in.
   // Memoized per prefix on the loaded airspace (a handful of prefixes per session).
   a._idCache=a._idCache||{};
-  if(a._idCache[pfx]===undefined){
+  const _ck=pfx+'|'+_seg;
+  if(a._idCache[_ck]===undefined){
     const mapped=a.prefixMap[pfx]||[];
     const bases=mapped.length?mapped.slice():[pfx].concat(pfx.length===3?['K'+pfx]:[]);
     const out=mapped.slice();
     for(const id of Object.keys(a.boundaries)){ if(out.indexOf(id)>=0) continue; for(const b of bases){ if(id===b||id.startsWith(b+'-')){ out.push(id); break; } } }
-    a._idCache[pfx]=out;
+    // Exact sector polygon for a sector-named callsign wins over the union; an unrecognised token
+    // (CHI_35_CTR) finds nothing and falls through to the merged list, so nothing regresses.
+    let only=null;
+    if(_seg) for(const b of bases){ if(a.boundaries[b+'-'+_seg]){ only=[b+'-'+_seg]; break; } }
+    a._idCache[_ck]=only||out;
   }
-  const ids=a._idCache[pfx];
+  const ids=a._idCache[_ck];
   if(!ids||!ids.length) return null;
   for(const id of ids){ if(_ptInGeom(lon,lat,a.boundaries[id])) return true; }
   return false;
@@ -7389,7 +7401,30 @@ function applyVatsimAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); c
 // immediately re-apply VATSIM on the next render (session-scoped; a fresh launch defaults to VATSIM
 // again). Clicking Apply again clears the flag.
 function revertVatsimAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); if(!S._vatsimReverted)S._vatsimReverted={}; S._vatsimReverted[icao]=true; delete S.datisCache[icao]; fetchDatis(icao,idx,side,prefix); }
-async function latcPoll(){ try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); LATC.writable=!!r.writable; LATC.adapterLabel=r.adapterLabel||null; }catch(e){} latcCheckToasts(); renderLiveAtc(); latcPushOverlay(); updateVatsimHeader(); }
+const LATC_SIMGONE_POLLS=18;   // 18 × 5s poll ≈ 90s of no position before we test for a closed sim
+async function latcPoll(){
+  const _prev=LATC.status;
+  try{ const r=await window.api.livePosition(); LATC.status=r.status; LATC.pos=r.pos||(r.status==='live'?LATC.pos:null); LATC.writable=!!r.writable; LATC.adapterLabel=r.adapterLabel||null; }catch(e){}
+  // v6.15.2: LOG status transitions. Dean's overlay dot vanished mid-flight (2026-07-28 KEYW-TNCM)
+  // and the debug log held NOTHING between "starting Live ATC" and session end, so there was no way
+  // to tell a SimConnect drop from an overlay-window problem. One line per change makes it provable.
+  if(LATC.status!==_prev) RLOG('[VATSIM] Live ATC status '+_prev+' → '+LATC.status);
+  // SIM GONE (v6.15.2): nothing stopped Live mode when MSFS closed — only ABRP quitting or vPilot
+  // closing did — so the dot sat on the desktop minutes after the sim exited (same flight). Once the
+  // position has been stale ~90s AND MSFS is genuinely not running, shut Live mode down. Gated on the
+  // real process check so a transient SimConnect drop mid-flight never kills a live session.
+  if(LATC.status!=='live'){
+    LATC._notLive=(LATC._notLive||0)+1;
+    if(LATC._notLive>=LATC_SIMGONE_POLLS && !LATC._simCheck && LATC.on){
+      LATC._simCheck=true;
+      window.api.msfsRunning().then(run=>{
+        LATC._simCheck=false;
+        if(!run && LATC.on){ RLOG('[VATSIM] MSFS closed — stopping Live ATC'); latcToggle(false,true); }
+      }).catch(()=>{ LATC._simCheck=false; });
+    }
+  } else LATC._notLive=0;
+  latcCheckToasts(); renderLiveAtc(); latcPushOverlay(); updateVatsimHeader();
+}
 // PMDG standby adapter (2026-07-11): the one sanctioned radio WRITE — explicit click, STANDBY only,
 // closed-loop knob walk in main.js with honest verify (the v6.7.0 no-auto-writes lesson stands).
 let _latcWriting=false;
@@ -8157,5 +8192,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.15.1</div>
+  pointer-events:none;">v6.15.2</div>
 </body></html>

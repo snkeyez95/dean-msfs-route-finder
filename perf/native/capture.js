@@ -23,6 +23,7 @@ const HEAD_TRIM_S = 5, STOP_BUFFER_S = 30, TAIL_FALLBACK_S = 60, MIN_TAIL_TRIM_S
 // v6.11.0: traffic-density radius = vPilot's default aircraft injection/draw distance, so the count
 // approximates what vPilot actually spawns into the sim around you.
 const TRAFFIC_NM = 40, TRAFFIC_FEED_MS = 30000;
+const LATE_VATSIM_MS = 120000, LATE_VATSIM_TRIES = 10;   // re-check a late VATSIM connect for ~20 min
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Great-circle distance in nm (haversine) — for the 40nm traffic count.
@@ -132,10 +133,12 @@ async function runAutoCapture(opts) {
   // benchmark Dean flies however he likes; these tags keep the baseline/drift math apples-to-apples
   // and give Compare an "online traffic on vs off" dimension.
   let onlineVatsim = false;   // v6.11.0: hoisted — gates the traffic-density sampler below
+  let vpilotSeen = false;     // v6.15.2: hoisted — gates the late-connect re-check below
   try {
     const out = require('child_process').spawnSync('tasklist', ['/NH'], { encoding: 'utf8', timeout: 15000 }).stdout || '';
     const low = out.toLowerCase();
     const vpilotRunning = low.includes('vpilot'), batc = low.includes('beyondatc');
+    vpilotSeen = vpilotRunning;
     if (low.includes('autofps')) {
       settings.autofps_active = true;
       // v6.12.0: AutoFPS's TLOD envelope lives in ITS config, not UserCfg — snapshot min/max/target
@@ -201,9 +204,32 @@ async function runAutoCapture(opts) {
   // v6.11.0: VATSIM traffic-density sampler — refresh the pilots cache every ~30s (the feed itself
   // only updates ~15s; NEVER fetch at 1 Hz), count within 40nm each tick. Online-VATSIM flights only.
   let trafficPilots = null, trafficIv = null;
-  if (onlineVatsim) {
+  const startTrafficSampler = () => {
+    if (trafficIv) return;
     const refresh = () => { fetchVatsimPilots().then(p => { if (p) trafficPilots = p; }).catch(() => {}); };
     refresh(); trafficIv = setInterval(refresh, TRAFFIC_FEED_MS);
+  };
+  if (onlineVatsim) startTrafficSampler();
+
+  // LATE VATSIM CONNECT (v6.15.2, Dean 2026-07-28 KEYW-TNCM): the probe above is ONE-SHOT at
+  // recording start, so connecting after pushback — or after takeoff — left a genuine VATSIM flight
+  // tagged offline, which then counted toward the fixed-TLOD baseline instead of being quarantined.
+  // Re-check while vPilot is up until the CID confirms. BOUNDED (the datafeed is ~20MB a call):
+  // every 2 min for the first ~20 min, which covers taxi + climb, then give up.
+  let lateIv = null;
+  if (vpilotSeen && !onlineVatsim && String(process.env.ABRP_VATSIM_CID || '').trim()) {
+    let tries = 0;
+    lateIv = setInterval(() => {
+      if (++tries > LATE_VATSIM_TRIES) { clearInterval(lateIv); lateIv = null; return; }
+      vatsimConnected(process.env.ABRP_VATSIM_CID).then(c => {
+        if (c !== true || !lateIv) return;
+        clearInterval(lateIv); lateIv = null;
+        onlineVatsim = true;
+        settings.online_traffic = (settings.online_traffic === 'batc') ? 'vatsim+batc' : 'vatsim';
+        say('  CONTEXT: VATSIM connect detected after start → tagged ' + settings.online_traffic);
+        startTrafficSampler();
+      }).catch(() => {});
+    }, LATE_VATSIM_MS);
   }
 
   const telemetryRows = [];
@@ -265,6 +291,7 @@ async function runAutoCapture(opts) {
   clearInterval(tick);
   clearInterval(liveIv); clearPerfLive(opts.dataRoot);   // strip disappears from the overlay at capture end
   if (trafficIv) clearInterval(trafficIv);
+  if (lateIv) clearInterval(lateIv);
   stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop();
   await sleep(1000);                            // CSV flush grace
 
