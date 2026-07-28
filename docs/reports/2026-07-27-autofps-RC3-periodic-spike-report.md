@@ -39,19 +39,21 @@ this is an independent read rather than a re-parse of your log. Spikes are 39–
 
 ## What protection did
 
-```
-21:04:27  activated @ TLOD 485      21:04:59  recovery activated
-21:06:37  activated @ TLOD 486      21:07:20  recovery activated
-21:16:38  activated @ TLOD 477      21:17:11  recovery activated
-21:18:28  activated @ TLOD 453      21:19:00  recovery activated
-```
+| Activated | @ TLOD | Recovery | Gap |
+|---|---|---|---|
+| 21:04:27 | 485 | 21:04:59 | 32 s |
+| 21:06:37 | 486 | 21:07:20 | 43 s |
+| 21:16:38 | 477 | 21:17:11 | 33 s |
+| 21:18:28 | 453 | 21:19:00 | 32 s |
 
 The reductions work — SRed climbs, TLOD drops, stutter stops every time:
 
-```
-21:04:31  SRed:55   TLOD:445        21:16:54  SRed:103  TLOD:397
-21:06:54  SRed:74   TLOD:426        21:18:46  SRed:107  TLOD:388
-```
+| Time | SRed | TLOD |
+|---|---|---|
+| 21:04:31 | 55 | 445 |
+| 21:06:54 | 74 | 426 |
+| 21:16:54 | 103 | 397 |
+| 21:18:46 | 107 | 388 |
 
 ## The loop
 
