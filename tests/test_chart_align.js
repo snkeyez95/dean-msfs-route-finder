@@ -47,7 +47,11 @@ console.log('\ndelivery:');
 {
   const bf = fs.readFileSync(path.resolve(__dirname, '..', 'perf', 'native', 'backfill_phases.js'), 'utf8');
   const m = bf.match(/const REPORT_V = '([^']+)'/);
-  T('REPORT_V bumped so existing reports regenerate once', !!m && m[1] === 'chart-align-vram-label', m && m[1]);
+  // The alignment change shipped with REPORT_V = 'chart-align-vram-label'. Later report changes bump
+  // it again (any bump regenerates every report, so this fix rides along), so don't pin the exact
+  // string — assert only that the marker exists and has moved past the value that PRECEDED this fix.
+  const PRE_ALIGN = 'vram-cpu-lines';
+  T('REPORT_V bumped so existing reports regenerate once', !!m && m[1] !== PRE_ALIGN, m && m[1]);
   const loader = fs.readFileSync(path.resolve(__dirname, '..', 'perf', 'native', 'report_assets.js'), 'utf8');
   T('report_assets loads chart.js from the split file (not a stale JSON blob)', /CHART_JS: rd\('chart\.js'\)/.test(loader));
 }

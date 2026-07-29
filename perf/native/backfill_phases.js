@@ -25,7 +25,8 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const REPORT_V = 'chart-align-vram-label'; // marker: bump to force a one-time report.html regen for ALL flights (v6.15.3: the two charts now share an identical plot area so the hover bullseyes line up vertically, and the VRAM legend chip carries avg + peak MB)
+const VRAM_V = 'trim-window';  // marker: bump to force a one-time per-phase VRAM recompute (v6.15.5: phase VRAM averages are now windowed to the kept/trimmed frames, so spawn-in + sim-shutdown samples no longer drag them)
+const REPORT_V = 'chart-window-no-pad'; // marker: bump to force a one-time report.html regen for ALL flights (v6.15.5: telemetry/trace chart series are clamped to the plotted frametime end instead of +30 s, so the sim's VRAM unload cliff is never drawn)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -59,10 +60,12 @@ function computeExt(dir, summary) {
   const buckets = splitFrametimesByPhase(t.ft, phaseLogFromTelemetry(tel), 0);   // telemetry wall_ms is recording-relative
   const phases = computePhaseStats(buckets, t.ft.length);
   if (!Object.keys(phases).length) return null;
-  const pv = computePhaseVram(tel);
+  // v6.15.5: same trim window as the capture path — spawn-in + shutdown samples never enter a phase average
+  let keptMs = 0; for (const v of t.ft) keptMs += v;
+  const pv = computePhaseVram(tel, HEAD, HEAD + keptMs / 1000);
   for (const ph of Object.keys(phases)) if (pv[ph]) { phases[ph].vram_peak = pv[ph].vram_peak; phases[ph].vram_avg = pv[ph].vram_avg; }
   const { dep_icao, arr_icao } = routeIcaos(summary);
-  return Object.assign({ v: 1, phases, dep_icao, arr_icao, teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V }, corrMetrics(t.ft));
+  return Object.assign({ v: 1, phases, dep_icao, arr_icao, teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V, vram_v: VRAM_V }, corrMetrics(t.ft));
 }
 
 // Ensure the sidecar carries the v6.6 teardown correction. Recomputes phases (when telemetry exists) +
@@ -72,13 +75,15 @@ function computeExt(dir, summary) {
 function backfillCorrection(dir, summary, extPath) {
   let ext = null;
   if (fs.existsSync(extPath)) { try { ext = JSON.parse(fs.readFileSync(extPath, 'utf8')); } catch (_) {} }
-  if (ext && ext.trim_v === TRIM_V) return { ext, wrote: false };   // already corrected
+  // Recompute when the teardown correction is missing OR the per-phase VRAM predates the v6.15.5
+  // trim window (an old sidecar averaged the shutdown samples into its taxi phases).
+  if (ext && ext.trim_v === TRIM_V && ext.vram_v === VRAM_V) return { ext, wrote: false };   // already corrected
   const full = computeExt(dir, summary);                            // teardown-trimmed phases + metrics (null if no telemetry)
   if (full) {
     ext = Object.assign(ext || {}, full);
   } else {
     const t = readTrimmedFt(dir); if (!t) return { ext, wrote: false };   // no frametimes → nothing to do
-    ext = Object.assign(ext || { v: 1 }, corrMetrics(t.ft), { teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V });
+    ext = Object.assign(ext || { v: 1 }, corrMetrics(t.ft), { teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V, vram_v: VRAM_V });
   }
   try { fs.writeFileSync(extPath, JSON.stringify(ext)); } catch (_) { return { ext, wrote: false }; }
   return { ext, wrote: true };

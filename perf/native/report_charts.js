@@ -150,10 +150,20 @@ function displayRoute(route){
   return route;
 }
 
+// v6.15.5 — THE CHART WINDOW (Dean 2026-07-29). Every telemetry-/trace-derived series (altitude,
+// TLOD, traffic, VRAM, busiest-core) shares this window. It used to be [0, totalMin + 0.5] — a
+// 30-second pad added as slack for the wall-clock vs summed-render-time skew. That pad is exactly
+// where the sim's shutdown lives: on Dean's 62-minute KPHX-KSAN flight the frametime series correctly
+// ended at 61.77 min, but the VRAM line ran on to 62.16 and drew the unload cliff (8,777 → 6,992 →
+// 1,068 MB), which reads as a capture that didn't close cleanly. The plotted frametime series DEFINES
+// the x domain; nothing may extend past it. Worst case this drops a second or two off the altitude
+// line's tail — cheap next to drawing the teardown.
+const inChartWindow = (x, totalMin) => x >= 0 && x <= totalMin;
+
 // v6.11.0: the AutoFPS dynamic-TLOD trace as a chart series. Reads the autofps_trace.json sidecar
 // (written at flight-file time from the AutoFPS app's own log); x uses the SAME wall-minutes-from-
-// head-trim convention as chartAltitudeSeries AND the same [0, totalMin+0.5] window — totalMin comes
-// from the TAIL-TRIMMED frametime series, so post-landing/sim-quit samples can never be drawn
+// head-trim convention as chartAltitudeSeries AND the same window — totalMin comes from the
+// TAIL-TRIMMED frametime series, so post-landing/sim-quit samples can never be drawn
 // (Dean 2026-07-12: the chart-tail lesson, applied by construction).
 function chartTlodSeries(sessionDir, totalMin){
   let side; try { side = JSON.parse(fs.readFileSync(path.join(sessionDir, 'autofps_trace.json'), 'utf8')); } catch(e){ return null; }
@@ -163,7 +173,7 @@ function chartTlodSeries(sessionDir, totalMin){
     const tRel = Array.isArray(s) ? s[0] : null, tlod = Array.isArray(s) ? s[1] : null;
     if(tRel == null || tlod == null) continue;
     const x = (tRel - HEAD_TRIM_S) / 60.0;
-    if(x < 0 || x > totalMin + 0.5) continue;
+    if(!inChartWindow(x, totalMin)) continue;
     out.push([pyRound(x, 4), Math.trunc(tlod)]);
   }
   return out.length ? out : null;
@@ -179,7 +189,7 @@ function chartTrafficSeries(sessionDir, totalMin){
     const c = r.vatsim_traffic;
     if(c == null) continue;
     const x = (r.wall_ms - HEAD_TRIM_S * 1000.0) / 60000.0;
-    if(x < 0 || x > totalMin + 0.5) continue;
+    if(!inChartWindow(x, totalMin)) continue;
     out.push([pyRound(x, 4), Math.trunc(c)]);
   }
   return out.length ? out : null;
@@ -195,7 +205,7 @@ function chartVramSeries(sessionDir, totalMin){
     const v = r.vram_mb;
     if(v == null) continue;
     const x = (r.wall_ms - HEAD_TRIM_S * 1000.0) / 60000.0;
-    if(x < 0 || x > totalMin + 0.5) continue;
+    if(!inChartWindow(x, totalMin)) continue;
     out.push([pyRound(x, 4), Math.trunc(v)]);
   }
   return out.length ? out : null;
@@ -212,7 +222,7 @@ function chartDomSeries(sessionDir, totalMin){
     const tRel = Array.isArray(s) ? s[0] : null, dom = (Array.isArray(s) && s.length > 5) ? s[5] : null;
     if(tRel == null || dom == null) continue;
     const x = (tRel - HEAD_TRIM_S) / 60.0;
-    if(x < 0 || x > totalMin + 0.5) continue;
+    if(!inChartWindow(x, totalMin)) continue;
     out.push([pyRound(x, 4), Math.trunc(dom)]);
   }
   return out.length ? out : null;
@@ -248,7 +258,7 @@ function chartAltitudeSeries(sessionDir, totalMin){
     const alt = r.alt_ft;
     if(alt == null || alt > ALT_SANE_FT) continue;
     const x = (r.wall_ms - HEAD_TRIM_S * 1000.0) / 60000.0;
-    if(x < 0 || x > totalMin + 0.5) continue;
+    if(!inChartWindow(x, totalMin)) continue;
     out.push([pyRound(x, 4), Math.trunc(alt)]);
   }
   return out.length ? out : null;

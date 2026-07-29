@@ -144,7 +144,10 @@ function fileSession(opts) {
   // so each of the 5 phases (incl. departing/arrival taxi) carries both metrics (Dean 2026-07-07).
   try {
     if (tel && smoothness.phases) {
-      const pv = computePhaseVram(tel);
+      // v6.15.5: window the VRAM samples to the frames we actually kept, so the trimmed spawn-in and
+      // sim-shutdown samples can't drag a phase average (telemetry wall_ms is recording-relative).
+      let keptMs = 0; for (const v of ft) keptMs += v;
+      const pv = computePhaseVram(tel, HEAD_TRIM_S, HEAD_TRIM_S + keptMs / 1000);
       for (const ph of Object.keys(smoothness.phases)) {
         if (pv[ph]) { smoothness.phases[ph].vram_peak = pv[ph].vram_peak; smoothness.phases[ph].vram_avg = pv[ph].vram_avg; }
       }

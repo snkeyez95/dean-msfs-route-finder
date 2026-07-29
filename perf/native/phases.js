@@ -198,17 +198,28 @@ function splitFrametimesByPhase(ftChron, phaseLog, recordingWallStart) {
 
 // Per-phase VRAM (peak/avg MB) from 1 Hz telemetry, split into the same 5 phases by the taxi
 // boundaries. telemetryRows: [{wall_ms, phase, vram_mb, ...}] (recording-relative wall_ms).
-function computePhaseVram(telemetryRows) {
+//
+// v6.15.5 (Dean 2026-07-29): windowed to the SAME [startS, endS] the frametime stats keep. Without
+// it every sample the trim threw away was still averaged in — the spawn-in load at the head and,
+// worse, the sim's VRAM unload at the tail. On KPHX-KSAN the last ~6 s (8,434 → 6,992 → 1,068 MB)
+// pulled arr_taxi's vram_avg down ~400 MB, and how much it pulls depends on how long the pilot sat
+// at the gate before quitting — noise straight into the Scenery view's arrival-taxi VRAM ranking.
+// Phase BOUNDARIES still come from all rows (a transition outside the window still defines the
+// timeline); only the VRAM accumulation is windowed. Omit the bounds for the old unwindowed behavior.
+function computePhaseVram(telemetryRows, startS, endS) {
   if (!telemetryRows || !telemetryRows.length) return {};
   const trans = phaseLogFromTelemetry(telemetryRows);
   if (!trans.length) return {};
   const { dep, arr } = taxiBoundaries(trans);
+  const lo = (startS == null) ? -Infinity : startS, hi = (endS == null) ? Infinity : endS;
   const acc = {};
   const add = (ph, v) => { if (v == null || isNaN(v)) return; if (!acc[ph]) acc[ph] = { sum: 0, n: 0, peak: 0 }; acc[ph].sum += v; acc[ph].n++; if (v > acc[ph].peak) acc[ph].peak = v; };
   for (const r of telemetryRows) {
     const v = r.vram_mb; if (v == null) continue;
+    const s = r.wall_ms / 1000.0;
+    if (s < lo || s > hi) continue;                 // outside the kept (trimmed) window — never averaged
     let ph = r.phase;
-    if (ph === 'ground') { const s = r.wall_ms / 1000.0; ph = (s < dep) ? 'dep_taxi' : (s >= arr ? 'arr_taxi' : null); }
+    if (ph === 'ground') { ph = (s < dep) ? 'dep_taxi' : (s >= arr ? 'arr_taxi' : null); }
     if (!ph) continue;
     add(ph, v);
   }
