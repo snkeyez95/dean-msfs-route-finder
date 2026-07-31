@@ -13,7 +13,15 @@
 // --- constants (match msfs_perf_logger.py exactly) ---
 const AUTO_MIN_SPEED_KT   = 2.0;      // above GSX reposition, below pushback
 const AUTO_CONFIRM_SECONDS = 3.0;     // rolling must hold this long before triggering
-const ALT_SANE_FT         = 45000;    // above this = SimConnect not settled
+// v6.15.6 (Dean 2026-07-30, KORD-CYYZ): was 45000, which is INSIDE the envelope of aircraft he
+// actually flies — the Citation Sovereign+ cruised at ~45,500 ft and 16 minutes of altitude were
+// discarded as "garbage" (blank alt_ft from 24.0 to 39.9 min). Worse, a null altitude freezes the
+// phase tracker, so that whole level cruise was filed as "climb" (51.8% climb / 3.3% cruise).
+// 70,000 still catches genuinely unsettled SimConnect reads while clearing every civil aircraft
+// (Concorde topped out at 60,000; bizjet ceilings sit around 51,000).
+const ALT_SANE_FT         = 70000;    // above this = SimConnect not settled
+const ALT_GAP_MAX_S       = 10.0;     // altitude gap longer than this = restart the climb-rate baseline
+                                      // rather than divide the change across the whole gap
 const PHASE_VS_FPM        = 150.0;    // climb/descent vs level deadband (feet/min)
 const AUTO_GIVEUP_SECONDS = 90;       // give up only after this long unreachable — RECONNECTS ONLY
 const AUTO_START_TIMEOUT_S = 1800;    // initial connect: MSFS may not even be LAUNCHED yet when we arm
@@ -50,9 +58,16 @@ class PhaseTracker {
   // feed one sample; returns the current phase (or null if not yet determinable)
   update(onGround, alt, nowSec) {
     if (onGround == null || alt == null) return this.current;
-    let fpm = 0.0;
-    if (this._prevAlt != null && this._prevAltT != null) fpm = computeFpm(alt, this._prevAlt, nowSec - this._prevAltT);
+    // A stale baseline across a long gap (dropped samples, or an altitude the old cap threw away)
+    // would spread the whole altitude change over the gap and report a near-zero climb rate — which
+    // is how a 16-minute cruise once turned into a phantom transition. On a stale baseline, re-anchor
+    // and HOLD the current phase; the next sample measures a real rate against the fresh anchor.
+    const prevAlt = this._prevAlt, prevAltT = this._prevAltT;
     this._prevAlt = alt; this._prevAltT = nowSec;
+    const stale = prevAltT != null && (nowSec - prevAltT) > ALT_GAP_MAX_S;
+    if (stale && this.current != null) return this.current;
+    let fpm = 0.0;
+    if (prevAlt != null && prevAltT != null && !stale) fpm = computeFpm(alt, prevAlt, nowSec - prevAltT);
     const phase = classifyPhase(!!onGround, fpm);
     if (phase !== this.current) { this.phaseLog.push([nowSec, phase]); this.current = phase; }
     return phase;

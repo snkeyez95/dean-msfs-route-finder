@@ -9,7 +9,9 @@ const { pyRound, pySum } = require('./stats.js');
 const TARGET_FRAMETIME_MS = 16.67;
 const STUTTER_FRAMETIME_MS = TARGET_FRAMETIME_MS * 2.0;
 const MIN_VALID_MS = 0.0, MAX_VALID_MS = 1000.0;
-const HEAD_TRIM_S = 5, ALT_SANE_FT = 45000;
+// ALT_SANE_FT must stay in step with simconnect.js — it was 45000 in both, which clipped the
+// altitude line for anything cruising above FL450 (v6.15.6).
+const HEAD_TRIM_S = 5, ALT_SANE_FT = 70000;
 const FRAMETIME_COLUMNS = ["MsBetweenPresents", "msBetweenPresents", "FrameTime", "ms_between_presents", "MsBetweenDisplayChange"];
 const CPUBUSY_COLUMNS = ["MsCPUBusy", "CPUBusy", "msCPUBusy"];
 const GPUBUSY_COLUMNS = ["MsGPUBusy", "GPUBusy", "msGPUBusy"];
