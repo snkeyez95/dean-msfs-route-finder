@@ -180,6 +180,19 @@ async function armAndWaitForRolling(appName, log) {
   }
 }
 
+// v6.15.7 — RECORD NOW (Dean 2026-07-31). Connect, then start recording straight away instead of
+// waiting for the takeoff roll. For deliberate at-the-gate work (cinematic / chase-plane / settings
+// A-B tests) where the aircraft may never move, so the rolling trigger would never fire and nothing
+// would ever be captured. Same connect path and the same long launch timeout as the normal arm —
+// only the rolling wait is skipped.
+async function armAndConnect(appName, log) {
+  const say = log || (() => {});
+  const conn = await openWithRetry(appName, AUTO_START_TIMEOUT_S, say);
+  if (conn === 'no-flight') return 'no-flight';
+  say('  Connected. RECORD NOW: starting immediately (takeoff-roll detection bypassed).');
+  return { handle: conn.handle, state: attachSampler(conn.handle, null) };
+}
+
 // Mid-RECORDING sampler that survives SimConnect drops. A transient 'close' (or silent freeze) must
 // NEVER end the capture — Python ends a capture ONLY when PresentMon exits (py:3845) and swallows
 // every tracker read failure. This goes one better: it reconnects so phase/movement data resumes,
@@ -259,7 +272,7 @@ function readTitle(handle, timeoutMs = 4000) {
 
 module.exports = {
   computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler, readTitle,
-  armAndWaitForRolling, ResilientSampler,
+  armAndWaitForRolling, armAndConnect, ResilientSampler,
   AUTO_MIN_SPEED_KT, AUTO_CONFIRM_SECONDS, ALT_SANE_FT, PHASE_VS_FPM, AUTO_GIVEUP_SECONDS,
   AUTO_START_TIMEOUT_S, STALE_DATA_SECONDS,
 };

@@ -31,6 +31,8 @@ runAutoCapture({
   // simply skipped; another user's install must never silently fetch the developer's flight plans.
   username: process.env.ABRP_SIMBRIEF_USER || null,
   appName: 'ABRP Native Perf',
+  // v6.15.7: RECORD NOW — skip the takeoff-roll trigger and record from connect (gate/cinematic work)
+  recordNow: process.env.ABRP_RECORD_NOW === '1',
   log: (m) => { console.log(m); logLine(m); },
   status: (s) => { writeStatus(s); logLine('[status] ' + s); },
 })

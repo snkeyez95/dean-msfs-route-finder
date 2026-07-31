@@ -96,7 +96,7 @@ function updateIndex(sessionsDir, entry, now) {
 // recordingWallStart, stopTrimS, driverVersion, simVersion, sessionsDir}. Returns the session dir.
 function fileSession(opts) {
   const { rawCsvPath, settings, vram, startedAt, telemetryRows, phaseLog, recordingWallStart,
-    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir } = opts;
+    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir, manual } = opts;
   const now = startedAt || new Date();
   const tlodStr = settings.tlod != null ? 'TLOD' + settings.tlod : 'TLODna';
   const olodStr = settings.olod != null ? 'OLOD' + settings.olod : 'OLODna';
@@ -130,7 +130,13 @@ function fileSession(opts) {
     if (cut > 0) { ft = a; cpu = b; gpu = c; teardownS = cut; trimMethod = method; return true; }
     return false;
   };
-  if (!tryAnchor(brakeAnchorS, 'brake') && !tryAnchor(moveAnchorS, 'movement')) {
+  // v6.15.7: a RECORD NOW session gets the teardown trim ONLY. Both ground-truth anchors assume a
+  // real flight — parked at a gate with the brake already set, the brake anchor lands at the start of
+  // the recording and would trim the session to nothing; the movement anchor would cut everything
+  // after the aircraft last moved, which for a static cinematic is the whole take.
+  if (manual) {
+    [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu); trimMethod = 'teardown';
+  } else if (!tryAnchor(brakeAnchorS, 'brake') && !tryAnchor(moveAnchorS, 'movement')) {
     [ft, cpu, gpu, teardownS] = trimTeardownTail(ft, cpu, gpu); trimMethod = 'teardown';
   }
   const smoothness = computeSmoothness(ft, cpu, gpu, teardownS, phaseLog, recordingWallStart);
@@ -213,6 +219,10 @@ function fileSession(opts) {
     peak_vram_mb: vram ? vram.peak_vram_mb : null, frame_count: smoothness.frame_count,
     aircraft: settings.aircraft, route: settings.simbrief_route || '',
     ...(settings.experiment ? { experiment: settings.experiment } : {}),   // Settings Lab tag (absent = normal flight)
+    // v6.15.7 RECORD NOW: a deliberate bench session. `excluded` is what every consumer already
+    // honours (baseline, coverage, drift, Settings A/B, Scenery), so one flag quarantines it
+    // everywhere; `manual_capture` keeps it readable as intentional rather than a failed flight.
+    ...(settings.manual_capture ? { manual_capture: true, excluded: true } : {}),
     // flight-context tags (v6.9.0): flown with online traffic (vatsim/batc) and/or AutoFPS (absent = offline, fixed TLOD)
     ...(settings.online_traffic ? { online_traffic: settings.online_traffic } : {}),
     ...(settings.autofps_active ? { autofps_active: true } : {}),

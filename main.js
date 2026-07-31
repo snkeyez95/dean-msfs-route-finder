@@ -1968,7 +1968,7 @@ function simbriefUser(){ const u = String(_perfCfg().simbriefUser || '').trim();
 // Steam UserCfg.opt (matches the Python engine). Store-vs-Steam detection is a cutover TODO.
 const USERCFG_PATH = path.join(app.getPath('appData'), 'Microsoft Flight Simulator 2024', 'UserCfg.opt');
 
-ipcMain.handle('perf-start-capture', () => {
+ipcMain.handle('perf-start-capture', (_e, o) => {
   try {
     // ONE capture engine only. Arming repeatedly without flying (or re-arming) leaves engines
     // waiting; they ALL fire on the next takeoff and collide over _capture_tmp.csv + PresentMon's
@@ -2006,6 +2006,7 @@ ipcMain.handle('perf-start-capture', () => {
         ABRP_BENCHMARK: JSON.stringify(benchCfg()),   // user grid + aircraft match terms (Phase 10)
         ABRP_THIRDPARTY_ICAOS: JSON.stringify(thirdPartyIcaos()),   // scenery attribution (v6.3.8)
         ...(vatsimCid() ? { ABRP_VATSIM_CID: vatsimCid() } : {}),   // confirm real VATSIM connection (v6.9.0)
+        ...((o && o.recordNow) ? { ABRP_RECORD_NOW: '1' } : {}),    // v6.15.7: record from connect, no takeoff-roll wait
         // node-simconnect (+ its 13 deps) is asarUnpack'd; point the detached process at it.
         NODE_PATH: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
                                   : path.join(__dirname, 'node_modules'),
@@ -2013,7 +2014,7 @@ ipcMain.handle('perf-start-capture', () => {
       const nchild = spawn(process.execPath, [entry], { detached:true, stdio:'ignore', windowsHide:true, env:nenv });
       nchild.on('error', e => LOG.error('[PERF] native capture spawn failed: ' + e.message));
       nchild.unref();
-      LOG.info('[PERF] native capture armed (Electron-as-node --auto) from ' + entry);
+      LOG.info('[PERF] native capture armed (Electron-as-node --auto' + ((o && o.recordNow) ? ', RECORD NOW' : '') + ') from ' + entry);
       return { ok:true, how:'native' };
     }
     const exe    = path.join(dir, 'perf-engine.exe');          // bundled, Python-free engine
@@ -2029,6 +2030,18 @@ ipcMain.handle('perf-start-capture', () => {
     LOG.info('[PERF] capture armed (headless --auto) [' + how + '] from ' + dir);
     return { ok:true, how };
   } catch (e) { LOG.error('[PERF] perf-start-capture failed: ' + e.message); return { ok:false, error:e.message }; }
+});
+
+// v6.15.7 — STOP & FILE without quitting the sim. The capture engine runs detached with stdio
+// ignored, so the request is a file it polls (capture_status.json is the same channel in reverse).
+// The engine consumes it, stops PresentMon and files the session through the normal path.
+ipcMain.handle('perf-stop-capture', () => {
+  try {
+    if (!isCaptureRunning()) return { ok:false, error:'no capture is running' };
+    fs.writeFileSync(path.join(USER_DATA, '_capture_stop'), String(Date.now()));
+    LOG.info('[PERF] stop requested — engine will file the session');
+    return { ok:true };
+  } catch (e) { LOG.error('[PERF] perf-stop-capture failed: ' + e.message); return { ok:false, error:e.message }; }
 });
 
 // Auto-TLOD: run the engine's --prep-next to pick + write the next benchmark TLOD for the aircraft on

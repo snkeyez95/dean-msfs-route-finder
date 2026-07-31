@@ -29,7 +29,8 @@ function buildSessionsNavJs(sessions){
 // when null, else ""). index.json is read-append-write (last_updated is a wall clock = non-deterministic).
 const INDEX_CSV_FIELDS = ["session_id", "timestamp", "driver_version", "sim_version", "aircraft",
   "route", "tlod", "olod", "p99_ft_ms", "stutter_pct", "consistency_pct",
-  "avg_fps", "peak_vram_mb", "frame_count", "experiment", "online_traffic", "autofps_active", "gfx_fp", "folder"];
+  "avg_fps", "peak_vram_mb", "frame_count", "experiment", "online_traffic", "autofps_active",
+  "manual_capture", "gfx_fp", "folder"];
 function buildIndexCsvRows(sessions){
   return (sessions || []).map(s => { const r = {}; for(const k of INDEX_CSV_FIELDS) r[k] = (k in s) ? s[k] : ''; return r; });
 }

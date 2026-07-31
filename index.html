@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.15.6</div>
+  <div class="tname">A Better Route Planner &mdash; v6.15.7</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.15.6</div>
+    <div class="sb-ver">v6.15.7</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -4081,6 +4081,8 @@ async function renderPerfPane(){
     +'<button class="btn bg bsm" onclick="perfShowScenery()" title="Rank which airports cost the most ground (taxi) performance — measured against your typical ground for the same plane, so the aircraft isn&#39;t blamed for the scenery">&#128748; Scenery</button>'
     +'<button class="btn bg bsm" title="Open the dashboard in your browser" onclick="window.api.perfOpenPath(_perfData.combinedPath)">&#8599;</button>'
     +'<button class="btn bg bsm" onclick="perfArmCapture()" title="Arm a capture for your next flight, then launch the sim yourself (one-click Launch + Capture lives on your route cards in Plan a Flight)">&#9679; Arm Capture</button>'
+    +'<button class="btn bg bsm" onclick="perfRecordNow()" title="Start recording immediately, without waiting for a takeoff roll &mdash; for gate/cinematic/settings testing. Marked as a test: it never counts toward your baseline or any comparison.">&#9210; Record Now</button>'
+    +'<button class="btn bg bsm" onclick="perfStopCapture()" title="Stop the running capture and file it now, leaving MSFS open &mdash; so you can record several short takes in one sim session">&#9209; Stop &amp; file</button>'
     +'<button class="btn bg bsm" id="cfx-export-btn" onclick="perfExportCfx()" title="Convert the flight you&#39;re viewing to a CapFrameX-format CSV (Sessions\\CapFrameX). From the dashboard you get a picker instead — choose one flight folder, a date, or Sessions for everything.">&#8687; CapFrameX</button>'
     +'<button class="btn bg bsm" id="perf-cov-btn" onclick="perfToggleCov()" title="Hide the &lsquo;Coverage &amp; what to fly next&rsquo; tracker now your 24-flight benchmark is complete — reversible; click again to bring it back if you re-baseline after a driver or sim update">'+(S.cfg.perfHideCoverage?'&#127919; Show coverage':'&#127919; Hide coverage')+'</button>'
     +'<span style="font-size:12px;color:var(--ink3);margin-left:auto">'+n+' flight'+(n>1?'s':'')+' logged &middot; open any flight from the table at the bottom of the dashboard</span>'
@@ -5069,6 +5071,32 @@ async function perfArmCapture(){
   let r; try{ r=await window.api.perfStartCapture(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
   if(r&&r.ok){ alert('Capture armed'+(n?(' and '+n+' app'+(n>1?'s':'')+' closed'):'')+'.\n\nLaunch MSFS and fly — it records on your takeoff roll, files when you close the sim, and your apps reopen automatically. Re-open this tab afterward to see the flight.'); }
   else{ alert('Could not arm capture: '+((r&&r.error)||'unknown error')); }
+}
+
+// v6.15.7 — RECORD NOW (Dean 2026-07-31). Arm Capture waits for the takeoff roll, so anything done
+// parked at a gate — chase-plane cinematics, a settings A/B, "what does this look like with frame
+// gen off" — never records at all. This starts the moment the engine reaches SimConnect. The session
+// is tagged manual_capture AND excluded, so it can never move your baseline, coverage, drift,
+// Settings A/B or Scenery numbers; it just shows up in the flight list like anything else.
+async function perfRecordNow(){
+  const msg='Start recording right now?\n\n'
+    +'• Begins as soon as ABRP reaches the sim — no need to take off, or even move.\n'
+    +'• For gate/cinematic/settings testing. It will NOT count toward your baseline or any comparison.\n'
+    +'• Stop it with “Stop & file”, or by closing the sim — either way it files normally.\n\n'
+    +'MSFS should already be running and in a flight.';
+  if(!confirm(msg))return;
+  let r; try{ r=await window.api.perfStartCapture({recordNow:true}); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.ok){ alert('Recording now.\n\nIt files when you press “Stop & file” or close the sim. The flight is marked as a test and stays out of your baseline and comparisons.'); }
+  else{ alert('Could not start recording: '+((r&&r.error)||'unknown error')); }
+}
+
+// Ends the running capture without quitting MSFS, so several short takes can be recorded in one
+// session. The engine stops PresentMon and files through the exact same path as a sim-close ending.
+async function perfStopCapture(){
+  if(!confirm('Stop the running capture and file it now?\n\nMSFS keeps running. The recording so far is saved as a flight.'))return;
+  let r; try{ r=await window.api.perfStopCapture(); }catch(e){ r={ok:false,error:(e&&e.message)||'error'}; }
+  if(r&&r.ok){ alert('Stopping — the session files in a few seconds.\n\nReopen the Performance tab to see it.'); }
+  else{ alert('Could not stop the capture: '+((r&&r.error)||'unknown error')); }
 }
 
 // One-click clean benchmark flight: auto-set the next benchmark TLOD (engine --prep-next, same
@@ -8196,5 +8224,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.15.6</div>
+  pointer-events:none;">v6.15.7</div>
 </body></html>

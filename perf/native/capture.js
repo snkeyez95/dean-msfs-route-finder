@@ -7,7 +7,7 @@
 // ⚠ INTEGRATION MODULE: every piece it calls is individually tested, but the full path can only be
 // validated with the sim running (a ~5-min gate+taxi session). This is the assembly, not new math.
 const fs = require('fs'), path = require('path');
-const { armAndWaitForRolling, ResilientSampler, readTitle, PhaseTracker,
+const { armAndWaitForRolling, armAndConnect, ResilientSampler, readTitle, PhaseTracker,
         AUTO_MIN_SPEED_KT, AUTO_GIVEUP_SECONDS } = require('./simconnect.js');
 const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
@@ -46,13 +46,22 @@ function trafficCount(pilots, lat, lon) {
 // (--terminate_on_proc_exit). That is the ONLY end condition — Python parity (py:3845 waits solely on
 // proc.poll()). A SimConnect 'quit'/'close' mid-flight is a transient the ResilientSampler absorbs;
 // treating it as capture-end filed truncated flights (deep-review finding 4).
-function waitForCaptureEnd(proc, sampler, say) {
+function waitForCaptureEnd(proc, sampler, say, stopFile) {
   return new Promise((resolve) => {
     let done = false, poll = null;
     const finish = (why) => { if (!done) { done = true; if (poll) clearInterval(poll); say('  Capture ended (' + why + ').'); resolve(); } };
     proc.on('exit', () => finish('sim closed — PresentMon exited'));
     proc.on('error', (e) => { say('  PresentMon process error: ' + (e && e.message)); finish('PresentMon error'); });
     poll = setInterval(() => {
+      // v6.15.7 — STOP & FILE from the app, without quitting the sim. The engine runs detached with
+      // stdio ignored, so a file is the channel (same idea as capture_status.json in the other
+      // direction). Consumed here, then the normal end-of-capture path runs: stopPresentmon → flush →
+      // trim → file. Nothing about the resulting session differs from a sim-close ending.
+      if (stopFile) {
+        try {
+          if (fs.existsSync(stopFile)) { try { fs.unlinkSync(stopFile); } catch (_) {} return finish('stopped from ABRP'); }
+        } catch (_) {}
+      }
       if (proc.exitCode !== null || proc.signalCode) return finish('PresentMon gone');
       // BACKSTOP (2026-07-02 hang): PresentMon's --terminate_on_proc_exit failed once in the wild,
       // leaving it — and this wait — running forever after the sim closed. SimConnect connectability
@@ -84,6 +93,10 @@ async function runAutoCapture(opts) {
   const pmPath = findPresentmon(opts.assetDir);
   if (!pmPath) { say('  PresentMon not found in ' + opts.assetDir); return { ok: false, reason: 'no-presentmon' }; }
   const tmpCsv = path.join(opts.dataRoot, '_capture_tmp.csv');
+  // v6.15.7 RECORD NOW: bypass the takeoff-roll trigger and record from the moment SimConnect is up.
+  const recordNow = !!opts.recordNow;
+  const stopFile = path.join(opts.dataRoot, '_capture_stop');
+  try { fs.unlinkSync(stopFile); } catch (_) {}   // a stale request must never kill a fresh capture
   try { fs.unlinkSync(tmpCsv); } catch (_) {}
 
   killStrayPresentmon();                       // one capture path only
@@ -92,7 +105,7 @@ async function runAutoCapture(opts) {
   setStatus('armed');
   // Armed wait — the long launch timeout + self-healing reconnects live in armAndWaitForRolling
   // (Python wait_for_auto_start parity: 1800s for MSFS to appear, 90s give-up on REconnects only).
-  const armed = await armAndWaitForRolling(appName, say);
+  const armed = recordNow ? await armAndConnect(appName, say) : await armAndWaitForRolling(appName, say);
   if (armed === 'no-flight') { setStatus('idle'); return { ok: false, reason: 'no-flight' }; }
 
   // Flight facts BEFORE starting PresentMon — Python gathers read_settings/title/SimBrief/sim_version
@@ -105,6 +118,11 @@ async function runAutoCapture(opts) {
     texture_quality: fresh.texture_quality, usercfg_found: fresh.usercfg_found,
   };
   settings.aircraft = await resolveAircraft(armed.handle, opts);
+  // A RECORD NOW session is a deliberate bench test (gate cinematics, a settings A-B), not a flight.
+  // Tagging it here makes engine.js mark it excluded, which quarantines it from the baseline,
+  // coverage, drift, Settings A/B and the Scenery ranking in one move — it still records and shows
+  // in the flight list, it just never counts toward anything.
+  if (recordNow) settings.manual_capture = true;
   // SETTINGS A/B (v6.12.0): snapshot the WHOLE {Graphics} block at capture start ("silent data") +
   // a short fingerprint over the curated watch keys. A fingerprint change between consecutive
   // flights = the user changed a setting = a before/after card. Single snapshot by design (Dean
@@ -281,7 +299,7 @@ async function runAutoCapture(opts) {
     } catch (_) {}
   }, 5000);
 
-  await waitForCaptureEnd(proc, sampler, say);
+  await waitForCaptureEnd(proc, sampler, say, stopFile);
 
   // End-of-capture anchor for the tail trim: the last moment the sim was provably ALIVE (last
   // SimConnect sample), never bare Date.now() — if PresentMon lingered past sim close (2026-07-02
@@ -320,6 +338,7 @@ async function runAutoCapture(opts) {
     rawCsvPath: tmpCsv, settings, vram: vram.summarize(), startedAt,
     telemetryRows, phaseLog: tracker.phaseLog, recordingWallStart,   // absolute times; split subtracts it
     stopTrimS: Math.round(trimS * 10) / 10, brakeAnchorS, driverVersion, simVersion: settings.sim_version,
+    manual: recordNow,   // teardown-only trim: the ground-truth anchors assume a real flight
     sessionsDir: opts.sessionsDir,
   });
 
