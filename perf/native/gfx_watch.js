@@ -39,6 +39,13 @@ const WATCH = [
   { id: 'Graphics/Water/FFTSize',          section: 'Water',            key: 'FFTSize', label: 'Water waves',        fmt: 'enum', labels: WATER_LABELS },
   { id: 'Graphics/WindShield',             section: 'WindShield',       key: 'Quality', label: 'Windshield effects', fmt: 'enum', labels: Q_LABELS },
   { id: 'Graphics/Particles',              section: 'Particles',        key: 'Quality', label: 'Particles (visual effects)', fmt: 'enum', labels: PARTICLE_LABELS },
+  // v6.15.8 (Dean 2026-07-31): frame generation and the FPS target live OUTSIDE the {Graphics}
+  // block, so the snapshot never saw them — his FG-off experiment produced the SAME fingerprint
+  // (bf731382) as the FG-on flight before it, i.e. the single biggest setting change he has ever
+  // made generated no before/after card. capture.js merges both in under a 'Sim/' prefix. The FPS
+  // target rides along because a 30 -> 40 cap change is the same blind spot and he's weighing one.
+  { id: 'Sim/FrameGeneration',             top: 'Sim', key: 'FrameGeneration', label: 'Frame generation', fmt: 'text' },
+  { id: 'Sim/TargetFPS',                   top: 'Sim', key: 'TargetFPS',       label: 'FPS target (per rendered frame)', fmt: 'raw' },
 ];
 
 // ── full {Graphics} snapshot ─────────────────────────────────────────────────
@@ -79,7 +86,7 @@ function readAllGraphics(text) {
 // flag) report -1 when disabled so an on/off toggle is a tracked change. null = key absent.
 function watchValue(w, graphics) {
   if (!graphics) return null;
-  if (w.top === 'Video') { const v = graphics['Video/' + w.key]; return v != null ? v : null; }
+  if (w.top) { const v = graphics[w.top + '/' + w.key]; return v != null ? v : null; }
   if (w.gated) {
     const en = graphics['Graphics/' + w.section + '/Enabled'];
     if (en === 0) return -1;
@@ -111,6 +118,7 @@ function fingerprint(graphics) {
 // beside an enum label so a label-calibration slip can never hide the real stored value.
 function displayValue(w, v) {
   if (v == null) return '—';
+  if (w.fmt === 'text') return String(v);   // frame generation reads 'FSR FG' / 'off'
   if (w.fmt === 'pct') return Math.round(v * 100) + '%';
   if (w.fmt === 'enum') {
     if (v === -1) return 'Off';
@@ -123,7 +131,7 @@ function displayValue(w, v) {
 // Watch metadata for the renderer (single source of truth — the UI never re-declares label maps).
 function watchMeta() {
   return WATCH.map(w => ({ id: w.id, label: w.label, fmt: w.fmt, labels: w.labels || null,
-    key: (w.top === 'Video' ? 'Video → ' + w.key : w.section + ' → ' + w.key) }));
+    key: (w.top ? w.top + ' → ' + w.key : w.section + ' → ' + w.key) }));
 }
 
 // ── AutoFPS config snapshot ──────────────────────────────────────────────────

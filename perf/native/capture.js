@@ -130,7 +130,15 @@ async function runAutoCapture(opts) {
   try {
     if (fresh.usercfg_found) {
       const g = gfxWatch.readAllGraphics(fs.readFileSync(opts.usercfgPath, 'utf8'));
-      if (g) { settings.graphics = g; settings.gfx_fp = gfxWatch.fingerprint(g); }
+      if (g) {
+        // v6.15.8: frame generation and the FPS target live OUTSIDE the {Graphics} block, so the
+        // snapshot never saw them — fold in what readSettings already parsed. Proved necessary
+        // 2026-07-31: Dean's frame-gen-OFF flight fingerprinted identically to the FG-on flight
+        // before it, so the biggest setting change on the machine produced no before/after card.
+        if (fresh.frame_gen != null) g['Sim/FrameGeneration'] = fresh.frame_gen;
+        if (fresh.target_fps != null) g['Sim/TargetFPS'] = fresh.target_fps;
+        settings.graphics = g; settings.gfx_fp = gfxWatch.fingerprint(g);
+      }
     }
   } catch (_) {}
   // SETTINGS LAB tag: consume the pending marker written by labNext at launch time. Consumed HERE
