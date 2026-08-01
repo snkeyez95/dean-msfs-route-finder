@@ -63,6 +63,26 @@ console.log('\nframe generation + FPS target:');
     /if \(fresh\.frame_gen != null\)/.test(capSrc) && /if \(fresh\.target_fps != null\)/.test(capSrc));
 }
 
+// ── 2b. v6.15.9 — the two checkbox rows from the free-visuals push ──────────
+console.log('\nraytraced shadows + displacement mapping:');
+{
+  const off = Object.assign({}, base, { 'Graphics/RaytracedShadows/Enabled': 0, 'Graphics/DisplacementMapping/Enabled': 0 });
+  const rt  = Object.assign({}, off, { 'Graphics/RaytracedShadows/Enabled': 1 });
+  const dm  = Object.assign({}, off, { 'Graphics/DisplacementMapping/Enabled': 1 });
+  T('enabling raytraced shadows changes the fingerprint', W.fingerprint(off) !== W.fingerprint(rt));
+  T('enabling displacement mapping changes the fingerprint', W.fingerprint(off) !== W.fingerprint(dm));
+  T('the two are distinguishable from each other', W.fingerprint(rt) !== W.fingerprint(dm));
+  T('values read as the raw 0/1, not as a gated -1',
+    W.watchValues(off)['Graphics/RaytracedShadows'] === 0 && W.watchValues(rt)['Graphics/RaytracedShadows'] === 1);
+  T('they label as On/Off on the card',
+    W.displayValue(W.watchMeta().find(m => m.id === 'Graphics/RaytracedShadows'), 1) === '1 · On' &&
+    W.displayValue(W.watchMeta().find(m => m.id === 'Graphics/DisplacementMapping'), 0) === '0 · Off');
+  T('both appear in the legend',
+    W.watchMeta().filter(m => /RaytracedShadows|DisplacementMapping/.test(m.id)).length === 2);
+  T('a flight predating the keys degrades to null without throwing',
+    W.watchValues(base)['Graphics/RaytracedShadows'] === null && W.fingerprint(base) != null);
+}
+
 // ── 3. the real flights that exposed the blind spot ────────────────────────
 console.log('\nreal data (skipped if unavailable):');
 {

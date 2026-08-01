@@ -22,6 +22,7 @@ const fs = require('fs'), path = require('path');
 const Q_LABELS = { '-1': 'Off', 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };
 const PARTICLE_LABELS = { '-1': 'Off', 0: 'Low', 1: 'High' };                    // 1=High IN-SIM CONFIRMED
 const WATER_LABELS = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512=High IN-SIM CONFIRMED; rest inferred
+const ONOFF_LABELS = { 0: 'Off', 1: 'On' };   // in-sim checkbox rows (Raytraced Shadows, Displacement Mapping)
 
 // The watch list (Dean-scoped 2026-07-14, from his REAL UserCfg): GPU-work levers that don't feed
 // VRAM. Excluded deliberately: Texture (VRAM), Terrain/ObjectsLoD (machine-driven + the TLOD study),
@@ -44,6 +45,12 @@ const WATCH = [
   // (bf731382) as the FG-on flight before it, i.e. the single biggest setting change he has ever
   // made generated no before/after card. capture.js merges both in under a 'Sim/' prefix. The FPS
   // target rides along because a 30 -> 40 cap change is the same blind spot and he's weighing one.
+  // v6.15.9 (Dean 2026-08-01): the two checkbox rows he turned on for the free-visuals push. Both are
+  // GPU-side and VRAM-light — exactly the class this list exists for — and without them the A/B card
+  // for that flight credited the whole change to windshield effects + ambient occlusion. The key IS
+  // 'Enabled' here, so no `gated` flag: the raw 0/1 is the value, labelled Off/On.
+  { id: 'Graphics/RaytracedShadows',       section: 'RaytracedShadows',    key: 'Enabled', label: 'Raytraced shadows',   fmt: 'enum', labels: ONOFF_LABELS },
+  { id: 'Graphics/DisplacementMapping',    section: 'DisplacementMapping', key: 'Enabled', label: 'Displacement mapping', fmt: 'enum', labels: ONOFF_LABELS },
   { id: 'Sim/FrameGeneration',             top: 'Sim', key: 'FrameGeneration', label: 'Frame generation', fmt: 'text' },
   { id: 'Sim/TargetFPS',                   top: 'Sim', key: 'TargetFPS',       label: 'FPS target (per rendered frame)', fmt: 'raw' },
 ];
