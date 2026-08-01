@@ -151,9 +151,17 @@ console.log('\nreal session (skipped if unavailable):');
     let keptMs = 0; for (const x of kept) keptMs += x;
     const w = PH.computePhaseVram(rt, HEAD, HEAD + keptMs / 1000);
     const u = PH.computePhaseVram(rt);
-    T('real flight: no windowed phase average is lower than the unwindowed one',
-      Object.keys(w).every(k => !u[k] || w[k].vram_avg >= u[k].vram_avg),
-      Object.keys(w).map(k => k + ' ' + (u[k] ? u[k].vram_avg : '-') + '->' + w[k].vram_avg).join(' · '));
+    // The TAIL correction is the one this fix is about: the sim's VRAM unload can only drag an
+    // average DOWN, so removing those samples can only raise arrival taxi (or leave it alone).
+    // The HEAD trim is not directional — spawn-in samples can sit above or below a phase's mean
+    // (KSFO-KGPI: dropping them moved dep_taxi by -1 MB), so don't assert a direction there.
+    T('real flight: the teardown correction only ever RAISES arrival-taxi VRAM',
+      !u.arr_taxi || !w.arr_taxi || w.arr_taxi.vram_avg >= u.arr_taxi.vram_avg,
+      u.arr_taxi ? (u.arr_taxi.vram_avg + ' -> ' + w.arr_taxi.vram_avg) : 'no arrival taxi');
+    T('real flight: phases the window barely touches stay put (head trim only, either direction)',
+      ['climb', 'cruise', 'descent'].every(k => !u[k] || !w[k] || Math.abs(w[k].vram_avg - u[k].vram_avg) <= 50),
+      ['dep_taxi', 'climb', 'cruise', 'descent'].filter(k => u[k] && w[k])
+        .map(k => k + ' ' + (w[k].vram_avg - u[k].vram_avg)).join(' · '));
   }
 }
 
