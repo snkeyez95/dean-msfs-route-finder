@@ -57,4 +57,24 @@ console.log('\ndelivery:');
 }
 T('chart.js parses', (() => { try { new Function(src); return true; } catch (_) { return false; } })());
 
+// ── v6.16.0: no stray hover markers (Dean 2026-08-02) ───────────────────────
+// Chart.js draws its own marker on the active point of EVERY dataset. Under interaction mode
+// 'index' it resolves that per dataset, and the telemetry lines (altitude and VATSIM traffic at
+// 1 Hz, TLOD every ~10 s) are sampled at different instants than the frametime line — so their
+// markers appeared several seconds away from the crosshair and read as a broken hover. The only
+// markers should be the bullseyes xhairPlugin draws AT the crosshair pixel.
+console.log('\nno stray hover markers:');
+{
+  const both = src.match(/elements:\{point:\{hoverRadius:0,hitRadius:0\}\}/g) || [];
+  T('both charts disable the built-in hover point', both.length === 2, both.length + ' found');
+  T('the frametime chart still uses index-mode interaction',
+    /interaction:\{mode:'index',axis:'x',intersect:false\}/.test(src));
+  T('the moving-average chart keeps nearest-mode interaction',
+    /interaction:\{mode:'nearest',axis:'x',intersect:false\}/.test(src));
+  T('our own bullseyes are still drawn at the CROSSHAIR pixel, not per dataset',
+    /bullseye\(x,px,py,m\.color\(\)\)/.test(src));
+  T('every line still hides its points when not hovered (pointRadius 0)',
+    (src.match(/pointRadius:0/g) || []).length >= 7);
+}
+
 process.exit(T.done() ? 1 : 0);

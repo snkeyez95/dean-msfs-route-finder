@@ -26,7 +26,7 @@ const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
 const VRAM_V = 'trim-window';  // marker: bump to force a one-time per-phase VRAM recompute (v6.15.5: phase VRAM averages are now windowed to the kept/trimmed frames, so spawn-in + sim-shutdown samples no longer drag them)
-const REPORT_V = 'chart-window-no-pad'; // marker: bump to force a one-time report.html regen for ALL flights (v6.15.5: telemetry/trace chart series are clamped to the plotted frametime end instead of +30 s, so the sim's VRAM unload cliff is never drawn)
+const REPORT_V = 'hover-marker-fix'; // marker: bump to force a one-time report.html regen for ALL flights (v6.16.0: Chart.js's own per-dataset hover markers are disabled, so the only markers are the bullseyes drawn at the crosshair)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 

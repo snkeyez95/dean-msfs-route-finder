@@ -121,8 +121,13 @@ console.log('\nwiring:');
   T('the idempotency gate checks VRAM_V as well as TRIM_V',
     /ext\.trim_v === TRIM_V && ext\.vram_v === VRAM_V/.test(backfillSrc));
   T('computeExt stamps vram_v into the sidecar', /trim_v: TRIM_V, vram_v: VRAM_V/.test(backfillSrc));
-  T('REPORT_V was bumped so every report regenerates once',
-    /const REPORT_V = 'chart-window-no-pad';/.test(backfillSrc));
+  // This fix shipped with REPORT_V = 'chart-window-no-pad'; later report changes bump it again and
+  // any bump regenerates every report, so this rides along. Assert only that the marker moved past
+  // the value that PRECEDED this fix — pinning the exact string breaks on the next report change.
+  T('REPORT_V was bumped so every report regenerates once', (() => {
+    const m = backfillSrc.match(/const REPORT_V = '([^']+)'/);
+    return !!m && m[1] !== 'chart-align-vram-label';
+  })(), (backfillSrc.match(/const REPORT_V = '([^']+)'/) || [])[1]);
 }
 
 // ── 5. real-session regression (skipped when Sessions isn't present) ────────

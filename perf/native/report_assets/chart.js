@@ -151,6 +151,13 @@
       type:'line',data:{datasets:datasets},plugins:[refLines,overCaret,xhairPlugin,readoutPlugin],
       options:{responsive:true,maintainAspectRatio:false,animation:false,
         parsing:false,normalized:true,interaction:{mode:'index',axis:'x',intersect:false},
+        // v6.16.0 (Dean 2026-08-02): Chart.js draws its OWN marker on the active point of
+        // EVERY dataset. With interaction mode 'index' it resolves that per dataset, and the
+        // telemetry lines (altitude 1 Hz, VATSIM traffic 1 Hz, TLOD ~10 s) are sampled at different
+        // instants than the frametime line — so their markers landed visibly off the crosshair and
+        // read as a broken hover. We draw our own bullseyes at the crosshair pixel in xhairPlugin;
+        // these built-in ones are pure noise. hitRadius 0 keeps them from grabbing the pointer too.
+        elements:{point:{hoverRadius:0,hitRadius:0}},
         scales:{
           x:{type:'linear',min:0,max:(CHART.total_min>0?CHART.total_min:undefined),
             title:{display:true,text:'minutes into flight',color:c.text},
@@ -301,6 +308,7 @@
         plugins:[tgtLine,xhairPlugin],
         options:{responsive:true,maintainAspectRatio:false,animation:false,
           parsing:false,normalized:true,interaction:{mode:'nearest',axis:'x',intersect:false},
+          elements:{point:{hoverRadius:0,hitRadius:0}},   // same: our bullseye is the only marker
           scales:{
             x:{type:'linear',min:xmin,max:xmax,grid:{color:colors().grid},
               ticks:{color:colors().faint,maxTicksLimit:12,
