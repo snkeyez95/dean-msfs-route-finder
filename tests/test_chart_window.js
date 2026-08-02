@@ -116,8 +116,11 @@ console.log('\nwiring:');
     /computePhaseVram\(tel, HEAD_TRIM_S, HEAD_TRIM_S \+ keptMs \/ 1000\)/.test(engineSrc));
   T('backfill_phases.js uses the identical window',
     /computePhaseVram\(tel, HEAD, HEAD \+ keptMs \/ 1000\)/.test(backfillSrc));
+  // Don't pin the marker's VALUE — later sidecar changes bump it and any bump forces the recompute
+  // this fix needs, so an exact-string assertion just breaks on the next unrelated change (it has
+  // now done so three times: REPORT_V twice, VRAM_V here). Assert the mechanism exists instead.
   T('a VRAM_V marker exists so old sidecars recompute once',
-    /const VRAM_V = 'trim-window';/.test(backfillSrc));
+    /const VRAM_V = '[^']+';/.test(backfillSrc), (backfillSrc.match(/const VRAM_V = '([^']+)'/) || [])[1]);
   T('the idempotency gate checks VRAM_V as well as TRIM_V',
     /ext\.trim_v === TRIM_V && ext\.vram_v === VRAM_V/.test(backfillSrc));
   T('computeExt stamps vram_v into the sidecar', /trim_v: TRIM_V, vram_v: VRAM_V/.test(backfillSrc));

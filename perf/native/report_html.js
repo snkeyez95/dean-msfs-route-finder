@@ -7,6 +7,8 @@ const A = require('./report_assets.js');
 const { pyRound } = require('./stats.js');
 const RC = require('./report_charts.js');
 const { trimChartTail } = require('./phases.js');
+const { buildDebrief, debriefHtml } = require('./debrief.js');
+const gfxWatch = require('./gfx_watch.js');
 
 const TARGET_FRAMETIME_MS = 16.67, STUTTER_FRAMETIME_MS = 33.34;
 
@@ -40,7 +42,7 @@ function pyJson(v){
   return '{' + Object.keys(v).map(k => jsonStr(k) + ': ' + pyJson(v[k])).join(', ') + '}';
 }
 
-function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sessionDir, driverVersion, simVersion){
+function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sessionDir, driverVersion, simVersion, history){
   const fmt = v => (v === null || v === undefined) ? 'n/a' : v;
   const g = (o, k) => (o && o[k] !== undefined) ? o[k] : undefined;
   const tlod = g(settings, 'tlod'), olod = g(settings, 'olod');
@@ -51,10 +53,11 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   // AutoFPS drove TLOD dynamically — the logged value is only the launch cap, NOT what rendered, so
   // show "AutoFPS" instead of a misleading number (Dean 2026-07-12). v6.11.0: when the trace sidecar
   // exists, show the EFFECTIVE median + range it actually ran.
-  let afpsEff = '';
+  let afpsEff = '', afTrace = null;
   if (autofps) {
     try {
       const st = require('./autofps_log.js').readSidecar(sessionDir);
+      afTrace = st || null;   // v6.17.0: the debrief reads TLOD churn from the same sidecar
       // OBSERVED values from the trace (what AutoFPS actually flew) — NOT the configured min/max
       // range, which ABRP can't confirm yet. Label accordingly (Dean 2026-07-14: "unless we can
       // confirm the range we have set, don't show 125-800" — it read like the setting).
@@ -159,19 +162,10 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   const frameCount = g(stats, 'frame_count') || 0;
   const durationSeconds = g(stats, 'duration_seconds');
 
-  // Flight verdict — keep the grade headline; make the BODY the thing that actually varies flight to
-  // flight on a smooth rig: the VRAM ceiling (the real constraint) + the worst frame. Not a footer echo.
-  const p99v = g(stats, 'p99_ft_ms'), grd = gradeP99(p99v);
-  const gword = { good: 'Smooth', ok: 'Playable', bad: 'Rough', na: '—' }[grd];
-  const gcol = { good: 'var(--good)', ok: 'var(--ok)', bad: 'var(--bad)', na: 'var(--text-faint)' }[grd];
-  const vpk = g(vram, 'peak_pct'), peakMb = g(vram, 'peak_vram_mb'), totMb = g(vram, 'total_vram_mb') || 12288;
-  const headGB = peakMb != null ? pyRound((totMb - peakMb) / 1024, 1) : null;
-  const cpuB2 = g(stats, 'cpu_bound_pct');
-  let insight;
-  if (vpk == null) insight = 'VRAM wasn’t captured for this flight.';
-  else if (vpk < 85) insight = 'Room to climb — VRAM peaked at ' + floatRepr(vpk) + '% (' + floatRepr(headGB) + ' GB free)' + (cpuB2 != null && cpuB2 > 90 ? ' with the GPU mostly idle' : '') + '. This TLOD isn’t the limiter.';
-  else if (vpk < 92) insight = 'VRAM is the ceiling here — peaked at ' + floatRepr(vpk) + '%, only ' + floatRepr(headGB) + ' GB to spare. About as high as this TLOD comfortably sustains.';
-  else insight = 'VRAM-limited — peaked at ' + floatRepr(vpk) + '% (' + floatRepr(headGB) + ' GB left). A higher TLOD risks running dry.';
+  // FLIGHT DEBRIEF (v6.17.0) — replaces the old static verdict. Grade + where it ranks against your
+  // own history, what characterised the flight, the one thing to act on (or an explicit nothing),
+  // and at most one context line. The grade ladder and the VRAM thresholds are carried over
+  // unchanged inside debrief.js, so a flight that read "Smooth" before still reads "Smooth".
   const maxSpike = g(stats, 'max_ft_ms'), stutN2 = g(stats, 'stutter_count') || 0, fc2 = g(stats, 'frame_count') || 0;
   const spikeTxt = (maxSpike != null) ? ('Worst single frame ' + floatRepr(maxSpike) + ' ms · ' + thousands(stutN2) + ' stutter' + (stutN2 !== 1 ? 's' : '') + ' across ' + thousands(fc2) + ' frames') : '';
   // v6.12.1: periodic-stutter classification — the "would lowering TLOD fix it?" line. Periodic
@@ -214,14 +208,21 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
     periodicTxt = '<div style="font-size:11px;margin-top:9px;line-height:1.55;color:var(--text-dim)">Spike pattern: aperiodic (' + ps.spikes_total +
       ' one-off hitches, no repeating cadence) — scenery streaming / main-thread work, not the TLOD-overload signature. Lowering TLOD would not have helped.</div>';
   }
-  const verdictHtml = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">' +
-    '<div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px">Verdict</div>' +
-    '<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:25px;font-weight:700;color:' + gcol + '">' + gword + '</span>' +
-    '<span style="font-size:13px;color:var(--text-dim);font-family:Consolas,monospace">P99 ' + (p99v != null ? floatRepr(p99v) : '—') + ' ms</span></div>' +
-    '<div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:9px">' + insight + '</div>' +
+  // Which watched graphics settings changed since the previous flight — the debrief's optional 4th
+  // line. Uses the SAME labels the Settings A/B card shows, so the two surfaces never disagree.
+  // The index carries only the PREVIOUS flight's fingerprint, not its values, so we can detect THAT a
+  // watched setting changed but not WHICH one. Say exactly that and point at the view that does know —
+  // listing this flight's current settings would read like a before/after we can't substantiate.
+  let changedKeys = null;
+  try {
+    const prev = (history || []).filter(h => h && !h.excluded && h.gfx_fp).slice(-1)[0];
+    const fp = g(settings, 'gfx_fp');
+    if (prev && fp && prev.gfx_fp !== fp) changedKeys = ['A watched graphics setting changed since your last flight — Settings A/B has the before and after.'];
+  } catch (_) { changedKeys = null; }
+  const debrief = buildDebrief({ stats, settings, vram, history, trace: afTrace, changedKeys, severePeriodic: psStrong });
+  const verdictHtml = debriefHtml(debrief,
     (spikeTxt ? '<div style="font-size:11px;color:var(--text-dim);margin-top:9px;font-family:Consolas,monospace">' + spikeTxt + '</div>' : '') +
-    periodicTxt +
-    '</div>';
+    periodicTxt);
 
   return `<!DOCTYPE html>
 <html lang="en" data-theme="dark">

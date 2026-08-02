@@ -15,7 +15,7 @@
 // original logs. Readers (main.js perf-compare-data) prefer the corrected sidecar values.
 const fs = require('fs'), path = require('path');
 const { readChronological, readTelemetry } = require('./report_charts.js');
-const { trimHead, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram } = require('./phases.js');
+const { trimHead, trimTail, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram } = require('./phases.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
@@ -25,18 +25,33 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const VRAM_V = 'trim-window';  // marker: bump to force a one-time per-phase VRAM recompute (v6.15.5: phase VRAM averages are now windowed to the kept/trimmed frames, so spawn-in + sim-shutdown samples no longer drag them)
-const REPORT_V = 'hover-marker-fix'; // marker: bump to force a one-time report.html regen for ALL flights (v6.16.0: Chart.js's own per-dataset hover markers are disabled, so the only markers are the bullseyes drawn at the crosshair)
+const VRAM_V = 'anchor-trim';  // marker: bump to force a one-time sidecar recompute (v6.17.0: the end trim now reproduces the capture's own brake/movement anchor instead of re-deriving it, so max/spike/perceptible + the phase split match the flight's summary)
+const REPORT_V = 'flight-debrief-v2'; // marker: bump to force a one-time report.html regen for ALL flights (v6.17.0: corrected end trim + the Flight Debrief replacing the static verdict)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
-// Read frametimes.csv → head-trim (5 s) → canonical teardown trim. Returns { ft, teardownS } or null.
+// Read frametimes.csv → head-trim (5 s) → the flight's OWN end trim. Returns { ft, teardownS } or null.
 // Only needs frametimes.csv, so it works even on flights that predate telemetry.
-function readTrimmedFt(dir) {
+//
+// v6.17.0 (Dean 2026-08-02): RESPECT THE CAPTURE'S ANCHOR. This used to always re-trim with
+// trimTeardownTail, which is the frametime-SHAPE fallback — but a capture that found a ground-truth
+// end (parking brake set and held, or last movement) already cut the tail correctly and recorded how
+// much it cut. Re-deriving it here kept shutdown frames the capture had thrown away, so the sidecar
+// disagreed with the flight's own summary: 37 of 51 flights, including ALL 20 with trim_method
+// 'brake'. The report and the Compare view both read the sidecar, so they showed the inflated
+// numbers (2026-08-01_2211: max 116.1 ms in summary, 193.36 in the report; 2026-06-24_0948, the
+// steadiest flight on record, 62.36 -> 153.85). trimTail by the recorded stop_trim_s reproduces the
+// exact array the capture kept. Flights with no recorded anchor keep the teardown heuristic.
+function readTrimmedFt(dir, summary) {
   const raw = path.join(dir, 'frametimes.csv');
   if (!fs.existsSync(raw)) return null;
   let ft; try { ({ ft } = readChronological(raw)); } catch (_) { return null; }
   [ft] = trimHead(ft, [], [], HEAD);
+  const sm = (summary && summary.smoothness) || {};
+  if ((sm.trim_method === 'brake' || sm.trim_method === 'movement') && sm.stop_trim_s > 0) {
+    [ft] = trimTail(ft, [], [], sm.stop_trim_s);
+    return { ft, teardownS: sm.stop_trim_s };
+  }
   let tS; [ft, , , tS] = trimTeardownTail(ft, [], []);
   return { ft, teardownS: tS };
 }
@@ -56,7 +71,7 @@ function routeIcaos(summary) {
 function computeExt(dir, summary) {
   const tel = readTelemetry(dir);
   if (!tel || !tel.length) return null;                   // no telemetry (pre-2026-06-22) → can't split
-  const t = readTrimmedFt(dir); if (!t) return null;
+  const t = readTrimmedFt(dir, summary); if (!t) return null;
   const buckets = splitFrametimesByPhase(t.ft, phaseLogFromTelemetry(tel), 0);   // telemetry wall_ms is recording-relative
   const phases = computePhaseStats(buckets, t.ft.length);
   if (!Object.keys(phases).length) return null;
@@ -82,7 +97,7 @@ function backfillCorrection(dir, summary, extPath) {
   if (full) {
     ext = Object.assign(ext || {}, full);
   } else {
-    const t = readTrimmedFt(dir); if (!t) return { ext, wrote: false };   // no frametimes → nothing to do
+    const t = readTrimmedFt(dir, summary); if (!t) return { ext, wrote: false };   // no frametimes → nothing to do
     ext = Object.assign(ext || { v: 1 }, corrMetrics(t.ft), { teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V, vram_v: VRAM_V });
   }
   try { fs.writeFileSync(extPath, JSON.stringify(ext)); } catch (_) { return { ext, wrote: false }; }
@@ -93,12 +108,12 @@ function backfillCorrection(dir, summary, extPath) {
 // the frametime chart drop the shutdown burst. Uses the sidecar's 5-phase split (or the summary's for
 // native 5-phase flights). Gated by ext.report_trim_v so it runs once. report.html is derived
 // (regenerable) — raw logs stay put. Returns true if it rewrote the report.
-function regenReport(dir, summary, ext, tpSet) {
+function regenReport(dir, summary, ext, tpSet, history) {
   try {
     if (ext && ext.report_trim_v === REPORT_V) return false;
     const rp = path.join(dir, 'report.html');
     if (!fs.existsSync(rp)) return false;
-    const t = readTrimmedFt(dir); if (!t) return false;
+    const t = readTrimmedFt(dir, summary); if (!t) return false;
     const ft = t.ft, sortedFt = ft.slice().sort((a, b) => a - b);
     const sm = summary.smoothness || {};
     const phases = (ext && ext.phases) || sm.phases || null;
@@ -114,7 +129,7 @@ function regenReport(dir, summary, ext, tpSet) {
       arr_scenery: (summary.settings && summary.settings.arr_scenery != null) ? summary.settings.arr_scenery
         : (ext && ext.arr_scenery != null) ? ext.arr_scenery : (arr_icao ? tpSet.has(arr_icao) : false) });
     const html = buildReport(summary.session_id, settings, stats, summary.vram, ft, sortedFt, dir,
-      summary.driver_version, summary.sim_version);
+      summary.driver_version, summary.sim_version, history || []);
     fs.writeFileSync(rp, html);
     return true;
   } catch (_) { return false; }
@@ -123,7 +138,11 @@ function regenReport(dir, summary, ext, tpSet) {
 function runBackfill(sessionsDir, tpIcaos) {
   let idx; try { idx = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'index.json'), 'utf8')); } catch (_) { return { corrected: 0, skipped: 0, noData: 0, reports: 0 }; }
   let tpSet; try { tpSet = new Set((tpIcaos || JSON.parse(process.env.ABRP_THIRDPARTY_ICAOS || '[]')).map(x => String(x).toUpperCase())); } catch (_) { tpSet = new Set(); }
-  let corrected = 0, skipped = 0, noData = 0, reports = 0;
+  let corrected = 0, skipped = 0, noData = 0, reports = 0, indexDirty = false;
+  // v6.17.0: the debrief ranks a flight against the ones BEFORE it. index.json is append-ordered by
+  // capture time (engine.js pushes), so array position is chronological — no sort needed.
+  const allSessions = idx.sessions || [];
+  const priorOf = cur => allSessions.slice(0, Math.max(allSessions.indexOf(cur), 0));
   for (const s of (idx.sessions || [])) {
     if (!s.folder) continue;
     const dir = path.join(sessionsDir, s.folder.replace(/\//g, '\\'));
@@ -143,7 +162,7 @@ function runBackfill(sessionsDir, tpIcaos) {
       // flight's own summary already carries a native classification — new captures)
       const needP = ext && ext.periodic_v !== PERIODIC_V && !(summary.smoothness && summary.smoothness.periodic_stutter !== undefined);
       if (needP) {
-        const t = readTrimmedFt(dir);
+        const t = readTrimmedFt(dir, summary);
         if (t) { ext.periodic_stutter = detectPeriodicStutter(t.ft); ext.periodic_v = PERIODIC_V; fs.writeFileSync(extPath, JSON.stringify(ext)); }
       }
     } catch (_) {}
@@ -172,12 +191,29 @@ function runBackfill(sessionsDir, tpIcaos) {
         }
       }
     } catch (_) {}
+    // v6.17.0: backfill the index fields the Flight Debrief ranks on. New captures write these
+    // directly (engine.js); older entries predate them, and this loop already has every summary.json
+    // open, so filling them costs nothing. Prefer the sidecar's corrected spike/perceptible counts
+    // (they're computed from the same trimmed array as everything else the report shows).
+    try {
+      const sm = summary.smoothness || {};
+      const want = {
+        frametime_stdev_ms: sm.frametime_stdev_ms,
+        spike_count: (ext && ext.spike_count != null) ? ext.spike_count : sm.spike_count,
+        perceptible_count: (ext && ext.perceptible_count != null) ? ext.perceptible_count : sm.perceptible_count,
+        duration_seconds: sm.duration_seconds,
+      };
+      for (const k of Object.keys(want)) {
+        if (want[k] != null && s[k] !== want[k]) { s[k] = want[k]; indexDirty = true; }
+      }
+    } catch (_) {}
     // regenerate the report from the trimmed data (idempotent via ext.report_trim_v)
-    if (regenReport(dir, summary, ext, tpSet)) {
+    if (regenReport(dir, summary, ext, tpSet, priorOf(s))) {
       reports++;
       try { const e = ext || {}; e.report_trim_v = REPORT_V; fs.writeFileSync(extPath, JSON.stringify(e)); } catch (_) {}
     }
   }
+  if (indexDirty) { try { fs.writeFileSync(path.join(sessionsDir, 'index.json'), JSON.stringify(idx, null, 2)); } catch (_) {} }
   // If any per-flight report regenerated, rebuild the dashboard too so its table reflects the same
   // builders (e.g. the AutoFPS 'dynamic TLOD' flag). combined_report.html is derived/regenerable.
   if (reports > 0) { try { fs.writeFileSync(path.join(sessionsDir, 'combined_report.html'), buildCombinedReport(idx.sessions || [])); } catch (_) {} }

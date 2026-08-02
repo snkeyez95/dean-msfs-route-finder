@@ -1,5 +1,130 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## 🗣️ v6.17.0 — FLIGHT DEBRIEF replaces the static VERDICT (Dean 2026-08-02, plan-approved)
+
+### Context
+The per-flight report ends with a VERDICT block (report_html.js:162-224) that grades P99, states the
+VRAM ceiling, quotes the worst frame, and classifies the spike pattern. It is accurate but
+**context-free**: it never says whether the flight was good *for Dean*, what explains it, or whether
+anything needs doing. The useful part of our chat analyses is exactly what it lacks — a rank against
+his own history, an attribution (aircraft / AutoFPS behaviour / payware field), and an explicit
+"nothing to do" when that's the truth.
+
+Dean's locked answers (AskUserQuestion 2026-08-02): **auto-generated only** (no slot for
+assistant-written notes — it must work on every flight forever, including ones never discussed);
+**replace** the verdict rather than sit beside it; **short — 3-4 lines**, matching the
+plain-language style he asked for.
+
+Honest limit to keep in the copy: rules can rank, attribute and caveat; they cannot notice something
+genuinely new. The debrief must never imply more certainty than a template has.
+
+### ⚠️ STEP 1 FIRST — the numbers the verdict quotes are wrong (found 2026-08-02)
+The report reads the `phases_ext.json` sidecar, and for any flight whose capture used a ground-truth
+end anchor the sidecar **re-trims with the weaker teardown heuristic**, keeping shutdown frames the
+capture had correctly cut. Measured: **37 of 51 flights disagree with themselves; all 20 with
+`trim_method:'brake'` are affected.** Examples — 2026-08-01_2211 summary max 116.1 ms / 15 spikes vs
+sidecar 193.36 / 28 (that's the 193.36 in Dean's screenshot); 2026-07-12_1829 100.12 → 186.19;
+2026-06-24_0948 (his steadiest flight ever) 62.36 → 153.85. The Compare view reads the inflated side
+too (main.js perf-compare-data prefers sidecar values).
+
+Root cause: `readTrimmedFt()` (backfill_phases.js:35-42) applies only `trimHead` + `trimTeardownTail`
+and has no idea the capture used the brake/movement anchor.
+
+**Fix:** reproduce the capture's own trim when it recorded one. `summary.smoothness` carries both
+`trim_method` and `stop_trim_s`, and `trimTail(ft, cpu, gpu, seconds)` already exists (phases.js:26).
+
+```js
+function readTrimmedFt(dir, summary) {           // summary is already in scope at both call sites
+  ... existing read + trimHead ...
+  const tm = summary && summary.smoothness && summary.smoothness.trim_method;
+  const st = summary && summary.smoothness && summary.smoothness.stop_trim_s;
+  if ((tm === 'brake' || tm === 'movement') && st > 0) {
+    [ft] = trimTail(ft, [], [], st);             // byte-reproduces the array the capture kept
+    return { ft, teardownS: st };
+  }
+  let tS; [ft, , , tS] = trimTeardownTail(ft, [], []);   // unchanged for older/anchorless flights
+  return { ft, teardownS: tS };
+}
+```
+This corrects `max_ft_ms` / `spike_count` / `perceptible_count` **and** the phase split **and** the
+report chart for all 20 anchored flights in one change. Bump `VRAM_V` (or add a `TRIM_FIX_V` marker)
+so every sidecar recomputes once. Callers: backfill_phases.js:59 (computeExt), :85, :101 (regenReport).
+
+### STEP 2 — index entries need the metric the debrief ranks on
+`INDEX_CSV_FIELDS` (index_writer.js:30-33) and the entry literal (engine.js:214-239) carry p99,
+stutter, consistency, avg_fps, peak_vram_mb, frame_count — but **not** `frametime_stdev_ms`, which is
+the metric that actually discriminates his flights (0.38 → 3.37, where P99 is nearly flat at
+17.1-21.6 and ranks on it are noise). Add to both the entry and the CSV field list:
+`frametime_stdev_ms`, `spike_count`, `perceptible_count`, `duration_seconds`. The backfill already
+opens every `summary.json`, so it can fill them for existing flights in the same pass.
+
+### STEP 3 — NEW `perf/native/debrief.js` (pure, desk-testable)
+```js
+buildDebrief({ stats, settings, vram, history, sessionId }) -> { word, color, lines: [ {text, tone} ] }
+```
+`history` = prior non-excluded index entries (chronological). Pure function, **no file I/O, no
+imports from report_combined.js** — that module already imports from report_html.js, so the reverse
+would create a cycle (keep any shared helper here or in stats.js).
+
+The 3-4 lines, in order:
+
+1. **Grade + where it sits.** Reuse `gradeP99` (report_html.js:18) verbatim for the word/colour, then
+   append the rank: *"Smooth · P99 17.56 ms — your 6th steadiest of 47 flights."* Rank on
+   `frametime_stdev_ms` among non-excluded history. **Guard: fewer than 5 prior flights → drop the
+   rank clause entirely** ("not enough flights to compare yet"), never fake a ranking.
+2. **What explains it.** Assembled from what's already in scope: aircraft; AutoFPS settled vs hunting
+   (TLOD changes/min from the `autofps_trace.json` sidecar — report_html.js already loads it at :58);
+   payware dep/arr (`settings.dep_scenery`/`arr_scenery`); online traffic. Name the worst phase only
+   when it is meaningfully worse than that flight's own cruise.
+3. **The one thing to watch — or explicitly nothing.** Reuse the existing VRAM thresholds
+   (85 / 92 %) so the ceiling advice is unchanged, otherwise the periodic-stutter call, otherwise
+   *"Nothing to act on."* A real "nothing to do" is a feature, not filler.
+4. **Conditional 4th line, at most one:** a settings change vs the previous flight (compare `gfx_fp`
+   with the prior entry; name the changed keys via `gfx_watch.watchValues`/`displayValue` — the same
+   labels the Settings A/B card uses), OR a duration caveat when under ~45 min ("short flights read
+   rougher — mostly taxi and descent"). Omit when neither applies.
+
+Keep the periodic-stutter classifier (report_html.js:180-216) as-is — it is the most genuinely
+diagnostic thing in the current verdict; it folds into line 3 rather than being rewritten.
+
+### STEP 4 — wiring (2 call sites, both nearly free)
+- `report_html.js:43` — add a 10th `history` param (defaults `[]`, so an un-updated caller degrades
+  to the no-rank variant rather than throwing). Replace lines 162-224 with `buildDebrief(...)`.
+- `engine.js:208` — hoist `const idx = readIndex(sessionsDir)` (engine.js:61-68, already in scope)
+  above the `buildReport` call and pass `idx.sessions`; then reuse that same object for
+  `updateIndex` (:240, currently re-reads) and the combined build (:242). **Net effect: one fewer
+  index read than today.**
+- `backfill_phases.js:116` — `idx.sessions` is already in scope in the `runBackfill` loop (:124-127);
+  pass the slice preceding the current flight. Zero extra I/O.
+- Bump `REPORT_V` (backfill_phases.js:29) so every report regenerates once.
+
+### STEP 5 — markup
+Keep the outer div shape exactly: `.mv-verdict > div:first-child` (report.css:12) strips the inline
+`margin-top/padding-top/border-top`, so a different wrapper renders an unwanted divider. Reuse the
+existing inline typography — 10px `.12em` uppercase section label (rename "Verdict" → "Debrief"),
+25px/700 headline, 13px mono P99 chip, 12px/1.6 body, 11px sub-lines, `margin-top:9px` between blocks.
+
+### Files
+`perf/native/debrief.js` (new) · `report_html.js` (signature + verdict block) · `engine.js` (hoist
+index read, pass history, 4 new entry fields) · `backfill_phases.js` (trim fix, pass history, backfill
+new index fields, REPORT_V + VRAM_V bump) · `index_writer.js` (INDEX_CSV_FIELDS) · `tests/test_debrief.js`
+(new) · version v6.17.0 (package.json + index.html ×3 + README changelog).
+
+### Verification
+- **Trim fix first, and prove it:** re-run the backfill, then assert for all 20 `brake` flights that
+  sidecar `max_ft_ms`/`spike_count`/`perceptible_count` now EQUAL the summary's, and that raw
+  frametimes/telemetry/summary files are hash-identical afterwards (the guardrail used in v6.15.5).
+- `tests/test_debrief.js`: synthetic histories — rank correct at n=50; rank clause absent at n<5;
+  "nothing to act on" fires on a clean flight; VRAM thresholds match the old verdict's wording at
+  84/86/93 %; settings-change line names the right key; short-flight caveat fires under 45 min and not
+  over; a flight with no history/no trace degrades without throwing.
+- Real-data smoke: build the debrief for 2026-08-01_2211 (expect "Smooth", rank 6 of 47, Fenix,
+  AutoFPS settled, VRAM 95.4 % watch-line) and for 2026-07-27_2053 (the Alps flight — expect the
+  rough grade and the periodic/overload call).
+- `node tests\run_all.js` **unpiped** and check its exit code — a piped run reports `tail`'s status
+  and let a failing suite through on 2026-08-01.
+- Commit + push per standing rules; Dean runs `release.bat`.
+
 ## 🌄 v6.15.0 — SCENIC APPROACHES MODE (Challenging ⟷ Scenic toggle, wind-gated, real routes) (Dean 2026-07-22, plan-approved)
 
 ### Context

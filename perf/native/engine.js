@@ -204,9 +204,14 @@ function fileSession(opts) {
   fs.writeFileSync(path.join(sessionDir, 'summary.json'), JSON.stringify(summary, null, 2));
 
   // 3. report.html (proven byte-identical writer)
+  // v6.17.0: the Flight Debrief ranks this flight against the ones before it, so the report needs the
+  // prior index entries. Read the index ONCE here and reuse it for updateIndex + the dashboard below —
+  // that's one fewer index read than before, not one more.
+  let priorSessions = [];
+  try { priorSessions = (readIndex(sessionsDir).sessions || []); } catch (_) {}
   try {
     const html = buildReport(sessionId, settings, smoothness, vram, ft, sortedFt, sessionDir,
-      driverVersion, simVersion);
+      driverVersion, simVersion, priorSessions);
     fs.writeFileSync(path.join(sessionDir, 'report.html'), html);
   } catch (e) { /* report is non-fatal, like Python */ }
 
@@ -218,6 +223,12 @@ function fileSession(opts) {
     consistency_pct: smoothness.consistency_pct, avg_fps: smoothness.avg_fps,
     peak_vram_mb: vram ? vram.peak_vram_mb : null, frame_count: smoothness.frame_count,
     aircraft: settings.aircraft, route: settings.simbrief_route || '',
+    // v6.17.0 — the Flight Debrief ranks a flight against your history, and the index is the only
+    // thing it can read cheaply for every prior flight. P99 barely separates them (17.1-21.6 across
+    // 47 flights, so a rank on it is noise); frametime STDEV does (0.38-3.37). Duration comes along
+    // because a short flight is mostly taxi/descent and reads rough for that reason alone.
+    frametime_stdev_ms: smoothness.frametime_stdev_ms, spike_count: smoothness.spike_count,
+    perceptible_count: smoothness.perceptible_count, duration_seconds: smoothness.duration_seconds,
     ...(settings.experiment ? { experiment: settings.experiment } : {}),   // Settings Lab tag (absent = normal flight)
     // v6.15.7 RECORD NOW: a deliberate bench session. `excluded` is what every consumer already
     // honours (baseline, coverage, drift, Settings A/B, Scenery), so one flag quarantines it
