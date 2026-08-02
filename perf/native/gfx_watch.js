@@ -52,7 +52,7 @@ const WATCH = [
   { id: 'Graphics/RaytracedShadows',       section: 'RaytracedShadows',    key: 'Enabled', label: 'Raytraced shadows',   fmt: 'enum', labels: ONOFF_LABELS },
   { id: 'Graphics/DisplacementMapping',    section: 'DisplacementMapping', key: 'Enabled', label: 'Displacement mapping', fmt: 'enum', labels: ONOFF_LABELS },
   { id: 'Sim/FrameGeneration',             top: 'Sim', key: 'FrameGeneration', label: 'Frame generation', fmt: 'text' },
-  { id: 'Sim/TargetFPS',                   top: 'Sim', key: 'TargetFPS',       label: 'FPS target (per rendered frame)', fmt: 'raw' },
+  { id: 'Sim/TargetFPS',                   top: 'Sim', key: 'TargetFPS',       label: 'FPS target', fmt: 'raw' },
 ];
 
 // ── full {Graphics} snapshot ─────────────────────────────────────────────────

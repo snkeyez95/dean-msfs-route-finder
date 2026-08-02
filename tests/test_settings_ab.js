@@ -109,4 +109,59 @@ console.log('\nreal data (skipped if unavailable):');
   }
 }
 
+// ── 4. v6.17.1 — the change cards must be scannable ─────────────────────────
+// Dean 2026-08-02: "difficult to interpret". A five-setting boundary rendered as one unbroken run of
+// words, because changes were joined with ' · ' — the SAME separator the value formatter puts INSIDE
+// an enum ("2 · High"). And a newly-watched key rendered as "— → FSR FG", the em-dash being a null
+// standing in for "we weren't watching this before".
+console.log('\nchange cards (renderer):');
+{
+  const X = require('./lib/extract.js');
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const src = ['_abWord', '_abRaw', '_abChanges', '_abChangeList'].map(n => X.grab(n, html)).join('\n');
+  const esc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const WATCH = [
+    { id: 'Graphics/SSAO', label: 'Ambient occlusion', fmt: 'enum', labels: { 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' } },
+    { id: 'Graphics/RaytracedShadows', label: 'Raytraced shadows', fmt: 'enum', labels: { 0: 'Off', 1: 'On' } },
+    { id: 'Sim/FrameGeneration', label: 'Frame generation', fmt: 'text' },
+    { id: 'Video/PrimaryScaling', label: 'Render scale', fmt: 'pct' },
+  ];
+  const api = new Function('esc', '_abWatch', '"use strict";' + src + '\nreturn {_abChanges,_abChangeList,_abWord,_abRaw};')(esc, WATCH);
+  const run = g => ({ flights: [{ gfx: g }] });
+  const runA = (g, cfg) => ({ flights: [{ gfx: g, autofps_cfg: cfg }] });
+
+  const ch = api._abChanges(run({ 'Graphics/SSAO': 2, 'Graphics/RaytracedShadows': 0 }),
+                            run({ 'Graphics/SSAO': 3, 'Graphics/RaytracedShadows': 1 }), false);
+  T('one entry per changed setting, not one blob', ch.length === 2);
+  T('the readable word leads, not the numeral', ch[0].from === 'High' && ch[0].to === 'Ultra');
+  T('the raw numerals are still carried (a mislabel cannot hide)', ch[0].raw === '2→3');
+  T('an unchanged setting is not listed',
+    api._abChanges(run({ 'Graphics/SSAO': 2 }), run({ 'Graphics/SSAO': 2 }), false).length === 0);
+  T('a newly-watched key is flagged, not rendered as an em-dash arrow', (() => {
+    const c = api._abChanges(run({}), run({ 'Sim/FrameGeneration': 'FSR FG' }), false);
+    return c.length === 1 && c[0].isNew === true && c[0].from === null && c[0].to === 'FSR FG';
+  })());
+  T('...and the markup says so in words', (() => {
+    const h = api._abChangeList(api._abChanges(run({}), run({ 'Sim/FrameGeneration': 'FSR FG' }), false));
+    return /now watched/.test(h) && !/—\s*&rarr;/.test(h);
+  })());
+  T('a cap-only AutoFPS change reads as a cap, not a range diff', (() => {
+    const c = api._abChanges(runA({}, { min: 125, max: 400 }), runA({}, { min: 125, max: 300 }), true);
+    return c.length === 1 && c[0].label === 'AutoFPS TLOD cap' && c[0].from === '400' && c[0].to === '300';
+  })());
+  T('a floor change still shows the full range', (() => {
+    const c = api._abChanges(runA({}, { min: 125, max: 400 }), runA({}, { min: 150, max: 400 }), true);
+    return c.length === 1 && c[0].label === 'AutoFPS TLOD range';
+  })());
+  T('percent values format as percent', api._abWord(WATCH[3], 1) === '100%');
+  T('a disabled feature reads Off', api._abWord(WATCH[1], -1) === 'Off');
+  T('the list renders one grid row per change', (() => {
+    const h = api._abChangeList(ch);
+    return (h.match(/Ambient occlusion|Raytraced shadows/g) || []).length === 2 && /display:grid/.test(h);
+  })());
+  T('no changes at all still renders something honest', /per-key detail unavailable/.test(api._abChangeList([])));
+  T('the FPS-target label is short enough to scan',
+    W.watchMeta().find(m => m.id === 'Sim/TargetFPS').label === 'FPS target');
+}
+
 process.exit(T.done() ? 1 : 0);
