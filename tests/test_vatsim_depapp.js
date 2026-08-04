@@ -48,6 +48,39 @@ console.log('\nnext-up skips ATIS (KDTW inbound):');
   T('no ATIS in the way → normal next-up (Ground → Tower)', nu3 && nu3.callsign==='MIA_TWR', nu3&&nu3.callsign);
 }
 
+// ── enroute coverage GAP into arrival → UNICOM in the sequence (Dean 2026-08-04, KDTW→KDCA) ──────────
+// Only Cleveland Center online, Washington Center dark. Next-up from a Center must read UNICOM (the gap),
+// not jump straight to the arrival CTAF. latcEnrichedSequence takes a pre-built stack (stOpt) so this is
+// pure — no polygons needed.
+console.log('\nenroute gap → UNICOM before the arrival CTAF:');
+{
+  const kdtw={icao:'KDTW', twr:118.400}, kdca={icao:'KDCA', twr:119.100};
+  // tailGap: route leaves its last Center before the field.
+  const stGap={dep:[], enr:[{callsign:'CLE_CTR', freq:120.450}], arr:[], enrouteGap:true, tailGap:true};
+  const seqG=sb.latcEnrichedSequence(kdtw, kdca, [], sb.LATC&&sb.LATC.db, stGap);
+  const iCtr=seqG.findIndex(x=>x.callsign==='CLE_CTR');
+  const iUni=seqG.findIndex(x=>x.tier==='UNICOM' && x.leg==='enr');
+  const iCtaf=seqG.findIndex(x=>x.tier==='CTAF' && x.leg==='arr');
+  T('sequence inserts a UNICOM enroute entry (122.800)', iUni>=0 && Math.abs(seqG[iUni].freq-122.800)<0.005, iUni);
+  T('  …ordered: Center → UNICOM → arrival CTAF', iCtr>=0 && iUni>iCtr && iCtaf>iUni, iCtr+'/'+iUni+'/'+iCtaf);
+  const nuG=sb.latcNextUp({found:true, callsign:'CLE_CTR', freq:120.450}, seqG);
+  T('next-up from Cleveland Center = UNICOM (the gap), NOT the KDCA CTAF', nuG && nuG.tier==='UNICOM' && Math.abs(nuG.freq-122.800)<0.005, nuG&&nuG.tier);
+
+  // No tail gap (covered all the way to the field) → no spurious UNICOM; next-up is the arrival CTAF.
+  const stNoGap={dep:[], enr:[{callsign:'CLE_CTR', freq:120.450}], arr:[], enrouteGap:false, tailGap:false};
+  const seqN=sb.latcEnrichedSequence(kdtw, kdca, [], sb.LATC&&sb.LATC.db, stNoGap);
+  T('no tail gap → no UNICOM enroute entry injected', seqN.every(x=>!(x.tier==='UNICOM' && x.leg==='enr')));
+  const nuN=sb.latcNextUp({found:true, callsign:'CLE_CTR', freq:120.450}, seqN);
+  T('  …next-up stays the arrival CTAF (unchanged behavior)', nuN && nuN.tier==='CTAF', nuN&&nuN.tier);
+
+  // Non-US uncontrolled arrival with a tail gap: arrival is also UNICOM 122.800 → must not double up.
+  const lgkr={icao:'LGKR'};   // no twr → UNICOM arrival
+  const stIntl={dep:[], enr:[{callsign:'LGGG_CTR', freq:129.675}], arr:[], enrouteGap:true, tailGap:true};
+  const seqI=sb.latcEnrichedSequence({icao:'LGAV'}, lgkr, [], sb.LATC&&sb.LATC.db, stIntl);
+  const unis=seqI.filter(x=>x.tier==='UNICOM' && Math.abs(x.freq-122.800)<0.005);
+  T('non-US UNICOM arrival + gap → single UNICOM entry, no consecutive duplicate', unis.length===1, unis.length);
+}
+
 // ── against real polygons: the actual pick ───────────────────────────────────
 if(!X.haveRealData()){ console.log('\n(pick tests skipped — needs airspace.json + airport_db.json)'); process.exit(T.done() ? 1 : 0); }
 sb.setAirspace(X.loadAirspace());

@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.17.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.17.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.17.1</div>
+    <div class="sb-ver">v6.17.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6856,7 +6856,7 @@ function _latcOnline(controllers){
 // Centers the great-circle path crosses in order, and arrival field positions (APP→TWR→GND). Enroute
 // crossings are great-circle-approximate (not the exact filed airway path) — labelled as such in the UI.
 function latcFreqStack(depApt, arrApt, controllers, dbMap){
-  const on=_latcOnline(controllers), st={dep:[], enr:[], arr:[], enrouteGap:false};
+  const on=_latcOnline(controllers), st={dep:[], enr:[], arr:[], enrouteGap:false, tailGap:false};
   const fieldPos=(apt,order,termRole)=>{ const res=[];
     for(const tier of order){ const belong=[];
       for(const c of on){ if(c.tier!==tier) continue; let belongs=false;
@@ -6874,13 +6874,15 @@ function latcFreqStack(depApt, arrApt, controllers, dbMap){
   if(depApt) st.dep=fieldPos(depApt,['DEL','GND','TWR','APP'],'DEP');
   if(arrApt) st.arr=fieldPos(arrApt,['APP','TWR','GND'],'APP');
   if(depApt&&arrApt){
-    const samples=gcSamples(depApt.lat,depApt.lon,arrApt.lat,arrApt.lon,40); let lastKey=null;
+    const samples=gcSamples(depApt.lat,depApt.lon,arrApt.lat,arrApt.lon,40); let lastKey=null, endCover=null;
     for(const [la,lo] of samples){ let cover=null;
       for(const c of on){ if(c.tier!=='CTR'&&c.tier!=='FSS') continue; if(airspaceCovers(c.callsign,la,lo)===true){ cover=c; break; } }
       if(!cover) st.enrouteGap=true;                             // any uncovered stretch (incl. a fully-uncovered route)
+      endCover=cover;
       const key=cover?cover.callsign:null;
       if(key!==lastKey){ if(cover && !st.enr.some(x=>x.callsign===cover.callsign)) st.enr.push({callsign:cover.callsign,freq:cover.freq}); lastKey=key; }
     }
+    st.tailGap = !endCover;   // the route LEAVES its last online Center before reaching the field → a UNICOM stretch into arrival
   }
   return st;
 }
@@ -7308,12 +7310,23 @@ function latcEnrichedSequence(depApt, arrApt, controllers, dbMap, stOpt){
   const st=stOpt||latcFreqStack(depApt, arrApt, controllers, dbMap);
   for(const x of st.dep) seq.push(Object.assign({kind:'atc', leg:'dep'}, x));
   for(const x of st.enr) seq.push(Object.assign({kind:'atc', tier:'CTR', leg:'enr'}, x));
+  // Enroute coverage GAP into arrival: the route leaves its last online Center before the field, so
+  // there's a stretch on UNICOM before you pick anything up again. Surface it so "Next up" from a Center
+  // points at UNICOM, not straight to the arrival CTAF (Dean 2026-08-04, KDTW→KDCA: only Cleveland Center
+  // online, Washington Center dark → the gap between them should read UNICOM 122.800). The briefing card
+  // already flags this gap; this makes the look-ahead agree with it. Gated on: at least one Center online
+  // (st.enr) AND the route uncovered at the END (tailGap). A fully-dark route (no Center at all) is NOT a
+  // "gap between Centers" — it's handled by the recommendation + planning-aid path; and a start-only gap
+  // under a controlled arrival must not inject UNICOM here.
+  if(st.enr.length && st.tailGap) seq.push({kind:'atc', tier:'UNICOM', leg:'enr', callsign:null, freq:LATC_UNICOM});
   const arrAtis=arrApt?latcAtisFreq(arrApt.icao,'arr'):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', leg:'arr', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
   for(const x of st.arr) seq.push(Object.assign({kind:'atc', leg:'arr'}, x));
   // Uncontrolled arrival: a real CTAF (the field's tower freq) only in the VATSIM divisions that run it
   // (US K/P, Australia Y); everywhere else it's the universal 122.800 UNICOM — and must be LABELLED that
-  // way, not "CTAF" (Dean 2026-07-10, SAEZ arrival showed "122.800 CTAF").
-  if(arrApt){ const useCtaf=!!(arrApt.twr&&/^[KPY]/.test(arrApt.icao)); seq.push({kind:'atc', tier:useCtaf?'CTAF':'UNICOM', leg:'arr', callsign:null, freq:useCtaf?arrApt.twr:LATC_UNICOM}); }
+  // way, not "CTAF" (Dean 2026-07-10, SAEZ arrival showed "122.800 CTAF"). Skip it when it would just
+  // repeat the enroute-gap UNICOM we already added (a non-US uncontrolled arrival at the same 122.800).
+  if(arrApt){ const useCtaf=!!(arrApt.twr&&/^[KPY]/.test(arrApt.icao)); const f=useCtaf?arrApt.twr:LATC_UNICOM; const prev=seq[seq.length-1];
+    if(!(prev && prev.freq!=null && Math.abs(prev.freq-f)<LATC_FREQ_TOL)) seq.push({kind:'atc', tier:useCtaf?'CTAF':'UNICOM', leg:'arr', callsign:null, freq:f}); }
   return seq;
 }
 // The sequence entry right after the one matching the current recommendation — for the "Next up"
@@ -8265,5 +8278,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.17.1</div>
+  pointer-events:none;">v6.17.2</div>
 </body></html>
