@@ -2407,8 +2407,9 @@ let _overlayWanted=false, _overlayTempTimer=null;
 function overlayEnsure(){
   if(overlayWin && !overlayWin.isDestroyed()) return overlayWin;
   const { screen } = require('electron');
-  // Big enough (transparent) to hold the dot AND its expanded panel; only the dot/panel are painted.
-  const wa=screen.getPrimaryDisplay().workArea, W=360, H=250, m=14;
+  // Big enough (transparent) to hold the dot AND its expanded panel + the hover ATC-chain flyout (v6.18.0);
+  // only the dot/panel are painted, so the extra height is invisible + click-through.
+  const wa=screen.getPrimaryDisplay().workArea, W=360, H=430, m=14;
   // Restore the user-dragged position when saved + still on a connected display (off-screen guard,
   // same idea as the main window's restore); else default to top-right.
   let ox=wa.x+wa.width-W-m, oy=wa.y+m;

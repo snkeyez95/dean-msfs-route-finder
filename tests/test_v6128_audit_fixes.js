@@ -2,7 +2,7 @@
 // v6.12.8 — the four audit fixes, locked in so they can't silently regress:
 //   1 boundary-graze alert storm gated on a real network change  (see also test_alerts.js A1)
 //   2 airspaceCovers merges '-SUFFIX' segments for MAPPED prefixes (NY_CTR over Pennsylvania)
-//   3 honest tier (UNICOM vs CTAF) + next-up from a dark departure field ("Later: ...")
+//   3 honest tier (UNICOM vs CTAF) + next-up from a dark departure field (v6.18.0: surfaces the UNICOM gap)
 //   4 toast-created overlay self-closes when Live mode is off (main.js, static check)
 const fs = require('fs'), path = require('path');
 const X = require('./lib/extract.js');
@@ -26,16 +26,24 @@ console.log('#3 — tier honesty + next-up from a dark field:');
   const rUS = sb.recommendFreq({lat:kmia.lat, lon:kmia.lon, agl:0, onGround:true}, [], db, {dep:'KMIA', arr:'KMCO'}, false);
   T('dark US field -> tier CTAF (a real field CTAF)', rUS.tier === 'CTAF' && Math.abs(rUS.freq - 118.3) < 0.001);
 
-  // Dean's exact miss: dark KMIA gate, KMCO staffed -> must offer the arrival's ATC as "Later"
+  // UPDATED v6.18.0 (Dean 2026-08-08, KDTW→KJFK): from a dark US departure with NO Center online, the very
+  // next frequency you change to is the enroute UNICOM stretch — the US field CTAF (118.3) differs from
+  // enroute UNICOM 122.800, so it's a real change. The arrival's ATC (MCO_E_DEP) is the step AFTER, kept in
+  // the chain. The OLD behavior jumped straight to MCO_E_DEP and skipped the UNICOM you'd actually fly —
+  // exactly the bug that recurred. (The European gate below stays "Later: TWR" because there the gate is
+  // already UNICOM 122.800, so no enroute change happens — an aviation-correct asymmetry.)
   const ctrl = [{callsign:'MCO_E_DEP', facility:5, frequency:'124.800', visual_range:0},
                 {callsign:'MCO_TWR', facility:4, frequency:'124.300', visual_range:0}];
   sb.setFeed({controllers:ctrl, atis:[], pilots:[], ts:802}); sb.LATC.controllers = ctrl;
   const rec = sb.recommendFreq({lat:kmia.lat, lon:kmia.lon, agl:0, onGround:true}, ctrl, db, {dep:'KMIA', arr:'KMCO'}, false);
-  const nx = sb.latcNextUp(rec, sb.latcEnrichedSequence(kmia, kmco, ctrl, db));
-  T('dark dep gate + staffed arrival -> next-up = MCO_E_DEP (was silent)', !!(nx && nx.callsign === 'MCO_E_DEP'), JSON.stringify(nx));
-  T('...flagged downroute so the UI says "Later", not "Next up"', !!(nx && nx.downroute === true));
-  T('...and labelled "Later"', sb.latcNextUpLabel(nx) === 'Later');
-  T('...noEnr flags that nothing is staffed enroute', !!(nx && nx.noEnr === true));
+  const seqMia = sb.latcEnrichedSequence(kmia, kmco, ctrl, db);
+  const nx = sb.latcNextUp(rec, seqMia);
+  T('dark US dep gate + no Center -> next-up = UNICOM (the enroute gap), not straight to MCO', !!(nx && nx.tier === 'UNICOM' && Math.abs(nx.freq - 122.8) < 0.005), JSON.stringify(nx));
+  T('...labelled "Next up" (the UNICOM stretch is imminent after takeoff)', sb.latcNextUpLabel(nx) === 'Next up');
+  T('...MCO_E_DEP still in the sequence, after the UNICOM gap (info not lost)',
+    (function(){ const iu = seqMia.findIndex(x => x.tier === 'UNICOM' && x.leg === 'enr'); const im = seqMia.findIndex(x => x.callsign === 'MCO_E_DEP'); return iu >= 0 && im > iu; })());
+  T('...and once airborne on UNICOM, next-up advances to MCO_E_DEP',
+    (function(){ const nu = sb.latcNextUp({found:false, callsign:null, freq:122.8}, seqMia); return !!(nu && nu.callsign === 'MCO_E_DEP'); })());
 
   sb.setS({cfg:{vatsim:{cid:'', enabled:true}, recentSimBriefRoutes:[{dep:'LGAV', arr:'LGKR'}]}});
   const c2 = [{callsign:'LGKR_TWR', facility:4, frequency:'120.850', visual_range:0}];

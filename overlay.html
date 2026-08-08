@@ -17,10 +17,23 @@
   .k{ font-size:9px; text-transform:uppercase; letter-spacing:.09em; color:#7a7d84; margin-bottom:3px; }
   .freq{ font-size:27px; font-weight:800; color:#f5a623; font-variant-numeric:tabular-nums; letter-spacing:-.01em; line-height:1.05; font-family:'JetBrains Mono','Consolas',monospace; }
   .who{ font-size:13px; font-weight:600; color:#e8e8ea; margin-top:2px; }
-  .why{ font-size:11px; color:#9a9da3; margin-top:5px; line-height:1.4; }
+  /* STANDBY slot — the next frequency to pre-load (a radio active/standby pair). */
   .next{ font-size:11.5px; color:#b9bbc0; margin-top:8px; font-variant-numeric:tabular-nums; display:none; }
+  .next b{ color:#7a7d84; font-weight:700; font-size:9px; letter-spacing:.09em; }
   .also{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
   .cur{ font-size:10.5px; color:#7a7d84; margin-top:5px; font-variant-numeric:tabular-nums; display:none; }
+  /* Hover-expand live ATC chain (Dean 2026-08-08): the predicted handoff chain + where you are in it. */
+  .chainhandle{ font-size:9px; text-transform:uppercase; letter-spacing:.09em; color:#7a7d84; margin-top:9px;
+                padding-top:7px; border-top:1px solid rgba(122,125,132,0.25); display:none; cursor:default; }
+  .chain{ display:none; margin-top:5px; }
+  .chainrow{ display:flex; align-items:center; gap:8px; padding:2px 0; font-size:10.5px;
+             font-family:'JetBrains Mono','Consolas',monospace; font-variant-numeric:tabular-nums; }
+  .chainrow .cf{ min-width:62px; color:#e8e8ea; }
+  .chainrow .cl{ color:#b9bbc0; }
+  .chainrow.passed{ opacity:.42; }
+  .chainrow.current .cf, .chainrow.current .cl{ color:#f5a623; font-weight:800; }
+  .chainrow.next .cf{ color:#f5a623; }
+  .chainrow.next .cl{ color:#d0a93a; }
   /* v6.12.0: minimal live perf strip (RTSS-style) — one mono line, only while a capture is recording. */
   .perf{ font-size:10px; color:#9a9da3; margin-top:8px; padding-top:7px; border-top:1px solid rgba(122,125,132,0.25);
          font-family:'JetBrains Mono','Consolas',monospace; font-variant-numeric:tabular-nums; white-space:nowrap; display:none; }
@@ -32,18 +45,36 @@
   <div class="k" id="klabel">Frequency to be on</div>
   <div class="freq" id="freq">&mdash;</div>
   <div class="who" id="who"></div>
-  <div class="why" id="why"></div>
   <div class="next" id="next"></div>
-  <div class="also" id="also"></div>
   <div class="cur" id="cur"></div>
   <div class="also" id="atisnote"></div>
+  <div id="chainwrap">
+    <div class="chainhandle" id="chainhandle">&#9741; flight chain &#9662;</div>
+    <div class="chain" id="chain"></div>
+  </div>
   <div class="perf" id="perf"></div>
 </div>
 <script>
   const dot=document.getElementById('dot'), panel=document.getElementById('panel');
   const st=document.getElementById('st'), atis=document.getElementById('atis'), freq=document.getElementById('freq'),
-        who=document.getElementById('who'), why=document.getElementById('why'), nxt=document.getElementById('next'), also=document.getElementById('also'), cur=document.getElementById('cur'),
-        klabel=document.getElementById('klabel'), perfEl=document.getElementById('perf'), atisnote=document.getElementById('atisnote');
+        who=document.getElementById('who'), nxt=document.getElementById('next'), cur=document.getElementById('cur'),
+        klabel=document.getElementById('klabel'), perfEl=document.getElementById('perf'), atisnote=document.getElementById('atisnote'),
+        chainwrap=document.getElementById('chainwrap'), chainhandle=document.getElementById('chainhandle'), chainEl=document.getElementById('chain');
+  // Hover the handle (or the chain itself) to reveal the predicted ATC chain; leaving the region hides it,
+  // so the base panel size never changes. Chips are built with textContent (feed data — never innerHTML).
+  chainwrap.addEventListener('mouseenter', function(){ if(chainhandle.style.display!=='none') chainEl.style.display='block'; });
+  chainwrap.addEventListener('mouseleave', function(){ chainEl.style.display='none'; });
+  function renderChain(items){
+    chainEl.innerHTML=''; chainEl.style.display='none';
+    if(!items || !items.length){ chainhandle.style.display='none'; return; }
+    chainhandle.style.display='block';
+    items.forEach(function(it){
+      const row=document.createElement('div'); row.className='chainrow '+(it.state||'upcoming');
+      const f=document.createElement('span'); f.className='cf'; f.textContent=it.freq||'';
+      const l=document.createElement('span'); l.className='cl'; l.textContent=it.label||'';
+      row.appendChild(f); row.appendChild(l); chainEl.appendChild(row);
+    });
+  }
   // v6.12.0: compact live perf line — fields simply skipped when null (offline / no data yet).
   function perfLine(q){
     if(!q) return '';
@@ -122,15 +153,18 @@
     // NOT live: grey the dot but PRESERVE the unread pulse — a connection blip must never silently
     // clear an alert you haven't seen (classList.add, never className=, which wiped 'pulse').
     if(!p.live){ dot.classList.add('off'); dot.classList.toggle('pulse', unread);
-      freq.innerHTML='&mdash;'; who.textContent=''; why.textContent='';
-      atis.style.display='none'; nxt.style.display='none'; also.style.display='none'; cur.style.display='none'; atisnote.style.display='none'; perfEl.style.display='none'; return; }
+      freq.innerHTML='&mdash;'; who.textContent='';
+      atis.style.display='none'; nxt.style.display='none'; cur.style.display='none'; atisnote.style.display='none'; perfEl.style.display='none'; renderChain(null); return; }
     dot.classList.remove('off');
     dot.classList.toggle('pulse', unread);   // re-assert every poll: unread survives blips + re-renders
-    freq.textContent=p.freq||'—'; who.textContent=p.who||''; why.textContent=p.why||'';
+    freq.textContent=p.freq||'—'; who.textContent=p.who||'';
     atis.textContent=p.atis||''; atis.style.display=p.atis?'block':'none';
-    nxt.textContent=p.next||''; nxt.style.display=p.next?'block':'none';
-    also.textContent=p.also||''; also.style.display=p.also?'block':'none';
+    // STANDBY slot — the next freq to pre-load. "STANDBY →" label is baked in; the string stays textContent.
+    if(p.next){ nxt.innerHTML=''; const b=document.createElement('b'); b.textContent='STANDBY → ';
+      nxt.appendChild(b); nxt.appendChild(document.createTextNode(p.next)); nxt.style.display='block'; }
+    else { nxt.textContent=''; nxt.style.display='none'; }
     atisnote.textContent=p.atisNote||''; atisnote.style.display=p.atisNote?'block':'none';
+    renderChain(p.chain);
     const pl=perfLine(p.perf); perfEl.textContent=pl; perfEl.style.display=pl?'block':'none';
     // On-frequency: the header confirms ("ON FREQUENCY ✓" green + green number) and the redundant
     // "you're tuned to X" line is dropped. Otherwise it instructs ("Frequency to be on") and shows

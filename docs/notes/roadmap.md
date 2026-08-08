@@ -1,5 +1,124 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## 🛰️ v6.18.0 — VATSIM OVERLAY REWORK: UNICOM-gap next-up, standby framing, hover chain, relevant blink (Dean 2026-08-08, plan-approved)
+
+### Context
+Dean flew KDTW→KJFK on VATSIM. At the (uncontrolled) departure the overlay correctly showed CTAF, but
+"Next up" jumped straight to **KJFK Approach** and never mentioned the **UNICOM 122.800** coverage gap in
+between — the same class of bug the v6.17.2 fix was supposed to kill, but a *different shape*: v6.17.2 only
+handles a gap between two Centers at the route's tail; this flight had **no Center online at all** enroute
+(a fully-uncovered stretch feeding a staffed arrival), which the v6.17.2 gate deliberately excluded. On top
+of the bug, Dean wants four overlay changes so it helps him *pre-select standby frequencies* and stops
+distracting him: (1) fix the UNICOM-gap next-up so the predicted chain is honest; (2) remove the small
+"chatter" text that clogs the panel; (3) add a **hover-expand live ATC-chain preview** (his screenshot is the
+route-score chip strip) showing the predicted handoff chain *and where he is in it right now*, without making
+the overlay bigger; (4) rework the blink/ding so it only fires for **relevant, ahead-of-the-aircraft** changes
+— today a departure-field controller signing on while he's at cruise still pulses/chimes the dot.
+
+Dean's locked answers (AskUserQuestion 2026-08-08): **standby = surface it, he tunes manually** (PMDG/Fenix
+ignore the SimConnect radio-write — v6.7.0 already dropped auto-tune; no auto-write); **chatter to drop = the
+'why' reasoning line AND the 'Also at KXXX…' line** (keep the ATIS footnote + "you're tuned to X"); **chain
+view = the live predicted chain** (ordered, only staffed positions + UNICOM gaps, current step highlighted /
+passed steps dimmed — NOT the full offline tier grid).
+
+Model for the build: surgical edits in the 8000-line `index.html` + `overlay.html` + a tiny `main.js` window-
+size bump → **Opus**.
+
+### Part A — UNICOM-gap next-up fix (the recurring bug), all in index.html
+Root cause (traced): for KDTW→KJFK with no Center online, `latcFreqStack` returns `st.enr=[]`,
+`enrouteGap=true`, `tailGap=true`. The insert gate at **index.html:7321** is `if(st.enr.length && st.tailGap)`
+→ `0 && true` = false, so no UNICOM enters the sequence. Even if it did, `latcNextUp`'s `!rec.found` branch
+(7361–7373) searches **only `leg:'arr'` ATC**, so from the dark-departure CTAF it returns KJFK Approach and
+skips the gap. Two coordinated changes:
+
+1. **Broaden the enroute-UNICOM insert gate (line 7321).** Replace with:
+   ```js
+   if(st.tailGap && (st.enr.length || st.arr.length)) seq.push({kind:'atc', tier:'UNICOM', leg:'enr', callsign:null, freq:LATC_UNICOM});
+   ```
+   Rationale: `tailGap` (route uncovered at the END) is the true "UNICOM stretch into arrival" signal; require
+   *something staffed* (`st.enr.length` a Center somewhere, OR `st.arr.length` a staffed arrival) so it's a
+   real intermediate handoff — **a fully-dark route (no Center AND dark arrival) still gets no insert**, keeping
+   the planning-aid path and its passing `test_v6128_audit_fixes.js` cases intact. Preserves the v6.17.2
+   tail-gap-between-Centers behavior (`st.enr.length` still truthy there). The de-dup guard at 7328–7329 (skip
+   the arrival CTAF/UNICOM when it would repeat the just-added enroute UNICOM) stays.
+
+2. **Teach `latcNextUp` to surface the enroute leg first from a dark departure (7361 `!rec.found` branch).**
+   Before the arrival-ATC search (`nextAtc`, 7367), when `atDep` (rec is the dark departure field, computed the
+   same way as 7371), prefer the first enroute entry:
+   ```js
+   if(atDep){ const nextEnr=(seq||[]).find(x=>x.leg==='enr' && x.kind==='atc'); if(nextEnr) return Object.assign({}, nextEnr, {downroute:false, noEnr:false}); }
+   ```
+   Result chain for KDTW→KJFK: at KDTW on CTAF → **Next up: 122.800 UNICOM**; once airborne on UNICOM the entry
+   is now matched by the found-path (7345, callsign-null + freq match) so it advances to **KJFK Approach** — the
+   exact proactive-standby progression Dean wants. Unaffected paths: rec sitting ON a Center (found-path, the
+   v6.17.2 case) and the fully-dark route (no enr entry inserted → falls through to the existing arrival-CTAF
+   planning aid).
+
+### Part B — Remove chatter + reframe next-up as a STANDBY slot (overlay.html + index.html payload)
+- **overlay.html:** delete the `#why` (`.why`) and `#also` (`.also`) DOM nodes + their JS refs/renders
+  (lines 20, 22, 35, 37, 45, 129, 132). Keep `#cur` ("you're tuned to X"), `#atisnote`, `#atis`, `#perf`.
+- **index.html `latcPushOverlay` (7650–7664):** stop building/pushing `why` and `also` (drop the `also` loop
+  7641–7646 and the `why:`/`also:` payload fields). 
+- **Reframe the `#next` line as an explicit STANDBY slot** — mirrors a radio's active/standby pair so it reads
+  as "pre-load THIS." Keep the honest `latcNextUpLabel`/`latcNextUpNote` logic but present it as e.g.
+  `STANDBY → 122.800 · UNICOM` (or "Later …" when downroute). Small styling: a caps `.k`-style "STANDBY"
+  affix on the `.next` line. Big `.freq` stays the active "frequency to be on."
+
+### Part C — Hover-expand live ATC-chain preview (overlay.html + index.html payload + main.js height)
+- **index.html:** push a new `chain` array in the overlay payload, built from `latcSeqForNow()` (skip `kind:'atis'`
+  entries — the ATIS footnote already covers weather). For each entry emit `{label, freq, state}` where `label` =
+  `latcPosLabel(tier,callsign)` (or "UNICOM"/"CTAF" for null-callsign entries), `freq` = `latcFmt(freq)`, and
+  `state ∈ {passed,current,next,upcoming}`. Compute state by locating the current `rec` in the sequence (same
+  match rule as `latcNextUp` 7345) → that index is `current`, earlier = `passed`, later = `upcoming`; mark the
+  `nextUp` entry as `next`. When `rec` isn't in the sequence (dark-dep CTAF), there's no `current`; mark the
+  `nextUp` entry `next` and everything before it `passed`. Cap ~12 entries.
+- **overlay.html:** add a hidden `.chain` flyout container below the panel. Reveal it on **hover of a small
+  handle** inside the panel (a "⛓ flight chain ▾" row) — `mouseenter` shows, `mouseleave` hides — so the base
+  panel size never changes; the chain only appears on demand. Render one compact mono chip per entry in flight
+  order (top→bottom): freq + label, styled by state — `current` = solid amber, `next` = amber outline, `passed`
+  = dimmed (opacity ~.45), `upcoming` = normal grey. Reuse the chip idiom from `vscoreDetailRow` (index.html
+  6224–6229) / the briefing card chip (`latcRenderBrief` 6999). Add the chain element to the mousemove
+  click-through hit-test (`overPanel` check, overlay.html 164) so hovering it keeps the window interactive.
+- **main.js:** bump the overlay window height (`H=250` → ~`430`, main.js:2411) so the chain flyout has room. The
+  window is transparent + click-through except over the dot/panel/chain, so the extra height is invisible and
+  inert. Dot/panel stay anchored top-right (positions unchanged).
+
+### Part D — Relevant/ahead-only blink & ding (index.html `latcCheckToasts`)
+The misfire is the `newController` toast at **index.html:7539** — it diffs the whole route's online set with no
+position filter, so a departure-field sign-on pulses/chimes the dot at cruise. Add a relevance gate:
+- New helper `latcCtrlRelevantAhead(callsign, pos, depApt, arrApt)`:
+  - On the ground (`pos.onGround`) or missing pos/route → **relevant** (don't filter; a new departure controller
+    matters pre-taxi).
+  - Field position (resolve `latcAirportForCallsign(callsign, LATC.db)`): relevant iff
+    `gcDist(ctrlApt, arrApt) <= gcDist(pos, arrApt) + 30` (the field is at/ahead of you toward the destination).
+    A departure field at cruise has `gcDist(dep,arr) ≫ gcDist(pos,arr)` → filtered out. The arrival field
+    (`dist 0`) and any field ahead → kept.
+  - Center / unresolvable: relevant iff it covers a **forward** sample — reuse the `latcNextHandoff` idiom
+    (`latcCoveringCtrl` over a few `gcSamples(pos → arrApt)`).
+- At 7539, only `latcOverlayToast('newController', …)` for the subset of `nw` that passes the gate (still set
+  `LATC._lastCtrl=cur` to the FULL set so a filtered controller doesn't re-alert later). Leaves `isNewRec`
+  (7615–7638, driven by the current-position rec — already relevant by construction) and the already-ahead-aware
+  `handoff` toast (7544–7555) untouched.
+
+### Files
+- **index.html** — Part A (`latcEnrichedSequence` 7321, `latcNextUp` 7361 branch); Part B (`latcPushOverlay`
+  7641–7664 drop why/also, standby reframe); Part C (chain array in payload); Part D (`latcCheckToasts` 7539 +
+  `latcCtrlRelevantAhead` helper). Version strings ×3 (title ~349, sb-ver ~393, footer ~8279).
+- **overlay.html** — remove `.why`/`.also`; STANDBY styling on `.next`; add `.chain` flyout + hover handle +
+  hit-test; render the `chain` payload.
+- **main.js** — overlay window `H` 250→~430 (2411).
+- **package.json** — version 6.17.2 → 6.18.0. **README.md** — changelog entry.
+- **tests/** — extend `tests/test_vatsim_depapp.js`; add `tests/test_overlay_chain.js` (chain-state + relevance
+  gate). Run `node tests\run_all.js`.
+
+### Verification
+- **Desk tests (must pass before ship):**
+  - `test_vatsim_depapp.js` NEW case — dark-enroute gap: `st={dep:[],enr:[],arr:[{tier:'APP',callsign:'JFK_APP',freq:...}],enrouteGap:true,tailGap:true}`, `depApt=KDTW`, `arrApt=KJFK` → `latcEnrichedSequence` contains a `{tier:'UNICOM',leg:'enr',freq:122.800}` entry ordered before the arrival APP; and `latcNextUp({found:false,apt:KDTW,callsign:null,freq:<KDTW twr>}, seq)` returns the UNICOM entry (not KJFK Approach). Also assert the **fully-dark** case (`arr:[]` too) inserts **no** UNICOM and the planning-aid CTAF still fires (guard the v6.12.8 cases). Re-run the existing v6.17.2 tail-gap assertions unchanged.
+  - `test_overlay_chain.js` — chain-state computation: rec on a Center → that chip `current`, later chips `upcoming`, `nextUp` chip `next`, earlier `passed`; rec = dark-dep CTAF (not in seq) → no `current`, `nextUp` = `next`. Relevance gate: airborne + departure-field callsign behind → filtered; arrival-field callsign → kept; on-ground → everything kept; a Center covering a forward sample → kept.
+  - `node tests\run_all.js` **unpiped**, exit 0 (a piped run reported tail's status and let a failure through on 2026-08-01).
+- **Live (Dean, VATSIM):** re-fly a dark-enroute departure (or any uncontrolled dep → staffed arrival with no Center) → overlay shows CTAF now, **Next up / STANDBY = 122.800 UNICOM**, then Approach once enroute. Panel no longer shows the 'why'/'Also at' lines. Hover the chain handle → the ordered predicted chain appears with the current step highlighted, without the panel growing. A departure controller signing on at cruise no longer pulses/chimes the dot; an ahead controller still does.
+- **Standing rules:** `node tests\run_all.js` before the final commit; `node tools\sync-notes.js` (roadmap changed); then `git add -A && git commit -m "v6.18.0: …" && git push`. Dean runs `release.bat`.
+
 ## 🗣️ v6.17.0 — FLIGHT DEBRIEF replaces the static VERDICT (Dean 2026-08-02, plan-approved)
 
 ### Context

@@ -81,6 +81,76 @@ console.log('\nenroute gap → UNICOM before the arrival CTAF:');
   T('non-US UNICOM arrival + gap → single UNICOM entry, no consecutive duplicate', unis.length===1, unis.length);
 }
 
+// ── DARK enroute (no Center at all) into a STAFFED arrival (Dean 2026-08-08, KDTW→KJFK) ──────────────
+// v6.17.2 only handled a gap BETWEEN Centers; here NOTHING is online enroute but KJFK Approach is staffed,
+// so the whole enroute is UNICOM. That stretch must be inserted AND surfaced as next-up from the dark
+// departure field — the exact case that recurred (it jumped straight to KJFK Approach, skipping 122.800).
+console.log('\ndark enroute (no Center) + staffed arrival → UNICOM next-up:');
+{
+  sb.setS({ cfg:{ vatsim:{cid:''}, recentSimBriefRoutes:[{dep:'KDTW', arr:'KJFK'}] } });
+  const kdtw={icao:'KDTW', twr:118.400}, kjfk={icao:'KJFK', twr:123.900};
+  const stDark={dep:[], enr:[], arr:[{tier:'APP', callsign:'JFK_APP', freq:127.400}], enrouteGap:true, tailGap:true};
+  const seqD=sb.latcEnrichedSequence(kdtw, kjfk, [], sb.LATC&&sb.LATC.db, stDark);
+  const iUni=seqD.findIndex(x=>x.tier==='UNICOM' && x.leg==='enr');
+  const iApp=seqD.findIndex(x=>x.callsign==='JFK_APP');
+  T('dark enroute + staffed arrival → UNICOM enroute entry inserted', iUni>=0 && Math.abs(seqD[iUni].freq-122.800)<0.005, iUni);
+  T('  …ordered before the arrival Approach', iApp>=0 && iUni<iApp, iUni+'/'+iApp);
+  const recDep={found:false, callsign:null, freq:118.400, apt:{icao:'KDTW'}};
+  const nuD=sb.latcNextUp(recDep, seqD);
+  T('next-up from the dark KDTW CTAF = UNICOM (the gap), NOT KJFK Approach', nuD && nuD.tier==='UNICOM' && Math.abs(nuD.freq-122.800)<0.005, nuD&&(nuD.tier+' '+nuD.freq));
+  const recUni={found:false, callsign:null, freq:122.800};
+  const nuU=sb.latcNextUp(recUni, seqD);
+  T('  …once airborne on UNICOM, next-up advances to KJFK Approach', nuU && nuU.callsign==='JFK_APP', nuU&&nuU.callsign);
+  // Fully dark (nothing online anywhere): NO UNICOM insert — the arrival-CTAF planning aid stays the path.
+  const stAllDark={dep:[], enr:[], arr:[], enrouteGap:true, tailGap:true};
+  const seqAD=sb.latcEnrichedSequence(kdtw, kjfk, [], sb.LATC&&sb.LATC.db, stAllDark);
+  T('fully-dark route → no UNICOM enroute entry (planning-aid path preserved)', seqAD.every(x=>!(x.tier==='UNICOM' && x.leg==='enr')));
+}
+
+// ── live ATC chain: state tagging (passed / current / next / upcoming) ───────────────────────────────
+console.log('\nlive ATC chain — where you are in it:');
+{
+  const seqC=[
+    {kind:'atc', tier:'TWR', leg:'dep', callsign:'DTW_TWR', freq:118.4},
+    {kind:'atc', tier:'CTR', leg:'enr', callsign:'CLE_CTR', freq:120.45},
+    {kind:'atc', tier:'APP', leg:'arr', callsign:'JFK_APP', freq:127.4},
+    {kind:'atc', tier:'TWR', leg:'arr', callsign:'JFK_TWR', freq:119.1},
+  ];
+  const recOn={found:true, callsign:'CLE_CTR', freq:120.45};
+  const ch=sb.latcBuildChain(seqC, recOn, sb.latcNextUp(recOn, seqC));
+  T('chain covers the ATC entries', ch.length===4, ch.length);
+  T('  behind you → passed', ch[0].state==='passed', ch[0].state);
+  T('  where you are → current', ch[1].state==='current', ch[1].state);
+  T('  the handoff you’ll take → next', ch[2].state==='next', ch[2].state);
+  T('  further ahead → upcoming', ch[3].state==='upcoming', ch[3].state);
+  // rec off-sequence (dark-dep CTAF): no current step; everything up to next reads passed.
+  const chD=sb.latcBuildChain(seqC, {found:false, callsign:null, freq:118.9, apt:{icao:'KDTW'}},
+    {callsign:'JFK_APP', freq:127.4, leg:'arr', tier:'APP', kind:'atc', downroute:true});
+  T('rec off-sequence → no current step', chD.every(c=>c.state!=='current'));
+  T('  the nextUp entry tagged next', chD[2].state==='next', chD[2].state);
+  T('  entries before it passed', chD[0].state==='passed' && chD[1].state==='passed', chD[0].state+'/'+chD[1].state);
+  // null-callsign gap entries fall back to the tier as the chip label.
+  const chU=sb.latcBuildChain([{kind:'atc', tier:'UNICOM', leg:'enr', callsign:null, freq:122.8}], null, null);
+  T('  UNICOM gap chip labelled from tier', chU[0].label==='UNICOM', chU[0].label);
+}
+
+// ── blink relevance: only ding for ATC ahead of the aircraft (Dean 2026-08-08) ───────────────────────
+console.log('\nblink relevance — ahead, not behind:');
+{
+  const dep={icao:'KDTW', lat:42.21, lon:-83.35}, arr={icao:'KJFK', lat:40.64, lon:-73.78};
+  const posNearArr={lat:41.0, lon:-74.5, onGround:false};   // at cruise, near the destination
+  T('dep-field controller behind you at cruise → NOT relevant',
+    sb.latcCtrlAheadRelevant({leg:'dep', tier:'TWR', callsign:'DTW_TWR'}, posNearArr, dep, arr)===false);
+  T('arrival-field controller → always relevant',
+    sb.latcCtrlAheadRelevant({leg:'arr', tier:'APP', callsign:'JFK_APP'}, posNearArr, dep, arr)===true);
+  T('on the ground → nothing filtered',
+    sb.latcCtrlAheadRelevant({leg:'dep', tier:'GND', callsign:'DTW_GND'}, {lat:42.21, lon:-83.35, onGround:true}, dep, arr)===true);
+  T('still near the departure field → dep controller stays relevant',
+    sb.latcCtrlAheadRelevant({leg:'dep', tier:'TWR', callsign:'DTW_TWR'}, {lat:42.3, lon:-83.4, onGround:false}, dep, arr)===true);
+  T('no position → relevant (can’t tell what’s behind)',
+    sb.latcCtrlAheadRelevant({leg:'dep', tier:'TWR'}, null, dep, arr)===true);
+}
+
 // ── against real polygons: the actual pick ───────────────────────────────────
 if(!X.haveRealData()){ console.log('\n(pick tests skipped — needs airspace.json + airport_db.json)'); process.exit(T.done() ? 1 : 0); }
 sb.setAirspace(X.loadAirspace());

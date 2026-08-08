@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.17.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.18.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.17.2</div>
+    <div class="sb-ver">v6.18.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -7310,15 +7310,16 @@ function latcEnrichedSequence(depApt, arrApt, controllers, dbMap, stOpt){
   const st=stOpt||latcFreqStack(depApt, arrApt, controllers, dbMap);
   for(const x of st.dep) seq.push(Object.assign({kind:'atc', leg:'dep'}, x));
   for(const x of st.enr) seq.push(Object.assign({kind:'atc', tier:'CTR', leg:'enr'}, x));
-  // Enroute coverage GAP into arrival: the route leaves its last online Center before the field, so
-  // there's a stretch on UNICOM before you pick anything up again. Surface it so "Next up" from a Center
-  // points at UNICOM, not straight to the arrival CTAF (Dean 2026-08-04, KDTW→KDCA: only Cleveland Center
-  // online, Washington Center dark → the gap between them should read UNICOM 122.800). The briefing card
-  // already flags this gap; this makes the look-ahead agree with it. Gated on: at least one Center online
-  // (st.enr) AND the route uncovered at the END (tailGap). A fully-dark route (no Center at all) is NOT a
-  // "gap between Centers" — it's handled by the recommendation + planning-aid path; and a start-only gap
-  // under a controlled arrival must not inject UNICOM here.
-  if(st.enr.length && st.tailGap) seq.push({kind:'atc', tier:'UNICOM', leg:'enr', callsign:null, freq:LATC_UNICOM});
+  // Enroute coverage GAP into arrival: the route is uncovered heading into the field, so there's a stretch
+  // on UNICOM before you pick anything up again. Surface it so "Next up" points at UNICOM, not straight to
+  // the arrival ATC. `tailGap` (route uncovered at the END) is the real "UNICOM stretch into arrival" signal,
+  // whether or not a Center was online earlier — it covers BOTH the gap-between-Centers case (Dean 2026-08-04,
+  // KDTW→KDCA: Cleveland online, Washington dark) AND the no-Center-at-all case (Dean 2026-08-08, KDTW→KJFK:
+  // nothing enroute, KJFK Approach staffed). Require SOMETHING staffed (a Center somewhere OR a staffed
+  // arrival) so this is a real intermediate handoff: a fully-dark route (no Center AND dark arrival) still
+  // gets no insert here — it's handled by the recommendation + arrival-CTAF planning aid (keeps the v6.12.8
+  // dark-network cases). A start-only gap under a covered arrival has tailGap=false, so it's not injected.
+  if(st.tailGap && (st.enr.length || st.arr.length)) seq.push({kind:'atc', tier:'UNICOM', leg:'enr', callsign:null, freq:LATC_UNICOM});
   const arrAtis=arrApt?latcAtisFreq(arrApt.icao,'arr'):null; if(arrAtis) seq.push({kind:'atis', tier:'ATIS', leg:'arr', icao:arrApt.icao, callsign:arrAtis.callsign, freq:arrAtis.freq});
   for(const x of st.arr) seq.push(Object.assign({kind:'atc', leg:'arr'}, x));
   // Uncontrolled arrival: a real CTAF (the field's tower freq) only in the VATSIM divisions that run it
@@ -7364,11 +7365,18 @@ function latcNextUp(rec, seq){
     // at a controlled field, i.e. acting as if KMCO had nobody. The CTAF aid below is for a genuinely
     // DARK network (its own stated intent); it must not fire while the arrival is staffed. So: offer the
     // next real ATC on the arrival leg first, and only fall through to CTAF when there is none.
+    // From a DARK departure field the next thing you'll switch to is the ENROUTE leg — a Center you'll pick
+    // up, or the UNICOM gap when nothing is online enroute — NOT the arrival ATC (Dean 2026-08-08, KDTW→KJFK:
+    // uncontrolled dep, no Center, KJFK Approach online → it jumped straight to Approach and skipped the
+    // UNICOM 122.800 stretch). Prefer the first enroute entry so "Next up" reads UNICOM; once airborne on
+    // UNICOM the found-path above matches that entry and advances to the arrival Approach on its own.
+    const r0=latcBriefRoute();
+    const atDep=!!(rec.apt && r0 && r0.dep && r0.dep!==r0.arr && rec.apt.icao===String(r0.dep).toUpperCase());
+    if(atDep){ const nextEnr=(seq||[]).find(x=>x.leg==='enr' && x.kind==='atc');
+      if(nextEnr) return Object.assign({}, nextEnr, {downroute:false, noEnr:false}); }
     const nextAtc=(seq||[]).find(x=>x.leg==='arr' && x.kind==='atc' && (x.tier==='APP'||x.tier==='TWR'||x.tier==='GND'));
     if(nextAtc){
       // From the DEPARTURE field that ATC is a whole departure away — label it "Later" (v6.12.5 honesty).
-      const r0=latcBriefRoute();
-      const atDep=!!(rec.apt && r0 && r0.dep && r0.dep!==r0.arr && rec.apt.icao===String(r0.dep).toUpperCase());
       return Object.assign({}, nextAtc, {downroute:atDep, noEnr: atDep && !(seq||[]).some(x=>x.leg==='enr')});
     }
     // Planning aid (Dean 2026-07-13): inbound with a dark network, surface the ARRIVAL field's CTAF as
@@ -7383,6 +7391,24 @@ function latcNextUp(rec, seq){
 // Label + optional context for the next-frequency line, shared by the overlay and the Live ATC card.
 function latcNextUpLabel(n){ return n && n.downroute ? 'Later' : 'Next up'; }
 function latcNextUpNote(n){ return n && n.noEnr ? ' — no ATC enroute' : ''; }
+// Live predicted ATC CHAIN (Dean 2026-08-08): the ordered handoff chain for THIS flight — every staffed
+// position + any UNICOM gap, in flight order — tagged with where you are in it right now, so a glance at the
+// overlay's hover flyout answers "what's the chain, and which step am I on". Skips ATIS (the footnote covers
+// it). state ∈ passed|current|next|upcoming. Priority: current > next > passed > upcoming. When the current
+// rec isn't in the sequence (a dark-dep CTAF), there's no `current` — everything up to `next` reads `passed`.
+function latcBuildChain(seq, rec, nextUp){
+  const chain=[], atc=(seq||[]).filter(x=>x.kind!=='atis');
+  const same=(x,y)=>!!y&&((y.callsign&&x.callsign===y.callsign)||(!y.callsign&&!x.callsign&&x.freq!=null&&Math.abs(x.freq-y.freq)<LATC_FREQ_TOL&&(y.leg?x.leg===y.leg:true)));
+  const curIdx=rec?atc.findIndex(x=>same(x,rec)):-1;
+  const nextIdx=nextUp?atc.findIndex(x=>same(x,nextUp)):-1;
+  for(let i=0;i<atc.length && chain.length<12;i++){ const x=atc[i]; let state;
+    if(i===curIdx) state='current';
+    else if(i===nextIdx) state='next';
+    else if(curIdx>=0 ? i<curIdx : (nextIdx>=0 && i<nextIdx)) state='passed';
+    else state='upcoming';
+    chain.push({label:(x.callsign?latcPosLabel(x.tier,x.callsign):x.tier), freq:latcFmt(x.freq), state:state}); }
+  return chain;
+}
 // Memoized frequency STACK for the current route (feed-ts + route key) — the expensive piece
 // (great-circle sampling × point-in-polygon over Center FIR polygons). Shared by the pre-flight
 // briefing card AND the enriched sequence below, so it's computed once per feed update instead of
@@ -7527,6 +7553,24 @@ async function latcWriteStandby(mhz){
 // Overlay toast (gated per-type by cfg.vatsim.overlay + optional sound). The overlay window is created
 // lazily in main on the first toast.
 function latcOverlayToast(type,title,sub,ms){ const v=vCfg(); if(!v.overlay.enabled||!v.overlay[type])return; window.api.overlayToast({type,title,sub,sound:!!(v.sound&&v.sound[type]),ms}); }
+// Is a newly-online position RELEVANT to the remaining flight — i.e. ahead of the aircraft (Dean 2026-08-08:
+// a departure-field controller signing on while at cruise shouldn't pulse/chime the dot). `entry` is the
+// enriched-sequence entry for the callsign (carries leg/tier). On the ground, or without a position/route, we
+// can't tell what's "behind", so nothing is filtered. Arrival-leg ATC is always ahead; a dep-field position is
+// relevant only while still near the departure field; an enroute Center is relevant only if it covers a point
+// ahead on the remaining great-circle (reuses the airspace polygons, defaulting to KEEP when we have no data).
+function latcCtrlAheadRelevant(entry, pos, depApt, arrApt){
+  if(!pos || pos.onGround || !arrApt || !entry) return true;
+  if(entry.leg==='arr') return true;
+  if(entry.leg==='dep'){ if(!depApt) return true; return gcDist(pos.lat,pos.lon,depApt.lat,depApt.lon)<=30; }
+  if(entry.leg==='enr' && entry.callsign){
+    const samples=gcSamples(pos.lat,pos.lon,arrApt.lat,arrApt.lon,40); let sawFalse=false;
+    for(let i=1;i<samples.length;i++){ const [la,lo]=samples[i]; const c=airspaceCovers(entry.callsign,la,lo);
+      if(c===true) return true; if(c===false) sawFalse=true; }
+    return !sawFalse;   // no forward coverage but polygon data existed → it's behind you → suppress; no data → keep
+  }
+  return true;
+}
 function latcCheckToasts(){
   const rec=(LATC.status==='live')?latcCurrentRec():null; if(!rec)return;
   // freq-change now drives the persistent overlay panel's auto-expand (latcPushOverlay), not a toast.
@@ -7535,9 +7579,15 @@ function latcCheckToasts(){
   // MCO_E_DEP, which had been online for an hour). Diff the route's ONLINE positions instead — the
   // enriched sequence is exactly that, already scoped to your dep/arr fields + the Centers you cross,
   // and memoized on the feed timestamp. It only changes when the NETWORK changes, never when you move.
-  const cur=new Set(latcSeqForNow().filter(x=>x.kind==='atc'&&x.callsign).map(x=>x.callsign));
-  if(LATC._lastCtrl){ const nw=[...cur].filter(c=>!LATC._lastCtrl.has(c)); if(nw.length) latcOverlayToast('newController', nw.length>1?(nw.length+' new controllers online'):'New controller online', nw.slice(0,2).join(', ')); }
-  LATC._lastCtrl=cur;
+  const seqNow=latcSeqForNow();
+  const cur=new Set(seqNow.filter(x=>x.kind==='atc'&&x.callsign).map(x=>x.callsign));
+  if(LATC._lastCtrl){ let nw=[...cur].filter(c=>!LATC._lastCtrl.has(c));
+    // Suppress alerts for sign-ons BEHIND you (only ding for relevant, ahead-of-the-aircraft ATC).
+    const _r=latcBriefRoute(), _dep=(_r&&LATC.db)?LATC.db.get(_r.dep):null, _arr=(_r&&LATC.db)?LATC.db.get(_r.arr):null;
+    const byCs={}; for(const x of seqNow){ if(x.callsign && !byCs[x.callsign]) byCs[x.callsign]=x; }
+    nw=nw.filter(c=>latcCtrlAheadRelevant(byCs[c], LATC.pos, _dep, _arr));
+    if(nw.length) latcOverlayToast('newController', nw.length>1?(nw.length+' new controllers online'):'New controller online', nw.slice(0,2).join(', ')); }
+  LATC._lastCtrl=cur;   // full set — a filtered (behind-you) controller must not re-alert on a later poll
   // Route-aware handoff prompt: airborne, look ahead along the route for the next different controller and
   // prompt once ~6 min out (or ≤30 nm when groundspeed is unknown). Cleared when passed onto or gone.
   const p=LATC.pos, r=latcBriefRoute(), arrApt=(r&&LATC.db)?LATC.db.get(r.arr):null;
@@ -7581,14 +7631,6 @@ function latcAutoTarget(rec){
 // v6.8.0 — push the current recommendation to the persistent in-sim overlay (dot + expandable panel)
 // every poll. Pre-formats every field to plain strings so overlay.html just sets textContent. isNewRec
 // (the recommended frequency changed) drives the panel's auto-expand + chime.
-// The overlay + in-sim panel render text as PLAIN text (textContent), but recommendFreq builds strings
-// for the in-app card's innerHTML — so they carry HTML entities (&rsquo; &mdash; …). Strip tags and
-// DECODE the common entities so the overlay shows "SCEL's TWR/APP are offline — …", not the raw markup.
-function latcPlain(s){ return String(s||'').replace(/<[^>]*>/g,'')
-  .replace(/&rsquo;|&#8217;/g,'’').replace(/&lsquo;|&#8216;/g,'‘')
-  .replace(/&mdash;|&#8212;/g,'—').replace(/&ndash;|&#8211;/g,'–')
-  .replace(/&middot;|&#183;/g,'·').replace(/&hellip;|&#8230;/g,'…')
-  .replace(/&quot;/g,'"').replace(/&amp;/g,'&'); }
 function latcPushOverlay(){
   const v=vCfg();
   // Push whenever Live mode is on — main.js caches this payload for the in-sim toolbar panel too
@@ -7636,14 +7678,7 @@ function latcPushOverlay(){
     isNewRec=true; LATC._lastStableKey=fkey; LATC._pendKey=null; LATC._pendCount=0;
   }
   LATC._prevFound=_curFound; LATC._prevNetKey=_netKey;
-  // "Also online at your field" (Dean 2026-07-13, his cycling-card idea): field ATC positions online that
-  // aren't the current pick — transparency so nothing live is hidden even when the pick is CTAF/UNICOM.
-  let also='';
-  if(rec.apt && rec.apt.icao){ const fi=rec.apt.icao, curCs=(rec.callsign||''), list=[];
-    for(const c of (LATC.controllers||[])){ if(c.facility===0)continue; const tr=LATC_TIER[c.facility], fr=parseFloat(c.frequency);
-      if(!tr||!(fr>0)||c.frequency==='199.998'||c.callsign===curCs)continue;
-      const a=latcAirportForCallsign(c.callsign, LATC.db); if(a && a.icao===fi) list.push(latcPosLabel(tr,c.callsign)+' '+latcFmt(fr)); }
-    if(list.length) also='Also at '+fi+': '+list.slice(0,3).join(' · '); }
+  const chain=latcBuildChain(seq, rec, nextUp);
   // Overlay self-heal (Dean 2026-07-18): if the overlay window ever dies while Live mode is on (it went
   // away during flight prep), main.js returns {ok:false, gone:true}. Re-create it on the next poll so the
   // dot comes back on its own — no need to toggle Live off/on. Gated on the desktop overlay being enabled.
@@ -7651,11 +7686,13 @@ function latcPushOverlay(){
     live:true,
     freq:latcFmt(rec.freq),
     who:(rec.callsign?rec.callsign+' · ':'')+(rec.label||''),
-    why:latcPlain(rec.why),
     atis:atis,
-    next: nextUp?(latcNextUpLabel(nextUp)+': '+latcFmt(nextUp.freq)+' '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':latcPosLabel(nextUp.tier,nextUp.callsign))+latcNextUpNote(nextUp)):'',
+    // The next frequency to pre-load in STANDBY (overlay labels it "STANDBY →"). "— later" keeps the honesty
+    // that a downroute entry (e.g. arrival ATC from the dep gate) isn't imminent; noEnr note when nothing
+    // between here and there.
+    next: nextUp?(latcFmt(nextUp.freq)+' · '+(nextUp.callsign?nextUp.callsign+' · ':'')+(nextUp.kind==='atis'?'ATIS':(nextUp.callsign?latcPosLabel(nextUp.tier,nextUp.callsign):nextUp.tier))+(nextUp.downroute?' — later':'')+latcNextUpNote(nextUp)):'',
+    chain: chain,
     cur: (activeMhz!=null)?("you're tuned to "+latcFmt(activeMhz)):'',
-    also: also,
     atisNote: atisNote,
     onFreq:onFreq,
     isNewRec:isNewRec,
@@ -8278,5 +8315,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.17.2</div>
+  pointer-events:none;">v6.18.0</div>
 </body></html>
