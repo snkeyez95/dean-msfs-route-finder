@@ -82,6 +82,15 @@ Never modify config.json, dean_msfs_debug.log, or community_routes.json directly
 8. If the roadmap or memory changed, run `node tools\sync-notes.js` before committing so the
    backup copies in docs/notes stay current.
 
+9. VERIFY AT THE SURFACE. For any user-facing change, exercise the real renderer path and assert on
+   what actually appears on screen — the chip, the row, the dropdown, the card — not just that the
+   underlying constant or data is right. Run it against Dean's REAL saved config/data where possible,
+   since a default-shaped fixture hides exactly the bugs an existing install hits.
+   Pattern to copy: tests/test_777_surfaces.js. (Why: v6.19.0 added the PMDG 777 and every test
+   passed — they proved FLEET_DEF contained the aircraft. Plan a Flight showed no 777 chip at all,
+   because his saved fleet had no key for it. The tests checked the code, not the screen.)
+   "Tests pass" is not "Dean will see it."
+
 ---
 
 ## Response Style
