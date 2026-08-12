@@ -108,7 +108,9 @@ console.log('\nfleet + route wiring (index.html):');
 
   // consts are declared at module scope in index.html — read them out of the source directly
   const gc = (name) => { const m = new RegExp('const ' + name + '=([\\s\\S]*?);\\n', 'm').exec(html); return m ? m[1] : ''; };
-  T('FLEET_DEF has the B77W entry', /\{code:'B77W',label:'PMDG 777-300ER',family:'777', def:true\}/.test(html));
+  T('FLEET_DEF has the B77W entry', /\{code:'B77W',label:'PMDG 777-300ER',family:'777', def:true/.test(html));
+  // One aircraft = one fleet entry. B773 rides along as an alias, never a second chip (Dean 2026-08-12).
+  T('  …B773 is an ALIAS of it, not a separate fleet entry', /alias:\['B773'\]/.test(html) && !/\{code:'B773'/.test(html));
   // v6.19.0 fix: a newly shipped aircraft must be live on FIRST LAUNCH. That needs def:true AND
   // getActiveFleet honouring the same missing-key fallback the Settings checkbox uses — otherwise the
   // box renders ticked while every route surface filters the aircraft out (Dean's empty 777 chip row).

@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.19.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.19.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.19.1</div>
+    <div class="sb-ver">v6.19.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1137,7 +1137,7 @@ function frAptCity(icao){
 // SayIntentions aircraft_type → sim key (all known types)
 // This map is the route INGEST GATE (processPage / importSIFile / downloadCommunityRoutes): a type that
 // isn't a key here is discarded and never stored, so adding an aircraft to FLEET_DEF alone would show a
-// checkbox with permanently zero routes. v6.19.1 adds the 777-300ER: B77W is the -300ER (Dean's PMDG
+// checkbox with permanently zero routes. v6.19.2 adds the 777-300ER: B77W is the -300ER (Dean's PMDG
 // airframe) and B773 the non-ER -300 — same airframe class, realistically flyable with it. Codes are
 // ICAO type designators, which is what SayIntentions serves (77W is the IATA form and matches nothing).
 const SI_ACFT_MAP={
@@ -1164,8 +1164,10 @@ const FLEET_DEF=[
   {code:'A21N',label:'Fenix A321neo', family:'A321',def:false},
   // def:true — getActiveFleet() and the Settings checkbox now share one missing-key rule (see
   // getActiveFleet), so a newly shipped aircraft is live on first launch instead of needing a manual tick.
-  {code:'B77W',label:'PMDG 777-300ER',family:'777', def:true},
-  {code:'B773',label:'Boeing 777-300', family:'777', def:true},
+  // `alias` = other SI type codes the SAME add-on flies. Real schedules file plenty of 777-300 (B773)
+  // legs alongside the -300ER, and you'd fly both in the PMDG 777-300ER — so they ride along with this
+  // one entry instead of appearing as a second aircraft you don't own (Dean 2026-08-12: two 777 chips).
+  {code:'B77W',label:'PMDG 777-300ER',family:'777', def:true, alias:['B773']},
   {code:'C680',label:'Citation Sovereign+',family:'Citation',def:false,freeOnly:true},
 ];
 // API code → specific display label (more precise than SIM_LBL which uses sim key)
@@ -2380,7 +2382,7 @@ async function addUtilPaths(paths){
 // Map a route aircraft type (e.g. A319, B738, A20N) to the best-matching aircraft
 // group, by matching the variant number(s) from the type code AND its fleet label
 // against the group's package folder names. Returns the group or null.
-// v6.19.1: the group's own id/label is matched too, not just its package folders. Vendors don't always
+// v6.19.2: the group's own id/label is matched too, not just its package folders. Vendors don't always
 // put the variant number in the folder name — the PMDG 777-300ER ships as `pmdg-aircraft-77w`, which
 // contains no 3-digit run at all, so a B77W route could never find its addon. The group folder Dean
 // names (`PMDG/777-300ER`) does carry it. Narrowbody matching is unchanged (their folders still win).
@@ -2914,14 +2916,24 @@ function fmtFlightLen(fl){
 }
 
 // A code MISSING from myFleet falls back to its `def` — the same rule the Settings checkbox and the
-// Free Route picker already used. v6.19.1: these disagreed. myFleet is only written when you toggle a
+// Free Route picker already used. v6.19.2: these disagreed. myFleet is only written when you toggle a
 // box, so an aircraft ADDED in an update had no key on an existing install: the checkbox rendered
 // ticked (def) while this returned unticked, and the new plane silently filtered out of Plan a Flight,
 // Free Route and Approaches until you toggled it by hand. One rule now, so shipping a new aircraft
 // works on first launch instead of looking broken.
 function getActiveFleet(){
   const fleet=S.cfg.myFleet||{};
-  return new Set(FLEET_DEF.filter(f=>fleet[f.code]!==undefined?fleet[f.code]:f.def).map(f=>f.code));
+  const on=FLEET_DEF.filter(f=>fleet[f.code]!==undefined?fleet[f.code]:f.def);
+  const s=new Set();
+  for(const f of on){ s.add(f.code); for(const a of (f.alias||[])) s.add(a); }
+  return s;
+}
+// Every SI type code one fleet entry covers — the entry's own code plus its aliases (variants of the
+// same add-on that real schedules file separately, e.g. B773 legs flown in the PMDG 777-300ER). Used by
+// the single-aircraft chip/dropdown narrowing so picking "PMDG 777-300ER" doesn't drop its B773 routes.
+function fleetCodesFor(code){
+  const f=FLEET_DEF.find(x=>x.code===code);
+  return new Set(f?[f.code,...(f.alias||[])]:[code]);
 }
 // A SimBrief type for the free-plan buttons that aren't tied to a specific route (Challenging/Scenic
 // Approaches). Was hardcoded A320 — it handed an A320 plan to someone who flies neither. Uses the first
@@ -2962,7 +2974,7 @@ function getRoutes(){
     if(S.mode==='1'&&!(di||ai))return false;
     if(S.dirFilter==='dep'&&!di)return false;
     if(S.dirFilter==='arr'&&!ai)return false;
-    if(S.acft!=='all'&&r.aircraft_type!==S.acft)return false;
+    if(S.acft!=='all'&&!fleetCodesFor(S.acft).has(r.aircraft_type))return false;
     const fl=blockLen(r.flight_length);
     if(durMaxHrs&&fl>durMaxHrs*60)return false;
     if(S.regionFilter!=='all'){
@@ -3296,7 +3308,7 @@ function getFreeRouteResults(){
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
   const pairMatch=r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
-    if(S.frAcft&&r.aircraft_type!==S.frAcft)return false;  // a specific plane is picked — filter to it
+    if(S.frAcft&&!fleetCodesFor(S.frAcft).has(r.aircraft_type))return false;  // a specific plane is picked — filter to it (aliases included)
     if(r.departure_airport!==S.frDep||r.arrival_airport!==S.frArr)return false;
     if(S.frAcFilter&&r.airline!==S.frAcFilter)return false;
     return true;
@@ -4445,7 +4457,7 @@ function _blCompute(all){
   const perAc={}; for(const ac of _BL.AC){ perAc[ac]={}; for(const t of _BL.TL){ const c=cell(ac,t); perAc[ac][t]=c.length?{n:c.length,p99:_cmpMean(c,'p99_ft_ms'),stut:_cmpMean(c,'stutter_pct'),cons:_cmpMean(c,'consistency_pct'),pvram:_cmpMean(c,'peak_vram_mb'),taxiStut:_maxN(_cmpMean(c,'dep_taxi_stutter'),_cmpMean(c,'arr_taxi_stutter')),feltHr:_cmpMean(c,'felt_stutter_hr')}:null; } }
   const prof={};
   for(const t of _BL.TL){ const cells=_BL.AC.map(ac=>perAc[ac][t]);
-    // Blend over the aircraft that actually HAVE data at this TLOD. v6.19.1: this used to void the whole
+    // Blend over the aircraft that actually HAVE data at this TLOD. v6.19.2: this used to void the whole
     // TLOD if ANY benchmark aircraft was missing a cell — so adding a 3rd aircraft (PMDG 777) with zero
     // flights would blank a baseline earned from 24 real flights. A new plane now shows as "collecting"
     // while the existing recommendation stands, and its cells tighten the blend as they fill. With every
@@ -4570,7 +4582,7 @@ function renderBaseline(){
   } else {
     h+='<div style="font-size:12px;color:#46c46a;margin-bottom:14px">&#10003; Full benchmark complete ('+cov.filled+'/'+cov.total+') &mdash; this recommendation is on solid data.</div>';
   }
-  // v6.19.1 — a NEWLY added benchmark aircraft has no flights yet. Say so plainly instead of letting it
+  // v6.19.2 — a NEWLY added benchmark aircraft has no flights yet. Say so plainly instead of letting it
   // hide inside the shortfall list: the pick above still stands on the planes that DO have data, and this
   // one starts shaping it as its cells fill. (Cells only fill on offline, non-AutoFPS, fixed-TLOD flights.)
   {
@@ -8370,5 +8382,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.19.1</div>
+  pointer-events:none;">v6.19.2</div>
 </body></html>

@@ -22,7 +22,7 @@ const myFleet = realCfg.myFleet || {};
 
 // Build a sandbox holding the REAL fleet/route surface functions out of index.html.
 function sandbox(){
-  const fns = ['getActiveFleet','fleetSbType','renderFleetChips','buildFrAcftDropdown','blockLen'];
+  const fns = ['getActiveFleet','fleetCodesFor','fleetSbType','renderFleetChips','buildFrAcftDropdown','blockLen'];
   let src = `
 let S={cfg:{},acft:'all',frAcft:'',routeRegistry:{},routeRegistrySnapshot:{},selICAOs:new Set(),allRows:[],chMode:'challenging',chMaxMins:0,chDep:''};
 let _els={};
@@ -36,7 +36,7 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
     src += m[0] + '\n';
   }
   for(const f of fns) src += X.grab(f, html) + '\n';
-  src += 'return {S,_els,getActiveFleet,fleetSbType,renderFleetChips,buildFrAcftDropdown,blockLen,SI_ACFT_MAP,SIM_LBL,SIM_SB,FLEET_DEF,FLEET_LBL,setCfg:(c)=>{S.cfg=c;}};';
+  src += 'return {S,_els,getActiveFleet,fleetCodesFor,fleetSbType,renderFleetChips,buildFrAcftDropdown,blockLen,SI_ACFT_MAP,SIM_LBL,SIM_SB,FLEET_DEF,FLEET_LBL,setCfg:(c)=>{S.cfg=c;}};';
   return new Function(src)();
 }
 const sb = sandbox();
@@ -59,6 +59,11 @@ console.log("surface sweep — Dean's real config (myFleet has NO B77W key):");
   T('2. Plan a Flight chip row renders a PMDG 777-300ER chip', chipHtml.includes('PMDG 777-300ER'));
   T('   …with a clickable data-acft="B77W" filter', /data-acft="B77W"/.test(chipHtml));
   T('   …existing chips still present (737 + Fenix)', chipHtml.includes('PMDG 737-800') && chipHtml.includes('Fenix A320'));
+  // Dean 2026-08-12: he owns ONE 777, so there must be ONE 777 chip. B773 is a route-type variant the
+  // same add-on flies, carried as an alias — never surfaced as a second aircraft he doesn't own.
+  const chip777 = (chipHtml.match(/777/g) || []).length;
+  T('   …and there is exactly ONE 777 chip, not one per type code', chip777 === 1, chip777 + ' mentions');
+  T('   …B773 is NOT its own chip', !/data-acft="B773"/.test(chipHtml));
 
   // 3. Free Route — the aircraft picker
   sb.buildFrAcftDropdown();
@@ -68,7 +73,9 @@ console.log("surface sweep — Dean's real config (myFleet has NO B77W key):");
   // 4. Labels — what a 777 route ROW and detail panel will actually say
   const lbl = (t) => sb.FLEET_LBL[t] || sb.SIM_LBL[sb.SI_ACFT_MAP[t]] || t;   // the app's own resolution chain
   T('4. a B77W route row reads "PMDG 777-300ER" (not a raw code)', lbl('B77W') === 'PMDG 777-300ER', lbl('B77W'));
-  T('   …a B773 route row also resolves to a real name', lbl('B773') === 'Boeing 777-300', lbl('B773'));
+  // A B773 leg has no fleet entry of its own now — it resolves through SI_ACFT_MAP to the add-on you'd
+  // actually fly it in, which is the honest label for a route row.
+  T('   …a B773 route row reads as the aircraft you fly it in', lbl('B773') === 'PMDG 777-300ER', lbl('B773'));
   T('   …737 labels unchanged', lbl('B738') === 'PMDG 737-800', lbl('B738'));
 
   // 5. Ingest gate — would a real 777 route survive import at all
@@ -104,7 +111,11 @@ console.log('\nend-to-end against real stored routes:');
     const act = sb.getActiveFleet();
     const visible = r777.filter(r => act.has(r.aircraft_type));
     T('   stored 777 routes PASS the Plan a Flight fleet filter (they will render)', visible.length === r777.length, visible.length + '/' + r777.length);
-    T('   …selecting the 777 chip narrows to exactly those routes', all.filter(r => r.aircraft_type === 'B77W').length === r777.filter(r => r.aircraft_type === 'B77W').length);
+    // The single-chip narrowing must keep BOTH type codes the one add-on flies, or clicking the 777
+    // chip would silently hide its B773 legs.
+    const picked = r777.filter(r => sb.fleetCodesFor('B77W').has(r.aircraft_type));
+    T('   …clicking the 777 chip keeps every 777-family route (B77W + B773)', picked.length === r777.length, picked.length + '/' + r777.length);
+    T('   …and does not leak another aircraft in', !all.some(r => r.aircraft_type === 'B738' && sb.fleetCodesFor('B77W').has(r.aircraft_type)));
     const lbl = (t) => sb.FLEET_LBL[t] || sb.SIM_LBL[sb.SI_ACFT_MAP[t]] || t;
     T('   …each renders a real aircraft name, never a bare code', r777.every(r => /[A-Za-z]{4,}/.test(lbl(r.aircraft_type))), lbl(r777[0].aircraft_type));
     T('   …and carries the dep/arr + duration a route row needs', r777.every(r => r.departure_airport && r.arrival_airport));
