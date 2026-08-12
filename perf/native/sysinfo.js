@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const CITATION_LABEL = 'Citation Sovereign+';
+const PMDG777_LABEL = 'PMDG 777';        // v6.19.0 — its own benchmark label, never the 737's 'PMDG'
 const TARGET_PROCESS = 'FlightSimulator2024.exe';
 
 function nvidiaSmi() {
@@ -61,7 +62,11 @@ function normalizeAircraftTitle(title, benchmark) {
     }
   }
   if (tl.includes('fenix') || ['a318', 'a319', 'a320', 'a321'].some(a => tl.includes(a))) return 'Fenix';
-  if (tl.includes('pmdg') || ['737', '747', '777', 'dc-6', 'dc6'].some(b => tl.includes(b))) return 'PMDG';
+  // The 777 is its OWN label and must be tested BEFORE the generic PMDG line below (which claims any
+  // title containing 'pmdg'). Belt-and-braces for contexts with no ABRP_BENCHMARK env — the config
+  // migration in main.js is the primary path (v6.19.0).
+  if (['777', '77w'].some(b => tl.includes(b))) return PMDG777_LABEL;
+  if (tl.includes('pmdg') || ['737', '747', 'dc-6', 'dc6'].some(b => tl.includes(b))) return 'PMDG';
   if (tl.includes('sovereign') || ['c68a', 'c680'].some(c => tl.includes(c))) return CITATION_LABEL;
   return title;
 }

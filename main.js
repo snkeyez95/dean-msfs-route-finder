@@ -584,9 +584,14 @@ const SNAP_FILE = path.join(USER_DATA, 'routeSnapshot.json');
 // It now lives in config.benchmark so any user's fleet works; the seed below IS Dean's classic
 // grid, so an existing install migrates with zero behavior change. vramCapMb null = auto-detect
 // from the flights' own total_vram_mb. The setup wizard / baseline walkthrough writes this block.
+// ORDER MATTERS: normalizeAircraftTitle (perf/native/sysinfo.js) and matchBenchmarkAircraft
+// (perf/native/prep.js) both return on the FIRST entry whose match terms appear in the title. The PMDG
+// entry's bare 'pmdg' term would swallow every other PMDG airframe, so any specific PMDG type must sit
+// ABOVE it (a 777 title hits '777' first; a 737 title contains no '777' and falls through to 'pmdg').
 const DEFAULT_BENCHMARK = {
   aircraft: [
     { label: 'Fenix', match: ['fenix', 'a318', 'a319', 'a320', 'a321'] },
+    { label: 'PMDG 777', match: ['777', '77w'] },
     { label: 'PMDG',  match: ['pmdg', '737', '738', '739'] },
   ],
   tlods: [100, 125, 150, 175],
@@ -616,6 +621,23 @@ function vatsimCid(){ try { return String((_perfCfg().vatsim||{}).cid || '').tri
     const c = JSON.parse(fs.readFileSync(CFG,'utf8'));
     let ch = false;
     if (!c.benchmark) { c.benchmark = DEFAULT_BENCHMARK; ch = true; LOG.info('[MIGRATE] seeded config.benchmark (classic Fenix/PMDG grid)'); }
+    // v6.19.0 — PMDG 777 gets its OWN benchmark label. Without this, the PMDG entry's bare 'pmdg' match
+    // term claims every 777 title too, so 777 flights would be logged as the 737 label and averaged into
+    // its baseline cells, coverage, Scenery z-baselines and Compare. Inserted BEFORE the PMDG entry
+    // because the matchers are first-match-wins. One-shot (mig777Done) so a later user edit sticks.
+    if (!c.mig777Done) {
+      const acs = (c.benchmark && Array.isArray(c.benchmark.aircraft)) ? c.benchmark.aircraft : null;
+      if (acs) {
+        const has777 = acs.some(a => a && Array.isArray(a.match) && a.match.some(t => /^(777|77w)$/i.test(String(t))));
+        if (!has777) {
+          const i = acs.findIndex(a => a && Array.isArray(a.match) && a.match.some(t => String(t).toLowerCase() === 'pmdg'));
+          const entry = { label: 'PMDG 777', match: ['777', '77w'] };
+          if (i >= 0) acs.splice(i, 0, entry); else acs.push(entry);
+          LOG.info('[MIGRATE] benchmark: added "PMDG 777" label ahead of PMDG (777 flights no longer count as the 737)');
+        }
+      }
+      c.mig777Done = true; ch = true;
+    }
     // an already-configured install is by definition "set up" — the wizard must never fire on it
     if (!c.setupDone && (c.folder || (c.savedRows && c.savedRows.length) || c.siCookie)) { c.setupDone = true; ch = true; }
     if (ch) writeFileAtomic(CFG, JSON.stringify(c, null, 2));

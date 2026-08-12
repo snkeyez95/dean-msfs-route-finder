@@ -1,5 +1,133 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## ✈️ v6.19.0 — ADD THE PMDG 777-300ER: fleet + routes + activation + benchmark, no stone unturned (Dean 2026-08-11, plan-approved)
+> ✅ BUILT + SHIPPED 2026-08-11. Folder move done (PMDG/737-800 + PMDG/777-300ER — real pkgScanGroups
+> verified two groups). Benchmark migration inserts 'PMDG 777' AHEAD of the PMDG entry (first-match-wins);
+> sysinfo/prep legacy fallbacks match 777 first; index_writer + report_combined now read benchmark labels
+> from ABRP_BENCHMARK env (777 tracks primary + gets its own dashboard card/coverage row); _blCompute
+> blends over aircraft WITH data (TLOD-125 pick proven byte-identical on real data); FLEET_DEF B77W+B773,
+> SI_ACFT_MAP ingest gate opened, 8h/12h duration buckets, aircraftGroupForType matches the group id,
+> fleetSbType replaces the hardcoded A320. tests/test_777_aircraft.js 47/47; full board 27 suites green.
+> OWED (Dean): tick "PMDG 777-300ER" in Settings → My Fleet; routes arrive on the next SI refresh.
+
+### Context
+Dean bought the PMDG 777-300ER and already moved its two packages (`pmdg-aircraft-77w` +
+`pmdg-aircraft-77w-liveries`) out of Community into his aircraft library at
+`C:\Users\MultiBotPC\Documents\MSFS\Aircraft\PMDG\`, flat beside the 738's packages. He asked for a
+full-implications pass: activation, Aircraft & Utility, fleet/routes, and anything else a new aircraft
+touches — "hit it perfect in one go." Exploration (3 agents, verified against his live config + the real
+community_routes.json) found the complete blast radius:
+
+- **Activation**: groups are derived by folder scan (`pkgScanGroups`, main.js:882-904 — "a group = any
+  folder directly holding ≥1 package"). Flat placement means the 777 would silently JOIN the 738's group
+  (one "PMDG" row linking all 5 packages). Fix = folder restructure into `PMDG\737-800\` +
+  `PMDG\777-300ER\` (mirrors Fenix). Liveries auto-ride (packages in the same group folder); `groupDeps`
+  not needed. `cfg.aircraftActive` is currently `[]` — nothing to migrate. An "add aircraft" function
+  effectively already exists: the filesystem + rescan IS the flow; only the subfolder convention was
+  undocumented.
+- **Fleet/routes**: `FLEET_DEF` (index.html:1146-1158), `SI_ACFT_MAP` (:1136-1141), `SIM_LBL`/`SIM_SB`
+  (:1143-1144) are hardcoded, 777-free. `SI_ACFT_MAP` is the INGEST GATE (processPage :2502,
+  importSIFile :8207, downloadCommunityRoutes :8274) — the registry, the 20k snapshot, and the shipped
+  community_routes.json contain **zero 777 routes** (verified histogram: exactly the 10 narrowbody keys).
+  Data only accumulates from the next SI refresh AFTER the code ships. SI uses ICAO designators →
+  **`B77W`** is the code (77W is IATA, would match nothing).
+- **Perf (the trap)**: `cfg.benchmark.aircraft` PMDG entry matches bare `'pmdg'` →
+  `normalizeAircraftTitle` (sysinfo.js:54-67, first-match-wins) labels every 777 flight **'PMDG'** — the
+  737's benchmark label — polluting the baseline cells (index.html:4409/4413), coverage (coverage.js:31),
+  Scenery leave-one-out z-pools (:4132-4147), Lab controls, and Compare matched cells (:4228). SimBrief
+  trap: `matchBenchmarkAircraft` (prep.js:17-24) on a blob containing "PMDG" would write a **737 benchmark
+  TLOD to a 777 flight**. Legacy built-in sysinfo.js:64 maps `'777'`→'PMDG' too.
+- **Safely handled already**: PMDG WASM cleaner (`pmdg-aircraft-*` wildcard + `work`-folder preserve,
+  main.js:1652-1669) and version watcher (prefix scan, liveries excluded, main.js:858-879) cover the 77W
+  automatically. The PMDG-737 radio adapter (main.js:2243-2250, `'pmdg' AND /73[7-9]/`) correctly declines
+  a 777 title (777 SDK uses different event IDs — a 777 adapter is a separate future project).
+
+Dean's locked answers (AskUserQuestion 2026-08-11): **full 3rd benchmark aircraft** (own label
+'PMDG 777', own grid cells — not a reference plane); **ingest B77W + B773** (the -300 non-ER is
+realistically flyable with the -300ER); **Claude does the folder move** (MSFS closed; no junctions live).
+
+Design consequence I'll engineer around: with 0 logged 777 flights, a naive worst-of-three blend marks
+every TLOD "incomplete" and would BLANK the existing TLOD-125 headline. `_blCompute` must blend over
+aircraft WITH data at each TLOD and show the 777 as "collecting 0/12" — the current pick survives while
+777 cells fill. Also: benchmark cells only fill on offline, non-AutoFPS, fixed-TLOD flights (the same
+quarantine rules as the original 24) — Dean's day-to-day VATSIM+AutoFPS 777 flights are logged/charted
+but won't fill the grid; auto-TLOD (`--prep-next`) will offer 777 cells when he SimBriefs a 77W and
+launches a capture flight without AutoFPS.
+
+### Build steps
+
+**A. Folder move (filesystem, Dean-approved; MSFS must be closed):**
+```
+PMDG\737-800\    ← pmdg-aircraft-738, pmdg-aircraft-738-liveries, xbaw-soundset-737
+PMDG\777-300ER\  ← pmdg-aircraft-77w, pmdg-aircraft-77w-liveries
+```
+Verify with a fresh `scan-packages`: two groups `PMDG/737-800` + `PMDG/777-300ER` under parent PMDG.
+`cfg.aircraftActive=[]` and `groupDeps` (Fenix-only) untouched.
+
+**B. Benchmark config migration (main.js):** one-time, gated by `cfg.mig777Done`. If `cfg.benchmark`
+exists and no entry's match terms intersect `['777','77w']`, INSERT `{label:'PMDG 777',
+match:['777','77w']}` **before** the PMDG entry (first-match-wins protects both directions: a 777 title
+hits '777' first; a 737 title contains no '777' and falls through to 'pmdg'/'737'). Update
+`DEFAULT_BENCHMARK` (main.js:587-595) the same way for fresh installs. `benchCfg()` already flows the
+migrated config into the capture child (`ABRP_BENCHMARK`, main.js:2006) and lab-report child (:2169).
+
+**C. Engine label correctness (perf/native):**
+- `sysinfo.js` legacy built-ins (:63-65): route `'777'`/`'77w'` → `'PMDG 777'` BEFORE the pmdg/737 line
+  (belt-and-braces for env-less contexts).
+- `prep.js` `normalizeSimbriefAircraft` (:25-31): add the same 777 → `'PMDG 777'` branch. With the
+  migrated config, `matchBenchmarkAircraft` hits '777' before 'pmdg' — the wrong-TLOD trap dies.
+- `index_writer.js` `isPrimaryAircraft` (:6-8) + `report_combined.js` COVERAGE_AIRCRAFT consumers
+  (:11/:49/:77): read benchmark labels from `ABRP_BENCHMARK` env (fall back to the constants) so a
+  'PMDG 777' flight tracks as **primary** and gets its own dashboard aircraft card. coverage.js already
+  takes the grid from config — 3 aircraft × 4 TLODs × 3 = 36 total flows through.
+
+**D. Baseline resilience (index.html `_blCompute` ~:4393-4435):** blend worst-of over aircraft WITH data
+at each TLOD (skip empty cells rather than voiding the TLOD); coverage strip + Baseline copy show
+'PMDG 777 — collecting 0/12'. The TLOD-125 headline must be byte-identical on Dean's real data until a
+777 benchmark flight exists (regression-assert this).
+
+**E. Fleet + routes (index.html):**
+- `FLEET_DEF` += `{code:'B77W', label:'PMDG 777-300ER', family:'777', def:false}` (def:false avoids the
+  getActiveFleet-vs-UI fallback mismatch at :2899-2903 vs :2460 — Dean ticks it once in My Fleet).
+- `SI_ACFT_MAP` += `'B77W':'b77w', 'B773':'b77w'`; `SIM_LBL` += `"b77w":"PMDG 777-300ER"`; `SIM_SB` +=
+  `"b77w":"B77W"` (SimBrief takes ICAO designators — B77W flows through openSimBrief callers unchanged).
+- Duration dropdown (:543-550): add `Under 8h` + `Under 12h` buckets (6h cap would hide long-haul when
+  a filter is set).
+- `aircraftGroupForType` (:2371-2386): add the group **id/label** to the match haystack (candidates
+  `['777','300']` from "PMDG 777-300ER" never appear in `pmdg-aircraft-77w`, but do in the
+  `PMDG/777-300ER` group id) — makes the route-card Activate-aircraft button + Launch+Capture warning
+  work for 777 routes. Verify 737/Fenix matching is unchanged.
+- `_benchCandidates` (:4980-4991): add `'777':'PMDG 777'` to the fam map + its match terms, so a future
+  wizard re-run offers the 777 without the free-text path.
+- Challenging Approaches free-plan buttons (:7963, :8017): replace hardcoded `SIM_SB['a320']` with the
+  first checked fleet code (minor honesty fix).
+- LEAVE AS-IS (by design): Scenic 240-min cap (scenic is short-haul themed); default dur-ascending sort;
+  snapshot frozen at 20k (Dean's 2026-07-06 decision — 777 routes live in the registry only; snapshot/
+  community file won't gain them unless that decision is revisited — flagged in the recap, not changed).
+
+**F. Docs/version:** v6.19.0 (package.json + index.html ×3 + README changelog). SKILL.md: new 'PMDG 777'
+label, 3-aircraft/36-flight grid, B77W/B773 route codes, the collecting-cells baseline rule. Memory +
+sync-notes.
+
+### Tests (tests/test_777_aircraft.js, new + extend existing)
+- `normalizeAircraftTitle` with the migrated benchmark: 'PMDG 777-300ER …' → 'PMDG 777';
+  'PMDG 737-800 …' → 'PMDG'; Fenix titles unchanged; env-less legacy fallback: 777 → 'PMDG 777'.
+- `matchBenchmarkAircraft` ordering: blob containing BOTH 'pmdg' and '777' → 'PMDG 777' (the TLOD trap).
+- Migration: old config gains the 777 entry FIRST; idempotent via mig777Done; fresh-install seed matches.
+- `aircraftGroupForType`: B77W → `PMDG/777-300ER`; B738 → `PMDG/737-800`; A320 unchanged (mock groups).
+- Consts wiring: FLEET_DEF has B77W; SI_ACFT_MAP maps B77W+B773 → b77w; SIM_LBL/SIM_SB present.
+- `computeCoverage` with the 3-aircraft grid: total 36, 'PMDG 777' cells zero-filled; existing 24 intact.
+- `_blCompute` on REAL data: TLOD-125 pick byte-identical with the 777 entry added (empty cells skipped).
+- Full board `node tests\run_all.js` unpiped, exit 0.
+
+### Verification (live, Dean)
+Folder move → Aircraft & Utility shows two PMDG rows; tick 777-300ER → both its packages junction into
+Community; MSFS loads it. Settings → My Fleet: tick "PMDG 777-300ER". Route data: next SI refresh ingests
+B77W/B773 routes (nothing to re-import — community file has none). SimBrief a 77W plan + Launch+Capture
+(no AutoFPS) → auto-TLOD announces "Set TLOD 100 for PMDG 777" (the thinnest 777 cell); flight files with
+aircraft='PMDG 777'; Baseline still says TLOD 125 with '777 collecting'. WASM cleaner + version watcher
+need no action (verified automatic). Radio Set-standby button correctly absent on the 777.
+
 ## 🛰️ v6.18.0 — VATSIM OVERLAY REWORK: UNICOM-gap next-up, standby framing, hover chain, relevant blink (Dean 2026-08-08, plan-approved)
 
 ### Context

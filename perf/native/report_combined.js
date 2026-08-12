@@ -8,7 +8,23 @@ const { computeCoverage, COVERAGE_AIRCRAFT, COVERAGE_TLODS } = require('./covera
 const { pyJson, htmlEscape, floatRepr } = require('./report_html.js');
 
 const PInt = n => ({ __int: n });
-const isPrimary = ac => COVERAGE_AIRCRAFT.includes(ac);
+// v6.19.0: honor the CONFIGURED benchmark grid (ABRP_BENCHMARK env) so a user-added aircraft — e.g.
+// 'PMDG 777' — gets its own dashboard card + coverage row instead of being filed as a reference plane.
+// No env (or malformed) → the hardcoded Fenix/PMDG × 100-175 grid, i.e. today's output byte-for-byte.
+let _bench;
+function benchFromEnv(){
+  if(_bench !== undefined) return _bench;
+  try{
+    const b = JSON.parse(process.env.ABRP_BENCHMARK || '');
+    const ac = (b && Array.isArray(b.aircraft)) ? b.aircraft.map(a => (a && a.label) ? a.label : a).filter(Boolean) : null;
+    const tl = (b && Array.isArray(b.tlods) && b.tlods.length) ? b.tlods : null;
+    _bench = (ac && ac.length) ? { aircraft: ac, tlods: tl || COVERAGE_TLODS, perCell: (b && b.perCell > 0) ? b.perCell : undefined } : null;
+  }catch(_){ _bench = null; }
+  return _bench;
+}
+const benchAircraft = () => (benchFromEnv() || {}).aircraft || COVERAGE_AIRCRAFT;
+const benchTlods    = () => (benchFromEnv() || {}).tlods    || COVERAGE_TLODS;
+const isPrimary = ac => benchAircraft().includes(ac);
 function gradeP99(p99){ if(p99 == null) return 'na'; if(p99 <= 20) return 'good'; if(p99 <= 33.3) return 'ok'; return 'bad'; }
 
 function buildCombinedReport(sessions){
@@ -74,7 +90,7 @@ function buildCombinedReport(sessions){
       '</div></div>';
   }
 
-  let cardsHtml = COVERAGE_AIRCRAFT.map(ac => aircraftCard(ac, ac === 'Fenix' ? 'var(--fenix)' : 'var(--pmdg)', '')).join('');
+  let cardsHtml = benchAircraft().map(ac => aircraftCard(ac, ac === 'Fenix' ? 'var(--fenix)' : 'var(--pmdg)', '')).join('');
   if(!cardsHtml) cardsHtml = '<div class="panel acard"><div class="lab">No flights logged yet.</div></div>';
 
   const refAcs = [...new Set(sessions.filter(s => s.aircraft && s.p99_ft_ms != null && !isPrimary(s.aircraft)).map(s => s.aircraft))].sort();
@@ -135,11 +151,11 @@ function buildCombinedReport(sessions){
     '<span class="chip">Drivers <b>' + drivers.length + ' tested</b></span>';
 
   // coverage panel
-  const cov = computeCoverage(sessions), tgt = cov.target;
-  let covGrid = '<table class="covgrid"><tr><th></th>' + COVERAGE_TLODS.map(t => '<th>' + t + '</th>').join('') + '</tr>';
-  for(const ac of COVERAGE_AIRCRAFT){
+  const cov = computeCoverage(sessions, benchFromEnv() || undefined), tgt = cov.target;
+  let covGrid = '<table class="covgrid"><tr><th></th>' + benchTlods().map(t => '<th>' + t + '</th>').join('') + '</tr>';
+  for(const ac of benchAircraft()){
     covGrid += '<tr><td class="lbl">' + ac + '</td>';
-    for(const t of COVERAGE_TLODS){ const c = cov.counts[ac + '|' + t]; const cls = c === 0 ? 'cov0' : (c < tgt ? 'cov1' : 'cov3'); covGrid += '<td><span class="covcell ' + cls + '">' + c + '/' + tgt + '</span></td>'; }
+    for(const t of benchTlods()){ const c = cov.counts[ac + '|' + t]; const cls = c === 0 ? 'cov0' : (c < tgt ? 'cov1' : 'cov3'); covGrid += '<td><span class="covcell ' + cls + '">' + c + '/' + tgt + '</span></td>'; }
     covGrid += '</tr>';
   }
   covGrid += '</table>';

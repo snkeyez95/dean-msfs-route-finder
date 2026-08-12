@@ -289,13 +289,20 @@ change"** - this matches the in-app Performance -> Baseline view, and your answe
 (one spec, two surfaces). The method:
 
 1. **Clean subset only - never all-vs-all** (the confound trap that faked a 2ms "sim update win" on
-   2026-06-30). Use only: aircraft in {Fenix, PMDG}; TLOD in {100,125,150,175}; the modal
-   `driver_version` (drop 591.86 / 610.47 flights); non-AutoFPS. Exclude the Citation (reference) and
-   the out-of-grid Fenix-80 flight. Say how many you excluded and why.
+   2026-06-30). Use only: aircraft in the configured benchmark set (**as of v6.19.0: Fenix, PMDG,
+   PMDG 777** - 3 x 4 TLODs x 3 = 36 flights); TLOD in {100,125,150,175}; the modal `driver_version`
+   (drop 591.86 / 610.47 flights); non-AutoFPS. Exclude the Citation (reference) and the out-of-grid
+   Fenix-80 flight. Say how many you excluded and why.
 2. **Per-aircraft, per-TLOD means** over the (target 3) flights/cell - averaging the 3 routes smooths
    the route-driven peak-VRAM noise.
-3. **Blend = worst-of-the-two** at each TLOD across Fenix & PMDG (max p99, max stutter, MIN consistency,
-   max peak VRAM). One number, safe for both heavies; lighter planes only do better. NOT per-aircraft.
+3. **Blend = worst-of the aircraft THAT HAVE DATA** at each TLOD (max p99, max stutter, MIN consistency,
+   max peak VRAM). One number, safe for every plane measured; lighter planes only do better. NOT
+   per-aircraft. **A benchmark aircraft with no flights yet does NOT void the TLOD** - it reads
+   "collecting 0/12" and the pick stands on the planes that do have data (v6.19.0: the PMDG 777 was
+   added to the grid with zero flights; the earned TLOD-125 recommendation is unchanged until its
+   cells fill). Say which aircraft the pick is currently based on when one is still collecting.
+   **The 777 is a SEPARATE label from the 737** - its titles match '777'/'77w' ahead of the generic
+   'pmdg' term, so never merge them; a flight labelled `PMDG` is the 737-800, `PMDG 777` the 777-300ER.
 4. **Hard limits:** consistency >= 99%, stutter <= 0.1%, peak VRAM <= 90% of 12,288 MB (~11,059). A
    TLOD "passes" if its blended profile clears all three.
 5. **Three modes:** Smoothest = lowest-p99 passing TLOD; Best-visuals = highest passing TLOD; **Balanced

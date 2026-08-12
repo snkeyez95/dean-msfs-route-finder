@@ -5,7 +5,21 @@
 // (json indent, \u escaping) is cosmetic for files that are parsed, so we match the DATA, not bytes.
 const { COVERAGE_AIRCRAFT } = require('./coverage.js');
 
-function isPrimaryAircraft(ac){ return COVERAGE_AIRCRAFT.includes(ac); }
+// v6.19.0: the benchmark grid is user-configurable (config.benchmark, passed to the capture child as
+// ABRP_BENCHMARK), so "primary vs reference" must follow the CONFIGURED labels — otherwise a new
+// benchmark aircraft (e.g. 'PMDG 777') would be filed as a reference plane. Falls back to the
+// hardcoded Fenix/PMDG pair when no env is present, so existing behavior is unchanged.
+let _benchLabels;
+function benchLabelsFromEnv(){
+  if(_benchLabels !== undefined) return _benchLabels;
+  try{
+    const b = JSON.parse(process.env.ABRP_BENCHMARK || '');
+    const l = (b && Array.isArray(b.aircraft)) ? b.aircraft.map(a => (a && a.label) ? a.label : a).filter(Boolean) : null;
+    _benchLabels = (l && l.length) ? l : null;
+  }catch(_){ _benchLabels = null; }
+  return _benchLabels;
+}
+function isPrimaryAircraft(ac){ return (benchLabelsFromEnv() || COVERAGE_AIRCRAFT).includes(ac); }
 
 // write_sessions_nav: ordered flight list (id/folder/label/track) every report.html loads for prev/next.
 function buildSessionsNavEntries(sessions){

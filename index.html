@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.18.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.19.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.18.0</div>
+    <div class="sb-ver">v6.19.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -547,6 +547,8 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
         <option value="3">Under 3h</option>
         <option value="4">Under 4h</option>
         <option value="6">Under 6h</option>
+        <option value="8">Under 8h</option>
+        <option value="12">Under 12h</option>
       </select>
       <select id="sort-f" onchange="onSortChange()">
         <option value="dur">Sort: Duration</option>
@@ -1133,15 +1135,21 @@ function frAptCity(icao){
 }
 
 // SayIntentions aircraft_type → sim key (all known types)
+// This map is the route INGEST GATE (processPage / importSIFile / downloadCommunityRoutes): a type that
+// isn't a key here is discarded and never stored, so adding an aircraft to FLEET_DEF alone would show a
+// checkbox with permanently zero routes. v6.19.0 adds the 777-300ER: B77W is the -300ER (Dean's PMDG
+// airframe) and B773 the non-ER -300 — same airframe class, realistically flyable with it. Codes are
+// ICAO type designators, which is what SayIntentions serves (77W is the IATA form and matches nothing).
 const SI_ACFT_MAP={
   'B739':'b738','B738':'b738','B38M':'b738','B737':'b738','B39M':'b738',
   'A319':'a319',
   'A320':'a320','A20N':'a320',
   'A321':'a321','A21N':'a321',
+  'B77W':'b77w','B773':'b77w',
 };
 
-const SIM_LBL={"a319":"Fenix A319","a320":"Fenix A320","a321":"Fenix A321","b738":"PMDG 737-800"};
-const SIM_SB={"a319":"A319","a320":"A320","a321":"A321","b738":"B738"};
+const SIM_LBL={"a319":"Fenix A319","a320":"Fenix A320","a321":"Fenix A321","b738":"PMDG 737-800","b77w":"PMDG 777-300ER"};
+const SIM_SB={"a319":"A319","a320":"A320","a321":"A321","b738":"B738","b77w":"B77W"};
 
 const FLEET_DEF=[
   {code:'B738',label:'PMDG 737-800',  family:'737', def:true},
@@ -1154,6 +1162,11 @@ const FLEET_DEF=[
   {code:'A20N',label:'Fenix A320neo', family:'A320',def:false},
   {code:'A321',label:'Fenix A321',    family:'A321',def:true},
   {code:'A21N',label:'Fenix A321neo', family:'A321',def:false},
+  // def:false deliberately — getActiveFleet() treats a MISSING myFleet key as unchecked while the
+  // Settings checkbox falls back to `def`, so a def:true newcomer would render ticked on an existing
+  // install yet filter no routes. Unticked-until-you-tick-it keeps the two honest.
+  {code:'B77W',label:'PMDG 777-300ER',family:'777', def:false},
+  {code:'B773',label:'Boeing 777-300', family:'777', def:false},
   {code:'C680',label:'Citation Sovereign+',family:'Citation',def:false,freeOnly:true},
 ];
 // API code → specific display label (more precise than SIM_LBL which uses sim key)
@@ -2368,6 +2381,10 @@ async function addUtilPaths(paths){
 // Map a route aircraft type (e.g. A319, B738, A20N) to the best-matching aircraft
 // group, by matching the variant number(s) from the type code AND its fleet label
 // against the group's package folder names. Returns the group or null.
+// v6.19.0: the group's own id/label is matched too, not just its package folders. Vendors don't always
+// put the variant number in the folder name — the PMDG 777-300ER ships as `pmdg-aircraft-77w`, which
+// contains no 3-digit run at all, so a B77W route could never find its addon. The group folder Dean
+// names (`PMDG/777-300ER`) does carry it. Narrowbody matching is unchanged (their folders still win).
 function aircraftGroupForType(type){
   if(!type||!S.acftGroups||!S.acftGroups.length)return null;
   const lbl=(typeof FLEET_LBL!=='undefined'&&FLEET_LBL[type])||'';
@@ -2376,8 +2393,9 @@ function aircraftGroupForType(type){
   let best=null,bestScore=0;
   for(const g of S.acftGroups){
     let score=0;
-    for(const p of g.packages){
-      const pn=p.name.toUpperCase();
+    const hay=g.packages.map(p=>p.name.toUpperCase());
+    hay.push(String(g.id||'').toUpperCase(), String(g.label||'').toUpperCase());
+    for(const pn of hay){
       for(const c of cands){ if(pn.includes(c)) score=Math.max(score,c.length); }
     }
     if(score>bestScore){bestScore=score;best=g;}
@@ -2900,6 +2918,14 @@ function getActiveFleet(){
   const fleet=S.cfg.myFleet||{};
   if(!Object.keys(fleet).length)return new Set(FLEET_DEF.filter(f=>f.def).map(f=>f.code));
   return new Set(FLEET_DEF.filter(f=>fleet[f.code]).map(f=>f.code));
+}
+// A SimBrief type for the free-plan buttons that aren't tied to a specific route (Challenging/Scenic
+// Approaches). Was hardcoded A320 — it handed an A320 plan to someone who flies neither. Uses the first
+// aircraft actually checked in My Fleet, still falling back to A320 when nothing is checked.
+function fleetSbType(){
+  const act=getActiveFleet();
+  const f=FLEET_DEF.find(x=>act.has(x.code));
+  return (f&&f.code)||SIM_SB['a320'];
 }
 
 // Region filter — ICAO first-letter prefixes per region (data-driven so it's easy to extend).
@@ -4415,13 +4441,21 @@ function _blCompute(all){
   const perAc={}; for(const ac of _BL.AC){ perAc[ac]={}; for(const t of _BL.TL){ const c=cell(ac,t); perAc[ac][t]=c.length?{n:c.length,p99:_cmpMean(c,'p99_ft_ms'),stut:_cmpMean(c,'stutter_pct'),cons:_cmpMean(c,'consistency_pct'),pvram:_cmpMean(c,'peak_vram_mb'),taxiStut:_maxN(_cmpMean(c,'dep_taxi_stutter'),_cmpMean(c,'arr_taxi_stutter')),feltHr:_cmpMean(c,'felt_stutter_hr')}:null; } }
   const prof={};
   for(const t of _BL.TL){ const cells=_BL.AC.map(ac=>perAc[ac][t]);
-    if(cells.some(c=>!c)){ prof[t]={incomplete:true}; continue; }
-    // blend = worst-of-ALL benchmark aircraft (works for 1..N planes; a passing TLOD is safe for every one)
-    const p99=Math.max(...cells.map(c=>c.p99)),stut=Math.max(...cells.map(c=>c.stut)),cons=Math.min(...cells.map(c=>c.cons)),pv=Math.max(...cells.map(c=>c.pvram));
+    // Blend over the aircraft that actually HAVE data at this TLOD. v6.19.0: this used to void the whole
+    // TLOD if ANY benchmark aircraft was missing a cell — so adding a 3rd aircraft (PMDG 777) with zero
+    // flights would blank a baseline earned from 24 real flights. A new plane now shows as "collecting"
+    // while the existing recommendation stands, and its cells tighten the blend as they fill. With every
+    // aircraft present the math is identical to before (same worst-of over the same cells).
+    const have=cells.filter(Boolean);
+    if(!have.length){ prof[t]={incomplete:true}; continue; }
+    const missing=_BL.AC.filter(ac=>!perAc[ac][t]);
+    // blend = worst-of the aircraft with data (a passing TLOD is safe for every one of them)
+    const p99=Math.max(...have.map(c=>c.p99)),stut=Math.max(...have.map(c=>c.stut)),cons=Math.min(...have.map(c=>c.cons)),pv=Math.max(...have.map(c=>c.pvram));
     // taxi-phase stutter + "felt" (>100ms/hr) are the discriminators Dean actually notices on a CPU-bound
     // rig where overall p99 is flat — surfaced (not hard-gated) so the pick stays stable on sparse data.
-    const taxi=_maxN(...cells.map(c=>c.taxiStut)),felt=_maxN(...cells.map(c=>c.feltHr));
-    prof[t]={p99,stut,cons,pvram:pv,taxiStut:taxi,feltHr:felt,minN:Math.min(...cells.map(c=>c.n)),pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
+    const taxi=_maxN(...have.map(c=>c.taxiStut)),felt=_maxN(...have.map(c=>c.feltHr));
+    prof[t]={p99,stut,cons,pvram:pv,taxiStut:taxi,feltHr:felt,minN:Math.min(...have.map(c=>c.n)),acN:have.length,missing,
+      pass:(cons>=_BL.LIM.cons&&stut<=_BL.LIM.stut&&pv<=VRAM_LIM)};
   }
   const passT=_BL.TL.filter(t=>prof[t]&&prof[t].pass);
   const bestP99=passT.length?Math.min(...passT.map(t=>prof[t].p99)):null;
@@ -4531,6 +4565,18 @@ function renderBaseline(){
       +'With only 1&ndash;2 flights per cell a single rough flight can sway the pick &mdash; it firms up as you finish the last few.</div>';
   } else {
     h+='<div style="font-size:12px;color:#46c46a;margin-bottom:14px">&#10003; Full benchmark complete ('+cov.filled+'/'+cov.total+') &mdash; this recommendation is on solid data.</div>';
+  }
+  // v6.19.0 — a NEWLY added benchmark aircraft has no flights yet. Say so plainly instead of letting it
+  // hide inside the shortfall list: the pick above still stands on the planes that DO have data, and this
+  // one starts shaping it as its cells fill. (Cells only fill on offline, non-AutoFPS, fixed-TLOD flights.)
+  {
+    const collecting=_BL.AC.filter(ac=>_BL.TL.every(t=>!d.perAc[ac]||!d.perAc[ac][t]));
+    if(collecting.length&&collecting.length<_BL.AC.length){
+      h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:14px;line-height:1.6">'
+        +'<b>'+collecting.map(esc).join(' &amp; ')+'</b> &mdash; collecting 0/'+(_BL.TL.length*_BL.PER_CELL)+'. '
+        +'No benchmark flights yet, so the pick above is based on '+_BL.AC.filter(a=>!collecting.includes(a)).map(esc).join(' &amp; ')+'. '
+        +'Cells fill on offline, fixed-TLOD flights (AutoFPS and online-traffic flights are logged but never counted).</div>';
+    }
   }
   // felt/taxi discriminator nudge: if a LOWER passing TLOD is clearly calmer on the ground, say so
   if(recKnown&&d.balanced!=null&&d.prof[d.balanced]){
@@ -4978,8 +5024,8 @@ function wizFinish(baseline){
 // grid is the seeded default; this walkthrough exists so ANY fleet can run the same study.
 let _bwiz=null;
 function _benchCandidates(){
-  const fam={'737':'PMDG','A319':'Fenix','A320':'Fenix','A321':'Fenix'};
-  const match={PMDG:['pmdg','737','738','739'],Fenix:['fenix','a318','a319','a320','a321']};
+  const fam={'737':'PMDG','A319':'Fenix','A320':'Fenix','A321':'Fenix','777':'PMDG 777'};
+  const match={PMDG:['pmdg','737','738','739'],Fenix:['fenix','a318','a319','a320','a321'],'PMDG 777':['777','77w']};
   const out=new Map();
   for(const f of FLEET_DEF){
     if(f.freeOnly)continue;
@@ -4987,7 +5033,12 @@ function _benchCandidates(){
     const label=fam[f.family]; if(!label||out.has(label))continue;
     out.set(label,{label,match:match[label].slice()});
   }
-  return [...out.values()];
+  // ORDER MATTERS downstream: the title matchers (perf/native/sysinfo.js, prep.js) return on the FIRST
+  // entry whose terms appear in the title, and the generic PMDG entry's 'pmdg' term would swallow the
+  // 777. Keep specific PMDG types ahead of it — same rule as DEFAULT_BENCHMARK in main.js.
+  const v=[...out.values()];
+  v.sort((a,b)=>(a.label==='PMDG'?1:0)-(b.label==='PMDG'?1:0));
+  return v;
 }
 function bwizOpen(){
   const cur=(S.cfg.benchmark&&Array.isArray(S.cfg.benchmark.aircraft))?S.cfg.benchmark:null;
@@ -7960,7 +8011,7 @@ function chRoutesHTML(ch){
   const uid='chr-'+ch.icao;
   const count=routes.length;
   if(count===0){
-    const sbType=SIM_SB['a320'];
+    const sbType=fleetSbType();
     const dep=S.chDep||'';
     const frBtn=scenic?`<button class="btn bp bxs" style="margin-top:6px" onclick="openSimBrief('${dep||'EGKK'}','${ch.icao}','${sbType}','https://dispatch.simbrief.com/options/custom?orig=${dep||'EGKK'}&dest=${ch.icao}&type=${sbType}')">&#9992; Free-route plan${dep?' from '+dep:''} &rarr; ${ch.icao}</button>`:'';
     return`<div style="border:1px solid var(--sep);border-radius:var(--r2);padding:9px 14px;margin-bottom:12px">
@@ -8014,7 +8065,7 @@ function renderCD(idx){
     (r.arrival_airport===S.chDep&&r.departure_airport===ch.icao)
   );
 
-  const sbType=SIM_SB['a320'];
+  const sbType=fleetSbType();
   const sbDep=S.chDep||'EGKK';
   const sbU=`https://dispatch.simbrief.com/options/custom?orig=${sbDep}&dest=${ch.icao}&type=${sbType}`;
   const svU=`https://skyvector.com/?ll=${ch.lat},${ch.lon}&chart=301&zoom=4`;
@@ -8315,5 +8366,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.18.0</div>
+  pointer-events:none;">v6.19.0</div>
 </body></html>

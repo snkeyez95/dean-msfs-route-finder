@@ -9,6 +9,7 @@ const { computeCoverage, nextGapForAircraft } = require('./coverage.js');
 const { readSettings, writeSettingsText } = require('./settings.js');
 
 const CITATION_LABEL = 'Citation Sovereign+';
+const PMDG777_LABEL = 'PMDG 777';        // v6.19.0 — matched ahead of the generic PMDG terms
 const p2 = n => String(n).padStart(2, '0');
 
 // Phase 10: user-defined benchmark aircraft (config.benchmark.aircraft = [{label, match:[terms]}])
@@ -25,6 +26,9 @@ function matchBenchmarkAircraft(blob, benchmark) {
 function normalizeSimbriefAircraft(...cands) {
   const blob = cands.filter(Boolean).map(String).join(' ').toLowerCase();
   if (blob.includes('fenix') || ['a318', 'a319', 'a320', 'a321'].some(a => blob.includes(a))) return 'Fenix';
+  // 777 BEFORE the generic PMDG line: a SimBrief airframe named "PMDG 777-300ER" would otherwise match
+  // 'pmdg' and auto-TLOD would write a 737 benchmark value for a 777 flight (v6.19.0).
+  if (['b77w', 'b773', 'b772', 'b77l', '777', '77w'].some(b => blob.includes(b))) return PMDG777_LABEL;
   if (blob.includes('pmdg') || ['b737', 'b738', 'b739', '737', '738', '739'].some(b => blob.includes(b))) return 'PMDG';
   if (blob.includes('sovereign') || ['c68a', 'c680'].some(c => blob.includes(c))) return CITATION_LABEL;
   return null;
