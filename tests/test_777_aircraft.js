@@ -108,8 +108,13 @@ console.log('\nfleet + route wiring (index.html):');
 
   // consts are declared at module scope in index.html — read them out of the source directly
   const gc = (name) => { const m = new RegExp('const ' + name + '=([\\s\\S]*?);\\n', 'm').exec(html); return m ? m[1] : ''; };
-  T('FLEET_DEF has the B77W entry', /\{code:'B77W',label:'PMDG 777-300ER',family:'777', def:false\}/.test(html));
-  T('  …def:false so the checkbox and the route filter agree', /code:'B77W'[^}]*def:false/.test(html));
+  T('FLEET_DEF has the B77W entry', /\{code:'B77W',label:'PMDG 777-300ER',family:'777', def:true\}/.test(html));
+  // v6.19.0 fix: a newly shipped aircraft must be live on FIRST LAUNCH. That needs def:true AND
+  // getActiveFleet honouring the same missing-key fallback the Settings checkbox uses — otherwise the
+  // box renders ticked while every route surface filters the aircraft out (Dean's empty 777 chip row).
+  T('  …def:true so it is live on first launch, no manual tick', /code:'B77W'[^}]*def:true/.test(html));
+  T('  …and getActiveFleet falls back to def for a MISSING key (matches the checkbox)',
+    /fleet\[f\.code\]!==undefined\?fleet\[f\.code\]:f\.def/.test(html));
   T('SI_ACFT_MAP (the ingest gate) maps B77W + B773', /'B77W':'b77w','B773':'b77w'/.test(html));
   T('SIM_LBL/SIM_SB carry the b77w key', /"b77w":"PMDG 777-300ER"/.test(html) && /"b77w":"B77W"/.test(html));
   T('duration filter offers long-haul buckets', /<option value="8">Under 8h<\/option>/.test(html) && /<option value="12">Under 12h<\/option>/.test(html));
