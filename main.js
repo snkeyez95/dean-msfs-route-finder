@@ -68,23 +68,60 @@ function isNewer(remote, local) {
   return false;
 }
 
+// The update check used to be a single shot at did-finish-load: one failure and the app
+// went the whole session with no update, silently. Dean hit exactly that on 2026-08-12 —
+// GitHub answered the v6.19.2 check with net::ERR_HTTP2_SERVER_REFUSED_STREAM (a transient
+// HTTP/2 refusal, 189ms after launch) and the installed app just sat on 6.19.1 looking like
+// release.bat had failed. So: retry a failed check with backoff, and keep re-checking on a
+// slow timer — which also covers the other half of his workflow, running release.bat while
+// ABRP is already open (a startup-only check can never see that release).
+const AU_RETRY_MS = [15e3, 60e3, 180e3, 600e3];  // backoff after a failed check
+const AU_POLL_MS  = 2 * 60 * 60 * 1000;          // re-check every 2h while the app stays open
+let _auWired = false, _auFails = 0, _auRetryTimer = null, _auPollTimer = null, _auDone = false;
+
+function _auStopTimers() {
+  if (_auRetryTimer) { clearTimeout(_auRetryTimer);  _auRetryTimer = null; }
+  if (_auPollTimer)  { clearInterval(_auPollTimer);  _auPollTimer  = null; }
+}
+
 function checkForUpdate() {
   if (app.isPackaged) {
     // Installed .exe — use electron-updater to download and apply updates
     const { autoUpdater } = require('electron-updater');
-    autoUpdater.logger = { info: m => LOG.info('[AU]', m), warn: m => LOG.warn('[AU]', m), error: m => LOG.error('[AU]', m) };
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.on('update-available', info => {
-      LOG.info('[AU] Update available: v' + info.version);
-      if (win && !win.isDestroyed()) win.webContents.send('update-available', info.version);
-    });
-    autoUpdater.on('update-downloaded', info => {
-      LOG.info('[AU] Update downloaded: v' + info.version);
-      if (win && !win.isDestroyed()) win.webContents.send('update-downloaded', info.version);
-    });
-    autoUpdater.on('error', e => LOG.error('[AU] Error:', e.message));
-    autoUpdater.checkForUpdates().catch(e => LOG.warn('[AU] Check failed:', e.message));
+    // Handlers are registered ONCE. checkForUpdate() is now re-entrant (retries + the 2h poll
+    // call it again), and re-registering would stack duplicate listeners on every attempt.
+    if (!_auWired) {
+      _auWired = true;
+      autoUpdater.logger = { info: m => LOG.info('[AU]', m), warn: m => LOG.warn('[AU]', m), error: m => LOG.error('[AU]', m) };
+      autoUpdater.autoDownload = true;
+      autoUpdater.autoInstallOnAppQuit = true;
+      autoUpdater.on('update-available', info => {
+        LOG.info('[AU] Update available: v' + info.version);
+        if (win && !win.isDestroyed()) win.webContents.send('update-available', info.version);
+      });
+      autoUpdater.on('update-downloaded', info => {
+        LOG.info('[AU] Update downloaded: v' + info.version);
+        _auDone = true;                 // nothing left to look for — stop the retry/poll timers
+        _auStopTimers();
+        if (win && !win.isDestroyed()) win.webContents.send('update-downloaded', info.version);
+      });
+      autoUpdater.on('error', e => LOG.error('[AU] Error:', e.message));
+      // Slow re-check so a release published while ABRP is open is still noticed this session.
+      _auPollTimer = setInterval(() => { if (!_auDone) checkForUpdate(); }, AU_POLL_MS);
+      if (_auPollTimer.unref) _auPollTimer.unref();   // never hold the app open at quit
+    }
+    if (_auDone) return;
+    autoUpdater.checkForUpdates()
+      .then(() => { _auFails = 0; })
+      .catch(e => {
+        // A failed check is retried; a check that simply finds nothing new resolves above.
+        const wait = AU_RETRY_MS[Math.min(_auFails, AU_RETRY_MS.length - 1)];
+        _auFails++;
+        LOG.warn(`[AU] Check failed: ${e.message} — retry ${_auFails} in ${Math.round(wait / 1000)}s`);
+        if (_auRetryTimer) clearTimeout(_auRetryTimer);
+        _auRetryTimer = setTimeout(() => { _auRetryTimer = null; if (!_auDone) checkForUpdate(); }, wait);
+        if (_auRetryTimer.unref) _auRetryTimer.unref();
+      });
   } else {
     // Dev mode — compare raw GitHub index.html version string, prompt to git pull (dev copies only)
     try {
