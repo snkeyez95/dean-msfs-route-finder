@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.19.3</div>
+  <div class="tname">A Better Route Planner &mdash; v6.19.4</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.19.3</div>
+    <div class="sb-ver">v6.19.4</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -4254,9 +4254,18 @@ const _cmpDimLabel={sim_version:'Sim version',driver_version:'GPU driver',aircra
 // ── VERSION-COMPARISON VERDICT (R4) — honest + confound-aware: matched (aircraft,TLOD) cells only,
 // judged against a ±1σ noise band (never pooled all-vs-all means — the "fake 2 ms" trap). ──────────
 function _pstdev(vals){ const n=vals.length; if(n<2)return 0; const m=vals.reduce((a,b)=>a+b,0)/n; return Math.sqrt(vals.reduce((s,v)=>s+(v-m)*(v-m),0)/n); }
-const _VERV={better:{c:'#46c46a',t:'FASTER'},worse:{c:'#e0823c',t:'SLOWER'},mixed:{c:'#b07cff',t:'MIXED'},noeffect:{c:'var(--ink3)',t:'NO REAL DIFFERENCE'},collecting:{c:'var(--ink3)',t:'COLLECTING DATA'},nooverlap:{c:'var(--ink3)',t:'NO MATCHED FLIGHTS'}};
-// smoothness metrics that decide a version verdict (lower = better for every one)
-const _VER_METRICS=[{k:'p99_ft_ms',label:'P99 frametime',unit:'ms',dec:2},{k:'stutter_pct',label:'stutter',unit:'%',dec:2},{k:'dep_taxi_stutter',label:'dep-taxi stutter',unit:'pp',dec:3},{k:'arr_taxi_stutter',label:'arr-taxi stutter',unit:'pp',dec:3},{k:'felt_stutter_hr',label:'felt stutters/hr',unit:'/hr',dec:1}];
+// v6.19.4: the chip used to read FASTER/SLOWER. Now that peak VRAM can decide a verdict, that wording
+// would be wrong — a build that frees 400 MB while holding the same P99 is not "faster". BETTER/WORSE
+// is honest for both kinds of metric. (The word carries the meaning, not the colour — hue is never the
+// only cue on this chip.)
+const _VERV={better:{c:'#46c46a',t:'BETTER'},worse:{c:'#e0823c',t:'WORSE'},mixed:{c:'#b07cff',t:'MIXED'},noeffect:{c:'var(--ink3)',t:'NO REAL DIFFERENCE'},collecting:{c:'var(--ink3)',t:'COLLECTING DATA'},nooverlap:{c:'var(--ink3)',t:'NO MATCHED FLIGHTS'}};
+// Metrics that decide a version verdict — lower = better for every one, which is what lets them share
+// the same ±1σ comparison and the same "(worse)"/"(better)" wording.
+// peak VRAM joins them in v6.19.4: a sim update that claims to change VRAM (SU6) was previously judged
+// only on smoothness, so the one thing it claimed to fix could never be called. On a 12 GB card sitting
+// at 88-96%, headroom IS the constraint — a build that eats another 400 MB is a real regression even if
+// the frametimes never move.
+const _VER_METRICS=[{k:'p99_ft_ms',label:'P99 frametime',unit:'ms',dec:2},{k:'stutter_pct',label:'stutter',unit:'%',dec:2},{k:'dep_taxi_stutter',label:'dep-taxi stutter',unit:'pp',dec:3},{k:'arr_taxi_stutter',label:'arr-taxi stutter',unit:'pp',dec:3},{k:'felt_stutter_hr',label:'felt stutters/hr',unit:'/hr',dec:1},{k:'peak_vram_mb',label:'peak VRAM',unit:'MB',dec:0}];
 // Compare version `cand` vs `base` on flights sharing the same (aircraft,TLOD). Per matched cell we take
 // mean(cand)-mean(base), then average those cell-deltas (equal weight) so aircraft/TLOD mix can't skew it.
 function _verdictPair(flights,dim,base,cand){
@@ -8382,5 +8391,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.19.3</div>
+  pointer-events:none;">v6.19.4</div>
 </body></html>
