@@ -105,7 +105,10 @@
         // Bullseye only the lines you actively TRACE (frametime, moving-average, TLOD). Altitude and
         // VATSIM traffic are context — their value shows in the readout box, but a dot on those faint
         // lines (on compressed hidden axes, near the red traffic dashes) just clutters (Dean 2026-07-18).
-        add(unit==='fps'?'Avg FPS':'Frametime','yMs',function(){return colors().line;});
+        // The main line is the 'Frametime' dataset in BOTH units (its data becomes 1000/smoothed in fps
+        // mode) — so bullseye it directly, not 'Avg FPS'. The old code dotted the flat Avg FPS line in fps
+        // mode, so the marker floated off the actual curve once the fps line was smoothed (Dean 2026-08-24).
+        add('Frametime','yMs',function(){return colors().line;});
         add(unit==='fps'?'Avg FPS':'Moving average','yMs',function(){return colors().amber;});
         add('TLOD','yTlod',function(){return colors().target;});
       } else { add('Moving average','y',function(){return colors().amber;}); }
@@ -127,7 +130,9 @@
       var px=xs.getPixelForValue(HOVER.x);if(px<a.left||px>a.right)return;
       var rows=[{t:HOVER.x.toFixed(1)+' min into flight',bold:true,col:colors().text}];
       var ftv=nearestAt(rawTasXY,HOVER.x);
-      if(unit==='fps'){ if(ftv!=null)rows.push({t:'FPS   '+(ftv?Math.round(1000/ftv):0),col:colors().line}); }
+      // fps readout reads the SMOOTHED series (the drawn line), so the number matches the dot on the
+      // curve. Raw per-frame fps lives on the Frametime tab (Dean 2026-08-24).
+      if(unit==='fps'){ var mvf=nearestAt(mavgData,HOVER.x); if(mvf!=null)rows.push({t:'FPS   '+(mvf?Math.round(1000/mvf):0),col:colors().line}); }
       else { if(ftv!=null)rows.push({t:'Frametime   '+ftv.toFixed(1)+' ms',col:colors().line});
         var mv=nearestAt(mavgData,HOVER.x); if(mv!=null)rows.push({t:'Moving avg   '+mv.toFixed(1)+' ms',col:colors().amber}); }
       var tl=nearestAt(tlodData,HOVER.x); if(tl!=null)rows.push({t:'TLOD (AutoFPS)   '+Math.round(tl),col:colors().target});
