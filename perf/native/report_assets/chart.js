@@ -99,21 +99,22 @@
       x.beginPath();x.arc(px,py,2.7,0,Math.PI*2);x.fillStyle=col;x.fill();}
     function markSeries(ch){                              // which lines to bullseye on this chart
       var out=[],ds=ch.data.datasets;
+      // Dean 2026-08-24: a dot on EVERY visible line, and NONE on a line toggled off in the legend
+      // (the `!d.hidden` gate — legend toggling sets dataset.hidden). Each line rides its own axis, so
+      // its dot sits on that line. Reverses the earlier context-lines-are-clutter call by his request.
       function add(label,axis,colf){var d=ds.find(function(z){return z.label===label;});
-        if(d&&d.data&&d.data.length&&ch.scales[axis])out.push({data:d.data,axis:axis,color:colf});}
+        if(d&&!d.hidden&&d.data&&d.data.length&&ch.scales[axis])out.push({data:d.data,axis:axis,color:colf});}
       if(ch===chart){
-        // Bullseye only the lines you actively TRACE (frametime, moving-average, TLOD). Altitude and
-        // VATSIM traffic are context — their value shows in the readout box, but a dot on those faint
-        // lines (on compressed hidden axes, near the red traffic dashes) just clutters (Dean 2026-07-18).
-        // The main line is the 'Frametime' dataset in BOTH units (its data becomes 1000/smoothed in fps
-        // mode) — so bullseye it directly, not 'Avg FPS'. The old code dotted the flat Avg FPS line in fps
-        // mode, so the marker floated off the actual curve once the fps line was smoothed (Dean 2026-08-24).
-        add('Frametime','yMs',function(){return colors().line;});
-        // Second traced dot only in ms mode (the Moving-average CURVE). In fps mode the moving average
-        // IS the main line already, so the only other line is the flat Avg FPS reference — a dot on a
-        // constant line just floats and reads as "not grabbing" (Dean 2026-08-24). One dot on the curve.
+        add('Frametime','yMs',function(){return colors().line;});          // FPS/frametime line
+        // The flat Avg FPS reference (the 'Moving average' dataset, relabeled in fps mode) is deliberately
+        // NOT dotted — a marker on a constant line floats and reads as "not grabbing" (the old rogue dot).
+        // In ms mode 'Moving average' is a real curve, so it keeps its dot there.
         if(unit!=='fps') add('Moving average','yMs',function(){return colors().amber;});
         add('TLOD','yTlod',function(){return colors().target;});
+        add('Altitude','yAlt',function(){return colors().faint;});
+        add('VRAM','yVram',vramCol);
+        add('Busiest core','yCpu',cpuCol);
+        add('Traffic','yTraf',function(){return colors().bad;});
       } else { add('Moving average','y',function(){return colors().amber;}); }
       return out;}
     var xhairPlugin={id:'xhair',afterDatasetsDraw:function(ch){

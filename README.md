@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.19.8 A HOVER DOT ON EVERY VISIBLE LINE. Hovering the chart now drops a dot on every line you have switched on — FPS, TLOD, altitude, VRAM, busiest core — each on its own line, colour-matched. A line you have toggled off in the legend gets no dot, and the flat average reference gets none either (a marker on a flat line just floats). Previously only FPS and TLOD were marked. (Reports redraw once on the next launch; if an open report still looks old, fully close and reopen the app — the redraw runs in the background at startup.)
+
 v6.19.7 ONE FPS HOVER DOT, ON THE LINE. The FPS tab drew a second hover dot on the flat average line, which stays put while the FPS curve moves — so it looked like a dot floating off the line. That dot is gone; the FPS tab now shows a single marker that rides the FPS curve, matching the readout. (Reports redraw once on the next launch. If a report you already have open still looks old, step to another flight and back to reload it.)
 
 v6.19.6 FPS CHART HOVER DOT LANDS ON THE LINE. After the FPS line was smoothed in v6.19.5, the hover marker on the FPS tab sat on the flat average line instead of the curve, so the dot floated off the line you were pointing at. The dot now rides the FPS line, and the "FPS" figure in the readout matches it. (Reports redraw once on the next launch.)
