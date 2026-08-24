@@ -109,7 +109,10 @@
         // mode) — so bullseye it directly, not 'Avg FPS'. The old code dotted the flat Avg FPS line in fps
         // mode, so the marker floated off the actual curve once the fps line was smoothed (Dean 2026-08-24).
         add('Frametime','yMs',function(){return colors().line;});
-        add(unit==='fps'?'Avg FPS':'Moving average','yMs',function(){return colors().amber;});
+        // Second traced dot only in ms mode (the Moving-average CURVE). In fps mode the moving average
+        // IS the main line already, so the only other line is the flat Avg FPS reference — a dot on a
+        // constant line just floats and reads as "not grabbing" (Dean 2026-08-24). One dot on the curve.
+        if(unit!=='fps') add('Moving average','yMs',function(){return colors().amber;});
         add('TLOD','yTlod',function(){return colors().target;});
       } else { add('Moving average','y',function(){return colors().amber;}); }
       return out;}

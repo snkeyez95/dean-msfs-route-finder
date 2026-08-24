@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.19.7 ONE FPS HOVER DOT, ON THE LINE. The FPS tab drew a second hover dot on the flat average line, which stays put while the FPS curve moves — so it looked like a dot floating off the line. That dot is gone; the FPS tab now shows a single marker that rides the FPS curve, matching the readout. (Reports redraw once on the next launch. If a report you already have open still looks old, step to another flight and back to reload it.)
+
 v6.19.6 FPS CHART HOVER DOT LANDS ON THE LINE. After the FPS line was smoothed in v6.19.5, the hover marker on the FPS tab sat on the flat average line instead of the curve, so the dot floated off the line you were pointing at. The dot now rides the FPS line, and the "FPS" figure in the readout matches it. (Reports redraw once on the next launch.)
 
 v6.19.5 A READABLE FPS CHART, AND MULTI-PROCESS COMPANION APPS ACTUALLY CLOSE. The FPS tab on a flight report drew one point per frame, and because fps is the reciprocal of frametime, every tiny frame-to-frame wobble got exaggerated into a thick band of "grass" you couldn't read. The FPS line now follows the smoothed trend — one clean curve — with the flat average as a reference; the Frametime tab still shows every raw spike for spike-hunting, and hovering still reports the exact fps at that moment. (Existing reports redraw themselves once on the next launch.) Separately, "close on sim exit" for a companion app now closes the whole app, not just one process: apps like SayIntentions run under a launcher and several helper processes, so closing only the named exe left the rest running. It now shuts down every process in the app's folder when the sim closes.
