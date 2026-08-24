@@ -360,7 +360,13 @@
       var ov=chart.data.datasets[chart.data.datasets.length-1];
       var sel=document.getElementById('yScale');
       if(u==='fps'){
-        tr.data=rawT.map(function(p){return {x:p.x,y:p.t?1000/p.t:0};});
+        // The FPS line reads from the SMOOTHED frametime (moving average), not per-frame 1000/frametime.
+        // Reciprocating every raw frametime spike turns the line into dense "grass" filling the whole
+        // band — unreadable (Dean 2026-08-23). One clean curve tracks the real fps trend; the flat
+        // Avg FPS stays as the reference, and the Frametime tab keeps the raw spikes for spike-hunting.
+        // (Hover still reports the exact instantaneous fps at the cursor, from the raw series.)
+        tr.data=mavgData.map(function(p){return {x:p.x,y:p.y?1000/p.y:0};});
+        tr.borderWidth=1.6;tr.tension=0.25;
         ov.label='Avg FPS';ov.borderColor=colors().target;ov.tension=0;
         ov.data=[{x:xmin,y:CHART.avg_fps||0},{x:xmax,y:CHART.avg_fps||0}];
         chart.options.scales.yMs.min=undefined;chart.options.scales.yMs.max=undefined;
@@ -368,6 +374,7 @@
         if(sel)sel.style.display='none';}
       else{
         tr.data=buildMs();
+        tr.borderWidth=1;tr.tension=0;
         ov.label='Moving average';ov.borderColor=colors().amber;ov.tension=0.25;
         ov.data=mavgData;
         chart.options.scales.yMs.title.text='ms';

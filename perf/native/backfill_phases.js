@@ -26,7 +26,7 @@ const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
 const VRAM_V = 'anchor-trim';  // marker: bump to force a one-time sidecar recompute (v6.17.0: the end trim now reproduces the capture's own brake/movement anchor instead of re-deriving it, so max/spike/perceptible + the phase split match the flight's summary)
-const REPORT_V = 'flight-debrief-v2'; // marker: bump to force a one-time report.html regen for ALL flights (v6.17.0: corrected end trim + the Flight Debrief replacing the static verdict)
+const REPORT_V = 'fps-line-smoothed-v3'; // marker: bump to force a one-time report.html regen for ALL flights (v6.19.5: FPS chart line reads from the smoothed series instead of reciprocated per-frame spikes)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 

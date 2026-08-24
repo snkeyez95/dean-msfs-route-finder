@@ -1564,11 +1564,22 @@ function startFlightWatch(){
 function flightReopenApps(){
   try {
     let killAfter = [];
+    let compFolders = [];
     try { const c = JSON.parse(fs.readFileSync(CFG, 'utf8'));
       killAfter = (c.flightCloseApps||[]).filter(a=>a&&a.enabled!==false&&a.mode==='kill-after').map(a=>a.name);
       // Companion apps flagged "close when the sim closes" (Navigraph, vPilot, …) get killed here too.
       const comps = (c.quickLaunchApps||[]).filter(a=>a&&a.closeOnSimExit&&a.name).map(a=>a.name);
       killAfter = [...new Set([...killAfter, ...comps])];
+      // Multi-process companions can't be closed by a single process name. SayIntentions is the case
+      // that exposed it (Dean 2026-08-23): the entry points at SayIntentionsUpdater3.exe — the updater,
+      // which runs once at launch and has EXITED by sim-close — while the app persists as a different
+      // exe (SayIntentionsAI.exe) plus children (si_sidecar/si_skynet/si_dispatcher). Killing the one
+      // listed name closes nothing. So ALSO collect each closeOnSimExit companion's install folder and
+      // kill every process running from under it. Fully general — the app's own path defines the folder,
+      // no per-app names hardcoded (rule #3).
+      compFolders = (c.quickLaunchApps||[]).filter(a=>a&&a.closeOnSimExit&&a.path)
+        .map(a=>{ try { return path.dirname(a.path); } catch(_){ return null; } })
+        .filter(Boolean);
     } catch(_){}
     const sf = FLIGHT_STATE();
     // Node owns the data: read + parse the state file here (Node's JSON is reliable across any
@@ -1579,11 +1590,17 @@ function flightReopenApps(){
     try { const raw = fs.readFileSync(sf, 'utf8'); const j = JSON.parse(raw); if (Array.isArray(j)) paths = j.filter(Boolean); } catch(_){}
     const killPs  = killAfter.map(n=>`'${String(n).replace(/'/g,"''")}'`).join(',');
     const pathsPs = paths.map(p=>`'${String(p).replace(/'/g,"''")}'`).join(',');
+    const dirsPs  = compFolders.map(f=>`'${String(f).replace(/'/g,"''")}'`).join(',');
     // PowerShell only does the OS actions: kill the kill-after apps, then for each path skip if it's
     // already running, relaunch via a matching Startup shortcut (the *arr suite / SABnzbd) else plain
     // exe launch (Plex, qbPortWeaver). Per-app outcome logged so any failure names the exact app.
     const ps = spawn('powershell', ['-NoProfile','-NonInteractive','-Command',
       `$kill=@(${killPs}); foreach($n in $kill){ Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
+       $killDirs=@(${dirsPs})
+       if($killDirs.Count -gt 0){
+         Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.ExecutablePath } | ForEach-Object {
+           $ep=$_.ExecutablePath.ToLower()
+           foreach($d in $killDirs){ if($ep.StartsWith(($d.ToLower()+'\'))){ try{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }catch{}; break } } } }
        $paths=@(${pathsPs})
        $reopened=0; $log=@()
        $running=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.ExecutablePath} | ForEach-Object { $_.ExecutablePath.ToLower() })

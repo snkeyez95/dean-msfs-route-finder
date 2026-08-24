@@ -65,9 +65,17 @@ if(!files.length){
   };
   if(marks.length > 50){
     const old4 = hitRate(4096), now = hitRate(131072);
-    console.log('\n  real log ' + files[files.length - 1] + ' (' + (buf.length / 1048576).toFixed(1) + ' MB, ' + marks.length + ' TLOD lines)');
+    // Median gap between TLOD lines decides whether the 4 KB window is even STRESSED. The fix was for
+    // sparse logs (~4.7 KB median gap); a short/dense flight log can have entries packed far tighter, in
+    // which case 4 KB legitimately catches everything and the "old window failed" claim doesn't apply.
+    // Gate that assertion on the log actually being the sparse kind, so a dense newest-log doesn't red the
+    // board (Dean 2026-08-23 — newest log was a short 08-23 session at 99.8% on 4 KB).
+    const gaps = []; for(let i = 1; i < marks.length; i++) gaps.push(marks[i] - marks[i - 1]);
+    gaps.sort((a, b) => a - b); const medGap = gaps[Math.floor(gaps.length / 2)] || 0;
+    console.log('\n  real log ' + files[files.length - 1] + ' (' + (buf.length / 1048576).toFixed(1) + ' MB, ' + marks.length + ' TLOD lines, median gap ' + (medGap / 1024).toFixed(1) + ' KB)');
     console.log('  worst-case poll hit-rate:  4 KB (old) ' + old4.toFixed(1) + '%   128 KB (new) ' + now.toFixed(1) + '%');
-    T('the old 4 KB window genuinely failed here (<60%)', old4 < 60, old4.toFixed(1) + '%');
+    if(medGap > 4096) T('the old 4 KB window genuinely failed here (<60%)', old4 < 60, old4.toFixed(1) + '%');
+    else T('log entries packed tighter than 4 KB (median ' + (medGap / 1024).toFixed(1) + ' KB) — 4 KB not stressed here, old-window claim N/A', true);
     T('128 KB finds a reading essentially always (>=99%)', now >= 99, now.toFixed(1) + '%');
   } else {
     console.log('\n  (real log has too few TLOD lines to measure — needs an AutoFPS flight)');
