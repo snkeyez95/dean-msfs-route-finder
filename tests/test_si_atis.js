@@ -85,4 +85,15 @@ T('render labels the badge "SI ATIS"', /isSi\?'SI ATIS'/.test(fd));
 T('vCfg default carries atisSource', /autoAtis:true,atisSource:''/.test(grab('vCfg')));
 T('siWxFetch caches with a 10-min TTL and needs a key', /600000/.test(grab('siWxFetch')) && /S\.cfg\.siApiKey/.test(grab('siWxFetch')));
 
+// ── (e) the panel lives in the Live ATC tab (Dean's ask), not buried in Settings ──
+const mod2 = new Function('S', 'esc',
+  grab('vCfg') + grab('atisSourceResolved') + grab('latcAtisSourcePanel') + '\nreturn { latcAtisSourcePanel };'
+)({ cfg:{ vatsim:{}, siApiKey:'KEY' } }, s => String(s==null?'':s));
+const panel = mod2.latcAtisSourcePanel();
+T('panel renders both source buttons', /vSetAtisSource\('vatsim'\)/.test(panel) && /vSetAtisSource\('si'\)/.test(panel));
+T('panel renders the SI key field + auto-detect', /id="si-apikey"/.test(panel) && /siDetectApiKey\(\)/.test(panel));
+T('panel marks the resolved source selected (key present → SI)', /✓ /.test(panel));
+T('renderLiveAtc shows the ATIS source panel (Live mode on OR off)', /h\+=latcAtisSourcePanel\(\);/.test(X.html));
+T('SI key field is NOT duplicated in the Settings VATSIM block', !/id="si-apikey"/.test(grab('renderVatsimSettings')));
+
 process.exit(T.done() ? 1 : 0);

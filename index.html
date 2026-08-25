@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.20.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.20.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.20.0</div>
+    <div class="sb-ver">v6.20.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6854,16 +6854,7 @@ function renderVatsimSettings(){
   h+=row('Auto-start Live mode when vPilot is running', v.autoStartVpilot, "vSetAutoVpilot(this.checked)", '(links the pilot client to Live ATC)');
   h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
   h+=row('Auto-show '+(atisSourceResolved()==='si'?'SI':'VATSIM')+' ATIS when it’s available', v.autoAtis, "vSet('autoAtis',this.checked)", '(otherwise click the button on the weather card)');
-  h+=hdr('Plan-a-Flight ATIS source <span style="color:var(--ink4)">(active runway + ATIS; real-world D-ATIS is the fallback)</span>');
-  const _as=atisSourceResolved();
-  const seg=(val,label)=>{const on=_as===val;return '<button class="btn bg bxs" onclick="vSetAtisSource(\''+val+'\')" style="'+(on?'border-color:var(--acc);color:var(--acc);font-weight:700':'opacity:.65')+'">'+(on?'✓ ':'')+label+'</button>';};
-  h+='<div style="display:flex;gap:6px;padding:3px 0 6px">'+seg('vatsim','VATSIM')+seg('si','SayIntentions')+'</div>';
-  h+='<div style="margin-bottom:6px"><label style="font-size:12px;color:var(--ink3)">SayIntentions API key <span style="color:var(--ink4)">&mdash; for SI ATIS/active-runway; from the SI Pilot Portal, or auto-detect from the running app</span></label><br>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">'
-    +'<input id="si-apikey" type="password" value="'+esc(S.cfg.siApiKey||'')+'" onchange="siSetApiKey(this.value)" placeholder="paste SI API key" autocomplete="off" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;width:220px">'
-    +'<button class="btn bg bxs" onclick="siDetectApiKey()">Auto-detect from SI</button>'
-    +'<span id="si-apikey-msg" style="font-size:11px;color:var(--ink3);align-self:center">'+(S.cfg.siApiKey?'✓ key set':'no key')+'</span>'
-    +'</div></div>';
+  h+='<div style="font-size:11px;color:var(--ink4);padding:2px 0 2px">Plan-a-Flight ATIS source (VATSIM vs SayIntentions) + your SI key live in the <b>Live ATC</b> tab.</div>';
   h+=hdr('Data <span style="color:var(--ink4)">(downloaded once, refresh per AIRAC)</span>');
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"><button class="btn bg bxs" onclick="latcRefreshDb()">Refresh airport database</button><button class="btn bg bxs" onclick="vRefreshAirspace()">Refresh airspace boundaries (VATSpy)</button><span id="vatsim-data-msg" style="font-size:11px;color:var(--ink3);align-self:center"></span></div>';
   el.innerHTML=h;
@@ -7670,9 +7661,9 @@ function applySiAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); const
 function revertSiAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); if(!S._siReverted)S._siReverted={}; S._siReverted[icao]=true; delete S.datisCache[icao]; fetchDatis(icao,idx,side,prefix); }
 // Source toggle + SI key setters (Live ATC settings). Clearing the overlay caches makes the next panel
 // open reflect the new source; real-world D-ATIS is always the fallback.
-function vSetAtisSource(v){ vCfg().atisSource=(v==='si'?'si':'vatsim'); window.api.saveConfig(S.cfg); refreshOpenAtis(); renderVatsimSettings(); }
-function siSetApiKey(v){ S.cfg.siApiKey=(v||'').trim(); window.api.saveConfig(S.cfg); S.siWxCache={}; const n=document.getElementById('si-apikey-msg'); if(n){n.textContent=S.cfg.siApiKey?'✓ key set':'no key';} refreshOpenAtis(); }
-async function siDetectApiKey(){ const n=document.getElementById('si-apikey-msg'); if(n)n.textContent='Detecting from running SI…'; try{ const r=await window.api.siDetectApiKey(); if(r&&r.ok&&r.api_key){ S.cfg.siApiKey=r.api_key; await window.api.saveConfig(S.cfg); const f=document.getElementById('si-apikey'); if(f)f.value=r.api_key; if(n)n.textContent='✓ key detected from SI'; S.siWxCache={}; refreshOpenAtis(); } else { if(n)n.textContent='SI not running — start SayIntentions, then retry'; } }catch(e){ if(n)n.textContent='Detect failed'; } }
+function vSetAtisSource(v){ vCfg().atisSource=(v==='si'?'si':'vatsim'); window.api.saveConfig(S.cfg); refreshOpenAtis(); renderVatsimSettings(); renderLiveAtc(); }
+function siSetApiKey(v){ S.cfg.siApiKey=(v||'').trim(); window.api.saveConfig(S.cfg); S.siWxCache={}; refreshOpenAtis(); renderVatsimSettings(); renderLiveAtc(); }
+async function siDetectApiKey(){ const n=document.getElementById('si-apikey-msg'); if(n)n.textContent='Detecting from running SI…'; try{ const r=await window.api.siDetectApiKey(); if(r&&r.ok&&r.api_key){ S.cfg.siApiKey=r.api_key; await window.api.saveConfig(S.cfg); S.siWxCache={}; refreshOpenAtis(); renderVatsimSettings(); renderLiveAtc(); const n2=document.getElementById('si-apikey-msg'); if(n2)n2.textContent='✓ key detected from SI'; } else { if(n)n.textContent='SI not running — start SayIntentions, then retry'; } }catch(e){ if(n)n.textContent='Detect failed'; } }
 // After a source/key change, drop the overlay caches so the next route panel re-fetches with the new source.
 function refreshOpenAtis(){ S.siWxCache={}; S._siReverted={}; for(const k in S.datisCache){ const c=S.datisCache[k]; if(c&&(c.vatsim||c.si))delete S.datisCache[k]; } }
 const LATC_SIMGONE_POLLS=18;   // 18 × 5s poll ≈ 90s of no position before we test for a closed sim
@@ -7901,6 +7892,22 @@ function startVpilotWatch(){ stopVpilotWatch(); if(!vCfg().autoStartVpilot)retur
 function stopVpilotWatch(){ if(S._vpilotIv){ clearInterval(S._vpilotIv); S._vpilotIv=null; } }
 function vSetAutoVpilot(on){ vCfg().autoStartVpilot=on; window.api.saveConfig(S.cfg); if(on)startVpilotWatch(); else stopVpilotWatch(); }
 
+// Plan-a-Flight ATIS source panel (v6.20.1) — lives in the Live ATC tab (Dean flies SI, so this is
+// where he looks). Always shown, Live mode on or off, since ATIS source is set up before flying.
+function latcAtisSourcePanel(){
+  const as=atisSourceResolved();
+  const seg=(val,label)=>'<button class="btn bg bxs" onclick="vSetAtisSource(\''+val+'\')" style="'+(as===val?'border-color:var(--acc);color:var(--acc);font-weight:700':'opacity:.6')+'">'+(as===val?'✓ ':'')+label+'</button>';
+  let h='<div style="background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:12px 14px;margin-bottom:14px">';
+  h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:6px">Plan-a-Flight ATIS source <span style="text-transform:none;letter-spacing:0;color:var(--ink4)">&mdash; active runway + ATIS on route cards; real-world D-ATIS is the fallback</span></div>';
+  h+='<div style="display:flex;gap:6px;margin-bottom:9px">'+seg('vatsim','VATSIM')+seg('si','SayIntentions')+'</div>';
+  h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:4px">SayIntentions API key <span style="color:var(--ink4)">&mdash; from the SI Pilot Portal, or auto-detect from the running app</span></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+    +'<input id="si-apikey" type="password" value="'+esc(S.cfg.siApiKey||'')+'" onchange="siSetApiKey(this.value)" placeholder="paste SI API key" autocomplete="off" style="background:var(--bg2);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;width:230px">'
+    +'<button class="btn bg bxs" onclick="siDetectApiKey()">Auto-detect from SI</button>'
+    +'<span id="si-apikey-msg" style="font-size:11px;color:var(--ink3)">'+(S.cfg.siApiKey?'✓ key set':'no key')+'</span>'
+    +'</div></div>';
+  return h;
+}
 function renderLiveAtc(){
   const el=document.getElementById('liveatc-body'); if(!el) return;
   const pill=(txt,c)=>'<span style="font-size:11px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:'+c+';border:1px solid '+c+';border-radius:5px;padding:2px 8px">'+txt+'</span>';
@@ -7910,6 +7917,7 @@ function renderLiveAtc(){
     +'<label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--ink1)"><input type="checkbox" '+(LATC.on?'checked':'')+' onchange="latcToggle(this.checked)" style="accent-color:var(--acc);width:16px;height:16px"> Live mode</label>'
     +pill(st[0],st[1])
     +(LATC.on&&LATC.controllers.length?'<span style="font-size:11px;color:var(--ink3)">'+LATC.controllers.filter(c=>c.facility!==0).length+' controllers online</span>':'')+'</div>';
+  h+=latcAtisSourcePanel();   // v6.20.1: Plan-a-Flight ATIS source (VATSIM/SI) + SI key — always shown, incl. Live mode OFF (set it up before flying)
   if(!LATC.on){ h+='<div style="font-size:13px;color:var(--ink3);line-height:1.6;background:var(--bg);border:1px solid var(--sep);border-radius:10px;padding:16px">Turn on <b>Live mode</b> before a VATSIM flight. ABRP watches your position and who&rsquo;s controlling, and recommends the frequency for each phase &mdash; clearance, ground, tower, approach &mdash; or CTAF/UNICOM when the field is uncontrolled. You tune it yourself; on the <b>PMDG 737</b> one click can walk it into your COM1 <b>standby</b> for you.<div style="margin-top:10px;color:var(--acc)">Requires MSFS running and you connected to VATSIM (vPilot). Nothing is ever transmitted for you, and the active frequency is never touched.</div></div>'; el.innerHTML=h; return; }
   h+=latcRenderBrief();   // Stage 5: pre-flight frequency stack for the filed/SimBrief route (shown before the sim connects too)
   if(LATC.dbLoading&&!LATC.db){ h+='<div style="font-size:13px;color:var(--ink3)">Building the global airport database (one-time, ~10&ndash;20s)…</div>'; el.innerHTML=h; return; }
@@ -8477,5 +8485,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.20.0</div>
+  pointer-events:none;">v6.20.1</div>
 </body></html>

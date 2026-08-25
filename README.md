@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.20.1 SI ATIS SOURCE MOVED INTO THE LIVE ATC TAB. The ATIS-source toggle (VATSIM/SayIntentions) and the SI API key field now live at the top of the Live ATC tab, shown whether or not Live mode is on — set it up before flying. (In v6.20.0 they landed in the VATSIM block under Settings, which isn't where you'd look.)
+
 v6.20.0 SI ATIS SOURCE FOR PLAN A FLIGHT. New "Plan-a-Flight ATIS source" toggle in the Live ATC section — switch between VATSIM and SayIntentions. In SayIntentions mode the active runway + ATIS on each route card come from SI's WX API (the same real-world-METAR-based ATIS SI serves in-sim), and that runway flows into SimBrief automatically. Real-world D-ATIS stays the fallback when the chosen source has nothing. Paste your SI API key from the Pilot Portal, or click "Auto-detect from SI" to pull it from the running app. The default is SayIntentions once a key is set (VATSIM otherwise); the key is stored separately from your route cookie and redacted in the log.
 
 v6.19.8 A HOVER DOT ON EVERY VISIBLE LINE. Hovering the chart now drops a dot on every line you have switched on — FPS, TLOD, altitude, VRAM, busiest core — each on its own line, colour-matched. A line you have toggled off in the legend gets no dot, and the flat average reference gets none either (a marker on a flat line just floats). Previously only FPS and TLOD were marked. (Reports redraw once on the next launch; if an open report still looks old, fully close and reopen the app — the redraw runs in the background at startup.)
