@@ -41,26 +41,33 @@ const d = mod.siAtisData('KJFK');
 T('siAtisData returns a hasData object', !!(d && d.hasData));
 T('flagged si:true', d.si === true);
 T('active_runway captured on siRwy', d.siRwy === '04L');
-T('runway made extractable for BOTH sides (DEP+ARR cue prepended)', /DEP RWY 04L\. ARR RWY 04L\./.test(d.combined.text));
-T('real ATIS text preserved for bullets/approach', /Information Alpha/.test(d.combined.text));
-T('info letter parsed from the ATIS text', d.combined.letter === 'A');
-T('zulu time parsed from the ATIS text', d.combined.time === '1451Z');
-T('arr and dep both point at the combined block', d.arr === d.combined && d.dep === d.combined);
+T('SI runway carried per side (authoritative — bypasses the local runway table)', d.dep.siRwy === '04L' && d.arr.siRwy === '04L');
+T('raw ATIS text preserved, no injected cue', d.combined.text === S.siWxCache.KJFK.data.atis && /Information Alpha/.test(d.combined.text));
+T('info letter parsed from the ATIS text', d.dep.letter === 'A');
+T('zulu time parsed from the ATIS text', d.arr.time === '1451Z');
 
-// SI abbreviations + empty active_runway (the LEBL/LEPA live case, 2026-08-25): parse the runway from
-// the ATIS text, per side, so a card no longer falls back to "est. wind" / "Check ATIS".
+// SI abbreviations + empty active_runway (the real LEBL/LEPA/KLAS case, 2026-08-25): parse the runway
+// from the ATIS text, per side, and carry it as authoritative so a stale local runway table can't veto it
+// (which was showing "est. wind" / "Check ATIS" even though the SI ATIS named the runway).
 S.siWxCache.LEPA = { data:{ airport:'LEPA', active_runway:'',
   atis:'PALMA DE MALLORCA ARPT, INFO NOVEMBER. 2030Z. ARVG RWY 24L. DPTG RWY 24R. WIND CALM.' }, ts: Date.now() };
 const dl = mod.siAtisData('LEPA');
 T('SI text parsed with empty active_runway (still hasData)', !!(dl && dl.hasData));
-T('arrival runway (ARVG 24L) placed by an ARR cue', /ARR RWY 24L\./.test(dl.combined.text));
-T('departure runway (DPTG 24R) placed by a DEP cue', /DEP RWY 24R\./.test(dl.combined.text));
-T('siRwy reflects a parsed runway even with empty active_runway', dl.siRwy === '24L');
+T('arrival runway parsed from ARVG (24L)', dl.arr.siRwy === '24L');
+T('departure runway parsed from DPTG (24R) — split from arrival', dl.dep.siRwy === '24R');
+T('raw text preserved (no injected DEP/ARR cue)', !/DEP RWY/.test(dl.combined.text) && /PALMA DE MALLORCA/.test(dl.combined.text));
 
-// active_runway present but no atis text → still usable (cue carries the runway)
+// the real KLAS "RWYS" plural case (empty active_runway, renumbered field the local table lags on)
+S.siWxCache.KLAS = { data:{ airport:'KLAS', active_runway:'',
+  atis:'LAS VEGAS ARPT, INFO OSCAR. 2156Z. ARVG RWYS 26L, 19L, 19R. DPTG RWYS 26R, 19L, 19R. WIND CALM.' }, ts: Date.now() };
+const dk = mod.siAtisData('KLAS');
+T('KLAS arrival runway (ARVG RWYS 26L…) → 26L', dk.arr.siRwy === '26L');
+T('KLAS departure runway (DPTG RWYS 26R…) → 26R', dk.dep.siRwy === '26R');
+
+// active_runway present but no atis text → still usable
 S.siWxCache.EGLL = { data:{ airport:'EGLL', atis:'', active_runway:'27R' }, ts: Date.now() };
 const d2 = mod.siAtisData('EGLL');
-T('runway-only entry still yields a usable ATIS', !!(d2 && d2.hasData) && /DEP RWY 27R\./.test(d2.combined.text));
+T('runway-only entry (active_runway, no atis text) still yields a runway', !!(d2 && d2.hasData) && d2.dep.siRwy === '27R' && d2.arr.siRwy === '27R');
 
 // empty / missing → null (so fetchDatis falls through to real-world D-ATIS)
 T('no cache → null', mod.siAtisData('ZZZZ') === null);
@@ -91,6 +98,8 @@ T('fetchDatis keeps the VATSIM path for vatsim mode', /else if\(_atisSrc==='vats
 T('SI ATIS skips the stale-wind cross-check (isLive)', /const isSi=!!\(data&&data\.si\)/.test(fd) && /const isLive=isVatsim\|\|isSi/.test(fd));
 T('cached SI entry skips the 5-min expiry', /cached\.vatsim\|\|cached\.si\|\|/.test(fd));
 T('render labels the badge "SI ATIS"', /isSi\?'SI ATIS'/.test(fd));
+T('fetchDatis honors the SI runway directly (bypasses the local runway table)', /if\(info && block && block\.siRwy\) info\.runways=\[block\.siRwy\]/.test(fd));
+T('datisActiveRwy honors the SI runway (feeds SimBrief)', /if\(block\.siRwy\)return block\.siRwy/.test(grab('datisActiveRwy')));
 
 T('vCfg default carries atisSource', /autoAtis:true,atisSource:''/.test(grab('vCfg')));
 T('siWxFetch caches with a 10-min TTL and needs a key', /600000/.test(grab('siWxFetch')) && /S\.cfg\.siApiKey/.test(grab('siWxFetch')));

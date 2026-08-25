@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.20.3 SI RUNWAY IS NOW TRUSTED DIRECTLY (FIXES LINGERING "CHECK ATIS" / "EST. WIND"). Even after v6.20.2 parsed the runway from SI's ATIS, cards could still show "Check ATIS" or a wind estimate — because ABRP was validating SI's runway against its own local runway table, which is stale for renumbered fields (e.g. KLAS renumbered 25→26) and thin for many non-US airports. SI's stated runway is authoritative, so ABRP now uses it directly (per side — arrival and departure can differ) and skips that check. This also feeds the correct runway to SimBrief.
+
 v6.20.2 SI ACTIVE RUNWAY NOW PARSES FROM THE SI ATIS. SI writes the runway with abbreviations ("ARVG RWY 24L. DPTG RWY 24R") and often returns an empty active_runway field on a pre-flight fetch, so route cards were falling back to a wind estimate ("est. wind") or "Check ATIS". ABRP now reads the runway straight from SI's ATIS text — per side, so arrival and departure can differ — and shows it as "RWY xx · SI ATIS" (which also flows to SimBrief).
 
 v6.20.1 SI ATIS SOURCE MOVED INTO THE LIVE ATC TAB. The ATIS-source toggle (VATSIM/SayIntentions) and the SI API key field now live at the top of the Live ATC tab, shown whether or not Live mode is on — set it up before flying. (In v6.20.0 they landed in the VATSIM block under Settings, which isn't where you'd look.)
