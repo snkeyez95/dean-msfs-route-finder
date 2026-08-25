@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.19.8</div>
+  <div class="tname">A Better Route Planner &mdash; v6.20.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.19.8</div>
+    <div class="sb-ver">v6.20.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1311,7 +1311,7 @@ const S={
   regionFilter:'all',
   dirFilter:'either',
   acFilter:'',
-  metarCache:{},rwyCache:{},datisCache:{},
+  metarCache:{},rwyCache:{},datisCache:{},siWxCache:{},
   gsxFiles:[],gsxBundled:{},gsxScanning:false,
   acftGroups:[],utilPkgs:[],depEditOpen:null,
   metarLastFetch:0,
@@ -6672,21 +6672,32 @@ async function fetchDatis(icao,idx,side,prefix){
   // make VATSIM the source BEFORE the render below — so it just shows, no click needed. Set the cache
   // INLINE (not via applyVatsimAtis, which would re-enter fetchDatis and race) so the cached.vatsim
   // branch a few lines down uses it directly: no real-world fetch, no flash, no double render.
+  const _atisSrc=atisSourceResolved();   // 'si' | 'vatsim' — real-world D-ATIS is the fallback either way
   if(vCfg().autoAtis && vCfg().weatherButton){
-    const cur=S.datisCache[icao];
-    if(!(cur&&cur.vatsim) && !(S._vatsimReverted&&S._vatsimReverted[icao])){
-      await vatsimFeedGet();
-      if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
-      if(vatsimAtisAvail(icao)){ const d=vatsimAtisData(icao); if(d)S.datisCache[icao]={data:d,ts:Date.now(),vatsim:true}; }
+    if(_atisSrc==='si' && (S.cfg.siApiKey||'').trim()){
+      const cur=S.datisCache[icao];
+      if(!(cur&&cur.si) && !(S._siReverted&&S._siReverted[icao])){
+        await siWxFetch(icao);
+        if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+        if(siAtisAvail(icao)){ const d=siAtisData(icao); if(d)S.datisCache[icao]={data:d,ts:Date.now(),si:true}; }
+      }
+    } else if(_atisSrc==='vatsim'){
+      const cur=S.datisCache[icao];
+      if(!(cur&&cur.vatsim) && !(S._vatsimReverted&&S._vatsimReverted[icao])){
+        await vatsimFeedGet();
+        if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
+        if(vatsimAtisAvail(icao)){ const d=vatsimAtisData(icao); if(d)S.datisCache[icao]={data:d,ts:Date.now(),vatsim:true}; }
+      }
     }
   }
-  renderVatsimAtisBtn(icao,idx,side,prefix);   // after auto-apply, so it shows the ✓ (revert) state
+  if(_atisSrc==='si') renderSiAtisBtn(icao,idx,side,prefix);   // after auto-apply, so it shows the ✓ (revert) state
+  else renderVatsimAtisBtn(icao,idx,side,prefix);
   let data;
   const cached=S.datisCache[icao];
   // QA fix (2026-07-09): a VATSIM-applied ATIS is an EXPLICIT user choice — it must not silently expire
   // after 5 min and revert to real-world D-ATIS on the next re-render. It stays until the user clicks
   // revert (or re-applies for a fresh copy); only ordinary D-ATIS entries use the 5-min cache window.
-  if(cached&&(cached.vatsim||(Date.now()-cached.ts)<300000)){data=cached.data;}
+  if(cached&&(cached.vatsim||cached.si||(Date.now()-cached.ts)<300000)){data=cached.data;}
   else{
     try{data=await window.api.fetchDatis({icao});}catch(e){data=null;}
     if(data)S.datisCache[icao]={data,ts:Date.now()};
@@ -6726,6 +6737,8 @@ async function fetchDatis(icao,idx,side,prefix){
   }
   const isArr=side==='arr';
   const isVatsim=!!(data&&data.vatsim);   // VATSIM ATIS is live/controller-set (no stale-wind cross-check, own label)
+  const isSi=!!(data&&data.si);           // SI ATIS is authoritative (SI's own active runway) — same skip-cross-check treatment
+  const isLive=isVatsim||isSi;            // either live overlay: don't run the stale-D-ATIS wind cross-check
   const rwyTxt=info.runways.length?info.runways.join('/'):null;
   const dAge=info.time?zuluAgeMin(info.time):null;
   // STALE-D-ATIS WIND CROSS-CHECK (2026-07-08): a D-ATIS runway older than 3h may no longer match
@@ -6736,8 +6749,8 @@ async function fetchDatis(icao,idx,side,prefix){
   let staleNote='';
   if(rwyEl&&rwyTxt){
     let rwyHtml=null;
-    const stale=!isVatsim&&dAge!=null&&dAge>DATIS_STALE_MIN;
-    const veryStale=!isVatsim&&dAge!=null&&dAge>DATIS_VERYSTALE_MIN;
+    const stale=!isLive&&dAge!=null&&dAge>DATIS_STALE_MIN;
+    const veryStale=!isLive&&dAge!=null&&dAge>DATIS_VERYSTALE_MIN;
     const m=stale?await fetchMetarObj(icao):null;
     if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
     const w=m?parseWind(m.rawOb||''):null;
@@ -6775,7 +6788,7 @@ async function fetchDatis(icao,idx,side,prefix){
       staleNote='<div class="datis-note" style="margin-top:3px;color:var(--acc)">D-ATIS '+ageLabel(dAge)+' &mdash; very old; verify the active runway on ATIS.</div>';
     }
     if(rwyHtml==null){
-      rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag"'+(isVatsim?' style="color:var(--grn);border-color:var(--grn)"':'')+'>'+(isVatsim?'VATSIM':'D-ATIS')+'</span>';
+      rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag"'+(isVatsim?' style="color:var(--grn);border-color:var(--grn)"':(isSi?' style="color:var(--acc);border-color:var(--acc)"':''))+'>'+(isSi?'SI ATIS':(isVatsim?'VATSIM':'D-ATIS'))+'</span>';
     }
     rwyEl.innerHTML=rwyHtml;
   }else if(rwyEl){
@@ -6788,11 +6801,11 @@ async function fetchDatis(icao,idx,side,prefix){
     const w=m?parseWind(m.rawOb||''):null;
     const best=w?bestRwy(icao,w.dir,w.spd):null;
     rwyEl.innerHTML=(best&&best!=='Check ATIS')
-      ? 'RWY '+esc(best)+' <span class="datis-tag" title="This '+(isVatsim?'VATSIM ATIS':'D-ATIS')+' does not state an active runway — estimated from the current METAR wind. Verify on ATIS.">&#9889; est. wind</span>'
+      ? 'RWY '+esc(best)+' <span class="datis-tag" title="This '+(isSi?'SI ATIS':(isVatsim?'VATSIM ATIS':'D-ATIS'))+' does not state an active runway — estimated from the current METAR wind. Verify on ATIS.">&#9889; est. wind</span>'
       : 'Check ATIS';
   }
-  const icon=isVatsim?'&#128251;':(isArr?'&#128757;':'&#128745;'); // 📻 VATSIM / 🛬 / 🛫
-  const verb=(isVatsim?'VATSIM ':'')+(isArr?'Landing':'Departure');
+  const icon=isSi?'&#128225;':(isVatsim?'&#128251;':(isArr?'&#128757;':'&#128745;')); // 📡 SI / 📻 VATSIM / 🛬 / 🛫
+  const verb=(isSi?'SI ':(isVatsim?'VATSIM ':''))+(isArr?'Landing':'Departure');
   const ageTag=dAge!=null?` &middot; <span style="color:${dAge>90?'var(--acc)':'var(--ink3)'}">${ageLabel(dAge)}</span>`:'';
   const head=icon+' '+verb+(rwyTxt?' RWY '+rwyTxt:'')+
     (info.approach?' &middot; '+info.approach:'')+
@@ -6802,7 +6815,7 @@ async function fetchDatis(icao,idx,side,prefix){
     ? '<details class="datis-exp"><summary>Plain-English details</summary><ul class="datis-ul">'+
       info.bullets.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details>'
     : '';
-  const raw='<details class="datis-exp"><summary>Raw '+(isVatsim?'VATSIM ATIS'+(data.atisCallsign?' ('+esc(data.atisCallsign)+')':''):'D-ATIS')+'</summary><pre class="datis-raw">'+
+  const raw='<details class="datis-exp"><summary>Raw '+(isSi?'SI ATIS':(isVatsim?'VATSIM ATIS'+(data.atisCallsign?' ('+esc(data.atisCallsign)+')':''):'D-ATIS'))+'</summary><pre class="datis-raw">'+
     esc(info.raw)+'</pre></details>';
   box.innerHTML='<div class="datis-head">'+head+'</div>'+staleNote+bullets+raw;
 }
@@ -6811,7 +6824,7 @@ async function fetchDatis(icao,idx,side,prefix){
 // the fully-populated object so toggles can write straight to it.
 function vCfg(){
   if(!S.cfg.vatsim) S.cfg.vatsim={};
-  const v=S.cfg.vatsim, d={enabled:false,cid:'',weatherButton:true,autoStartVpilot:false,autoAtis:true};
+  const v=S.cfg.vatsim, d={enabled:false,cid:'',weatherButton:true,autoStartVpilot:false,autoAtis:true,atisSource:''};
   for(const k in d) if(v[k]===undefined) v[k]=d[k];
   v.overlay=Object.assign({enabled:true,freqChange:true,newController:true,handoff:true,connectionLost:true,loggingStarted:true}, v.overlay||{});
   v.sound=Object.assign({freqChange:true,newController:false,handoff:false,connectionLost:false}, v.sound||{});
@@ -6840,7 +6853,17 @@ function renderVatsimSettings(){
   h+=hdr('Behavior');
   h+=row('Auto-start Live mode when vPilot is running', v.autoStartVpilot, "vSetAutoVpilot(this.checked)", '(links the pilot client to Live ATC)');
   h+=row('&ldquo;VATSIM&rdquo; button on weather cards', v.weatherButton, "vSet('weatherButton',this.checked)");
-  h+=row('Auto-show VATSIM ATIS when a controller is staffing it', v.autoAtis, "vSet('autoAtis',this.checked)", '(otherwise click the VATSIM button)');
+  h+=row('Auto-show '+(atisSourceResolved()==='si'?'SI':'VATSIM')+' ATIS when it’s available', v.autoAtis, "vSet('autoAtis',this.checked)", '(otherwise click the button on the weather card)');
+  h+=hdr('Plan-a-Flight ATIS source <span style="color:var(--ink4)">(active runway + ATIS; real-world D-ATIS is the fallback)</span>');
+  const _as=atisSourceResolved();
+  const seg=(val,label)=>{const on=_as===val;return '<button class="btn bg bxs" onclick="vSetAtisSource(\''+val+'\')" style="'+(on?'border-color:var(--acc);color:var(--acc);font-weight:700':'opacity:.65')+'">'+(on?'✓ ':'')+label+'</button>';};
+  h+='<div style="display:flex;gap:6px;padding:3px 0 6px">'+seg('vatsim','VATSIM')+seg('si','SayIntentions')+'</div>';
+  h+='<div style="margin-bottom:6px"><label style="font-size:12px;color:var(--ink3)">SayIntentions API key <span style="color:var(--ink4)">&mdash; for SI ATIS/active-runway; from the SI Pilot Portal, or auto-detect from the running app</span></label><br>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">'
+    +'<input id="si-apikey" type="password" value="'+esc(S.cfg.siApiKey||'')+'" onchange="siSetApiKey(this.value)" placeholder="paste SI API key" autocomplete="off" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;width:220px">'
+    +'<button class="btn bg bxs" onclick="siDetectApiKey()">Auto-detect from SI</button>'
+    +'<span id="si-apikey-msg" style="font-size:11px;color:var(--ink3);align-self:center">'+(S.cfg.siApiKey?'✓ key set':'no key')+'</span>'
+    +'</div></div>';
   h+=hdr('Data <span style="color:var(--ink4)">(downloaded once, refresh per AIRAC)</span>');
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"><button class="btn bg bxs" onclick="latcRefreshDb()">Refresh airport database</button><button class="btn bg bxs" onclick="vRefreshAirspace()">Refresh airspace boundaries (VATSpy)</button><span id="vatsim-data-msg" style="font-size:11px;color:var(--ink3);align-self:center"></span></div>';
   el.innerHTML=h;
@@ -7589,6 +7612,69 @@ function applyVatsimAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); c
 // immediately re-apply VATSIM on the next render (session-scoped; a fresh launch defaults to VATSIM
 // again). Clicking Apply again clears the flag.
 function revertVatsimAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); if(!S._vatsimReverted)S._vatsimReverted={}; S._vatsimReverted[icao]=true; delete S.datisCache[icao]; fetchDatis(icao,idx,side,prefix); }
+
+// ── SAYINTENTIONS ATIS (v6.20.0) ─────────────────────────────────────────────
+// Dean flies SI, where a VATSIM controller ATIS is irrelevant. SI's WX API returns the active runway +
+// ATIS it serves in-sim (real-world-METAR-based), so it drops into the SAME S.datisCache slot the VATSIM
+// overlay uses — active-runway display + SimBrief origrwy/destrwy get it for free. Mirrors the VATSIM trio.
+// Which overlay auto-applies is picked by atisSourceResolved(); real-world D-ATIS stays the fallback.
+function atisSourceResolved(){ const s=vCfg().atisSource; if(s==='si'||s==='vatsim')return s; return S.cfg.siApiKey?'si':'vatsim'; }
+// Fetch + cache SI WX for one airport (10-min TTL; SI WX tracks the ~hourly METAR). Returns the airport
+// entry or null. Successful data is cached; nulls are not (so adding a key / SI coming online is picked up
+// on the next panel open, not blocked for 10 min).
+async function siWxFetch(icao){
+  icao=(icao||'').toUpperCase(); if(!icao)return null;
+  const c=S.siWxCache[icao];
+  if(c&&c.data&&(Date.now()-c.ts)<600000) return c.data;
+  const key=(S.cfg.siApiKey||'').trim(); if(!key)return null;
+  try{
+    const r=await window.api.siFetchWx({icao,apiKey:key});
+    if(r&&r.ok&&r.data&&Array.isArray(r.data.airports)){
+      const ap=r.data.airports.find(a=>String(a.airport||'').toUpperCase()===icao)||r.data.airports[0];
+      if(ap&&(ap.atis||ap.active_runway)){ S.siWxCache[icao]={data:ap,ts:Date.now()}; return ap; }
+    }
+  }catch(e){}
+  return null;
+}
+// Build the D-ATIS-shaped object from cached SI WX (mirror vatsimAtisData). SI gives one atis string +
+// an authoritative active_runway; prepend explicit DEP/ARR runway cues so extractRunways yields it for
+// BOTH sides regardless of the atis wording, while the real atis text still drives bullets/approach/letter.
+function siAtisData(icao){
+  icao=(icao||'').toUpperCase();
+  const c=S.siWxCache[icao]; const a=c&&c.data; if(!a||(!a.atis&&!a.active_runway))return null;
+  const atisText=String(a.atis||'');
+  const rwy=String(a.active_runway||'').trim().toUpperCase();
+  const cue=rwy?('DEP RWY '+rwy+'. ARR RWY '+rwy+'. '):'';
+  const text=cue+atisText;
+  const tM=atisText.match(/\b(\d{4})Z\b/);
+  const lM=atisText.match(/\bINFORMATION\s+([A-Za-z])/i);
+  const block={letter:lM?lM[1].toUpperCase():null, time:tM?tM[1]+'Z':null, text};
+  return {hasData:true, arr:block, dep:block, combined:block, si:true, siRwy:rwy||null};
+}
+function siAtisAvail(icao){ return !!siAtisData(icao); }
+// SI button under each airport's ATIS block. Greyed when no key or SI has nothing for the field.
+async function renderSiAtisBtn(icao,idx,side,prefix){
+  prefix=prefix||''; const id=prefix+'vbtn-'+side+'-'+idx;
+  const set=html=>{const el=document.getElementById(id); if(el)el.innerHTML=html||'';};
+  if(!vCfg().weatherButton){ set(''); return; }
+  if(!(S.cfg.siApiKey||'').trim()){ set('<button class="btn bg bxs" disabled style="opacity:.4" title="Set your SayIntentions API key in the Live ATC section to use SI ATIS">SI ATIS</button>'); return; }
+  const cached=S.datisCache[(icao||'').toUpperCase()];
+  if(cached&&cached.si){ set('<button class="btn bg bxs" onclick="revertSiAtis(\''+icao+'\',\''+idx+'\',\''+side+'\',\''+prefix+'\')" style="color:var(--grn);border-color:var(--grn)" title="Showing SayIntentions ATIS — click to switch back to real-world D-ATIS">&#10003; SI ATIS</button>'); return; }
+  set('<button class="btn bg bxs" disabled style="opacity:.5" title="Checking SayIntentions…">SI ATIS</button>');
+  await siWxFetch(icao);
+  if(!document.getElementById(id)) return;
+  if(siAtisAvail(icao)) set('<button class="btn bg bxs" onclick="applySiAtis(\''+icao+'\',\''+idx+'\',\''+side+'\',\''+prefix+'\')" style="color:var(--acc);border-color:var(--acc)" title="Use SayIntentions’ active runway + ATIS (also fills SimBrief)">&#128225; SI ATIS</button>');
+  else set('<button class="btn bg bxs" disabled style="opacity:.4" title="SayIntentions returned no ATIS for '+icao+'">SI ATIS</button>');
+}
+function applySiAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); const d=siAtisData(icao); if(!d)return; if(S._siReverted)delete S._siReverted[icao]; S.datisCache[icao]={data:d,ts:Date.now(),si:true}; fetchDatis(icao,idx,side,prefix); }
+function revertSiAtis(icao,idx,side,prefix){ icao=(icao||'').toUpperCase(); if(!S._siReverted)S._siReverted={}; S._siReverted[icao]=true; delete S.datisCache[icao]; fetchDatis(icao,idx,side,prefix); }
+// Source toggle + SI key setters (Live ATC settings). Clearing the overlay caches makes the next panel
+// open reflect the new source; real-world D-ATIS is always the fallback.
+function vSetAtisSource(v){ vCfg().atisSource=(v==='si'?'si':'vatsim'); window.api.saveConfig(S.cfg); refreshOpenAtis(); renderVatsimSettings(); }
+function siSetApiKey(v){ S.cfg.siApiKey=(v||'').trim(); window.api.saveConfig(S.cfg); S.siWxCache={}; const n=document.getElementById('si-apikey-msg'); if(n){n.textContent=S.cfg.siApiKey?'✓ key set':'no key';} refreshOpenAtis(); }
+async function siDetectApiKey(){ const n=document.getElementById('si-apikey-msg'); if(n)n.textContent='Detecting from running SI…'; try{ const r=await window.api.siDetectApiKey(); if(r&&r.ok&&r.api_key){ S.cfg.siApiKey=r.api_key; await window.api.saveConfig(S.cfg); const f=document.getElementById('si-apikey'); if(f)f.value=r.api_key; if(n)n.textContent='✓ key detected from SI'; S.siWxCache={}; refreshOpenAtis(); } else { if(n)n.textContent='SI not running — start SayIntentions, then retry'; } }catch(e){ if(n)n.textContent='Detect failed'; } }
+// After a source/key change, drop the overlay caches so the next route panel re-fetches with the new source.
+function refreshOpenAtis(){ S.siWxCache={}; S._siReverted={}; for(const k in S.datisCache){ const c=S.datisCache[k]; if(c&&(c.vatsim||c.si))delete S.datisCache[k]; } }
 const LATC_SIMGONE_POLLS=18;   // 18 × 5s poll ≈ 90s of no position before we test for a closed sim
 async function latcPoll(){
   const _prev=LATC.status;
@@ -8391,5 +8477,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.19.8</div>
+  pointer-events:none;">v6.20.0</div>
 </body></html>

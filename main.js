@@ -3,6 +3,7 @@ const path   = require('path');
 const fs     = require('fs');
 const os     = require('os');
 const https  = require('https');
+const http   = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
@@ -749,6 +750,53 @@ ipcMain.handle('si-fetch-page', (_, {page, cookie}) => new Promise(resolve => {
   });
   req.on('error', e => { LOG.error('si-fetch-page network error:', e.message); resolve({ok: false, error: e.message}); });
   req.setTimeout(15000, () => { req.destroy(); resolve({ok: false, error: 'timeout'}); });
+  req.end();
+}));
+
+// SayIntentions WX API (v6.20.0): per-airport ATIS + active runway + METAR, built from real-world
+// aviationweather.gov METAR — i.e. exactly what SI serves in-sim. Feeds the Plan-a-Flight ATIS overlay
+// for pilots who fly SI instead of VATSIM. api_key is a SEPARATE credential from the route cookie and is
+// REDACTED in logs (mirror si-fetch-page); the key never appears in a logged URL.
+ipcMain.handle('si-fetch-wx', (_, {icao, apiKey}) => new Promise(resolve => {
+  const key = String(apiKey || '');
+  const ic  = String(icao || '').toUpperCase();
+  LOG.info('si-fetch-wx: icao=' + ic + ' key=***REDACTED***');
+  if (!key || !ic) { resolve({ ok:false, error:'missing key or icao' }); return; }
+  const opts = {
+    hostname: 'apipri.sayintentions.ai',
+    path: `/sapi/getWX?api_key=${encodeURIComponent(key)}&icao=${encodeURIComponent(ic)}&with_comms=0`,
+    method: 'GET',
+    headers: { 'Accept':'application/json', 'User-Agent':'DeanMSFSRouteFinder/6.20' },
+  };
+  const req = https.request(opts, res => {
+    let data = '';
+    res.on('data', c => data += c);
+    res.on('end', () => {
+      LOG.info('si-fetch-wx response: status=' + res.statusCode + ' icao=' + ic + ' bytes=' + data.length);
+      try { resolve({ ok: res.statusCode < 300, status: res.statusCode, data: JSON.parse(data) }); }
+      catch(e) { LOG.error('si-fetch-wx parse error: status=' + res.statusCode + ' raw=' + data.slice(0,160)); resolve({ ok:false, status:res.statusCode, data:null }); }
+    });
+  });
+  req.on('error', e => { LOG.error('si-fetch-wx network error:', e.message); resolve({ ok:false, error:e.message }); });
+  req.setTimeout(12000, () => { req.destroy(); resolve({ ok:false, error:'timeout' }); });
+  req.end();
+}));
+
+// Auto-detect the SI API key from the running SayIntentions app's local flightJSON endpoint, so Dean
+// never has to copy it from the Pilot Portal. Only works while SI is running (localhost:63287).
+ipcMain.handle('si-detect-apikey', () => new Promise(resolve => {
+  const req = http.request({ hostname:'127.0.0.1', port:63287, path:'/flightJSON', method:'GET' }, res => {
+    let data = '';
+    res.on('data', c => data += c);
+    res.on('end', () => {
+      try { const j = JSON.parse(data); const k = j && (j.api_key || j.apiKey);
+        if (k) { LOG.info('si-detect-apikey: key found via flightJSON'); resolve({ ok:true, api_key:String(k) }); }
+        else resolve({ ok:false, error:'no api_key in flightJSON' });
+      } catch(e) { resolve({ ok:false, error:'parse' }); }
+    });
+  });
+  req.on('error', () => resolve({ ok:false, error:'SI not running' }));
+  req.setTimeout(2000, () => { req.destroy(); resolve({ ok:false, error:'timeout' }); });
   req.end();
 }));
 

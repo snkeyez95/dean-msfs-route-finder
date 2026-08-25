@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('api', {
   utilAdd:                (o)   => ipcRenderer.invoke('util-add', o),
   sceneryAdd:             (o)   => ipcRenderer.invoke('scenery-add', o),
   fetchDatis:             (o)   => ipcRenderer.invoke('fetch-datis', o),
+  siFetchWx:              (o)   => ipcRenderer.invoke('si-fetch-wx', o),
+  siDetectApiKey:         ()    => ipcRenderer.invoke('si-detect-apikey'),
   launchMsfs:             (o)   => ipcRenderer.invoke('launch-msfs', o),
   openExternal:       (url) => ipcRenderer.send('open-external', url),
   winMinimize:        ()    => ipcRenderer.send('win-minimize'),

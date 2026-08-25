@@ -1,5 +1,107 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## 📻 v6.20.0 — SI ATIS SOURCE for Plan a Flight (VATSIM ⟷ SayIntentions toggle) (Dean 2026-08-25, plan-approved)
+
+### Context
+Dean is flying **SayIntentions (SI)** going forward, so a VATSIM controller ATIS (which only exists when a
+human is online) is the wrong active-runway/ATIS source for his Plan-a-Flight cards. He asked for a toggle
+in the **Live ATC section** to switch the ATIS source between **VATSIM** and **SI**. Research confirmed SI
+exposes a public **WX API** returning the exact ATIS + active runway it uses in-sim (built from real-world
+aviationweather.gov METAR), so ABRP can show SI's active runway/ATIS pre-flight and feed it to SimBrief —
+matching what Dean will actually hear. Outcome: the same tidy overlay the VATSIM ATIS already uses, sourced
+from SI instead.
+
+### SI WX API (verified 2026-08-25)
+`GET https://apipri.sayintentions.ai/sapi/getWX?api_key={key}&icao={ICAO[,ICAO…]}&with_comms=1`
+→ `{ airports:[{airport, atis, atis_cpdlc, metar, taf, active_runway, wind_direction, wind_speed}],
+   comms:[{type,freq,callsign,airport}] }`
+API key = SI Pilot Portal account page **or** the running app's `http://localhost:63287/flightJSON`
+(`api_key` field). No strict rate limits ("don't abuse" → cache). Separate credential from the route
+cookie (`cfg.siCookie`).
+
+### Decisions locked (Dean 2026-08-25)
+- Source toggle **VATSIM ⟷ SayIntentions** in the Live ATC settings section.
+- API key = **BOTH**: a masked paste field **and** an "Auto-detect from SI" button (reads flightJSON).
+- Default source = **SI, but DERIVED** to honor rule #3: `cfg.vatsim.atisSource || (cfg.siApiKey ? 'si'
+  : 'vatsim')` — SI is the default only once a key exists (a fresh keyless install stays VATSIM); an
+  explicit toggle choice always wins. Real-world D-ATIS / synthetic-from-METAR stays the fallback in
+  every mode.
+- Scope = **ATIS text + active runway** (the core). METAR unchanged (aviationweather.gov = what SI uses).
+  `comms`/frequencies noted as an optional future add, not built now.
+
+### Key facts / reuse (verified 2026-08-25)
+- `fetchDatis` (index.html:6657) = the ATIS hub for Plan a Flight (''), Free Route ('fr'), Trip Planner
+  ('tp'). Auto-applies an online overlay at **:6675** (`vCfg().autoAtis && vCfg().weatherButton` →
+  `vatsimAtisAvail` → cache `{vatsim:true}`), else real-world D-ATIS (`window.api.fetchDatis` →
+  main.js `datisGet`), else synthetic-from-METAR. **:6675 is the exact seam the source toggle plugs into.**
+- `vatsimAtisData(icao)` (:7561) builds the D-ATIS-shaped object `{hasData, arr, dep, combined,
+  vatsim:true, atisCallsign}` that drops into `S.datisCache` and is read by the active-runway display +
+  **SimBrief `origrwy`/`destrwy` (:5557)** — so an SI overlay lands in SimBrief for free.
+  `renderVatsimAtisBtn`/`applyVatsimAtis`/`revertVatsimAtis` (:7575-7591) = the button + apply/revert
+  pattern to mirror. The `{vatsim:true}` cache entry skips the 5-min expiry + stale-wind cross-check
+  (:6689/:6739) — the `{si:true}` entry does the same (SI ATIS is authoritative).
+- `vCfg()` (:6812, defaults `{enabled,cid,weatherButton,autoStartVpilot,autoAtis}`) + `vSet('key',val)`
+  setter + settings rows at **:6842** = where the toggle + key field go. `saveConfig` persists arbitrary
+  fields; `cfg.siCookie` (:1379) is the separate-credential precedent for `cfg.siApiKey`.
+- `interpretDatis`/`extractRunways` (:6627/:6562) parse ATIS text → `{letter,time,runways}` — reuse on
+  SI's `atis` text; use SI's `active_runway` as the authoritative runway token.
+- `main.js si-fetch-page` (:719) redacts the cookie in logs — mirror that redaction for `api_key`.
+  preload.js exposes IPCs (`fetchDatis` :30) — add `siFetchWx`/`siDetectApiKey` the same way.
+
+### Build steps
+1. **Config + accessor (index.html):** add `cfg.siApiKey` (string, separate from `cfg.siCookie`).
+   `vCfg()` default gains `atisSource`, resolved as `cfg.vatsim.atisSource || (cfg.siApiKey?'si':'vatsim')`.
+2. **Live ATC settings UI (near :6842):** a segmented "ATIS source: VATSIM | SayIntentions" control →
+   `vSet('atisSource',…)`; a masked SI-API-key paste field (save → `cfg.siApiKey` → `saveConfig`) + an
+   **[Auto-detect from SI]** button (calls `si-detect-apikey`, fills + saves) + a status line
+   (key set / detected / SI not running). Show only the selected source's button on weather cards.
+3. **main.js IPCs (+ preload):**
+   - `si-fetch-wx {icao}`: GET the getWX endpoint with `api_key` from `cfg.siApiKey` (optional
+     `with_comms`); **redact `api_key` in logs**; return parsed JSON. Main-process proxy = no CORS + the
+     key never sits in a renderer-visible URL.
+   - `si-detect-apikey`: GET `http://localhost:63287/flightJSON`, return `{api_key}` or `{ok:false}`
+     when SI isn't running.
+   - preload: expose `siFetchWx`, `siDetectApiKey`.
+4. **Renderer SI ATIS layer (mirror the VATSIM trio):** `S.siWxCache[icao]={data,ts}` (~10-min TTL);
+   `siWxFetch(icao)` (batch dep+arr where easy); `siAtisData(icao)` maps a getWX airport entry → the
+   D-ATIS shape (`combined.text`=atis; runways from `active_runway`, extras via `extractRunways`;
+   letter/time via `interpretDatis`; flag `{si:true}`); `siAtisAvail(icao)`; `renderSiAtisBtn` /
+   `applySiAtis` / `revertSiAtis`.
+5. **fetchDatis wiring (:6675 branch):** make the auto-apply source-aware — if `autoAtis && weatherButton`:
+   `atisSource==='si' && cfg.siApiKey` → `await siWxFetch` → if `siAtisAvail` cache `{data:siAtisData,
+   ts, si:true}`; else the current VATSIM path. `{si:true}` skips the 5-min expiry + stale cross-check.
+   SimBrief runway auto-feeds via the existing `datisCache → origrwy/destrwy` path (no change). Render
+   the correct button per `atisSource`.
+6. **Labels/empty state + version:** card label "SI ATIS" + tag/title "From SayIntentions"; SI mode with
+   no key → button prompts "Set SI API key in Live ATC" (real-world D-ATIS still shows). Version v6.20.0
+   (package.json + index.html ×3 + README changelog).
+
+### Files
+index.html (cfg/`vCfg` default; Live ATC toggle + key field + auto-detect; `S.siWxCache` + `siWxFetch` +
+`siAtisData`/`siAtisAvail` + `renderSiAtisBtn`/`applySiAtis`/`revertSiAtis`; source-aware `fetchDatis`),
+main.js (`si-fetch-wx` + `si-detect-apikey`, api_key redaction), preload.js (`siFetchWx`,
+`siDetectApiKey`). Version ×4 + README changelog. No SKILL.md change (Plan-a-Flight ATIS, not perf).
+
+### Tests (tests/, reuse tests/lib/extract.js `grab()` like the VATSIM suites)
+`tests/test_si_atis.js`: `siAtisData` maps a real getWX payload → `{hasData, combined.text,
+runways(active_runway), letter}`; `siAtisAvail` false on empty/no-key; default resolution (key → 'si',
+none → 'vatsim', explicit wins); the `fetchDatis` source branch picks SI vs VATSIM overlay (mock caches)
+and falls back to real-world when the source has none; the `{si:true}` cache entry skips the 5-min expiry.
+Then `node tests\run_all.js` full board.
+
+### Verification
+- Desk: `test_si_atis` + full board green; `node --check main.js`; renderer Function-parse.
+- Live (Dean): Live ATC → source = SayIntentions; paste key OR click Auto-detect (SI running) → key saved.
+  Open a route in Plan a Flight → card shows "SI ATIS" with SI's active runway; **Open in SimBrief carries
+  that runway** (origrwy/destrwy). Flip to VATSIM → VATSIM overlay returns. No key + SI mode → button
+  prompts to set the key; real-world D-ATIS still shows. Confirm `api_key` is **REDACTED** in
+  dean_msfs_debug.log.
+
+### Risks / notes
+- Requires an active SI subscription/API key (Dean has one). Per-ICAO network call → cache + batch dep/arr;
+  ~10-min TTL (SI WX ≈ hourly METAR). Auto-detect only works while SI is running (localhost:63287); paste
+  is the always-available path. api_key sensitive → main-process proxy + log redaction (mirror si-fetch-page).
+
 ## ✈️ v6.19.0 — ADD THE PMDG 777-300ER: fleet + routes + activation + benchmark, no stone unturned (Dean 2026-08-11, plan-approved)
 > ✅ BUILT + SHIPPED 2026-08-11. Folder move done (PMDG/737-800 + PMDG/777-300ER — real pkgScanGroups
 > verified two groups). Benchmark migration inserts 'PMDG 777' AHEAD of the PMDG entry (first-match-wins);
