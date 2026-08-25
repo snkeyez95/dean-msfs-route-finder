@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.20.2 SI ACTIVE RUNWAY NOW PARSES FROM THE SI ATIS. SI writes the runway with abbreviations ("ARVG RWY 24L. DPTG RWY 24R") and often returns an empty active_runway field on a pre-flight fetch, so route cards were falling back to a wind estimate ("est. wind") or "Check ATIS". ABRP now reads the runway straight from SI's ATIS text — per side, so arrival and departure can differ — and shows it as "RWY xx · SI ATIS" (which also flows to SimBrief).
+
 v6.20.1 SI ATIS SOURCE MOVED INTO THE LIVE ATC TAB. The ATIS-source toggle (VATSIM/SayIntentions) and the SI API key field now live at the top of the Live ATC tab, shown whether or not Live mode is on — set it up before flying. (In v6.20.0 they landed in the VATSIM block under Settings, which isn't where you'd look.)
 
 v6.20.0 SI ATIS SOURCE FOR PLAN A FLIGHT. New "Plan-a-Flight ATIS source" toggle in the Live ATC section — switch between VATSIM and SayIntentions. In SayIntentions mode the active runway + ATIS on each route card come from SI's WX API (the same real-world-METAR-based ATIS SI serves in-sim), and that runway flows into SimBrief automatically. Real-world D-ATIS stays the fallback when the chosen source has nothing. Paste your SI API key from the Pilot Portal, or click "Auto-detect from SI" to pull it from the running app. The default is SayIntentions once a key is set (VATSIM otherwise); the key is stored separately from your route cookie and redacted in the log.

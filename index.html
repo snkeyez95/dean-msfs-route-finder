@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.20.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.20.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.20.1</div>
+    <div class="sb-ver">v6.20.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -7634,13 +7634,23 @@ function siAtisData(icao){
   icao=(icao||'').toUpperCase();
   const c=S.siWxCache[icao]; const a=c&&c.data; if(!a||(!a.atis&&!a.active_runway))return null;
   const atisText=String(a.atis||'');
-  const rwy=String(a.active_runway||'').trim().toUpperCase();
-  const cue=rwy?('DEP RWY '+rwy+'. ARR RWY '+rwy+'. '):'';
+  const up=atisText.toUpperCase();
+  const grab1=re=>{const m=up.match(re);return m?m[1].toUpperCase():null;};
+  // SI states runways with ATIS abbreviations ("ARVG RWY 24L. DPTG RWY 24R"), and active_runway comes
+  // back empty on a planning (non-live-flight) fetch — so parse the text as the PRIMARY source and keep
+  // active_runway as a fallback. Rebuild canonical DEP/ARR cues so the shared extractRunways picks the
+  // right runway per side (arrival vs departure can differ, e.g. LEPA 24L in / 24R out).
+  const arrRwy=grab1(/\b(?:ARVG|ARRIVING|ARR|LANDING|LDG)\s+(?:RWYS?|RUNWAYS?)\s*(\d{1,2}[LRC]?)/);
+  const depRwy=grab1(/\b(?:DPTG|DEPARTING|DEPG|DEP|TKOF|TAKE\s?OFF)\s+(?:RWYS?|RUNWAYS?)\s*(\d{1,2}[LRC]?)/);
+  const active=String(a.active_runway||'').trim().toUpperCase()||null;
+  const dep=depRwy||active||arrRwy||null;
+  const arr=arrRwy||active||depRwy||null;
+  const cue=(dep||arr)?('DEP RWY '+(dep||arr)+'. ARR RWY '+(arr||dep)+'. '):'';
   const text=cue+atisText;
   const tM=atisText.match(/\b(\d{4})Z\b/);
   const lM=atisText.match(/\bINFORMATION\s+([A-Za-z])/i);
   const block={letter:lM?lM[1].toUpperCase():null, time:tM?tM[1]+'Z':null, text};
-  return {hasData:true, arr:block, dep:block, combined:block, si:true, siRwy:rwy||null};
+  return {hasData:true, arr:block, dep:block, combined:block, si:true, siRwy:active||arr||dep||null};
 }
 function siAtisAvail(icao){ return !!siAtisData(icao); }
 // SI button under each airport's ATIS block. Greyed when no key or SI has nothing for the field.
@@ -8485,5 +8495,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.20.1</div>
+  pointer-events:none;">v6.20.2</div>
 </body></html>

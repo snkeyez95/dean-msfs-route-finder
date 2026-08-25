@@ -47,6 +47,16 @@ T('info letter parsed from the ATIS text', d.combined.letter === 'A');
 T('zulu time parsed from the ATIS text', d.combined.time === '1451Z');
 T('arr and dep both point at the combined block', d.arr === d.combined && d.dep === d.combined);
 
+// SI abbreviations + empty active_runway (the LEBL/LEPA live case, 2026-08-25): parse the runway from
+// the ATIS text, per side, so a card no longer falls back to "est. wind" / "Check ATIS".
+S.siWxCache.LEPA = { data:{ airport:'LEPA', active_runway:'',
+  atis:'PALMA DE MALLORCA ARPT, INFO NOVEMBER. 2030Z. ARVG RWY 24L. DPTG RWY 24R. WIND CALM.' }, ts: Date.now() };
+const dl = mod.siAtisData('LEPA');
+T('SI text parsed with empty active_runway (still hasData)', !!(dl && dl.hasData));
+T('arrival runway (ARVG 24L) placed by an ARR cue', /ARR RWY 24L\./.test(dl.combined.text));
+T('departure runway (DPTG 24R) placed by a DEP cue', /DEP RWY 24R\./.test(dl.combined.text));
+T('siRwy reflects a parsed runway even with empty active_runway', dl.siRwy === '24L');
+
 // active_runway present but no atis text → still usable (cue carries the runway)
 S.siWxCache.EGLL = { data:{ airport:'EGLL', atis:'', active_runway:'27R' }, ts: Date.now() };
 const d2 = mod.siAtisData('EGLL');
