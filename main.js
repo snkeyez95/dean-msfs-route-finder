@@ -222,6 +222,9 @@ function createWindow() {
   // Catch-up: if a prior run closed apps but never reopened them (ABRP/sim ended early) and the
   // sim isn't running now, reopen them so nothing stays closed.
   try { if (fs.existsSync(FLIGHT_STATE()) && !isMsfsRunning()) { _flightReopenPending = true; flightReopenApps(); } } catch(_){}
+  // v6.21.0: if a prior run changed the desktop resolution but never restored it (crash/early exit) and
+  // the sim isn't running, restore it now so the desktop is never left at the DLDSR resolution.
+  try { if (fs.existsSync(DISPLAY_STATE()) && !isMsfsRunning()) displayRestore(); } catch(_){}
   const ws = loadWindowState();
   win = new BrowserWindow({
     width:(ws&&ws.width)||WIN_DEFAULT.width, height:(ws&&ws.height)||WIN_DEFAULT.height,
@@ -1120,7 +1123,7 @@ function cleanupActivationsOnQuit(){
   }
 }
 let _cleanupDone = false;
-app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.destroy(); }catch(_){} cleanupActivationsOnQuit(); });
+app.on('before-quit', () => { if(_cleanupDone) return; _cleanupDone = true; try{ LiveATC.stop(); }catch(_){} try{ if(overlayWin&&!overlayWin.isDestroyed())overlayWin.destroy(); }catch(_){} try{ displayRestore(); }catch(_){} cleanupActivationsOnQuit(); });
 // When the auto-updater restarts ABRP to install a new version, exit FAST: skip the close-confirm
 // dialog and the (slow) activation cleanup so the NSIS installer doesn't catch ABRP still shutting
 // down and show "cannot be closed / Retry". The junctions are intentionally left in place — the
@@ -1296,6 +1299,7 @@ ipcMain.handle('msfs-detect', () => {
 
 ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
   try {
+    try { displayApplyForLaunch(); } catch(_){}   // v6.21.0: set the desktop to the DLDSR res before MSFS reads it; restored on sim close
     if (version === 'store') {
       // Microsoft Store version — launch via Windows shell protocol (no storefront)
       const child = spawn('explorer.exe', ['shell:AppsFolder\\Microsoft.Limitless_8wekyb3d8bbwe!App'], {
@@ -1318,6 +1322,10 @@ ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
     return {ok: false, error: e.message};
   }
 });
+
+ipcMain.handle('display-list-modes', () => { try { return displayListModes(); } catch(_){ return []; } });
+ipcMain.handle('display-get-current', () => { try { return displayGetCurrent(); } catch(_){ return null; } });
+ipcMain.handle('display-restore-now', () => { try { displayRestore(); return {ok:true}; } catch(e){ return {ok:false, error:e.message}; } });
 
 ipcMain.handle('get-world-map', () => {
   try {
@@ -1594,6 +1602,92 @@ ipcMain.handle('list-running-apps', () => new Promise((resolve) => {
 // ABRP stays open through the flight, so ABRP closes the chosen apps before a capture and
 // reopens them once the sim closes (watched here). The reopen list persists to disk so a
 // catch-up on next launch can recover if ABRP/sim ended unexpectedly.
+// ── DISPLAY RESOLUTION (v6.21.0) ─────────────────────────────────────────────
+// Dean's DLDSR-fullscreen fix: MSFS 2024 only downsamples a DLDSR resolution in fullscreen when the
+// Windows desktop is ALREADY at that resolution. So set the desktop to the configured res before MSFS
+// launches and restore it on sim close. FAIL-SAFE by design: never applies without a successful current-
+// mode read AND a passing CDS_TEST; the change is DYNAMIC (flags=0, not written to the registry) so a
+// reboot self-reverts any stuck state. Single-monitor / primary display (Dean's setup, 2026-08-27).
+const DISPLAY_STATE = () => path.join(USER_DATA, 'display_res.json');
+let _displayWatch = null, _displayRestorePending = false;
+const _DISP_CS = [
+  "Add-Type -TypeDefinition @'",
+  "using System;using System.Runtime.InteropServices;",
+  "public class ABRPDisp{",
+  " [DllImport(\"user32.dll\")] public static extern int ChangeDisplaySettings(ref DEVMODE d,int f);",
+  " [DllImport(\"user32.dll\")] public static extern bool EnumDisplaySettings(string dev,int m,ref DEVMODE d);",
+  " [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Ansi)] public struct DEVMODE{",
+  "  [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmDeviceName;",
+  "  public ushort dmSpecVersion;public ushort dmDriverVersion;public ushort dmSize;public ushort dmDriverExtra;public uint dmFields;",
+  "  public int dmPositionX;public int dmPositionY;public uint dmDisplayOrientation;public uint dmDisplayFixedOutput;",
+  "  public short dmColor;public short dmDuplex;public short dmYResolution;public short dmTTOption;public short dmCollate;",
+  "  [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmFormName;",
+  "  public ushort dmLogPixels;public uint dmBitsPerPel;public uint dmPelsWidth;public uint dmPelsHeight;",
+  "  public uint dmDisplayFlags;public uint dmDisplayFrequency;public uint dmICMMethod;public uint dmICMIntent;",
+  "  public uint dmMediaType;public uint dmDitherType;public uint dmReserved1;public uint dmReserved2;",
+  "  public uint dmPanningWidth;public uint dmPanningHeight;}}",
+  "'@",
+  "$ErrorActionPreference='Stop'"
+].join("\n");
+function _dispPs(body){
+  try {
+    const cp = require('child_process');
+    const r = cp.spawnSync('powershell', ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command', _DISP_CS + "\n" + body], { encoding:'utf8', timeout:15000, windowsHide:true });
+    return (r && r.stdout || '').trim();
+  } catch(e){ try{LOG.warn('[DISPLAY] ps failed: '+e.message);}catch(_){} return ''; }
+}
+function displayListModes(){
+  const out = _dispPs(`$d=New-Object ABRPDisp+DEVMODE;$d.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($d);$s=@{};for($i=0;[ABRPDisp]::EnumDisplaySettings($null,$i,[ref]$d);$i++){if($d.dmBitsPerPel -ge 32){$k=""+$d.dmPelsWidth+"x"+$d.dmPelsHeight+"x"+$d.dmDisplayFrequency;if(-not $s.ContainsKey($k)){$s[$k]=1;Write-Output $k}}}`);
+  const modes=[]; for(const ln of out.split(/\r?\n/)){ const m=ln.trim().match(/^(\d+)x(\d+)x(\d+)$/); if(m)modes.push({w:+m[1],h:+m[2],hz:+m[3]}); }
+  return modes;
+}
+function displayGetCurrent(){
+  const out = _dispPs(`$d=New-Object ABRPDisp+DEVMODE;$d.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($d);[void][ABRPDisp]::EnumDisplaySettings($null,-1,[ref]$d);Write-Output (""+$d.dmPelsWidth+"x"+$d.dmPelsHeight+"x"+$d.dmDisplayFrequency)`);
+  const m = out.match(/(\d+)x(\d+)x(\d+)/); if(!m)return null;
+  const r={w:+m[1],h:+m[2],hz:+m[3]}; return (r.w>0&&r.h>0)?r:null;
+}
+function displaySet(w,h,hz,test){
+  w=+w|0; h=+h|0; hz=+hz|0; const flag=test?'0x02':'0';
+  const out = _dispPs(`$d=New-Object ABRPDisp+DEVMODE;$d.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($d);[void][ABRPDisp]::EnumDisplaySettings($null,-1,[ref]$d);$d.dmPelsWidth=${w};$d.dmPelsHeight=${h};$d.dmDisplayFrequency=${hz};$d.dmFields=0x80000 -bor 0x100000 -bor 0x400000;$r=[ABRPDisp]::ChangeDisplaySettings([ref]$d,${flag});Write-Output $r`);
+  const m = out.match(/-?\d+/); return m?parseInt(m[0],10):-999;
+}
+// Set the desktop to the configured res before MSFS, remembering the original. No-ops safely on any failure.
+function displayApplyForLaunch(){
+  try {
+    const c = JSON.parse(fs.readFileSync(CFG,'utf8')); const dr = c.displayRes;
+    if(!dr || !dr.enabled || !(dr.w>0) || !(dr.h>0)) return;
+    const cur = displayGetCurrent();
+    if(!cur){ LOG.warn('[DISPLAY] could not read current mode — skipping'); return; }
+    if(cur.w===dr.w && cur.h===dr.h){ LOG.info('[DISPLAY] desktop already at '+dr.w+'x'+dr.h+' — no change'); return; }
+    const hz = dr.hz||cur.hz;
+    if(displaySet(dr.w,dr.h,hz,true)!==0){ LOG.warn('[DISPLAY] target '+dr.w+'x'+dr.h+'@'+hz+' failed CDS_TEST — skipping (is DLDSR still enabled?)'); return; }
+    fs.writeFileSync(DISPLAY_STATE(), JSON.stringify(cur));
+    const rc = displaySet(dr.w,dr.h,hz,false);
+    LOG.info('[DISPLAY] set '+dr.w+'x'+dr.h+'@'+hz+' (rc='+rc+'); original '+cur.w+'x'+cur.h+'@'+cur.hz+' saved for restore');
+    _displayRestorePending=true; startDisplayWatch();
+  } catch(e){ try{LOG.warn('[DISPLAY] apply failed: '+e.message);}catch(_){} }
+}
+function displayRestore(){
+  try {
+    const sf = DISPLAY_STATE(); if(!fs.existsSync(sf)) return;
+    const o = JSON.parse(fs.readFileSync(sf,'utf8'));
+    if(o && o.w>0 && o.h>0){ const rc=displaySet(o.w,o.h,o.hz||60,false); LOG.info('[DISPLAY] restored '+o.w+'x'+o.h+'@'+(o.hz||60)+' (rc='+rc+')'); }
+    try{ fs.unlinkSync(sf); }catch(_){}
+    _displayRestorePending=false;
+  } catch(e){ try{LOG.warn('[DISPLAY] restore failed: '+e.message);}catch(_){} }
+}
+function startDisplayWatch(){
+  if(_displayWatch) return;
+  let sawSim=false, ticks=0;
+  _displayWatch = setInterval(() => {
+    ticks++;
+    let up=false; try{ up=isMsfsRunning(); }catch(_){}
+    if(up){ sawSim=true; return; }
+    if(sawSim && !up){ clearInterval(_displayWatch); _displayWatch=null; if(_displayRestorePending)displayRestore(); return; }
+    if(!sawSim && ticks>=50){ clearInterval(_displayWatch); _displayWatch=null; if(_displayRestorePending){ displayRestore(); LOG.info('[DISPLAY] MSFS never launched — resolution restored'); } }   // ~5-min safety net
+  }, 6000);
+}
+
 const FLIGHT_STATE = () => path.join(USER_DATA, 'flight_closed_apps.json');
 let _flightReopenPending = false;
 let _flightWatch = null;
