@@ -1610,22 +1610,30 @@ ipcMain.handle('list-running-apps', () => new Promise((resolve) => {
 // reboot self-reverts any stuck state. Single-monitor / primary display (Dean's setup, 2026-08-27).
 const DISPLAY_STATE = () => path.join(USER_DATA, 'display_res.json');
 let _displayWatch = null, _displayRestorePending = false;
+// The whole EnumDisplaySettings/ChangeDisplaySettings loop lives INSIDE C# — PowerShell's [ref]$struct
+// marshaling of DEVMODE fails with ERROR_INVALID_PARAMETER (87), which was why the picker came up empty
+// (verified on Dean's machine 2026-08-27). PS only calls the static helpers and prints their strings.
 const _DISP_CS = [
   "Add-Type -TypeDefinition @'",
-  "using System;using System.Runtime.InteropServices;",
+  "using System;using System.Text;using System.Collections.Generic;using System.Runtime.InteropServices;",
   "public class ABRPDisp{",
-  " [DllImport(\"user32.dll\")] public static extern int ChangeDisplaySettings(ref DEVMODE d,int f);",
-  " [DllImport(\"user32.dll\")] public static extern bool EnumDisplaySettings(string dev,int m,ref DEVMODE d);",
+  " [DllImport(\"user32.dll\", CharSet=CharSet.Ansi)] static extern bool EnumDisplaySettings(string dev,int mode,ref DEVMODE dm);",
+  " [DllImport(\"user32.dll\", CharSet=CharSet.Ansi)] static extern int ChangeDisplaySettings(ref DEVMODE dm,int flags);",
   " [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Ansi)] public struct DEVMODE{",
   "  [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmDeviceName;",
-  "  public ushort dmSpecVersion;public ushort dmDriverVersion;public ushort dmSize;public ushort dmDriverExtra;public uint dmFields;",
-  "  public int dmPositionX;public int dmPositionY;public uint dmDisplayOrientation;public uint dmDisplayFixedOutput;",
+  "  public short dmSpecVersion;public short dmDriverVersion;public short dmSize;public short dmDriverExtra;public int dmFields;",
+  "  public int dmPositionX;public int dmPositionY;public int dmDisplayOrientation;public int dmDisplayFixedOutput;",
   "  public short dmColor;public short dmDuplex;public short dmYResolution;public short dmTTOption;public short dmCollate;",
   "  [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmFormName;",
-  "  public ushort dmLogPixels;public uint dmBitsPerPel;public uint dmPelsWidth;public uint dmPelsHeight;",
-  "  public uint dmDisplayFlags;public uint dmDisplayFrequency;public uint dmICMMethod;public uint dmICMIntent;",
-  "  public uint dmMediaType;public uint dmDitherType;public uint dmReserved1;public uint dmReserved2;",
-  "  public uint dmPanningWidth;public uint dmPanningHeight;}}",
+  "  public short dmLogPixels;public int dmBitsPerPel;public int dmPelsWidth;public int dmPelsHeight;",
+  "  public int dmDisplayFlags;public int dmDisplayFrequency;public int dmICMMethod;public int dmICMIntent;",
+  "  public int dmMediaType;public int dmDitherType;public int dmReserved1;public int dmReserved2;",
+  "  public int dmPanningWidth;public int dmPanningHeight;}",
+  "  static DEVMODE Blank(){ DEVMODE d=new DEVMODE(); d.dmDeviceName=\"\"; d.dmFormName=\"\"; d.dmSize=(short)Marshal.SizeOf(typeof(DEVMODE)); return d; }",
+  "  public static string Current(){ DEVMODE d=Blank(); if(!EnumDisplaySettings(null,-1,ref d))return \"0x0x0\"; return d.dmPelsWidth+\"x\"+d.dmPelsHeight+\"x\"+d.dmDisplayFrequency; }",
+  "  public static string ListModes(){ var seen=new HashSet<string>(); var sb=new StringBuilder(); for(int i=0;;i++){ DEVMODE d=Blank(); if(!EnumDisplaySettings(null,i,ref d))break; if(d.dmBitsPerPel>=32){ string k=d.dmPelsWidth+\"x\"+d.dmPelsHeight+\"x\"+d.dmDisplayFrequency; if(seen.Add(k))sb.Append(k).Append(\"\\n\"); } } return sb.ToString(); }",
+  "  public static int SetMode(int w,int h,int hz,int flags){ DEVMODE d=Blank(); if(!EnumDisplaySettings(null,-1,ref d))return -100; d.dmPelsWidth=w; d.dmPelsHeight=h; if(hz>0)d.dmDisplayFrequency=hz; d.dmFields=0x80000|0x100000|0x400000; return ChangeDisplaySettings(ref d, flags); }",
+  "}",
   "'@",
   "$ErrorActionPreference='Stop'"
 ].join("\n");
@@ -1637,18 +1645,18 @@ function _dispPs(body){
   } catch(e){ try{LOG.warn('[DISPLAY] ps failed: '+e.message);}catch(_){} return ''; }
 }
 function displayListModes(){
-  const out = _dispPs(`$d=New-Object ABRPDisp+DEVMODE;$d.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($d);$s=@{};for($i=0;[ABRPDisp]::EnumDisplaySettings($null,$i,[ref]$d);$i++){if($d.dmBitsPerPel -ge 32){$k=""+$d.dmPelsWidth+"x"+$d.dmPelsHeight+"x"+$d.dmDisplayFrequency;if(-not $s.ContainsKey($k)){$s[$k]=1;Write-Output $k}}}`);
+  const out = _dispPs('Write-Output ([ABRPDisp]::ListModes())');
   const modes=[]; for(const ln of out.split(/\r?\n/)){ const m=ln.trim().match(/^(\d+)x(\d+)x(\d+)$/); if(m)modes.push({w:+m[1],h:+m[2],hz:+m[3]}); }
   return modes;
 }
 function displayGetCurrent(){
-  const out = _dispPs(`$d=New-Object ABRPDisp+DEVMODE;$d.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($d);[void][ABRPDisp]::EnumDisplaySettings($null,-1,[ref]$d);Write-Output (""+$d.dmPelsWidth+"x"+$d.dmPelsHeight+"x"+$d.dmDisplayFrequency)`);
+  const out = _dispPs('Write-Output ([ABRPDisp]::Current())');
   const m = out.match(/(\d+)x(\d+)x(\d+)/); if(!m)return null;
   const r={w:+m[1],h:+m[2],hz:+m[3]}; return (r.w>0&&r.h>0)?r:null;
 }
 function displaySet(w,h,hz,test){
-  w=+w|0; h=+h|0; hz=+hz|0; const flag=test?'0x02':'0';
-  const out = _dispPs(`$d=New-Object ABRPDisp+DEVMODE;$d.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($d);[void][ABRPDisp]::EnumDisplaySettings($null,-1,[ref]$d);$d.dmPelsWidth=${w};$d.dmPelsHeight=${h};$d.dmDisplayFrequency=${hz};$d.dmFields=0x80000 -bor 0x100000 -bor 0x400000;$r=[ABRPDisp]::ChangeDisplaySettings([ref]$d,${flag});Write-Output $r`);
+  w=+w|0; h=+h|0; hz=+hz|0; const flag=test?2:0;   // 2 = CDS_TEST (validate only); 0 = apply dynamically (not persisted → reboot reverts)
+  const out = _dispPs('Write-Output ([ABRPDisp]::SetMode('+w+','+h+','+hz+','+flag+'))');
   const m = out.match(/-?\d+/); return m?parseInt(m[0],10):-999;
 }
 // Set the desktop to the configured res before MSFS, remembering the original. No-ops safely on any failure.

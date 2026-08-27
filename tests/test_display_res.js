@@ -41,8 +41,10 @@ T('apply saves the ORIGINAL before the real set', apply.indexOf('writeFileSync(D
 T('apply arms the restore watch', /_displayRestorePending=true; startDisplayWatch\(\);/.test(apply));
 
 const set = grab(main, 'displaySet');
-T('change is DYNAMIC (flags=0, non-registry) so a reboot self-reverts; test uses CDS_TEST 0x02', /const flag=test\?'0x02':'0';/.test(set));
-T('displaySet sets DM_PELSWIDTH|DM_PELSHEIGHT|DM_DISPLAYFREQUENCY', /dmFields=0x80000 -bor 0x100000 -bor 0x400000/.test(set));
+T('change is DYNAMIC (flags=0, non-registry) so a reboot self-reverts; test uses CDS_TEST (2)', /const flag=test\?2:0;/.test(set));
+T('displaySet calls the C# SetMode helper (no PS ref-struct)', /\[ABRPDisp\]::SetMode\(/.test(set));
+T('enumeration + set live INSIDE C# (PS ref-struct marshaling was the empty-picker bug)', /public static string ListModes\(\)/.test(main) && /public static int SetMode\(/.test(main) && /public static string Current\(\)/.test(main));
+T('SetMode sets DM_PELSWIDTH|DM_PELSHEIGHT|DM_DISPLAYFREQUENCY', /d\.dmFields=0x80000\|0x100000\|0x400000/.test(main));
 
 const watch = grab(main, 'startDisplayWatch');
 T('watch restores on sim close', /if\(sawSim && !up\)\{[\s\S]*?displayRestore\(\)/.test(watch));
@@ -54,7 +56,7 @@ T('restore reads the saved original and deletes the state file', /DISPLAY_STATE\
 T('launch-msfs applies the resolution before launching', /try \{ displayApplyForLaunch\(\); \} catch\(_\)\{\}/.test(main));
 T('boot catch-up restores a stuck resolution', /if \(fs\.existsSync\(DISPLAY_STATE\(\)\) && !isMsfsRunning\(\)\) displayRestore\(\);/.test(main));
 T('before-quit restores the resolution', /try\{ displayRestore\(\); \}catch\(_\)\{\}/.test(main));
-T('P/Invoke here-string opener + flush-left terminator element (valid PS -Command)', /Add-Type -TypeDefinition @'/.test(main) && /"'@"/.test(main) && /ChangeDisplaySettings\(ref DEVMODE/.test(main));
+T('P/Invoke here-string opener + flush-left terminator element (valid PS -Command)', /Add-Type -TypeDefinition @'/.test(main) && /"'@"/.test(main) && /ChangeDisplaySettings\(ref DEVMODE dm/.test(main));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
