@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.21.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.21.2</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.21.1</div>
+    <div class="sb-ver">v6.21.2</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6873,19 +6873,26 @@ async function renderDisplayResSettings(){
   const el=document.getElementById('display-res-settings'); if(!el)return;
   const dr=S.cfg.displayRes||{};
   el.innerHTML='<div style="font-size:12px;color:var(--ink3)">Loading display modes&hellip;</div>';
-  let modes=[]; try{ modes=await window.api.displayListModes()||[]; }catch(e){}
+  let modes=[], cur=null;
+  try{ modes=await window.api.displayListModes()||[]; }catch(e){}
+  try{ cur=await window.api.displayGetCurrent(); }catch(e){}
   if(!document.getElementById('display-res-settings'))return;
+  const nativePx=(cur&&cur.w&&cur.h)?cur.w*cur.h:0;
   const by={}; for(const m of modes){ if(!(m.w>0&&m.h>0))continue; const k=m.w+'x'+m.h; if(!by[k]||m.hz>by[k].hz)by[k]=m; }
-  const list=Object.values(by).sort((a,b)=>(b.w*b.h)-(a.w*a.h));
-  let opts='<option value="">&mdash; pick a resolution &mdash;</option>';
-  for(const m of list){ const v=m.w+'x'+m.h+'x'+m.hz; const sel=(dr.w===m.w&&dr.h===m.h)?' selected':''; opts+='<option value="'+v+'"'+sel+'>'+m.w+' &times; '+m.h+' @ '+m.hz+' Hz</option>'; }
+  // Only the SUPERSAMPLED (DLDSR/DSR) resolutions — larger than native — belong here; ABRP restores to
+  // native automatically, so everything at/below native is noise (Dean 2026-08-27). Keep the saved pick visible.
+  const list=Object.values(by).filter(m=>(m.w*m.h)>nativePx || (m.w===dr.w&&m.h===dr.h)).sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+  const oS=' style="background:var(--bg2);color:var(--ink1)"';   // explicit option colours — the native dropdown rendered them too dark
+  let opts='<option value=""'+oS+'>&mdash; pick a resolution &mdash;</option>';
+  for(const m of list){ const v=m.w+'x'+m.h+'x'+m.hz; const sel=(dr.w===m.w&&dr.h===m.h)?' selected':''; opts+='<option value="'+v+'"'+sel+oS+'>'+m.w+' &times; '+m.h+' @ '+m.hz+' Hz</option>'; }
   let h='<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink1);cursor:pointer;padding:3px 0"><input type="checkbox" '+(dr.enabled?'checked':'')+' onchange="drSetEnabled(this.checked)" style="accent-color:var(--acc);width:15px;height:15px"> Set the desktop resolution when MSFS launches, restore it when the sim closes</label>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">'
-    +'<select id="dr-mode" onchange="drSetMode(this.value)" style="background:var(--bg);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;min-width:210px">'+opts+'</select>'
+  h+=(cur&&cur.w?'<div style="font-size:11px;color:var(--ink3);margin:3px 0 6px">Native <b>'+cur.w+' &times; '+cur.h+'</b> — restored automatically on sim close. Pick your DLDSR resolution:</div>':'');
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px">'
+    +'<select id="dr-mode" onchange="drSetMode(this.value)" style="background:var(--bg2);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;min-width:210px">'+opts+'</select>'
     +'<button class="btn bg bxs" onclick="drRestoreNow()">Restore now</button>'
     +'<span id="dr-msg" style="font-size:11px;color:var(--ink3)"></span>'
     +'</div>';
-  if(!list.length) h+='<div style="font-size:11px;color:var(--acc);margin-top:6px">No display modes read. If you just enabled DLDSR in NVIDIA Control Panel, restart ABRP so the new resolution appears here.</div>';
+  if(!list.length) h+='<div style="font-size:11px;color:var(--ink2);margin-top:6px">No resolutions above your native'+((cur&&cur.w)?' '+cur.w+' &times; '+cur.h:'')+' — enable DLDSR in NVIDIA Control Panel first, then restart ABRP.</div>';
   el.innerHTML=h;
 }
 function drSetEnabled(v){ S.cfg.displayRes=Object.assign({}, S.cfg.displayRes||{}, {enabled:!!v}); window.api.saveConfig(S.cfg); }
@@ -8528,5 +8535,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.21.1</div>
+  pointer-events:none;">v6.21.2</div>
 </body></html>
