@@ -115,4 +115,15 @@ T('panel marks the resolved source selected (key present → SI)', /✓ /.test(p
 T('renderLiveAtc shows the ATIS source panel (Live mode on OR off)', /h\+=latcAtisSourcePanel\(\);/.test(X.html));
 T('SI key field is NOT duplicated in the Settings VATSIM block', !/id="si-apikey"/.test(grab('renderVatsimSettings')));
 
+// ── (f) ATIS runway must WIN the write race vs the METAR wind-estimate (Dean 2026-08-28, LFMN 22L/22R):
+// fetchDatis + the METAR writers both fill the same Active-Runway span, unawaited → last-write-wins.
+// For LFMN's parallels (SI: ARVG 22R / DPTG 22L) the wind can't tell 22L from 22R, so bestRwy picked 22L
+// and clobbered SI's authoritative 22R. Guard: fetchDatis flags the field, the METAR writers defer.
+T('fetchDatis flags the Active-Runway field as ATIS-owned', /rwyEl\.innerHTML=rwyHtml; rwyEl\.dataset\.atis='1'/.test(fd));
+for(const fn of ['fetchMetar','fetchFrMetar','fetchTpMetar']){
+  const src = grab(fn);
+  T(fn+" defers its wind-estimate to an ATIS runway", /if\(rwyEl&&rwyEl\.dataset\.atis!=='1'\)rwyEl\.textContent=best;/.test(src));
+  T(fn+" defers 'Check ATIS' to an ATIS runway too", /if\(rwyEl&&rwyEl\.dataset\.atis!=='1'\)rwyEl\.textContent='Check ATIS'/.test(src));
+}
+
 process.exit(T.done() ? 1 : 0);

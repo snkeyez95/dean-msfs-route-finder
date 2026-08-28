@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.21.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.21.3</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.21.2</div>
+    <div class="sb-ver">v6.21.3</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3544,9 +3544,9 @@ async function fetchFrMetar(icao,idx,side){
   const wxEl=document.getElementById('frwx-'+side+'-'+idx);
   if(wxEl)wxEl.innerHTML=wxBlock(m);
   const w=parseWind(rawText);
-  if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  if(!w){if(rwyEl&&rwyEl.dataset.atis!=='1')rwyEl.textContent='Check ATIS';return;}
   const best=bestRwy(icao,w.dir,w.spd);
-  if(rwyEl)rwyEl.textContent=best;
+  if(rwyEl&&rwyEl.dataset.atis!=='1')rwyEl.textContent=best;   // defer to an ATIS/SI runway if fetchDatis already set one
   if(windEl){
     const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
     const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
@@ -3939,9 +3939,9 @@ async function fetchTpMetar(icao,idx,side){
   const wxEl=document.getElementById('tpwx-'+side+'-'+idx);
   if(wxEl)wxEl.innerHTML=wxBlock(m);
   const w=parseWind(rawText);
-  if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  if(!w){if(rwyEl&&rwyEl.dataset.atis!=='1')rwyEl.textContent='Check ATIS';return;}
   const best=bestRwy(icao,w.dir,w.spd);
-  if(rwyEl)rwyEl.textContent=best;
+  if(rwyEl&&rwyEl.dataset.atis!=='1')rwyEl.textContent=best;   // defer to an ATIS/SI runway if fetchDatis already set one
   if(windEl){
     const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
     const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
@@ -6186,10 +6186,10 @@ async function fetchMetar(icao,idx,side){
   const wxEl=document.getElementById('wx-'+side+'-'+idx);
   if(wxEl)wxEl.innerHTML=wxBlock(m);
   const w=parseWind(rawText);
-  if(!w){if(rwyEl)rwyEl.textContent='Check ATIS';return;}
+  if(!w){if(rwyEl&&rwyEl.dataset.atis!=='1')rwyEl.textContent='Check ATIS';return;}
   await fetchRwyData(icao);
   const best=bestRwy(icao,w.dir,w.spd);
-  if(rwyEl)rwyEl.textContent=best;
+  if(rwyEl&&rwyEl.dataset.atis!=='1')rwyEl.textContent=best;   // defer to an ATIS/SI runway if fetchDatis already set one
   if(windEl){
     const xw=best!=='Check ATIS'?xwind(icao,best,w.dir,w.spd):0;
     const cls=xw>20?'advr':xw>12||w.spd>25?'adva':'advg';
@@ -6797,7 +6797,7 @@ async function fetchDatis(icao,idx,side,prefix){
     if(rwyHtml==null){
       rwyHtml='RWY '+rwyTxt+(info.approach?' &middot; '+info.approach:'')+' <span class="datis-tag"'+(isVatsim?' style="color:var(--grn);border-color:var(--grn)"':(isSi?' style="color:var(--acc);border-color:var(--acc)"':''))+'>'+(isSi?'SI ATIS':(isVatsim?'VATSIM':'D-ATIS'))+'</span>';
     }
-    rwyEl.innerHTML=rwyHtml;
+    rwyEl.innerHTML=rwyHtml; rwyEl.dataset.atis='1';   // ATIS/SI runway is authoritative — the METAR wind-estimate must not clobber it (both write this field; last-write-wins race; e.g. LFMN parallels 22L/22R indistinguishable by wind)
   }else if(rwyEl){
     // NO RUNWAY FROM THIS ATIS. Never leave the field as-is: it may still be showing a DIFFERENT
     // source's runway wearing that source's badge (Dean 2026-07-16 — an unparseable VATSIM ATIS at
@@ -8535,5 +8535,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.21.2</div>
+  pointer-events:none;">v6.21.3</div>
 </body></html>
