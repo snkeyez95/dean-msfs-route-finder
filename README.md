@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.21.4 CESSNA CITATION X RECOGNIZED (REFERENCE AIRCRAFT). The MSFS in-sim Citation X now logs under one clean name ("Citation X") and no longer triggers the "SimBrief aircraft not recognized" warning before Launch + Capture. It's treated as a reference aircraft like the Citation Sovereign — its flights are logged and charted, but it's excluded from your fixed-TLOD baseline (it's a light jet, not one of your benchmark heavies), so it doesn't touch your completed 24-flight benchmark.
+
 v6.21.3 ARRIVAL CARD SHOWED THE WRONG RUNWAY (DEPARTURE INSTEAD OF LANDING). At an airport with parallel runways where SI splits arrivals and departures (e.g. Nice LFMN — SI: land 22R, depart 22L), the "Active Runway" field could show the departure runway even though the SI ATIS badge correctly said land 22R. Cause: two things fill that field at once — the authoritative SI/ATIS runway and a wind-based estimate — and whichever finished last won; the wind estimate can't tell parallel runways apart, so it sometimes overwrote SI's correct runway. Fixed: an ATIS/SI runway now always wins; the wind estimate only fills in when there's no ATIS runway. Applies to Plan a Flight, Free Route, and Trip Planner cards.
 
 v6.21.2 DISPLAY PICKER SHOWS ONLY DLDSR RESOLUTIONS + READABLE TEXT. The resolution dropdown now lists only resolutions above your native (the DLDSR/supersampled ones you'd actually pick), with readable option text, and a neutral empty-state.

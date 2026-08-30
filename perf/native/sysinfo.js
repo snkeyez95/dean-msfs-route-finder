@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const CITATION_LABEL = 'Citation Sovereign+';
+const CITATIONX_LABEL = 'Citation X';    // reference aircraft (MSFS in-sim light jet) — not benchmarked
 const PMDG777_LABEL = 'PMDG 777';        // v6.19.0 — its own benchmark label, never the 737's 'PMDG'
 const TARGET_PROCESS = 'FlightSimulator2024.exe';
 
@@ -67,6 +68,12 @@ function normalizeAircraftTitle(title, benchmark) {
   // migration in main.js is the primary path (v6.19.0).
   if (['777', '77w'].some(b => tl.includes(b))) return PMDG777_LABEL;
   if (tl.includes('pmdg') || ['737', '747', 'dc-6', 'dc6'].some(b => tl.includes(b))) return 'PMDG';
+  // Citation X (MSFS in-sim light jet) — a REFERENCE aircraft like the Sovereign: recognized so its
+  // flights group under one label, but NOT in the benchmark grid, so it's excluded from the baseline
+  // and auto-TLOD treats it as coverage-complete (no "aircraft not recognized" prompt). Match the sim
+  // title ("Citation X Winglets") and the SimBrief ICAO (C750); 'citation x'/'c750' can't steal the
+  // Sovereign ("citation sovereign" contains neither).
+  if (tl.includes('citation x') || tl.includes('c750')) return CITATIONX_LABEL;
   if (tl.includes('sovereign') || ['c68a', 'c680'].some(c => tl.includes(c))) return CITATION_LABEL;
   return title;
 }

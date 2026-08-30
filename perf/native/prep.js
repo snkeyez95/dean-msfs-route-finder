@@ -9,6 +9,7 @@ const { computeCoverage, nextGapForAircraft } = require('./coverage.js');
 const { readSettings, writeSettingsText } = require('./settings.js');
 
 const CITATION_LABEL = 'Citation Sovereign+';
+const CITATIONX_LABEL = 'Citation X';    // reference aircraft (MSFS in-sim light jet) — not benchmarked
 const PMDG777_LABEL = 'PMDG 777';        // v6.19.0 — matched ahead of the generic PMDG terms
 const p2 = n => String(n).padStart(2, '0');
 
@@ -30,6 +31,10 @@ function normalizeSimbriefAircraft(...cands) {
   // 'pmdg' and auto-TLOD would write a 737 benchmark value for a 777 flight (v6.19.0).
   if (['b77w', 'b773', 'b772', 'b77l', '777', '77w'].some(b => blob.includes(b))) return PMDG777_LABEL;
   if (blob.includes('pmdg') || ['b737', 'b738', 'b739', '737', '738', '739'].some(b => blob.includes(b))) return 'PMDG';
+  // Citation X (C750) — recognized as a reference aircraft so auto-TLOD treats it as coverage-complete
+  // (nextGapForAircraft returns null: it's not in the benchmark grid) instead of the misleading
+  // "SimBrief aircraft not recognized" prompt Dean hit. Not counted toward any baseline.
+  if (blob.includes('citation x') || blob.includes('c750')) return CITATIONX_LABEL;
   if (blob.includes('sovereign') || ['c68a', 'c680'].some(c => blob.includes(c))) return CITATION_LABEL;
   return null;
 }
