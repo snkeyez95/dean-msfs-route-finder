@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.21.6 FIX: CITATION X OFFERED TO ACTIVATE THE WRONG AIRCRAFT. In Free Route with the Citation X selected, the activate box offered to link your "Caravan" group — because that group bundles the pms50 GTN750 GPS mod, whose name contains "750", which collided with the Citation X's ICAO code C750. The aircraft matcher was doing a loose substring match on the model number; it now matches the number only as its own token, so C750 no longer latches onto "gtn750" (and any model number embedded in an unrelated package name is no longer a false match). The Citation X is a marketplace plane, so it now correctly offers no aircraft to activate.
+
 v6.21.5 CITATION X NOW IN MY FLEET. The Cessna Citation X appears in Settings → My Fleet under CITATION, next to the Sovereign, marked "Free Route only · no scheduled routes" (bizjets have no scheduled airline routes). It ships checked, so it's ready to pick in Free Route right away — no tick needed. (v6.21.4 added the engine-side recognition; this adds the visible fleet option.)
 
 v6.21.4 CESSNA CITATION X RECOGNIZED (REFERENCE AIRCRAFT). The MSFS in-sim Citation X now logs under one clean name ("Citation X") and no longer triggers the "SimBrief aircraft not recognized" warning before Launch + Capture. It's treated as a reference aircraft like the Citation Sovereign — its flights are logged and charted, but it's excluded from your fixed-TLOD baseline (it's a light jet, not one of your benchmark heavies), so it doesn't touch your completed 24-flight benchmark.

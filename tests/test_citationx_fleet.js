@@ -70,4 +70,26 @@ T('3. Free Route aircraft picker offers the Citation X', fr.includes('Citation X
 const sov = sb.FLEET_DEF.find(f => f.code === 'C680');
 T('4. Sovereign entry unchanged (def:false, freeOnly)', sov && sov.def === false && sov.freeOnly === true);
 
+// ── 5. aircraftGroupForType must NOT false-match C750 → the Caravan group's GTN750 GPS mod ──
+// (Dean 2026-09-02: Free Route + Citation X offered to activate "Caravan (3 pkg)". Its
+// pms50-instrument-gtn750 package contains "750", which collided with the C750 ICAO code under the
+// old loose-substring match. The Citation X is a marketplace plane — it should match NOTHING.)
+const agft = (function(){
+  let src = 'let S={acftGroups:[]};\n';
+  src += /const FLEET_DEF=\[[\s\S]*?\n\];/.exec(html)[0] + '\n';
+  src += /const FLEET_LBL=[^\n]*;/.exec(html)[0] + '\n';
+  src += X.grab('aircraftGroupForType', html) + '\nreturn {S, aircraftGroupForType};';
+  return new Function(src)();
+})();
+agft.S.acftGroups = [
+  { id:'Caravan', label:'Caravan', packages:[
+    {name:'bksq-aircraft-caravanpro'}, {name:'bksq-aircraft-caravanprovariants'}, {name:'pms50-instrument-gtn750'} ] },
+  { id:'Fenix/320', label:'Fenix A320', packages:[ {name:'fnx-aircraft-320'}, {name:'fnx-aircraft-320-liveries'} ] },
+  { id:'PMDG/737-800', label:'PMDG 737-800', packages:[ {name:'pmdg-aircraft-738'} ] },
+];
+const cxGroup = agft.aircraftGroupForType('C750');
+T('5. C750 (Citation X) matches NO group — the gtn750 collision is gone', cxGroup === null, cxGroup && cxGroup.id);
+T('   …A320 still matches the Fenix 320 group (real match preserved)', (agft.aircraftGroupForType('A320')||{}).id === 'Fenix/320', (agft.aircraftGroupForType('A320')||{}).id);
+T('   …B738 still matches the PMDG 737-800 group', (agft.aircraftGroupForType('B738')||{}).id === 'PMDG/737-800', (agft.aircraftGroupForType('B738')||{}).id);
+
 process.exit(T.done() ? 1 : 0);
