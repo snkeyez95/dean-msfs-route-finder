@@ -2720,6 +2720,20 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **🎚️ AutoFPS TLOD band 250/400 — validated finding + envelope-card dataset (Dean 2026-09-18).** Dean's
+  insight: high TLOD at cruise (FL430) is wasted (can't resolve terrain 8mi down); TLOD's visible payoff is
+  LOW altitude (taxi/climb/approach). His traces confirmed AutoFPS did the opposite by default — pinned TLOD
+  at the 125 floor on payware GROUND (VRAM had room, 77–81%) and cranked to the 800 cap at CRUISE (VRAM
+  redline 95–98%), spending FPS headroom where detail is invisible. Fix = narrow the band toward where
+  detail pays: min 125→250, max 800→400. VALIDATED (Citation X LDDU→LTFM, reverse-leg A/B vs the 800-cap
+  LTFM→LDDU): floor held exactly at 250 (VRAM backstop never fired, LDDU payware taxi 88%), 71% at the 400
+  cap, VRAM peak 89.4% vs 95.6% at 800, P99 17.18 vs 17.22, 0 periodic both — ~6pts VRAM cushion back, off
+  the crash redline, smoothness identical. Min is a SOFT floor (AutoFPS VRAM protection can pull below it —
+  Dean's correction, confirmed). Headroom at 89% to nudge max to ~450–500 if more mid-alt detail wanted.
+  **This is the textbook real-world dataset for the parked "AutoFPS envelope card" feature** (roadmap
+  v6.11.0 §6) — a per-rig read "at cap 800 you park at 96% VRAM and never reach it; the useful band is
+  250–400." Build the envelope card when Dean wants it. Context: last week's S_OK device-removed crash
+  (sim 1.8.16) is why the VRAM cushion matters. See [[autofps-tlod-band-250-400]].
 - **🔗 Fenix installer "phantom update" triggered by ABRP aircraft-junction re-creation (Dean 2026-07-21,
   diagnosed end-to-end).** Fenix installer repeatedly shows "Update v2.4.0.4720" (the SAME version already
   installed, April 15) for the A320/A319-321 BASE packs (not liveries — that guess was wrong). PROVEN
