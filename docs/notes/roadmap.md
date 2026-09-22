@@ -1,5 +1,92 @@
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
+## 🛬 v6.22.0 — TLOD LEGEND STAT + LANDING PERFORMANCE READOUT (Dean 2026-09-22, plan-approved design)
+> ✅ BUILT 2026-09-22 (awaiting Dean release.bat). Feature 1: report_html.js passes autofps_trace stats
+> as CHART.tlod_stats; chart.js chipName renders "TLOD (AutoFPS · med · min–max · %at cap)" (verified vs
+> the real KDFW-KTPA sidecar: med 400 · 250–400 · 75% at cap). Feature 2: simconnect.js adds a SIM_FRAME
+> VERTICAL SPEED + G FORCE stream (DEF_LAND/REQ_LAND, isolated from the 1 Hz path, re-attaches on
+> reconnect) → LandingTracker (touchdown FPM from the last airborne frame, peak-G 2s window, bounce
+> detection, soft MIN_AIRBORNE gate); capture.js wires it → summary.settings.landing + perf_live.json;
+> engine.js writes the landing block + index entry; report_html.js landing card + report.css; debrief.js
+> landing line; overlay via perf-capture-status.landing → updateCaptureBadge fires a one-time overlay
+> toast (type 'landing', default-on, VATSIM-independent — same path as the recording dot). tests/test_landing.js
+> 24/24 + full board green (repaired one stale test_record_now regex for the new destructure). Rating is a
+> WORD (colourblind-safe). Going-forward only. OWED: Dean release.bat + a live landing to validate FPM/G.
+
+### Context
+Dean flies AutoFPS on the validated 250/400 band ([[autofps-tlod-band-250-400]]) and wants two additions to
+the per-flight performance report: (1) a **TLOD summary stat on the chart legend**, mirroring the VRAM chip
+that already shows "VRAM (avg 9,539 · peak 11,636 MB)" — so the dynamic AutoFPS TLOD gets an at-a-glance
+range too; (2) a **landing-performance readout** (touchdown vertical speed in FPM + peak G, plus touchdown
+groundspeed, a plain-word rating, and bounce detection) — the kind of number a landing-rate monitor gives.
+Dean wants the landing readout in THREE places: the per-flight report card, the text debrief, and the
+**in-sim overlay after touchdown** (the recording dot/panel shows the landing result once you're down).
+ABRP already plots dynamic TLOD and computes trace stats, but it does NOT capture vertical speed or G, and
+its SimConnect sampler runs at 1 Hz — too coarse to catch a touchdown (a firm landing is sub-second).
+
+### Decisions locked (Dean 2026-09-22)
+- TLOD legend chip = **median + range + % at cap** (e.g. "TLOD (AutoFPS · med 400 · 250–800 · 71% at cap)").
+- Landing readout includes **FPM + peak G + touchdown groundspeed + rating label + bounce detection**, shown
+  in **report card + debrief line + in-sim overlay after touchdown**.
+- Going-forward only for landing (needs new capture; can't backfill). Live-landing validation required.
+
+### Feature 1 — TLOD legend stat (small, mostly chart-file)
+- `perf/native/report_assets/chart.js` (~:219, beside `_vramStat`): the VRAM chip is built in `chipName(d)`
+  (~:236) from an in-chart avg/peak. Add the TLOD equivalent. **Prefer the AUTHORITATIVE precomputed stats**
+  from `autofps_trace.json` (`traceStats` in `autofps_log.js` already emits `tlod_med`, `tlod_min`,
+  `tlod_max`, `pct_at_cap`) over recomputing from the possibly-downsampled plotted `tlodData` — so `%at cap`
+  matches the sidecar. Pass them through: `report_html.js` already reads the trace for the TLOD line, so add
+  `CHART.tlodStats = trace.stats`; `chipName` renders "TLOD (AutoFPS · med {med} · {min}–{max} · {pct}% at
+  cap)", falling back to plain "TLOD (AutoFPS)" when no stats (non-AutoFPS flights). Works on existing flights
+  immediately.
+- Files: `report_assets/chart.js`, `report_html.js`.
+
+### Feature 2 — Landing performance (capture-side addition, mirrors the v6.6.1 parking-brake pattern)
+- **Capture (`simconnect.js`):** add `VERTICAL SPEED` (unit "Feet per minute", FLOAT64) + `G FORCE` (unit
+  "GForce", FLOAT64). Both are sim-level SimVars → reliable on PMDG/Fenix/Citation (unlike the brake var).
+  Touchdown needs frame-rate sampling, so add these via a **separate `requestDataOnSimObject` at
+  `SimConnectPeriod.SIM_FRAME`** (own DEF/REQ id) feeding a new `LandingTracker` — this ISOLATES the change
+  from the proven 1 Hz `SECOND` stream that drives rolling-detection / telemetry / VATSIM traffic (do NOT
+  bump that stream's period). Positional reads, documented like the lat/lon + brake additions.
+- **`LandingTracker`:** while airborne, keep the rolling VS; on the airborne→on-ground transition (after a
+  sustained airborne period, to ignore the initial ground roll), record `touchdown_fpm` (VS at touchdown),
+  open a ~2 s window tracking `peak_g` (max G), capture `touchdown_gs_kt` (from GROUND VELOCITY). Count
+  transitions inside a short window as **bounces**; report the firmest touchdown (most-negative FPM / highest
+  G) as primary + `bounce_count`. Rating from FPM with a G bump (tunable consts): Butter > −60, Good
+  −60..−180, Firm −180..−400, Hard < −400; peak G > ~1.8 bumps up a tier. **Rating is colorblind-safe** —
+  always show the WORD (never color alone), per [[dean_colorblind]].
+- **`capture.js` / `engine.js`:** at `fileSession`, write a `landing` block into `summary.json`
+  `{touchdown_fpm, peak_g, touchdown_gs_kt, rating, bounce_count}`. On touchdown, ALSO write the landing
+  result into `perf_live.json` (the v6.12.0 live-strip channel) so the overlay can show it live.
+- **Surfaces:**
+  - `report_html.js` (+ `report_assets/report.css`): a small "Landing" card near the debrief, shown only when
+    a `landing` block exists.
+  - `debrief.js`: one landing line (e.g. "Touchdown: −142 fpm · 1.28 G · 138 kt — Good (no bounce)").
+  - **Overlay:** `main.js` `readPerfLive()` already attaches `perf_live.json` to the `overlay-state` payload;
+    add the `landing` field; `overlay.html` renders a landing card on the dot/panel after touchdown. VERIFY
+    the overlay is present for a non-VATSIM capture flight (the recording-confirmation dot is — Dean sees it
+    with VATSIM off — but confirm the landing card shows outside Live ATC mode; if the overlay is gated to
+    Live mode, ungate the landing card so it shows on any capture flight).
+- Retroactivity: none — landing card/line absent on pre-v6.22.0 flights.
+
+### Files
+`report_assets/chart.js` + `report_html.js` (TLOD chip); `simconnect.js` (VS+G SIM_FRAME def + LandingTracker),
+`capture.js` (wire tracker → summary + perf_live.json), `engine.js` (summary landing block), `debrief.js`
+(landing line), `report_html.js` + `report_assets/report.css` (landing card), `main.js` (landing in
+overlay-state), `overlay.html` (landing card). Version v6.22.0 ×4 + README changelog. Memory/roadmap sync.
+
+### Verification
+- Desk (tests/): `LandingTracker` on synthetic VS/G/on-ground sequences — smooth landing (small −FPM, ~1.1 G →
+  Butter/Good), hard landing (large −FPM / high G → Hard), a bounce (two transitions → bounce_count≥1, firmest
+  reported), and a go-around-then-land (early transition ignored, final landing captured). TLOD chip: assert
+  `chipName` renders med/range/%at-cap from a real `autofps_trace.json` stats block and falls back cleanly
+  when absent. `node tests\run_all.js` full board + `node --check` all touched + renderer Function-parse.
+- Live (Dean): fly a landing → per-flight report shows the Landing card + the TLOD chip shows med/range/%at-cap;
+  debrief has the landing line; the overlay shows the landing readout after touchdown (test once with VATSIM
+  OFF to confirm it's not Live-mode-gated). Sanity-check the FPM/G against his feel or a landing-rate reference.
+
+
+
 ## 📻 v6.20.0 — SI ATIS SOURCE for Plan a Flight (VATSIM ⟷ SayIntentions toggle) (Dean 2026-08-25, plan-approved)
 
 ### Context

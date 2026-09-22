@@ -58,3 +58,11 @@
   .phase-row .num { font-family:Consolas,monospace; font-size:12px; text-align:right; }
   .note { color:var(--text-faint); font-size:12px; font-style:italic; padding:14px 15px; }
   footer { color:var(--text-faint); font-size:11px; margin-top:6px; line-height:1.6; }
+  /* v6.22.0 landing performance card */
+  .land-body { padding:4px 2px 2px; }
+  .land-rate { display:flex; align-items:baseline; gap:6px; }
+  .land-num { font-family:Consolas,monospace; font-size:26px; font-weight:700; color:var(--text); }
+  .land-unit { font-size:13px; color:var(--text-dim); }
+  .land-rating { margin-left:auto; font-size:13px; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:2px 9px; }
+  .land-sub { margin-top:8px; font-family:Consolas,monospace; font-size:12px; color:var(--text-dim); }

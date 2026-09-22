@@ -133,6 +133,15 @@ function buildDebrief(opts) {
   // 4. optional context
   const ctx = contextLine(settings, stats, history, changedKeys);
   if (ctx) lines.push({ text: ctx, tone: 'dim' });
+  // 5. landing (v6.22.0) — touchdown FPM/G, when captured
+  const ld = settings.landing;
+  if (ld && ld.touchdown_fpm != null) {
+    const bc = ld.bounce_count || 0;
+    lines.push({ text: 'Touchdown: ' + ld.touchdown_fpm + ' fpm · ' + pyRound(ld.peak_g, 2) + ' G' +
+      (ld.touchdown_gs_kt != null ? ' · ' + ld.touchdown_gs_kt + ' kt' : '') +
+      ' — ' + ld.rating + (bc > 0 ? ' (' + bc + ' bounce' + (bc > 1 ? 's' : '') + ')' : ''),
+      tone: 'body' });
+  }
 
   return { word: GRADE_WORD[grade], color: GRADE_COL[grade], grade, headSub, rank, autofps: af, lines };
 }

@@ -96,7 +96,10 @@ function updateIndex(sessionsDir, entry, now) {
 // recordingWallStart, stopTrimS, driverVersion, simVersion, sessionsDir}. Returns the session dir.
 function fileSession(opts) {
   const { rawCsvPath, settings, vram, startedAt, telemetryRows, phaseLog, recordingWallStart,
-    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir, manual } = opts;
+    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir, manual, landing } = opts;
+  // v6.22.0: landing performance rides on settings (same flow as vatsim_traffic_*) → summary.settings.landing
+  // + the report/debrief (which receive settings) + the index entry below. Absent on flights with no touchdown.
+  if (landing) settings.landing = landing;
   const now = startedAt || new Date();
   const tlodStr = settings.tlod != null ? 'TLOD' + settings.tlod : 'TLODna';
   const olodStr = settings.olod != null ? 'OLOD' + settings.olod : 'OLODna';
@@ -237,6 +240,8 @@ function fileSession(opts) {
     // flight-context tags (v6.9.0): flown with online traffic (vatsim/batc) and/or AutoFPS (absent = offline, fixed TLOD)
     ...(settings.online_traffic ? { online_traffic: settings.online_traffic } : {}),
     ...(settings.autofps_active ? { autofps_active: true } : {}),
+    // v6.22.0: landing performance (touchdown FPM/G/gs/rating/bounce) — absent on flights with no touchdown
+    ...(settings.landing ? { landing: settings.landing } : {}),
     // graphics-settings fingerprint (v6.12.0 Settings A/B): hash of the curated watch keys — a change
     // between consecutive flights = a before/after card. Full snapshot lives in summary.settings.graphics.
     ...(settings.gfx_fp ? { gfx_fp: settings.gfx_fp } : {}),

@@ -58,7 +58,7 @@ console.log('\nquarantine:');
 // ── 3. the trim trap — this is what would silently ruin a gate recording ────
 console.log('\nend-trim on a parked session:');
 {
-  T('engine.js takes a manual flag', /sessionsDir, manual \} = opts;/.test(engSrc));
+  T('engine.js takes a manual flag', /sessionsDir, manual, landing \} = opts;/.test(engSrc));
   T('manual sessions use the teardown trim only', /if \(manual\) \{\s*\[ft, cpu, gpu, teardownS\] = trimTeardownTail/.test(engSrc));
   T('the brake/movement anchors still run for real flights',
     /\} else if \(!tryAnchor\(brakeAnchorS, 'brake'\) && !tryAnchor\(moveAnchorS, 'movement'\)\)/.test(engSrc));

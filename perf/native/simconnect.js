@@ -46,6 +46,76 @@ function isRolling(gspeed, onGround, alt) {
          !!onGround && alt != null && alt < ALT_SANE_FT;
 }
 
+// --- landing performance (v6.22.0, Dean 2026-09-22) — touchdown FPM + peak G ---
+// The 1 Hz sampler above is too coarse for a touchdown (a firm landing is sub-second), so VERTICAL SPEED
+// + G FORCE are read on a SEPARATE SIM_FRAME request (attachLandingSampler) feeding this tracker. Pure
+// logic here so it's desk-testable with synthetic frame sequences.
+const MIN_AIRBORNE_S   = 30.0;   // must have flown this long before an on-ground transition counts as a
+                                 // landing — ignores the takeoff ground roll and any pre-flight bump
+const BOUNCE_WINDOW_S  = 8.0;    // a re-touch within this long of going back airborne = a bounce (short hop)
+const PEAK_G_WINDOW_S  = 2.0;    // track peak G for this long after a touchdown (the G spike lags on-ground)
+
+// Rating from descent rate (primary) with a G-spike override. Word-based (never colour alone) — Dean is
+// red-green colourblind. Thresholds are the landing-rate-monitor conventions; tunable.
+function rateLanding(fpm, g) {
+  const a = Math.abs(fpm || 0);
+  let r = a < 60 ? 'Butter' : a < 180 ? 'Good' : a < 400 ? 'Firm' : 'Hard';
+  if (g != null) { if (g >= 2.2) r = 'Hard'; else if (g >= 1.8 && (r === 'Butter' || r === 'Good')) r = 'Firm'; }
+  return r;
+}
+
+class LandingTracker {
+  constructor() {
+    this._airborne = false; this._airborneSince = null; this._lastVs = null;
+    this._touchdowns = [];               // {fpm, t, gs, peak_g}
+    this._peakUntil = 0;                 // ts through which we still grow the latest touchdown's peak G
+  }
+  // vsFpm: vertical speed (ft/min, negative = descending); g: G force (~1.0 level); onGround: 0/1/bool;
+  // gsKt: ground speed; t: wall seconds. Called at frame rate.
+  update(vsFpm, g, onGround, gsKt, t) {
+    const down = (onGround === 0 || onGround === false);
+    const grounded = (onGround === 1 || onGround === true);
+    if (down) {
+      if (!this._airborne) { this._airborne = true; this._airborneSince = t; }
+      if (vsFpm != null) this._lastVs = vsFpm;
+    } else if (grounded) {
+      if (this._airborne) {
+        const dur = this._airborneSince != null ? (t - this._airborneSince) : 0;
+        const first = this._touchdowns.length === 0;
+        // first touchdown needs a real flight before it; a bounce is a short hop after one
+        const qualifies = first ? (dur >= MIN_AIRBORNE_S) : (dur <= BOUNCE_WINDOW_S);
+        if (qualifies) {
+          // touchdown rate = VS from the last AIRBORNE frame (at the on-ground frame VS has already
+          // arrested); fall back to the current read only if we somehow have no airborne sample.
+          const fpm = (this._lastVs != null ? this._lastVs : vsFpm) || 0;
+          this._touchdowns.push({ fpm, t, gs: (gsKt != null ? gsKt : null), peak_g: (g != null ? g : 0) });
+          this._peakUntil = t + PEAK_G_WINDOW_S;
+        }
+      }
+      this._airborne = false; this._airborneSince = null;
+    }
+    // grow the latest touchdown's peak G through the window (the spike arrives a frame or two after
+    // the on-ground flag flips)
+    if (this._touchdowns.length && t <= this._peakUntil && g != null) {
+      const td = this._touchdowns[this._touchdowns.length - 1];
+      if (g > td.peak_g) td.peak_g = g;
+    }
+  }
+  // The firmest touchdown (most-negative FPM) + bounce count. null when no landing was seen.
+  result() {
+    if (!this._touchdowns.length) return null;
+    let firmest = this._touchdowns[0];
+    for (const td of this._touchdowns) if (td.fpm < firmest.fpm) firmest = td;
+    return {
+      touchdown_fpm: Math.round(firmest.fpm),
+      peak_g: Math.round((firmest.peak_g || 0) * 100) / 100,
+      touchdown_gs_kt: firmest.gs != null ? Math.round(firmest.gs) : null,
+      bounce_count: Math.max(0, this._touchdowns.length - 1),
+      rating: rateLanding(firmest.fpm, firmest.peak_g),
+    };
+  }
+}
+
 // Accumulates the phase_log (transition list) + telemetry the same way the Python tracker does.
 class PhaseTracker {
   constructor(recordingWallStart) {
@@ -76,6 +146,7 @@ class PhaseTracker {
 
 // --- node-simconnect I/O (validated at the gate) ---
 const DEF_ID = 1, REQ_ID = 1;
+const DEF_LAND = 3, REQ_LAND = 3;   // v6.22.0: separate SIM_FRAME stream for touchdown FPM + G (id 2 = TITLE)
 
 // Open a SimConnect session, retrying until success or sustained unreachability. Resolves the handle
 // (sim is alive) or 'no-flight' (sim genuinely closed). log(msg) is optional.
@@ -134,6 +205,31 @@ function attachSampler(handle, tracker) {
     } catch (_) {}
   });
   return state;
+}
+
+// v6.22.0: attach a SIM_FRAME (per-frame) landing stream to a handle, feeding a LandingTracker. Isolated
+// from the 1 Hz stream above so touchdown FPM + peak G are caught at frame rate without touching the
+// proven rolling/telemetry path. Fully defensive — any failure here must never disturb the capture.
+function attachLandingSampler(handle, landing) {
+  if (!landing) return;
+  try {
+    const { SimConnectDataType, SimConnectPeriod } = require('node-simconnect');
+    handle.addToDataDefinition(DEF_LAND, 'VERTICAL SPEED', 'Feet per minute', SimConnectDataType.FLOAT64);
+    handle.addToDataDefinition(DEF_LAND, 'G FORCE', 'GForce', SimConnectDataType.FLOAT64);
+    handle.addToDataDefinition(DEF_LAND, 'SIM ON GROUND', 'Bool', SimConnectDataType.INT32);
+    handle.addToDataDefinition(DEF_LAND, 'GROUND VELOCITY', 'Knots', SimConnectDataType.FLOAT64);
+    handle.requestDataOnSimObject(REQ_LAND, DEF_LAND, 0 /* USER */, SimConnectPeriod.SIM_FRAME);
+    handle.on('simObjectData', (recv) => {
+      if (recv.requestID !== REQ_LAND) return;
+      try {
+        const vs = recv.data.readFloat64();
+        const g = recv.data.readFloat64();
+        const onGround = recv.data.readInt32();
+        const gs = recv.data.readFloat64();
+        landing.update(vs, g, onGround, gs, Date.now() / 1000);
+      } catch (_) {}
+    });
+  } catch (_) {}
 }
 
 // Watch one connection for rolling. Resolves 'rolling' when ground-roll holds AUTO_CONFIRM_SECONDS,
@@ -200,9 +296,11 @@ async function armAndConnect(appName, log) {
 class ResilientSampler {
   constructor(appName, handle, state, log) {
     this._appName = appName; this._say = log || (() => {});
-    this._stopped = false; this._reconnecting = false;
+    this._stopped = false; this._reconnecting = false; this._landing = null;
     this._adopt(handle, state);
   }
+  // v6.22.0: begin per-frame touchdown tracking on the live handle (re-attached on reconnect below).
+  enableLanding(tracker) { this._landing = tracker; try { attachLandingSampler(this._handle, tracker); } catch (_) {} }
   _adopt(handle, state) {
     this._handle = handle; this._state = state;
     const onDrop = () => this._reconnect('connection dropped');
@@ -238,6 +336,7 @@ class ResilientSampler {
         .then(({ handle }) => {
           if (this._stopped) { try { handle.close(); } catch (_) {} return; }
           this._adopt(handle, attachSampler(handle, null));
+          if (this._landing) { try { attachLandingSampler(handle, this._landing); } catch (_) {} }
           this._reconnecting = false;
           this._say('  SimConnect reconnected — phase/movement tracking resumed.');
         })
@@ -272,7 +371,7 @@ function readTitle(handle, timeoutMs = 4000) {
 
 module.exports = {
   computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler, readTitle,
-  armAndWaitForRolling, armAndConnect, ResilientSampler,
+  armAndWaitForRolling, armAndConnect, ResilientSampler, attachLandingSampler, LandingTracker, rateLanding,
   AUTO_MIN_SPEED_KT, AUTO_CONFIRM_SECONDS, ALT_SANE_FT, PHASE_VS_FPM, AUTO_GIVEUP_SECONDS,
   AUTO_START_TIMEOUT_S, STALE_DATA_SECONDS,
 };

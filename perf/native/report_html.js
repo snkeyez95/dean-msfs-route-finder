@@ -135,7 +135,8 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
     tlod: tlodPoints ? tlodPoints.map(([x, t]) => [x, PInt(t)]) : null,
     traffic: trafPoints ? trafPoints.map(([x, t]) => [x, PInt(t)]) : null,
     vram: vramPoints ? vramPoints.map(([x, v]) => [x, PInt(v)]) : null,
-    cpu: domPoints ? domPoints.map(([x, d]) => [x, PInt(d)]) : null });
+    cpu: domPoints ? domPoints.map(([x, d]) => [x, PInt(d)]) : null,
+    tlod_stats: (afTrace && afTrace.stats) ? afTrace.stats : null });
   const phaseHtml = RC.phaseBarsHtml(g(stats, 'phases'), {
     dep_icao: g(settings, 'dep_icao'), arr_icao: g(settings, 'arr_icao'),
     dep_scenery: g(settings, 'dep_scenery'), arr_scenery: g(settings, 'arr_scenery') });
@@ -151,6 +152,20 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
       '<span>headroom ' + floatRepr(head) + ' GB</span></div>';
   } else {
     vramHtml = '<div class="vram-nums"><span>VRAM not captured</span><span>install nvidia-ml-py</span></div>';
+  }
+
+  // v6.22.0: landing performance card — touchdown FPM + peak G + groundspeed + rating + bounce. Only when
+  // a landing was captured (going-forward flights). Rating is a WORD (colourblind-safe), never colour alone.
+  let landingHtml = '';
+  const _ld = g(settings, 'landing');
+  if (_ld) {
+    const bc = _ld.bounce_count || 0;
+    const bounceTxt = bc > 0 ? (bc + ' bounce' + (bc > 1 ? 's' : '')) : 'no bounce';
+    landingHtml = '<div class="panel" style="margin-bottom:12px"><div class="panel-h">Landing performance</div>' +
+      '<div class="land-body"><div class="land-rate"><span class="land-num">' + _ld.touchdown_fpm +
+      '</span> <span class="land-unit">fpm</span> <span class="land-rating">' + htmlEscape(String(_ld.rating || '')) + '</span></div>' +
+      '<div class="land-sub">peak ' + floatRepr(_ld.peak_g) + ' G' +
+      (_ld.touchdown_gs_kt != null ? ' · ' + _ld.touchdown_gs_kt + ' kt' : '') + ' · ' + bounceTxt + '</div></div></div>';
   }
 
   let cpuGpu = '';
@@ -307,6 +322,8 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
       <div class="vram-body">${vramHtml}</div>
     </div>
   </div>
+
+  ${landingHtml}
 
   <div class="panel" style="margin-bottom:12px">
     <div class="panel-h">Flight phase breakdown · P99 frametime per phase</div>

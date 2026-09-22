@@ -7,7 +7,7 @@
 // ⚠ INTEGRATION MODULE: every piece it calls is individually tested, but the full path can only be
 // validated with the sim running (a ~5-min gate+taxi session). This is the assembly, not new math.
 const fs = require('fs'), path = require('path');
-const { armAndWaitForRolling, armAndConnect, ResilientSampler, readTitle, PhaseTracker,
+const { armAndWaitForRolling, armAndConnect, ResilientSampler, readTitle, PhaseTracker, LandingTracker,
         AUTO_MIN_SPEED_KT, AUTO_GIVEUP_SECONDS } = require('./simconnect.js');
 const { VramSampler } = require('./vram.js');
 const { TelemetrySampler } = require('./telemetry.js');
@@ -215,6 +215,10 @@ async function runAutoCapture(opts) {
   const tracker = new PhaseTracker(recordingWallStart);
   // Mid-recording SimConnect drops are absorbed here — they must never end the capture (finding 4).
   const sampler = new ResilientSampler(appName, armed.handle, armed.state, say);
+  // v6.22.0 — landing performance: per-frame VERTICAL SPEED + G FORCE feed a touchdown tracker (isolated
+  // from the 1 Hz stream; re-attaches across reconnects). result() is null until a real touchdown.
+  const landing = new LandingTracker();
+  try { sampler.enableLanding(landing); } catch (_) {}
   let lastMovingTs = null, wasAirborne = false, endedOnGround = true;
   // v6.6.1 — parking-brake end-trim anchor (Dean 2026-07-09): the START of the trailing UNBROKEN
   // "parked" streak (brake set, not moving). An explicit release (brake===false) or real ground
@@ -303,6 +307,7 @@ async function runAutoCapture(opts) {
         gpu_util_pct: vram.latestUtil(),
         vram_pct: (vNow != null && vram.totalMb) ? Math.round(vNow / vram.totalMb * 100) : null,
         tlod,
+        landing: landing.result(),   // v6.22.0: null until touchdown, then rides to the overlay
       });
     } catch (_) {}
   }, 5000);
@@ -347,6 +352,7 @@ async function runAutoCapture(opts) {
     telemetryRows, phaseLog: tracker.phaseLog, recordingWallStart,   // absolute times; split subtracts it
     stopTrimS: Math.round(trimS * 10) / 10, brakeAnchorS, driverVersion, simVersion: settings.sim_version,
     manual: recordNow,   // teardown-only trim: the ground-truth anchors assume a real flight
+    landing: landing.result(),   // v6.22.0: touchdown FPM/G/gs/rating/bounce (null if no landing captured)
     sessionsDir: opts.sessionsDir,
   });
 

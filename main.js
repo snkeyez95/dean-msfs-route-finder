@@ -2424,7 +2424,10 @@ ipcMain.handle('perf-capture-status', () => {
   let state = null;
   if (active) { try { const sf = path.join(USER_DATA, 'capture_status.json');
     if (fs.existsSync(sf)) { const j = JSON.parse(fs.readFileSync(sf,'utf8')); if (j && j.state) state = j.state; } } catch(_){} }
-  return { active, state };
+  // v6.22.0: surface the landing result (from perf_live.json) so the badge poll can fire the in-sim
+  // overlay landing summary after touchdown — works with VATSIM Live mode off (SI flights).
+  let landing = null; if (active) { try { const pl = readPerfLive(); if (pl && pl.landing) landing = pl.landing; } catch(_){} }
+  return { active, state, landing };
 });
 ipcMain.on('install-update', () => {
   // Exit FAST so the NSIS installer doesn't catch ABRP mid-shutdown ("cannot be closed / Retry").

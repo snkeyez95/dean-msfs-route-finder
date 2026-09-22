@@ -220,6 +220,10 @@
       if(!vramData||!vramData.length)return null;
       var mx=0,su=0;for(var i=0;i<vramData.length;i++){var v=vramData[i].y;if(v>mx)mx=v;su+=v;}
       return{peak:mx,avg:su/vramData.length};})();
+    // v6.22.0: TLOD median/range/%-at-cap for the legend chip (Dean's ask, mirroring the VRAM chip).
+    // Uses the AUTHORITATIVE precomputed autofps_trace stats (not the possibly-downsampled plotted line),
+    // so %-at-cap matches the sidecar. Null on non-AutoFPS flights → chip falls back to plain label.
+    var _tlodStat=(CHART.tlod_stats&&typeof CHART.tlod_stats.tlod_med==='number')?CHART.tlod_stats:null;
     function _mb(v){return Math.round(v).toLocaleString();}
     // v6.13.11: the legend is now a row of CLICKABLE toggle chips — one per charted line (Dean's ask).
     // Clicking a chip shows/hides that dataset (and its own right-hand axis), state remembered in
@@ -231,7 +235,10 @@
       if(d.label==='VRAM')return vramCol(); if(d.label==='Busiest core')return cpuCol(); return cc.text;}
     function chipName(d){
       if(d.label==='Frametime')return unit==='fps'?'FPS':'Frame time';
-      if(d.label==='TLOD')return 'TLOD (AutoFPS)'; if(d.label==='Traffic')return 'VATSIM traffic';
+      if(d.label==='TLOD')return _tlodStat
+        ?('TLOD (AutoFPS · med '+Math.round(_tlodStat.tlod_med)+' · '+Math.round(_tlodStat.tlod_min)+'–'+Math.round(_tlodStat.tlod_max)+' · '+Math.round(_tlodStat.pct_at_cap)+'% at cap)')
+        :'TLOD (AutoFPS)';
+      if(d.label==='Traffic')return 'VATSIM traffic';
       if(d.label==='Busiest core')return 'Busiest core (AutoFPS)';
       if(d.label==='VRAM')return _vramStat
         ?('VRAM (avg '+_mb(_vramStat.avg)+' · peak '+_mb(_vramStat.peak)+' MB)'):'VRAM';
