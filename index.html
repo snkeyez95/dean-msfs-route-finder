@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.22.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.22.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -390,7 +390,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.22.0</div>
+    <div class="sb-ver">v6.22.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -4180,7 +4180,11 @@ async function perfShowScenery(){
   renderScenery();
 }
 function _scnAgg(flights){
-  const clean=(flights||[]).filter(f=>!f.experiment&&!f.excluded&&!f.autofps_active);
+  // v6.22.1 (Dean 2026-10-02): INCLUDE AutoFPS flights. Scenery is a RELATIVE per-airport z-score vs your
+  // own typical taxi for the same plane+end — NOT the fixed-TLOD baseline — so the baseline flights are
+  // also AutoFPS and the dynamic-TLOD regime cancels. Excluding AutoFPS (a copy of the baseline quarantine)
+  // starved this view to ~27 of 99 flights once AutoFPS became the daily driver. experiment/excluded stay out.
+  const clean=(flights||[]).filter(f=>!f.experiment&&!f.excluded);
   const S_=[];   // one sample per airport-END per flight
   for(const f of clean){
     if(f.dep_icao&&(f.dep_taxi_stutter!=null||f.dep_taxi_vram!=null)) S_.push({icao:f.dep_icao,end:'dep',ac:f.aircraft||'?',payware:!!f.dep_scenery,stut:f.dep_taxi_stutter,p99:f.dep_taxi_p99,vram:f.dep_taxi_vram});
@@ -4224,7 +4228,7 @@ function renderScenery(){
   if(_scnState.paywareOnly) rows=rows.filter(r=>r.payware);
   let h='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:15px;font-weight:700;color:var(--ink1)">&#128748; Scenery impact</span>'
     +'<label style="font-size:12px;color:var(--ink3);display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" '+(_scnState.paywareOnly?'checked':'')+' onchange="scnTogglePayware()" style="accent-color:var(--acc)"> payware only (&#10035;)</label></div>'
-    +'<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Ranked by how much heavier your ground (taxi) performance is at each airport vs your typical ground for the <b>same plane and same end</b> (arrival/departure) — this cancels the aircraft, so a heavy jet isn&rsquo;t blamed on the scenery. &#10035; = you own payware here (addressable). Fresh-boot VRAM, live traffic, and weather also move these numbers, so treat anything under 3 samples as preliminary and ignore tiny gaps. (Felt stutters/hr is a whole-flight number, so it can&rsquo;t be pinned to one airport — see Compare.)</div>';
+    +'<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:14px">Ranked by how much heavier your ground (taxi) performance is at each airport vs your typical ground for the <b>same plane and same end</b> (arrival/departure) — this cancels the aircraft, so a heavy jet isn&rsquo;t blamed on the scenery. &#10035; = you own payware here (addressable). Fresh-boot VRAM, live traffic, and weather also move these numbers, so treat anything under 3 samples as preliminary and ignore tiny gaps. (Felt stutters/hr is a whole-flight number, so it can&rsquo;t be pinned to one airport — see Compare.) <b>AutoFPS flights are included</b> (the comparison is to your own AutoFPS taxis, so it cancels) — but AutoFPS lowers TLOD to protect VRAM at the heaviest fields, so the <b>taxi-VRAM</b> number reads softer there; the taxi-stutter column still shows the real pain.</div>';
   if(!rows.length){ h+='<div style="font-size:13px;color:var(--ink3)">No payware airports in your flights yet.</div>'; sc.innerHTML=h; return; }
   h+='<table style="width:100%;border-collapse:collapse;font-size:12px">'
     +'<tr style="color:var(--ink3);text-align:right"><th style="text-align:left;padding:5px 6px">Airport</th><th style="padding:5px 6px">samples</th><th style="text-align:left;padding:5px 6px">planes</th><th style="padding:5px 6px">taxi stutter</th><th style="padding:5px 6px">taxi VRAM</th><th style="padding:5px 6px">taxi p99</th><th style="text-align:center;padding:5px 6px">impact</th></tr>';
@@ -8551,5 +8555,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.22.0</div>
+  pointer-events:none;">v6.22.1</div>
 </body></html>
