@@ -55,12 +55,23 @@ const MIN_AIRBORNE_S   = 30.0;   // must have flown this long before an on-groun
 const BOUNCE_WINDOW_S  = 8.0;    // a re-touch within this long of going back airborne = a bounce (short hop)
 const PEAK_G_WINDOW_S  = 2.0;    // track peak G for this long after a touchdown (the G spike lags on-ground)
 
-// Rating from descent rate (primary) with a G-spike override. Word-based (never colour alone) — Dean is
-// red-green colourblind. Thresholds are the landing-rate-monitor conventions; tunable.
+// Rating driven by PEAK G (v6.22.3, Dean 2026-10-06) — real airlines/manufacturers rate hard landings by
+// FDR vertical acceleration, not descent rate (Boeing 737 hard-inspection ≈2.1 G, A320 ≈2.6 G, 747 ≈1.7 G,
+// severe ≈2.86 G). Generic/conservative transport bands here; FPM stays shown as context, with a safety
+// escalator only for a genuinely extreme sink rate (rare low-G/high-sink case). Word-based (never colour
+// alone) — Dean is red-green colourblind. Both FPM and G are always reported on the card.
 function rateLanding(fpm, g) {
   const a = Math.abs(fpm || 0);
-  let r = a < 60 ? 'Butter' : a < 180 ? 'Good' : a < 400 ? 'Firm' : 'Hard';
-  if (g != null) { if (g >= 2.2) r = 'Hard'; else if (g >= 1.8 && (r === 'Butter' || r === 'Good')) r = 'Firm'; }
+  const ORDER = ['Butter', 'Good', 'Firm', 'Hard', 'Severe'];
+  let r;
+  if (g != null && g > 0) {
+    r = g < 1.2 ? 'Butter' : g < 1.4 ? 'Good' : g < 1.7 ? 'Firm' : g < 2.1 ? 'Hard' : 'Severe';
+    const fr = a >= 1000 ? 'Severe' : a >= 700 ? 'Hard' : null;   // extreme-sink backstop
+    if (fr && ORDER.indexOf(fr) > ORDER.indexOf(r)) r = fr;
+  } else {
+    // No G available (shouldn't happen — G is a sim-level var) → airliner-calibrated FPM bands (good ≤250).
+    r = a < 130 ? 'Butter' : a < 250 ? 'Good' : a < 400 ? 'Firm' : a < 600 ? 'Hard' : 'Severe';
+  }
   return r;
 }
 

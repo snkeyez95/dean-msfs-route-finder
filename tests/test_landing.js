@@ -23,13 +23,16 @@ function landingSeq(vs, touchG, opts){
   return f;
 }
 
-// ── 1. rateLanding thresholds ──
-T('1. rateLanding: -40 fpm → Butter', rateLanding(-40, 1.1) === 'Butter', rateLanding(-40,1.1));
-T('   -120 fpm → Good', rateLanding(-120, 1.1) === 'Good');
-T('   -300 fpm → Firm', rateLanding(-300, 1.2) === 'Firm');
-T('   -650 fpm → Hard', rateLanding(-650, 1.3) === 'Hard');
-T('   G bump: soft fpm but 1.9 G → Firm', rateLanding(-50, 1.9) === 'Firm', rateLanding(-50,1.9));
-T('   G bump: 2.3 G → Hard regardless of fpm', rateLanding(-90, 2.3) === 'Hard');
+// ── 1. rateLanding — G-primary bands (v6.22.3: airlines rate by vertical acceleration, not descent rate) ──
+T('1. G 1.1 → Butter', rateLanding(-120, 1.1) === 'Butter', rateLanding(-120,1.1));
+T('   G 1.3 → Good', rateLanding(-250, 1.3) === 'Good');
+T('   G 1.5 → Firm', rateLanding(-350, 1.5) === 'Firm');
+T('   G 1.9 → Hard', rateLanding(-500, 1.9) === 'Hard');
+T('   G 2.3 → Severe', rateLanding(-600, 2.3) === 'Severe');
+T('   G drives it (1.26 G @ -282 fpm → Good, was Firm on the old FPM scale)', rateLanding(-282, 1.26) === 'Good', rateLanding(-282,1.26));
+T('   extreme-sink backstop: -780 fpm → at least Hard even at modest G', rateLanding(-780, 1.3) === 'Hard', rateLanding(-780,1.3));
+T('   -1100 fpm backstop → Severe', rateLanding(-1100, 1.2) === 'Severe', rateLanding(-1100,1.2));
+T('   no-G fallback uses airliner FPM bands (-200 → Good)', rateLanding(-200, null) === 'Good', rateLanding(-200,null));
 
 // ── 2. a smooth landing ──
 const smooth = run(landingSeq(-140, 1.25));
@@ -40,10 +43,12 @@ T('   groundspeed captured at touchdown (130 kt)', smooth && smooth.touchdown_gs
 T('   rating Good', smooth && smooth.rating === 'Good');
 T('   no bounce', smooth && smooth.bounce_count === 0);
 
-// ── 3. a hard landing ──
-const hard = run(landingSeq(-620, 2.4));
-T('3. hard landing → Hard', hard && hard.rating === 'Hard', hard && hard.rating);
-T('   fpm -620', hard && hard.touchdown_fpm === -620);
+// ── 3. a hard landing (1.9 G → Hard) + a severe one (2.4 G → Severe) ──
+const hard = run(landingSeq(-500, 1.9));
+T('3. hard landing (1.9 G) → Hard', hard && hard.rating === 'Hard', hard && hard.rating);
+T('   fpm -500', hard && hard.touchdown_fpm === -500);
+const severe = run(landingSeq(-620, 2.4));
+T('   severe landing (2.4 G) → Severe', severe && severe.rating === 'Severe', severe && severe.rating);
 
 // ── 4. a bounce: touchdown, brief hop back up, touchdown again ──
 const bounceFrames = landingSeq(-300, 1.4).concat([
