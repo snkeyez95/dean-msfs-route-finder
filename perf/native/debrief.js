@@ -137,8 +137,10 @@ function buildDebrief(opts) {
   const ld = settings.landing;
   if (ld && ld.touchdown_fpm != null) {
     const bc = ld.bounce_count || 0;
+    const xw = (ld.crosswind_kt != null && ld.crosswind_kt > 0) ? ' · XW ' + ld.crosswind_kt + ' kt' + (ld.crosswind_side ? ' ' + ld.crosswind_side : '') : '';
+    const bk = (ld.bank_deg != null) ? ' · wings ' + ld.bank_deg + '°' : '';
     lines.push({ text: 'Touchdown: ' + ld.touchdown_fpm + ' fpm · ' + pyRound(ld.peak_g, 2) + ' G' +
-      (ld.touchdown_gs_kt != null ? ' · ' + ld.touchdown_gs_kt + ' kt' : '') +
+      (ld.touchdown_gs_kt != null ? ' · ' + ld.touchdown_gs_kt + ' kt' : '') + xw + bk +
       ' — ' + ld.rating + (bc > 0 ? ' (' + bc + ' bounce' + (bc > 1 ? 's' : '') + ')' : ''),
       tone: 'body' });
   }

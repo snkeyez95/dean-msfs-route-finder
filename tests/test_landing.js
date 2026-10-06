@@ -6,7 +6,7 @@
 const fs = require('fs'), os = require('os'), path = require('path');
 const X = require('./lib/extract.js');
 const T = X.runner('Landing performance:');
-const { LandingTracker, rateLanding } = require('../perf/native/simconnect.js');
+const { LandingTracker, rateLanding, windComponents } = require('../perf/native/simconnect.js');
 const { buildDebrief } = require('../perf/native/debrief.js');
 const { buildReport } = require('../perf/native/report_html.js');
 
@@ -103,5 +103,38 @@ try {
 } catch (e) {
   T('8. report HTML build (landing card)', false, 'threw: ' + (e && e.message));
 } finally { try { fs.rmSync(dir, { recursive:true, force:true }); } catch(_){} }
+
+// ── 9. windComponents — crosswind/headwind math (v6.23.0) ──
+// heading 360 (nose N); wind DIRECTION = where it comes FROM (true °).
+{
+  const r = windComponents(20, 90, 360);   // wind from the EAST = from the RIGHT
+  T('9. wind from the right → XW to the R, full magnitude', r && r.xw_kt === 20 && r.xw_side === 'R', JSON.stringify(r));
+  T('   …and ~0 headwind (pure crosswind)', r && r.hw_kt === 0, r && r.hw_kt);
+}
+T('   wind from the left → XW to the L', (() => { const r = windComponents(20, 270, 360); return r && r.xw_kt === 20 && r.xw_side === 'L'; })());
+T('   direct headwind → ~0 XW, + headwind', (() => { const r = windComponents(15, 360, 360); return r && r.xw_kt === 0 && r.hw_kt === 15; })());
+T('   direct tailwind → negative headwind', (() => { const r = windComponents(15, 180, 360); return r && r.hw_kt === -15; })());
+T('   45° off the nose → split roughly even', (() => { const r = windComponents(20, 45, 360); return r && r.xw_kt === 14 && r.hw_kt === 14 && r.xw_side === 'R'; })());
+T('   missing wind data → null', windComponents(null, 90, 360) === null && windComponents(20, null, 360) === null);
+
+// ── 10. the tracker captures crosswind + wings-level at the touchdown frame ──
+function run2(frames){ const lt = new LandingTracker(); for(const f of frames) lt.update(f[0],f[1],f[2],f[3],f[4],f[5],f[6],f[7],f[8]); return lt.result(); }
+{
+  const fr = [ [0,1.0,1,5,0, 0,0,0,0] ];
+  for(let t=2; t<=40; t+=2) fr.push([-200,1.0,0,130,t, 15,90,360,-3.0]);   // 15 kt from the right, 3° bank, 38 s airborne
+  fr.push([-200,1.3,1,130,41, 15,90,360,-4.0]);                            // TOUCHDOWN: 15 kt XW from R, 4° bank
+  fr.push([0,1.3,1,125,41.3, 15,90,360,-1.0]);
+  const r = run2(fr);
+  T('10. crosswind captured at touchdown (15 kt, R)', r && r.crosswind_kt === 15 && r.crosswind_side === 'R', JSON.stringify(r));
+  T('   wings-level (bank) captured as a magnitude (4.0°)', r && r.bank_deg === 4.0, r && r.bank_deg);
+  T('   headwind ~0 on a pure crosswind', r && r.headwind_kt === 0, r && r.headwind_kt);
+}
+// pre-v6.23.0-style frames (no wind/bank args) → those fields are null, not garbage
+T('   a landing with no wind/bank data → crosswind + bank null (graceful)', (() => {
+  const lt = new LandingTracker(); lt.update(0,1,1,5,0);
+  for(let t=2;t<=40;t+=2) lt.update(-150,1.0,0,130,t);
+  lt.update(-150,1.2,1,130,41);
+  const r = lt.result(); return r && r.crosswind_kt === null && r.bank_deg === null;
+})());
 
 process.exit(T.done() ? 1 : 0);

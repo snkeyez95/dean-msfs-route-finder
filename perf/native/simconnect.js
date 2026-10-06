@@ -75,15 +75,27 @@ function rateLanding(fpm, g) {
   return r;
 }
 
+// v6.23.0: wind components at touchdown. windDir = where the wind comes FROM (true °); hdgTrue = nose (true °).
+// Crosswind + = from the RIGHT; headwind + / tailwind −. All from standard SimVars read at the touchdown frame.
+function windComponents(windVel, windDir, hdgTrue) {
+  if (windVel == null || windDir == null || hdgTrue == null || !(windVel >= 0)) return null;
+  const rel = (((windDir - hdgTrue) % 360) + 540) % 360 - 180;   // normalize to [-180, 180]
+  const rad = rel * Math.PI / 180;
+  const xw = windVel * Math.sin(rad);
+  const hw = windVel * Math.cos(rad);
+  return { xw_kt: Math.round(Math.abs(xw)), xw_side: Math.abs(xw) < 0.5 ? '' : (xw > 0 ? 'R' : 'L'), hw_kt: Math.round(hw) };
+}
+
 class LandingTracker {
   constructor() {
     this._airborne = false; this._airborneSince = null; this._lastVs = null;
-    this._touchdowns = [];               // {fpm, t, gs, peak_g}
+    this._touchdowns = [];               // {fpm, t, gs, peak_g, xw_kt, xw_side, hw_kt, bank}
     this._peakUntil = 0;                 // ts through which we still grow the latest touchdown's peak G
   }
   // vsFpm: vertical speed (ft/min, negative = descending); g: G force (~1.0 level); onGround: 0/1/bool;
-  // gsKt: ground speed; t: wall seconds. Called at frame rate.
-  update(vsFpm, g, onGround, gsKt, t) {
+  // gsKt: ground speed; t: wall seconds. windVel/windDir (true °) + hdg (true °) → crosswind; bank ° → wings
+  // level. All read at frame rate.
+  update(vsFpm, g, onGround, gsKt, t, windVel, windDir, hdg, bank) {
     const down = (onGround === 0 || onGround === false);
     const grounded = (onGround === 1 || onGround === true);
     if (down) {
@@ -99,7 +111,10 @@ class LandingTracker {
           // touchdown rate = VS from the last AIRBORNE frame (at the on-ground frame VS has already
           // arrested); fall back to the current read only if we somehow have no airborne sample.
           const fpm = (this._lastVs != null ? this._lastVs : vsFpm) || 0;
-          this._touchdowns.push({ fpm, t, gs: (gsKt != null ? gsKt : null), peak_g: (g != null ? g : 0) });
+          const wc = windComponents(windVel, windDir, hdg);
+          this._touchdowns.push({ fpm, t, gs: (gsKt != null ? gsKt : null), peak_g: (g != null ? g : 0),
+            xw_kt: wc ? wc.xw_kt : null, xw_side: wc ? wc.xw_side : '', hw_kt: wc ? wc.hw_kt : null,
+            bank: (bank != null && Number.isFinite(bank)) ? Math.round(Math.abs(bank) * 10) / 10 : null });
           this._peakUntil = t + PEAK_G_WINDOW_S;
         }
       }
@@ -121,6 +136,10 @@ class LandingTracker {
       touchdown_fpm: Math.round(firmest.fpm),
       peak_g: Math.round((firmest.peak_g || 0) * 100) / 100,
       touchdown_gs_kt: firmest.gs != null ? Math.round(firmest.gs) : null,
+      crosswind_kt: firmest.xw_kt != null ? firmest.xw_kt : null,
+      crosswind_side: firmest.xw_side || '',
+      headwind_kt: firmest.hw_kt != null ? firmest.hw_kt : null,   // negative = tailwind
+      bank_deg: firmest.bank != null ? firmest.bank : null,         // |bank| at touchdown; 0 = wings level
       bounce_count: Math.max(0, this._touchdowns.length - 1),
       rating: rateLanding(firmest.fpm, firmest.peak_g),
     };
@@ -229,6 +248,11 @@ function attachLandingSampler(handle, landing) {
     handle.addToDataDefinition(DEF_LAND, 'G FORCE', 'GForce', SimConnectDataType.FLOAT64);
     handle.addToDataDefinition(DEF_LAND, 'SIM ON GROUND', 'Bool', SimConnectDataType.INT32);
     handle.addToDataDefinition(DEF_LAND, 'GROUND VELOCITY', 'Knots', SimConnectDataType.FLOAT64);
+    // v6.23.0: crosswind + wings-level at touchdown — ambient wind (true °) vs heading (true °), and bank °.
+    handle.addToDataDefinition(DEF_LAND, 'AMBIENT WIND VELOCITY', 'Knots', SimConnectDataType.FLOAT64);
+    handle.addToDataDefinition(DEF_LAND, 'AMBIENT WIND DIRECTION', 'Degrees', SimConnectDataType.FLOAT64);
+    handle.addToDataDefinition(DEF_LAND, 'PLANE HEADING DEGREES TRUE', 'Degrees', SimConnectDataType.FLOAT64);
+    handle.addToDataDefinition(DEF_LAND, 'PLANE BANK DEGREES', 'Degrees', SimConnectDataType.FLOAT64);
     handle.requestDataOnSimObject(REQ_LAND, DEF_LAND, 0 /* USER */, SimConnectPeriod.SIM_FRAME);
     handle.on('simObjectData', (recv) => {
       if (recv.requestID !== REQ_LAND) return;
@@ -237,7 +261,11 @@ function attachLandingSampler(handle, landing) {
         const g = recv.data.readFloat64();
         const onGround = recv.data.readInt32();
         const gs = recv.data.readFloat64();
-        landing.update(vs, g, onGround, gs, Date.now() / 1000);
+        const windVel = recv.data.readFloat64();
+        const windDir = recv.data.readFloat64();
+        const hdg = recv.data.readFloat64();
+        const bank = recv.data.readFloat64();
+        landing.update(vs, g, onGround, gs, Date.now() / 1000, windVel, windDir, hdg, bank);
       } catch (_) {}
     });
   } catch (_) {}
@@ -382,7 +410,7 @@ function readTitle(handle, timeoutMs = 4000) {
 
 module.exports = {
   computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler, readTitle,
-  armAndWaitForRolling, armAndConnect, ResilientSampler, attachLandingSampler, LandingTracker, rateLanding,
+  armAndWaitForRolling, armAndConnect, ResilientSampler, attachLandingSampler, LandingTracker, rateLanding, windComponents,
   AUTO_MIN_SPEED_KT, AUTO_CONFIRM_SECONDS, ALT_SANE_FT, PHASE_VS_FPM, AUTO_GIVEUP_SECONDS,
   AUTO_START_TIMEOUT_S, STALE_DATA_SECONDS,
 };

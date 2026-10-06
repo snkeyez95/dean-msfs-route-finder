@@ -161,11 +161,16 @@ function buildReport(sessionId, settings, stats, vram, ftInOrder, sortedFt, sess
   if (_ld) {
     const bc = _ld.bounce_count || 0;
     const bounceTxt = bc > 0 ? (bc + ' bounce' + (bc > 1 ? 's' : '')) : 'no bounce';
+    // v6.23.0: crosswind + wings-level (both absent on pre-v6.23.0 landings)
+    const xwTxt = (_ld.crosswind_kt != null && _ld.crosswind_kt > 0)
+      ? ' · XW ' + _ld.crosswind_kt + ' kt' + (_ld.crosswind_side ? ' ' + _ld.crosswind_side : '') : '';
+    const twTxt = (_ld.headwind_kt != null && _ld.headwind_kt < -1) ? ' · ' + Math.abs(_ld.headwind_kt) + ' kt tailwind' : '';
+    const bankTxt = (_ld.bank_deg != null) ? ' · wings ' + floatRepr(_ld.bank_deg) + '° off level' : '';
     landingHtml = '<div class="panel" style="margin-bottom:12px"><div class="panel-h">Landing performance</div>' +
       '<div class="land-body"><div class="land-rate"><span class="land-num">' + _ld.touchdown_fpm +
       '</span> <span class="land-unit">fpm</span> <span class="land-rating">' + htmlEscape(String(_ld.rating || '')) + '</span></div>' +
       '<div class="land-sub">peak ' + floatRepr(_ld.peak_g) + ' G' +
-      (_ld.touchdown_gs_kt != null ? ' · ' + _ld.touchdown_gs_kt + ' kt' : '') + ' · ' + bounceTxt + '</div></div></div>';
+      (_ld.touchdown_gs_kt != null ? ' · ' + _ld.touchdown_gs_kt + ' kt' : '') + xwTxt + twTxt + bankTxt + ' · ' + bounceTxt + '</div></div></div>';
   }
 
   let cpuGpu = '';
