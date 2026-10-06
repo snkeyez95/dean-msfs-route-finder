@@ -76,4 +76,34 @@ function row(vals){ return vals.map(v => q(String(v))).join(','); }
   T('...and sys_cpu is no longer blank (the whole point)', cpu !== null, String(cpu));
 }
 
+// ── sys_ram stuck-100% guard (v6.22.2, Dean 2026-10-05): a disabled/blank \Memory\Available MBytes
+//    read used to coerce to 0 → a FALSE 100% RAM for a whole flight. It must now read null, not 100. ──
+{
+  const { s, n } = makeSampler();
+  feed(s, header({ withCpu:true }));
+  // valid: avail = half of total → ~50% used
+  feed(s, row(['ts', n*100-200, 10, 12.5, Math.round(s.totalMemMb/2)]));
+  const ram = s.latest()[1];
+  T('valid Available MBytes → sys_ram computes (~50%)', typeof ram === 'number' && ram > 40 && ram < 60, String(ram));
+}
+{
+  const { s, logs, n } = makeSampler();
+  feed(s, header({ withCpu:true }));
+  feed(s, row(['ts', n*100-200, 10, 12.5, '']));          // BLANK memory cell (the real glitch)
+  T('blank Available MBytes → sys_ram null, NOT 100', s.latest()[1] === null, String(s.latest()[1]));
+  T('warns once about the bad memory counter', logs.length === 1 && /Available MBytes.*lodctr/.test(logs[0]), logs.join(' | '));
+}
+{
+  const { s, n } = makeSampler();
+  feed(s, header({ withCpu:true }));
+  feed(s, row(['ts', n*100-200, 10, 12.5, 0]));            // "0 MB available" is physically impossible mid-flight
+  T('zero Available MBytes → sys_ram null, NOT 100 (the bug)', s.latest()[1] === null, String(s.latest()[1]));
+}
+{
+  const { s, n } = makeSampler();
+  feed(s, header({ withCpu:true }));
+  feed(s, row(['ts', n*100-200, 10, 12.5, 'x']));          // non-numeric
+  T('garbage Available MBytes → sys_ram null', s.latest()[1] === null, String(s.latest()[1]));
+}
+
 process.exit(T.done() ? 1 : 0);

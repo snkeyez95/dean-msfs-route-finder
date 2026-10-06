@@ -22,6 +22,7 @@ class TelemetrySampler {
     this._memCol = -1;
     this._idleCol = -1;         // \Process(Idle)\% Processor Time — the sys-cpu FALLBACK source
     this._warnedNoCpu = false;
+    this._warnedBadMem = false;
     this._log = typeof log === 'function' ? log : (() => {});
     this._latest = [null, null, '', null];
     this._ignore = new Set([...IGNORE, ...selfNames.map(s => s.toLowerCase())]);
@@ -83,7 +84,19 @@ class TelemetrySampler {
     }
     let sysRam = null;
     if (this._memCol >= 0 && this.totalMemMb) {
-      sysRam = Math.round((this.totalMemMb - num(this._memCol)) / this.totalMemMb * 1000) / 10;
+      // Guard the stuck-100% bug (Dean 2026-10-05): a transient/disabled \Memory\Available MBytes counter
+      // returns blank or non-numeric; num() would coerce that to 0 → "0 MB free" → a FALSE 100% RAM. (3
+      // flights logged 99.9% for the whole flight while identical routes/aircraft read ~45%.) A running
+      // flight never has 0 MB available — Windows thrashes long before that — so a non-finite, <=0, or
+      // >total read is a glitch: leave sysRam null (blank in telemetry) rather than a false 100%.
+      const availMb = parseFloat(cells[this._memCol]);
+      if (Number.isFinite(availMb) && availMb > 0 && availMb <= this.totalMemMb) {
+        sysRam = Math.round((this.totalMemMb - availMb) / this.totalMemMb * 1000) / 10;
+      } else if (!this._warnedBadMem) {
+        this._warnedBadMem = true;
+        this._log('[telemetry] \\Memory\\Available MBytes returned a bad value ("' + cells[this._memCol] +
+          '") — sys_ram left blank this sample (Windows perf-counter glitch; run "lodctr /R" if it persists)');
+      }
     }
     let topName = '', topCpu = 0;                  // busiest non-ignored process (normalized to whole-system %)
     for (const i in this._procCols) {
