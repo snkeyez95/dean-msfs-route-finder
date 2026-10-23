@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-09-22T16:30:59.195Z
+  modified: 2026-10-23T21:36:44.380Z
 ---
 
 **Symptom (2026-09-20, KLAX→KLAS, Citation X):** a handful of ~1-second freezes on climb-out that felt
@@ -40,9 +40,19 @@ small spikes) but is now **capped ~100–215 ms** — contained, not absent. Tha
   verify the rule re-applies after an SI restart (the CPU-affinity column should stay `14-15`, not revert to
   `0-15`). If it reverts, needs Pro, or set per-session via CPU Affinity → Current.
 - If SI's own UI ever feels laggy on 2 cores, widen the fence to 12–15.
-- Windows Defender exclusions for MSFS/Community folders were already done in prior discussions — an
-  occasional `MsMpEng` blip on arrival is background noise (Defender can still scan non-excluded files), not
-  chased further.
+- Windows Defender: an earlier partial MSFS/Community exclusion existed, but `MsMpEng` then caused the
+  BIGGEST hits on 2026-10-21/23 (724 ms, 1,158 ms — scanning freshly updated Fenix files). Now handled by
+  ABRP v6.24.0 Maintenance → "Windows Defender Exclusions" (sim install, sim data, aircraft + scenery
+  libraries, sim + Fenix processes; launch banner if a Windows update removes them). Lasso can't fence
+  MsMpEng (protected process).
+
+**Expanded fence (2026-10-23, Dean applied + screenshot-confirmed):**
+- Fenix avionics storm recurred on 3 warm flights (EGKK→LOWI, KMIA→KMCO 10-21, EDDM→EDDB 10-23 — cruise
+  FenixSystem.exe hits up to 1,158 ms) → `FenixDisplay.exe` + `FenixSystem.exe` fenced to cores **8–13**
+  (a block, not 2 cores — real-time avionics).
+- SI keeps adding helpers: `si_dispatcher`, `si_skynet` (set), plus **`si_sidecar` + `si_telemetry`** seen
+  2026-10-23 → any `si_*` goes to 14–15. Plex left alone by Dean's choice (family direct-play).
+- Map: 0–7 MSFS (unrestricted, uncontended) · 8–13 Fenix · 14–15 SI/background.
 - The other recurring background offender across flights is SI generally (comms bursts near airports); the
   fence contains it. Closing SI when not using voice is the zero-cost alternative.
 

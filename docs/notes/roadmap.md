@@ -1,3 +1,104 @@
+# v6.24.0 — Defender exclusions (Maintenance tab) + "exclusions missing" banner
+> ✅ BUILT 2026-10-23 (awaiting Dean release.bat). Pure logic in root `defender.js`; main.js IPCs
+> defender-targets/-status/-change (elevated via one UAC when ABRP isn't admin; output handed back via a
+> file — PS 5.1 writes a BOM, stripped twice so the not-admin sentinel can't be missed); Maintenance
+> panel + amber launch banner. Real-machine targets: MSFS2024 Steam dir, %APPDATA% sim folder,
+> Documents\MSFS\Aircraft + \Scenery (Community dropped as nested), FlightSimulator2024.exe + 6 Fenix
+> processes. tests/test_defender_excl.js 46/46; full board 37 suites green. All generated PS parse in
+> real 5.1. OWED LIVE (Dean): click Apply → UAC → ✓; cross-check Windows Security → Exclusions; next
+> flight's spike report should show no MsMpEng.exe. Elevated apply path is the one piece not run live.
+
+## Context
+Spike reports on Oct 21 + Oct 23 showed `MsMpEng.exe` (Windows Defender) causing the single biggest
+hitches (724 ms, 1,158 ms) — it was scanning MSFS / Fenix files mid-flight. Disabling Defender per
+flight isn't possible (Tamper Protection is ON on Dean's PC — verified) and isn't safe. The right fix
+is permanent Defender exclusions for the sim + aircraft + scenery folders and the sim/Fenix processes.
+Dean wants it as a Maintenance-tab panel, plus a launch-time check and a banner (like the
+"new sim / Fenix version" banner) if Windows Update ever removes the exclusions.
+
+## Facts verified on Dean's machine (read-only)
+- Tamper Protection = ON; real-time protection = on.
+- Reading/writing exclusions needs admin. A non-admin read returns the literal string
+  `N/A: Must be an administrator to view exclusions` — must be handled as "can't verify", not "missing".
+- MSFS Steam install: `libraryfolders.vdf` → `C:\Program Files (x86)\Steam`; `appmanifest_2537590.acf`
+  → `installdir "MSFS2024"` → `...\steamapps\common\MSFS2024`.
+- Sim data root (packages, streamed data, rolling cache default): `%APPDATA%\Microsoft Flight Simulator 2024`.
+- Fenix companion processes seen in Lasso: `Fenix.exe`, `FenixSystem.exe`, `FenixDisplay.exe`,
+  `FenixCDU.exe`, `Fenix.GqlGateway.exe`, `FenixBootstrapper.exe`. Process-name exclusions work
+  without knowing their install path.
+
+## Design
+**What gets excluded (all derived at runtime from config — rule #3):**
+- Paths: MSFS Steam install dir (from libraryfolders.vdf + acf, not a fixed root list);
+  `%APPDATA%\Microsoft Flight Simulator 2024`; `cfg.communityFolder`; `cfg.aircraftFolder`;
+  `cfg.folder` (scenery library — junction targets are the real files). Only paths that exist.
+- Processes: `FlightSimulator2024.exe` always; Fenix process names only when a Fenix aircraft group
+  exists in the aircraft library (reuse `pkgScanGroups`). PMDG runs inside the sim — no extra exes.
+
+**Admin handling (Defender requires it):**
+- If ABRP is elevated → apply / verify directly via `powershell` (5.1).
+- If not elevated → Apply runs an elevated PowerShell (`Start-Process powershell -Verb RunAs`, one UAC
+  prompt) that writes results to a temp file Node reads. The launch-time check never prompts UAC; when
+  it can't read, the panel says "Can't verify without admin" and no banner shows.
+- All parsing in Node (PS emits `PATH|...` / `PROC|...` lines) — no `ConvertFrom-Json` (PS 5.1 rule).
+
+**Banner logic (mirrors `checkMaintenanceVersions`):**
+- Only nags if Dean applied them before (`cfg.defenderExcl.applied = true` + saved list).
+- On launch: read current exclusions; if any saved path/process is missing → amber `defender-banner`
+  "Windows Defender exclusions for MSFS were removed (likely a Windows update) — [Re-apply] [x]".
+- Dismiss hides for this launch only (it re-checks next launch — a real gap should keep surfacing).
+- Re-apply runs the same apply path, then re-verifies and hides the banner on success.
+
+## Build steps
+0. **Roadmap guard (do first).** The live roadmap at `~/.claude/plans/imperative-drifting-rain.md` was
+   missing when planning started; this file now holds only this plan. `tools/sync-notes.js` copies it
+   over `docs/notes/roadmap.md` (the 424 KB backup, Sep 22). Before any `sync-notes` run: restore the
+   full roadmap from `docs/notes/roadmap.md`, then insert this v6.24.0 section at the top. Never run
+   sync-notes while this file is short.
+1. **main.js** — new IPCs beside `get-maintenance-versions` (~1912):
+   - `defender-targets` → `{paths[], processes[], msfsInstall}` built from cfg + Steam vdf/acf.
+   - `defender-status` → runs `Get-MpPreference`, returns `{ok, canRead, elevated, paths[], processes[],
+     tamper}`; `canRead:false` on the `N/A:` sentinel.
+   - `defender-apply` / `defender-remove` → `Add-/Remove-MpPreference -ExclusionPath/-ExclusionProcess`
+     (quote with existing `psq()`), elevated fallback when needed, then re-read + return what's present.
+   - Elevation check: `net session` exit code (cheap, standard).
+   - Refuse nothing based on MSFS running (exclusions are safe to add any time).
+2. **preload.js** — `defenderTargets`, `defenderStatus`, `defenderApply`, `defenderRemove`.
+3. **index.html**
+   - New Maintenance panel "Windows Defender Exclusions" (after Shader Cache, same `api-pan` style):
+     plain-English why line, a status line (✓ all N in place / ⚠ X missing / can't verify), the list of
+     paths + processes, buttons **Apply exclusions**, **Remove exclusions**, **Check now**.
+   - `defender-banner` beside `maint-banner` (~375), amber (not green — it's a warning), with
+     Re-apply + dismiss. Colour-blind safe: ⚠ icon + words, not colour alone.
+   - `checkDefenderExclusions()` called next to `checkMaintenanceVersions()` at boot (~1437).
+   - `cfg.defenderExcl = {applied, paths, processes, ts}` saved on successful apply; cleared on remove.
+4. Version **v6.24.0** — package.json, index.html (title bar, sb-ver, footer), README changelog.
+
+## Tests (tests/test_defender_excl.js, real-renderer pattern like test_777_surfaces.js)
+- Target builder: given a cfg + fake vdf/acf → exact path list; missing dirs dropped; Fenix procs only
+  when a Fenix group exists; no hardcoded Steam root.
+- Status parser: `PATH|`/`PROC|` lines → arrays; the `N/A: Must be an administrator` sentinel →
+  `canRead:false` (never "missing").
+- Banner decision: never-applied → no banner; applied + all present → none; applied + one missing →
+  banner text names the count; can't-read → no banner.
+- Surface: render the Maintenance panel + banner HTML from the real index.html functions against
+  Dean's real config → assert the panel lists his actual MSFS install path + Fenix processes, and the
+  banner element appears only in the missing case.
+- `node tests\run_all.js` full board.
+
+## Verification (live)
+- Click **Apply exclusions** → UAC once if ABRP isn't elevated → panel shows ✓ all in place.
+- Cross-check in Windows Security → Virus & threat protection → Exclusions: the same list is there.
+- Remove one exclusion by hand in Windows Security → restart ABRP → amber banner appears →
+  **Re-apply** → banner clears, panel ✓.
+- Next flight: spike report should show no `MsMpEng.exe` in the top offenders.
+
+## Files
+main.js, preload.js, index.html, package.json, README.md, tests/test_defender_excl.js (new).
+Then `node tests\run_all.js`, `node tools\sync-notes.js` (roadmap), commit + push per standing rules.
+Dean runs `release.bat`.
+
+
 # Roadmap: Port the TLOD Performance Optimizer into ABRP
 
 ## 🛬 v6.22.0 — TLOD LEGEND STAT + LANDING PERFORMANCE READOUT (Dean 2026-09-22, plan-approved design)

@@ -1928,6 +1928,95 @@ ipcMain.handle('get-maintenance-versions', (_, aircraftRoot) => {
   return { driver, simBuild, pmdg: ac.pmdg, fenix: ac.fenix };
 });
 
+// ── WINDOWS DEFENDER EXCLUSIONS (v6.24.0) ────────────────────────────────────
+// Defender real-time scanning of sim/Fenix files caused the biggest mid-flight hitches. Disabling it
+// isn't possible (Tamper Protection) or safe, so we add permanent exclusions. Logic lives in
+// defender.js (pure, desk-tested); this block only runs PowerShell 5.1 and reads files.
+const DEF = require('./defender');
+function defIsElevated(){
+  try { return require('child_process').spawnSync('net', ['session'], { windowsHide:true, timeout:5000 }).status === 0; }
+  catch(_){ return false; }
+}
+function defSteamRoots(){
+  const roots = [];
+  try {
+    const r = require('child_process').spawnSync('reg', ['query','HKCU\\Software\\Valve\\Steam','/v','SteamPath'],
+      { encoding:'utf8', windowsHide:true, timeout:5000 });
+    const m = /SteamPath\s+REG_SZ\s+(.+)/i.exec(r.stdout || '');
+    if (m) roots.push(m[1].trim().replace(/\//g, '\\'));
+  } catch(_){}
+  roots.push('C:\\Program Files (x86)\\Steam', 'C:\\Program Files\\Steam');
+  return roots;
+}
+function defReadCfg(){ try { return JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(_){ return {}; } }
+function defTargets(){
+  const cfg = defReadCfg();
+  return DEF.buildTargets({
+    cfg, appData: process.env.APPDATA, steamRoots: defSteamRoots(),
+    aircraftRoot: pkgResolveRoot(cfg.aircraftFolder, 'aircraft'),
+    hasFenix: !!readAircraftVersions(cfg.aircraftFolder || '').fenix,
+    io: { exists: p => { try { return fs.existsSync(p); } catch(_){ return false; } },
+          readFile: p => fs.readFileSync(p, 'utf8'),
+          canon: p => { try { return fs.realpathSync.native(p); } catch(_){ return p; } } },
+  });
+}
+// Run a Defender script. Elevated (or a plain read) runs directly; a write from a non-elevated ABRP
+// goes through one UAC prompt and hands its output back via a file.
+function defRunPs(script, elevate){
+  const cp = require('child_process');
+  const stamp = Date.now();
+  const ps1 = path.join(USER_DATA, `_defender_${stamp}.ps1`);
+  const out = path.join(USER_DATA, `_defender_${stamp}.out`);
+  const launcher = path.join(USER_DATA, `_defender_${stamp}_launch.ps1`);
+  const cleanup = () => { for (const f of [ps1, out, launcher]) { try { fs.unlinkSync(f); } catch(_){} } };
+  return new Promise(resolve => {
+    try {
+      if (!elevate) {
+        fs.writeFileSync(ps1, script, 'utf8');
+        cp.execFile('powershell', ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File', ps1],
+          { windowsHide:true, timeout:60000, encoding:'utf8' }, (err, stdout) => {
+            cleanup(); resolve({ ran:true, stdout: stdout || '' });
+          });
+        return;
+      }
+      const body = '& {\r\n' + script + '\r\n} 2>&1 | ForEach-Object { "$_" } | Set-Content -LiteralPath ' + psq(out) + ' -Encoding UTF8';
+      fs.writeFileSync(ps1, body, 'utf8');
+      // ArgumentList elements are joined unquoted, so the path (USER_DATA has spaces) carries its own quotes.
+      fs.writeFileSync(launcher, `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',${psq('"' + ps1 + '"')}`, 'utf8');
+      cp.execFile('powershell', ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File', launcher],
+        { windowsHide:true, timeout:120000, encoding:'utf8' }, () => {
+          let stdout = null;
+          try { if (fs.existsSync(out)) stdout = fs.readFileSync(out, 'utf8').replace(/^\uFEFF/, ''); } catch(_){}
+          cleanup();
+          resolve(stdout === null ? { ran:false, cancelled:true } : { ran:true, stdout });
+        });
+    } catch (e) { cleanup(); resolve({ ran:false, error:e.message }); }
+  });
+}
+ipcMain.handle('defender-targets', () => { try { return { ok:true, ...defTargets() }; } catch(e){ return { ok:false, error:e.message }; } });
+// opts.elevate: allow a UAC prompt to read (manual "Check now"). The launch check never elevates.
+ipcMain.handle('defender-status', async (_, opts) => {
+  const elevated = defIsElevated();
+  const useUac = !elevated && !!(opts && opts.elevate);
+  const r = await defRunPs(DEF.buildScript('status'), useUac);
+  if (!r.ran) return { ok:false, elevated, cancelled: !!r.cancelled, error: r.error || null, canRead:false };
+  return { ok:true, elevated, ...DEF.parseStatus(r.stdout) };
+});
+// action: 'apply' (targets from live config) | 'remove' (only the list ABRP saved — never anything else).
+ipcMain.handle('defender-change', async (_, { action, saved }) => {
+  const elevated = defIsElevated();
+  const t = action === 'remove' ? { paths:(saved && saved.paths) || [], processes:(saved && saved.processes) || [] } : defTargets();
+  const r = await defRunPs(DEF.buildScript(action === 'remove' ? 'remove' : 'apply', t), !elevated);
+  if (!r.ran) return { ok:false, elevated, cancelled: !!r.cancelled, error: r.error || (r.cancelled ? 'UAC prompt was cancelled' : 'PowerShell did not run') };
+  const st = DEF.parseStatus(r.stdout);
+  const miss = DEF.missingFrom(t, st);
+  const ok = st.canRead && (action === 'remove'
+    ? (miss.paths.length === t.paths.length && miss.processes.length === t.processes.length)
+    : (miss.paths.length === 0 && miss.processes.length === 0));
+  LOG.info(`[DEFENDER] ${action}: ok=${ok} paths=${t.paths.length} procs=${t.processes.length} errors=${st.errors.length} elevated=${elevated}`);
+  return { ok, elevated, targets: t, status: st, missing: miss };
+});
+
 // ── SETUP EXPORT / IMPORT (backup & restore) ──────────────────────────────────
 // One .zip of the three files that define an ABRP install: config.json (all settings) +
 // routeRegistry.json + routeSnapshot.json. Flight logs (Sessions, GBs) are deliberately excluded.

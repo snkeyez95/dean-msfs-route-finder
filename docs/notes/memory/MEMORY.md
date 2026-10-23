@@ -1,6 +1,6 @@
 # Memory Index
 
-- [Process Lasso SI affinity fence](process_lasso_si_affinity_fence.md) — near-crash 1s climb freezes = SayIntentions + its WebView2 helpers starving the sim's main thread (ProBalance blind to single-core contention); fixed by fencing SayIntentionsAI.exe + msedgewebview2.exe to cores 14-15; validated (climb clean, WebView2 gone from top spikes, SI capped ~100-215ms); Lasso UNLICENSED so verify rule persists
+- [Process Lasso SI affinity fence](process_lasso_si_affinity_fence.md) — core map 0–7 MSFS / 8–13 Fenix / 14–15 SI+bg (Fenix fence added 2026-10-23; Defender via ABRP v6.24.0); near-crash 1s climb freezes = SayIntentions + its WebView2 helpers starving the sim's main thread (ProBalance blind to single-core contention); fixed by fencing SayIntentionsAI.exe + msedgewebview2.exe to cores 14-15; validated (climb clean, WebView2 gone from top spikes, SI capped ~100-215ms); Lasso UNLICENSED so verify rule persists
 
 - [AutoFPS TLOD band 250/400](autofps_tlod_band_250_400.md) — Dean's validated min 250 / max 400: detail at low alt where you see it, not at cruise; ~6pts VRAM cushion back off the redline, smoothness identical; min is a soft floor (VRAM protection overrides it)
 

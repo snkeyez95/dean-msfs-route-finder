@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.23.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.24.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -377,6 +377,11 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
   <button onclick="openMaintenance()" style="margin-left:12px;background:rgba(70,196,106,0.22);border:1px solid rgba(70,196,106,0.5);border-radius:4px;color:#46c46a;cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 10px">Open Maintenance</button>
   <button onclick="maintAck()" title="Dismiss" style="margin-left:auto;background:none;border:none;color:#46c46a;cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
 </div>
+<div id="defender-banner" style="display:none;background:rgba(245,166,35,0.13);border-bottom:1px solid rgba(245,166,35,0.4);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
+  <span id="defender-msg"></span>
+  <button onclick="defenderApplyUi(true)" style="margin-left:12px;background:rgba(245,166,35,0.22);border:1px solid rgba(245,166,35,0.5);border-radius:4px;color:var(--acc);cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 10px">Re-apply</button>
+  <button onclick="document.getElementById('defender-banner').style.display='none'" title="Dismiss (re-checks next launch)" style="margin-left:auto;background:none;border:none;color:var(--acc);cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:0.7">&times;</button>
+</div>
 <div id="drift-banner" style="display:none;background:rgba(245,166,35,0.13);border-bottom:1px solid rgba(245,166,35,0.4);padding:6px 40px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--acc);letter-spacing:0.02em;flex-shrink:0;align-items:center;gap:10px">
   <span id="drift-msg"></span>
   <button onclick="driftOpen()" style="margin-left:12px;background:rgba(245,166,35,0.22);border:1px solid rgba(245,166,35,0.5);border-radius:4px;color:var(--acc);cursor:pointer;font-size:11px;font-family:'JetBrains Mono',monospace;padding:3px 10px">See details</button>
@@ -390,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.23.0</div>
+    <div class="sb-ver">v6.24.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -877,6 +882,18 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     <button class="btn bp bsm" onclick="clearShaderCache()">&#129529; Clear Shader Cache</button>
     <div id="cache-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
     <div style="font-size:11px;color:var(--ink3);font-family:'Inter',sans-serif;margin-top:12px;line-height:1.6"><b>Before:</b> disable Shader Cache in the NVIDIA App &rarr; <b>reboot</b> &rarr; close MSFS &amp; overlays. <b>After:</b> re-enable NVIDIA Shader Cache &rarr; <b>reboot again</b>. Two reboots — the first one releases the locked cache so it can be deleted. (Full steps are in the confirm dialog.)</div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">&#128737; Windows Defender Exclusions</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Defender scanning sim and aircraft files mid-flight caused some of your biggest stutters. This tells Defender to skip the MSFS, scenery and aircraft folders and the sim&rsquo;s own processes. Protection stays <b>on</b> for everything else. Set once &mdash; ABRP checks on every launch and warns you if a Windows update removes them. Needs admin (one Windows prompt if ABRP isn&rsquo;t elevated).</div>
+    <div id="defender-status" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-bottom:8px;line-height:1.7">Loading&hellip;</div>
+    <div id="defender-list" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace;margin-bottom:10px;line-height:1.6;word-break:break-all"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn bp bsm" onclick="defenderApplyUi(false)">&#128737; Apply exclusions</button>
+      <button class="btn bg bsm" onclick="defenderCheckUi()">Check now</button>
+      <button class="btn bg bsm" onclick="defenderRemoveUi()">Remove exclusions</button>
+    </div>
+    <div id="defender-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
   </div>
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-t">Aircraft WASM Cache (PMDG / Fenix)</div>
@@ -1435,6 +1452,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   setInterval(updateCaptureBadge,7000);
   // Maintenance watcher: prompt to clear caches if the sim or GPU driver changed since last launch.
   checkMaintenanceVersions();
+  // Defender exclusions: warn if a Windows update removed the MSFS exclusions (never prompts UAC here).
+  checkDefenderExclusions();
   // Drift monitor: alert if the newest-flown driver/sim is measurably worse than your baseline.
   checkDrift();
   // VATSIM header chip (always visible; click toggles Live mode).
@@ -5747,6 +5766,104 @@ function openMaintenance(){
   sw('maintenance');
   maintAck();
 }
+// ── WINDOWS DEFENDER EXCLUSIONS (v6.24.0) ───────────────────────────────────
+// Defender scanning sim/Fenix files caused the biggest mid-flight hitches. ABRP adds permanent
+// exclusions (main.js + defender.js do the PowerShell) and re-checks them every launch, showing an
+// amber banner if a Windows update removed any. Only nags after you've applied them once.
+function _defNorm(p){ let s=String(p||'').trim().replace(/\//g,'\\'); while(s.length>3&&s.endsWith('\\'))s=s.slice(0,-1); return s.toLowerCase(); }
+function defenderMissing(want,cur){
+  const h=new Set(((cur&&cur.paths)||[]).map(_defNorm)), hp=new Set(((cur&&cur.processes)||[]).map(x=>String(x).toLowerCase()));
+  return { paths:((want&&want.paths)||[]).filter(p=>!h.has(_defNorm(p))), processes:((want&&want.processes)||[]).filter(p=>!hp.has(String(p).toLowerCase())) };
+}
+function defenderBannerState(saved,st){
+  if(!saved||!saved.applied) return {show:false,reason:'never-applied'};
+  if(!st||!st.canRead) return {show:false,reason:'cannot-read'};
+  const m=defenderMissing(saved,st), n=m.paths.length+m.processes.length;
+  const total=(saved.paths||[]).length+(saved.processes||[]).length;
+  return n?{show:true,count:n,total,missing:m,reason:'missing'}:{show:false,reason:'all-present'};
+}
+// Pure: the panel's status line + target list for a given targets/saved/status. Words + icons, never
+// colour alone (Dean is red-green colourblind).
+function defenderPanelHtml(targets,saved,st){
+  const t=targets||{paths:[],processes:[]}, all=(t.paths||[]).length+(t.processes||[]).length;
+  const applied=!!(saved&&saved.applied), when=applied&&saved.ts?new Date(saved.ts).toLocaleDateString():'';
+  let status, miss=null;
+  if(!st) status='Checking&hellip;';
+  else if(!st.canRead) status=applied
+    ? '&#10003; Applied '+esc(when)+' &mdash; can&rsquo;t re-check without admin. <b>Check now</b> will ask once.'
+    : '&#9675; Not applied yet. ('+all+' exclusions ready to add.)';
+  else {
+    miss=defenderMissing(t,st); const n=miss.paths.length+miss.processes.length;
+    status = n===0 ? '&#10003; All '+all+' exclusions are in place.'
+      : applied ? '&#9888; '+n+' of '+all+' missing &mdash; click <b>Apply exclusions</b> to restore.'
+      : '&#9675; Not applied yet. ('+n+' of '+all+' to add.)';
+  }
+  const mark=(v,list)=>!miss?'&bull;':(list.indexOf(v)<0?'&#10003;':'&#10007; missing');
+  const rows=[];
+  for(const p of (t.paths||[])) rows.push(mark(p,miss?miss.paths:[])+' folder &nbsp;'+esc(p));
+  for(const p of (t.processes||[])) rows.push(mark(p,miss?miss.processes:[])+' process '+esc(p));
+  return { status, list: rows.length?rows.join('<br>'):'No folders found yet &mdash; set your sim, scenery and aircraft folders in Settings.' };
+}
+function renderDefenderPanel(){
+  const s=document.getElementById('defender-status'), l=document.getElementById('defender-list');
+  if(!s||!l)return;
+  const h=defenderPanelHtml(S._defTargets,S.cfg.defenderExcl,S._defStatus);
+  s.innerHTML=h.status; l.innerHTML=h.list;
+}
+function defenderShowBanner(st){
+  const b=defenderBannerState(S.cfg.defenderExcl,st), ban=document.getElementById('defender-banner'), m=document.getElementById('defender-msg');
+  if(!ban||!m)return b;
+  if(b.show){
+    m.textContent='⚠ Windows Defender exclusions for MSFS are missing ('+b.count+' of '+b.total+') — likely removed by a Windows update. Defender scanning can bring the stutters back.';
+    ban.style.display='flex';
+  } else ban.style.display='none';
+  return b;
+}
+async function checkDefenderExclusions(){
+  try{ const t=await window.api.defenderTargets(); if(t&&t.ok)S._defTargets=t; }catch(e){}
+  let st=null; try{ st=await window.api.defenderStatus({elevate:false}); }catch(e){}
+  S._defStatus=(st&&st.ok)?st:{canRead:false};
+  renderDefenderPanel();
+  defenderShowBanner(S._defStatus);
+}
+async function defenderCheckUi(){
+  const el=document.getElementById('defender-result'); if(el)el.textContent='Checking Defender… (approve the Windows prompt if one appears)';
+  try{ const t=await window.api.defenderTargets(); if(t&&t.ok)S._defTargets=t; }catch(e){}
+  let st; try{ st=await window.api.defenderStatus({elevate:true}); }catch(e){ st={ok:false,error:e.message}; }
+  if(st&&st.ok){ S._defStatus=st; if(el)el.textContent=st.canRead?'Checked just now.':'Defender wouldn’t share its list (admin needed).'; }
+  else if(el) el.textContent=st&&st.cancelled?'Cancelled — the Windows admin prompt was declined.':'Could not check: '+((st&&st.error)||'unknown error');
+  renderDefenderPanel(); defenderShowBanner(S._defStatus);
+}
+async function defenderApplyUi(fromBanner){
+  if(!fromBanner && !confirm('Add Windows Defender exclusions for MSFS?\n\nDefender will skip the folders and processes listed in the panel. Real-time protection stays ON for everything else.\n\nWindows may ask for admin permission once.\n\nProceed?'))return;
+  if(fromBanner)sw('maintenance');
+  const el=document.getElementById('defender-result'); if(el)el.textContent='Applying… (approve the Windows prompt if one appears)';
+  let r; try{ r=await window.api.defenderChange({action:'apply'}); }catch(e){ r={ok:false,error:e.message}; }
+  if(r&&r.targets)S._defTargets=Object.assign({},S._defTargets||{},r.targets);
+  if(r&&r.status)S._defStatus=r.status;
+  if(r&&r.ok){
+    S.cfg.defenderExcl={applied:true,paths:r.targets.paths,processes:r.targets.processes,ts:Date.now()};
+    try{ await window.api.saveConfig(S.cfg); }catch(e){}
+    if(el)el.innerHTML='&#10003; '+(r.targets.paths.length+r.targets.processes.length)+' exclusions added and verified in Defender.';
+  } else if(r&&r.cancelled){ if(el)el.textContent='Cancelled — the Windows admin prompt was declined. Nothing changed.'; }
+  else {
+    const errs=(r&&r.status&&r.status.errors)||[], n=r&&r.missing?(r.missing.paths.length+r.missing.processes.length):0;
+    if(el)el.innerHTML='<span style="color:var(--acc)">&#9888; '+(n?n+' exclusion'+(n!==1?'s':'')+' did not stick. ':'')+esc(errs[0]||(r&&r.error)||'Defender did not confirm the change.')
+      +'</span><br>If this keeps failing, add them by hand: Windows Security &rarr; Virus &amp; threat protection &rarr; Manage settings &rarr; Exclusions.';
+  }
+  renderDefenderPanel(); defenderShowBanner(S._defStatus);
+}
+async function defenderRemoveUi(){
+  const saved=S.cfg.defenderExcl, el=document.getElementById('defender-result');
+  if(!saved||!saved.applied){ if(el)el.textContent='Nothing to remove — ABRP hasn’t added any exclusions.'; return; }
+  if(!confirm('Remove the Windows Defender exclusions ABRP added?\n\nOnly the '+((saved.paths||[]).length+(saved.processes||[]).length)+' entries ABRP added are removed — any exclusions you set yourself are left alone.\n\nProceed?'))return;
+  if(el)el.textContent='Removing… (approve the Windows prompt if one appears)';
+  let r; try{ r=await window.api.defenderChange({action:'remove',saved}); }catch(e){ r={ok:false,error:e.message}; }
+  if(r&&r.status)S._defStatus=r.status;
+  if(r&&r.ok){ S.cfg.defenderExcl={applied:false}; try{ await window.api.saveConfig(S.cfg); }catch(e){} if(el)el.textContent='✓ Exclusions removed. Defender scans those folders again.'; }
+  else if(el) el.textContent=r&&r.cancelled?'Cancelled — the Windows admin prompt was declined.':'Could not remove: '+((r&&r.error)||'Defender did not confirm the change.');
+  renderDefenderPanel(); defenderShowBanner(S._defStatus);
+}
 // ── NVIDIA Control Panel backup/restore ──────────────────────────────────────
 // ── SETUP BACKUP + FLIGHT-LOG STORAGE (Maintenance tab) ─────────────────────
 // ── Backup & Restore (v6.13.0) ──────────────────────────────────────────────
@@ -8557,5 +8674,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.23.0</div>
+  pointer-events:none;">v6.24.0</div>
 </body></html>
