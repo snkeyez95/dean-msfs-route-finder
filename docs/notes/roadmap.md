@@ -1,4 +1,15 @@
 # v6.24.0 — Defender exclusions (Maintenance tab) + "exclusions missing" banner
+> ✅ v6.24.1 REWORK 2026-10-23 (Dean reviewed his real Windows Security list). Apply now reads first and
+> adds ONLY what isn't covered (same entry, closest parent folder, or whole drive) — gate runs in PS 5.1,
+> mirrored in Node, proven equal against Dean's real list (dry run: his MSFS2024 folder → skipped; 8
+> folders + 7 processes to add). Saved record = targets + ONLY what ABRP added, so Remove never touches
+> his entries (old v6.24.0 shape → empty "added" = safe no-op). Key insight shown in panel: his
+> FlightSimulator2024.exe "File" entry ≠ a PROCESS exclusion. Added: shader caches (LocalLow NVIDIA
+> DXCache, D3DSCache, Steam shadercache\2537590), ABRP Sessions + _capture_tmp.csv (file, may not exist
+> yet), UserCfg InstalledPackagesPath. Coverage/banner logic moved out of the renderer into defender.js
+> (panelModel) — single source. Bugs caught by tests: drive-root (C:\) coverage; exact-vs-parent credit.
+> Skipped on purpose: AutoFPS, Navigraph Simlink, ChasePlane, OC3, more SI — CPU contention, not I/O.
+> test_defender_excl.js 78/78; full board green.
 > ✅ BUILT 2026-10-23 (awaiting Dean release.bat). Pure logic in root `defender.js`; main.js IPCs
 > defender-targets/-status/-change (elevated via one UAC when ABRP isn't admin; output handed back via a
 > file — PS 5.1 writes a BOM, stripped twice so the not-admin sentinel can't be missed); Maintenance

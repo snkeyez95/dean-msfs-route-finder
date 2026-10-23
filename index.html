@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.24.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.24.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.24.0</div>
+    <div class="sb-ver">v6.24.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -5766,103 +5766,82 @@ function openMaintenance(){
   sw('maintenance');
   maintAck();
 }
-// ── WINDOWS DEFENDER EXCLUSIONS (v6.24.0) ───────────────────────────────────
-// Defender scanning sim/Fenix files caused the biggest mid-flight hitches. ABRP adds permanent
-// exclusions (main.js + defender.js do the PowerShell) and re-checks them every launch, showing an
-// amber banner if a Windows update removed any. Only nags after you've applied them once.
-function _defNorm(p){ let s=String(p||'').trim().replace(/\//g,'\\'); while(s.length>3&&s.endsWith('\\'))s=s.slice(0,-1); return s.toLowerCase(); }
-function defenderMissing(want,cur){
-  const h=new Set(((cur&&cur.paths)||[]).map(_defNorm)), hp=new Set(((cur&&cur.processes)||[]).map(x=>String(x).toLowerCase()));
-  return { paths:((want&&want.paths)||[]).filter(p=>!h.has(_defNorm(p))), processes:((want&&want.processes)||[]).filter(p=>!hp.has(String(p).toLowerCase())) };
-}
-function defenderBannerState(saved,st){
-  if(!saved||!saved.applied) return {show:false,reason:'never-applied'};
-  if(!st||!st.canRead) return {show:false,reason:'cannot-read'};
-  const m=defenderMissing(saved,st), n=m.paths.length+m.processes.length;
-  const total=(saved.paths||[]).length+(saved.processes||[]).length;
-  return n?{show:true,count:n,total,missing:m,reason:'missing'}:{show:false,reason:'all-present'};
-}
-// Pure: the panel's status line + target list for a given targets/saved/status. Words + icons, never
-// colour alone (Dean is red-green colourblind).
-function defenderPanelHtml(targets,saved,st){
-  const t=targets||{paths:[],processes:[]}, all=(t.paths||[]).length+(t.processes||[]).length;
-  const applied=!!(saved&&saved.applied), when=applied&&saved.ts?new Date(saved.ts).toLocaleDateString():'';
-  let status, miss=null;
-  if(!st) status='Checking&hellip;';
-  else if(!st.canRead) status=applied
-    ? '&#10003; Applied '+esc(when)+' &mdash; can&rsquo;t re-check without admin. <b>Check now</b> will ask once.'
-    : '&#9675; Not applied yet. ('+all+' exclusions ready to add.)';
-  else {
-    miss=defenderMissing(t,st); const n=miss.paths.length+miss.processes.length;
-    status = n===0 ? '&#10003; All '+all+' exclusions are in place.'
-      : applied ? '&#9888; '+n+' of '+all+' missing &mdash; click <b>Apply exclusions</b> to restore.'
-      : '&#9675; Not applied yet. ('+n+' of '+all+' to add.)';
-  }
-  const mark=(v,list)=>!miss?'&bull;':(list.indexOf(v)<0?'&#10003;':'&#10007; missing');
-  const rows=[];
-  for(const p of (t.paths||[])) rows.push(mark(p,miss?miss.paths:[])+' folder &nbsp;'+esc(p));
-  for(const p of (t.processes||[])) rows.push(mark(p,miss?miss.processes:[])+' process '+esc(p));
+// ── WINDOWS DEFENDER EXCLUSIONS (v6.24.0, reworked v6.24.1) ─────────────────
+// Defender scanning the files the sim streams in mid-flight caused the biggest hitches. ABRP adds
+// permanent exclusions and re-checks them every launch, with an amber banner if a Windows update
+// removed any. Every decision (what's covered, what ABRP added, banner yes/no) is made in defender.js
+// via main.js — this code only displays the model it gets back. Only nags after you've applied once.
+// Pure: model → HTML. Words + icons, never colour alone (Dean is red-green colourblind).
+function defenderPanelHtml(m){
+  if(!m) return { status:'Checking&hellip;', list:'' };
+  const when=m.ts?new Date(m.ts).toLocaleDateString():'';
+  const status = m.kind==='all-present' ? '&#10003; All '+m.total+' exclusions are in place.'
+    : m.kind==='missing' ? '&#9888; '+m.missing+' of '+m.total+' missing &mdash; click <b>Apply exclusions</b> to restore.'
+    : m.kind==='not-applied' ? '&#9675; '+m.missing+' of '+m.total+' to add. Anything you already have is skipped &mdash; no duplicates.'
+    : m.kind==='applied-unverified' ? '&#10003; Applied '+esc(when)+' &mdash; can&rsquo;t re-check without admin. <b>Check now</b> will ask once.'
+    : '&#9675; Not checked yet &mdash; Defender only shares its list with admin. <b>Check now</b> or <b>Apply</b> will ask once.';
+  const rows=(m.rows||[]).map(r=>{
+    const mark = r.state==='ok' ? '&#10003;' : r.state==='missing' ? '&#10007; <b>to add</b>' : '&bull;';
+    const note = r.state!=='ok' ? '' : r.coveredBy ? ' <span style="opacity:.75">(covered by your '+esc(r.coveredBy)+')</span>'
+      : r.by==='you' ? ' <span style="opacity:.75">(yours)</span>' : r.by==='abrp' ? ' <span style="opacity:.75">(added by ABRP)</span>' : '';
+    return mark+' '+(r.kind==='process'?'process':r.kind==='file'?'file&nbsp;&nbsp;&nbsp;':'folder&nbsp;')+' '+esc(r.value)+(r.label?' <span style="opacity:.6">&mdash; '+esc(r.label)+'</span>':'')+note;
+  });
   return { status, list: rows.length?rows.join('<br>'):'No folders found yet &mdash; set your sim, scenery and aircraft folders in Settings.' };
 }
 function renderDefenderPanel(){
   const s=document.getElementById('defender-status'), l=document.getElementById('defender-list');
   if(!s||!l)return;
-  const h=defenderPanelHtml(S._defTargets,S.cfg.defenderExcl,S._defStatus);
+  const h=defenderPanelHtml(S._defModel);
   s.innerHTML=h.status; l.innerHTML=h.list;
 }
-function defenderShowBanner(st){
-  const b=defenderBannerState(S.cfg.defenderExcl,st), ban=document.getElementById('defender-banner'), m=document.getElementById('defender-msg');
-  if(!ban||!m)return b;
-  if(b.show){
+function defenderShowBanner(b){
+  const ban=document.getElementById('defender-banner'), m=document.getElementById('defender-msg');
+  if(!ban||!m)return;
+  if(b&&b.show){
     m.textContent='⚠ Windows Defender exclusions for MSFS are missing ('+b.count+' of '+b.total+') — likely removed by a Windows update. Defender scanning can bring the stutters back.';
     ban.style.display='flex';
   } else ban.style.display='none';
-  return b;
 }
+function _defApplyModel(r){ if(r&&r.model){ S._defModel=r.model; } renderDefenderPanel(); defenderShowBanner(S._defModel&&S._defModel.banner); }
 async function checkDefenderExclusions(){
-  try{ const t=await window.api.defenderTargets(); if(t&&t.ok)S._defTargets=t; }catch(e){}
-  let st=null; try{ st=await window.api.defenderStatus({elevate:false}); }catch(e){}
-  S._defStatus=(st&&st.ok)?st:{canRead:false};
-  renderDefenderPanel();
-  defenderShowBanner(S._defStatus);
+  let r=null; try{ r=await window.api.defenderStatus({elevate:false,saved:S.cfg.defenderExcl}); }catch(e){}
+  _defApplyModel(r);
 }
 async function defenderCheckUi(){
   const el=document.getElementById('defender-result'); if(el)el.textContent='Checking Defender… (approve the Windows prompt if one appears)';
-  try{ const t=await window.api.defenderTargets(); if(t&&t.ok)S._defTargets=t; }catch(e){}
-  let st; try{ st=await window.api.defenderStatus({elevate:true}); }catch(e){ st={ok:false,error:e.message}; }
-  if(st&&st.ok){ S._defStatus=st; if(el)el.textContent=st.canRead?'Checked just now.':'Defender wouldn’t share its list (admin needed).'; }
-  else if(el) el.textContent=st&&st.cancelled?'Cancelled — the Windows admin prompt was declined.':'Could not check: '+((st&&st.error)||'unknown error');
-  renderDefenderPanel(); defenderShowBanner(S._defStatus);
+  let r; try{ r=await window.api.defenderStatus({elevate:true,saved:S.cfg.defenderExcl}); }catch(e){ r={ok:false,error:e.message}; }
+  if(el) el.textContent = r&&r.ok ? (r.canRead?'Checked just now.':'Defender wouldn’t share its list (admin needed).')
+    : r&&r.cancelled ? 'Cancelled — the Windows admin prompt was declined.' : 'Could not check: '+((r&&r.error)||'unknown error');
+  _defApplyModel(r);
 }
 async function defenderApplyUi(fromBanner){
-  if(!fromBanner && !confirm('Add Windows Defender exclusions for MSFS?\n\nDefender will skip the folders and processes listed in the panel. Real-time protection stays ON for everything else.\n\nWindows may ask for admin permission once.\n\nProceed?'))return;
+  if(!fromBanner && !confirm('Add Windows Defender exclusions for MSFS?\n\nDefender will skip the folders and processes listed in the panel. Anything you already have is left alone (no duplicates). Real-time protection stays ON for everything else.\n\nWindows may ask for admin permission once.\n\nProceed?'))return;
   if(fromBanner)sw('maintenance');
   const el=document.getElementById('defender-result'); if(el)el.textContent='Applying… (approve the Windows prompt if one appears)';
-  let r; try{ r=await window.api.defenderChange({action:'apply'}); }catch(e){ r={ok:false,error:e.message}; }
-  if(r&&r.targets)S._defTargets=Object.assign({},S._defTargets||{},r.targets);
-  if(r&&r.status)S._defStatus=r.status;
+  let r; try{ r=await window.api.defenderChange({action:'apply',saved:S.cfg.defenderExcl}); }catch(e){ r={ok:false,error:e.message}; }
+  if(r&&r.saved){ S.cfg.defenderExcl=r.saved; try{ await window.api.saveConfig(S.cfg); }catch(e){} }
   if(r&&r.ok){
-    S.cfg.defenderExcl={applied:true,paths:r.targets.paths,processes:r.targets.processes,ts:Date.now()};
-    try{ await window.api.saveConfig(S.cfg); }catch(e){}
-    if(el)el.innerHTML='&#10003; '+(r.targets.paths.length+r.targets.processes.length)+' exclusions added and verified in Defender.';
+    const a=r.added?(r.added.paths.length+r.added.processes.length):0, h=(r.have||[]).length;
+    if(el)el.innerHTML='&#10003; Verified in Defender &mdash; '+a+' added'+(h?', '+h+' you already had (skipped)':'')+'.';
   } else if(r&&r.cancelled){ if(el)el.textContent='Cancelled — the Windows admin prompt was declined. Nothing changed.'; }
   else {
-    const errs=(r&&r.status&&r.status.errors)||[], n=r&&r.missing?(r.missing.paths.length+r.missing.processes.length):0;
-    if(el)el.innerHTML='<span style="color:var(--acc)">&#9888; '+(n?n+' exclusion'+(n!==1?'s':'')+' did not stick. ':'')+esc(errs[0]||(r&&r.error)||'Defender did not confirm the change.')
+    const n=r&&r.model?r.model.missing:0;
+    if(el)el.innerHTML='<span style="color:var(--acc)">&#9888; '+(n?n+' exclusion'+(n!==1?'s':'')+' did not stick. ':'')+esc(((r&&r.errors)||[])[0]||(r&&r.error)||'Defender did not confirm the change.')
       +'</span><br>If this keeps failing, add them by hand: Windows Security &rarr; Virus &amp; threat protection &rarr; Manage settings &rarr; Exclusions.';
   }
-  renderDefenderPanel(); defenderShowBanner(S._defStatus);
+  _defApplyModel(r);
 }
 async function defenderRemoveUi(){
   const saved=S.cfg.defenderExcl, el=document.getElementById('defender-result');
-  if(!saved||!saved.applied){ if(el)el.textContent='Nothing to remove — ABRP hasn’t added any exclusions.'; return; }
-  if(!confirm('Remove the Windows Defender exclusions ABRP added?\n\nOnly the '+((saved.paths||[]).length+(saved.processes||[]).length)+' entries ABRP added are removed — any exclusions you set yourself are left alone.\n\nProceed?'))return;
+  const added=saved&&saved.added?(saved.added.paths||[]).length+(saved.added.processes||[]).length:0;
+  if(!saved||!saved.applied||!added){ if(el)el.textContent='Nothing to remove — ABRP hasn’t added any exclusions (your own are never touched).'; return; }
+  if(!confirm('Remove the '+added+' Windows Defender exclusion'+(added!==1?'s':'')+' ABRP added?\n\nOnly ABRP’s own entries are removed — any exclusions you set yourself are left alone.\n\nProceed?'))return;
   if(el)el.textContent='Removing… (approve the Windows prompt if one appears)';
   let r; try{ r=await window.api.defenderChange({action:'remove',saved}); }catch(e){ r={ok:false,error:e.message}; }
-  if(r&&r.status)S._defStatus=r.status;
-  if(r&&r.ok){ S.cfg.defenderExcl={applied:false}; try{ await window.api.saveConfig(S.cfg); }catch(e){} if(el)el.textContent='✓ Exclusions removed. Defender scans those folders again.'; }
-  else if(el) el.textContent=r&&r.cancelled?'Cancelled — the Windows admin prompt was declined.':'Could not remove: '+((r&&r.error)||'Defender did not confirm the change.');
-  renderDefenderPanel(); defenderShowBanner(S._defStatus);
+  if(r&&r.saved){ S.cfg.defenderExcl=r.saved; try{ await window.api.saveConfig(S.cfg); }catch(e){} }
+  if(el) el.textContent = r&&r.ok ? '✓ ABRP’s exclusions removed. Your own entries were left alone.'
+    : r&&r.cancelled ? 'Cancelled — the Windows admin prompt was declined.' : 'Could not remove: '+((r&&r.error)||'Defender did not confirm the change.');
+  _defApplyModel(r);
 }
 // ── NVIDIA Control Panel backup/restore ──────────────────────────────────────
 // ── SETUP BACKUP + FLIGHT-LOG STORAGE (Maintenance tab) ─────────────────────
@@ -8674,5 +8653,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.24.0</div>
+  pointer-events:none;">v6.24.1</div>
 </body></html>

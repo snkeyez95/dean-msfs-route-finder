@@ -1951,8 +1951,11 @@ function defSteamRoots(){
 function defReadCfg(){ try { return JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch(_){ return {}; } }
 function defTargets(){
   const cfg = defReadCfg();
+  let usercfgText = '';
+  try { usercfgText = fs.readFileSync(path.join(process.env.APPDATA || '', 'Microsoft Flight Simulator 2024', 'UserCfg.opt'), 'utf8'); } catch(_){}
   return DEF.buildTargets({
-    cfg, appData: process.env.APPDATA, steamRoots: defSteamRoots(),
+    cfg, appData: process.env.APPDATA, localAppData: process.env.LOCALAPPDATA, userData: USER_DATA, usercfgText,
+    steamRoots: defSteamRoots(),
     aircraftRoot: pkgResolveRoot(cfg.aircraftFolder, 'aircraft'),
     hasFenix: !!readAircraftVersions(cfg.aircraftFolder || '').fenix,
     io: { exists: p => { try { return fs.existsSync(p); } catch(_){ return false; } },
@@ -1995,26 +1998,49 @@ function defRunPs(script, elevate){
 }
 ipcMain.handle('defender-targets', () => { try { return { ok:true, ...defTargets() }; } catch(e){ return { ok:false, error:e.message }; } });
 // opts.elevate: allow a UAC prompt to read (manual "Check now"). The launch check never elevates.
+// Returns the panel model + banner decision, computed in defender.js from the saved record.
 ipcMain.handle('defender-status', async (_, opts) => {
   const elevated = defIsElevated();
+  const saved = opts && opts.saved;
   const useUac = !elevated && !!(opts && opts.elevate);
+  let targets = { paths:[], processes:[], labels:{} };
+  try { targets = defTargets(); } catch(_){}
   const r = await defRunPs(DEF.buildScript('status'), useUac);
-  if (!r.ran) return { ok:false, elevated, cancelled: !!r.cancelled, error: r.error || null, canRead:false };
-  return { ok:true, elevated, ...DEF.parseStatus(r.stdout) };
+  const st = r.ran ? DEF.parseStatus(r.stdout) : { canRead:false, paths:[], processes:[] };
+  return { ok: !!r.ran, elevated, cancelled: !!r.cancelled, error: r.error || null,
+           canRead: st.canRead, tamper: st.tamper, model: DEF.panelModel(targets, saved, st) };
 });
-// action: 'apply' (targets from live config) | 'remove' (only the list ABRP saved — never anything else).
+// action: 'apply' — add only what isn't already covered (same entry or a parent folder you excluded);
+//         'remove' — exactly the entries ABRP recorded adding; your own exclusions are never touched.
+// Returns the new saved record for the renderer to persist, plus the fresh panel model.
 ipcMain.handle('defender-change', async (_, { action, saved }) => {
   const elevated = defIsElevated();
-  const t = action === 'remove' ? { paths:(saved && saved.paths) || [], processes:(saved && saved.processes) || [] } : defTargets();
-  const r = await defRunPs(DEF.buildScript(action === 'remove' ? 'remove' : 'apply', t), !elevated);
+  const isRemove = action === 'remove';
+  const prev = DEF.normSaved(saved);
+  let targets = { paths:[], processes:[], labels:{} };
+  try { targets = defTargets(); } catch(_){}
+  const work = isRemove ? (prev.added || { paths:[], processes:[] }) : targets;
+  if (isRemove && !work.paths.length && !work.processes.length)
+    return { ok:true, nothing:true, elevated, saved:{ applied:false }, model: DEF.panelModel(targets, { applied:false }, { canRead:false }) };
+  const r = await defRunPs(DEF.buildScript(isRemove ? 'remove' : 'apply', work), !elevated);
   if (!r.ran) return { ok:false, elevated, cancelled: !!r.cancelled, error: r.error || (r.cancelled ? 'UAC prompt was cancelled' : 'PowerShell did not run') };
   const st = DEF.parseStatus(r.stdout);
-  const miss = DEF.missingFrom(t, st);
-  const ok = st.canRead && (action === 'remove'
-    ? (miss.paths.length === t.paths.length && miss.processes.length === t.processes.length)
-    : (miss.paths.length === 0 && miss.processes.length === 0));
-  LOG.info(`[DEFENDER] ${action}: ok=${ok} paths=${t.paths.length} procs=${t.processes.length} errors=${st.errors.length} elevated=${elevated}`);
-  return { ok, elevated, targets: t, status: st, missing: miss };
+  let ok, next;
+  if (isRemove) {
+    // gone = no longer listed as that exact entry (one of your own parent folders may still cover it — fine)
+    const lp = new Set(st.paths.map(p => DEF.normPath(p).toLowerCase())), lr = new Set(st.processes.map(p => p.toLowerCase()));
+    const leftP = work.paths.filter(p => lp.has(DEF.normPath(p).toLowerCase())), leftR = work.processes.filter(p => lr.has(p.toLowerCase()));
+    ok = st.canRead && !leftP.length && !leftR.length;
+    next = (leftP.length || leftR.length) ? Object.assign({}, saved, { added:{ paths:leftP, processes:leftR } }) : { applied:false };
+  } else {
+    const miss = DEF.missingFrom(targets, st);
+    ok = st.canRead && !miss.paths.length && !miss.processes.length;
+    // record whatever ABRP really added, even on a partial success, so Remove can always undo it
+    next = (ok || st.added.paths.length || st.added.processes.length) ? DEF.savedAfterApply(saved, targets, st.added) : saved;
+  }
+  LOG.info(`[DEFENDER] ${action}: ok=${ok} targets=${targets.paths.length}+${targets.processes.length} added=${st.added.paths.length}+${st.added.processes.length} alreadyCovered=${st.have.length} removed=${st.removed.paths.length}+${st.removed.processes.length} errors=${st.errors.length} elevated=${elevated}`);
+  return { ok, elevated, saved: next, added: st.added, have: st.have, errors: st.errors, canRead: st.canRead,
+           model: DEF.panelModel(targets, next, st) };
 });
 
 // ── SETUP EXPORT / IMPORT (backup & restore) ──────────────────────────────────
