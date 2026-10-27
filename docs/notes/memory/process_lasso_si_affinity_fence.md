@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-10-23T21:36:44.380Z
+  modified: 2026-10-23T21:49:56.263Z
 ---
 
 **Symptom (2026-09-20, KLAX→KLAS, Citation X):** a handful of ~1-second freezes on climb-out that felt
@@ -44,7 +44,11 @@ small spikes) but is now **capped ~100–215 ms** — contained, not absent. Tha
   BIGGEST hits on 2026-10-21/23 (724 ms, 1,158 ms — scanning freshly updated Fenix files). Now handled by
   ABRP v6.24.0 Maintenance → "Windows Defender Exclusions" (sim install, sim data, aircraft + scenery
   libraries, sim + Fenix processes; launch banner if a Windows update removes them). Lasso can't fence
-  MsMpEng (protected process).
+  MsMpEng (protected process). APPLIED + live-verified 2026-10-23 (v6.24.1): 16/16 in place — 10 already
+  his (Documents\MSFS parent, MSFS data folder, all 6 Fenix procs by full path), 6 added by ABRP; the real
+  gap was FlightSimulator2024.exe existing only as a FILE exclusion (not a process) + the shader caches.
+  Next flight's spike report should show no MsMpEng. ABRP runs non-elevated → launch check can't read
+  Defender; use Check now after big Windows updates (Dean chose not to run ABRP elevated).
 
 **Expanded fence (2026-10-23, Dean applied + screenshot-confirmed):**
 - Fenix avionics storm recurred on 3 warm flights (EGKK→LOWI, KMIA→KMCO 10-21, EDDM→EDDB 10-23 — cruise

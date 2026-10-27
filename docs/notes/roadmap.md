@@ -2919,6 +2919,12 @@ EXPERIMENTS rebirth. v7-scale arc, not a weekend. Nothing breaks mid-way; static
 until its replacement ships.
 
 ## Backlog — general ABRP to-dos (log every little thing here as it comes up)
+- **🌐 UDP port-exhaustion pre-flight check (idea, Dean 2026-10-27 — NOT built).** A recurring Windows UDP
+  ephemeral-port exhaustion (Tcpip 4266, every 2–4 days of uptime) is the prime suspect for the LIMC sim deadlock
+  freeze. Idea: Launch + Capture (and/or the Maintenance tab) reads the System log for a recent 4266 and/or counts
+  `Get-NetUDPEndpoint` vs the 16,384-port pool, and warns "your PC is running out of network ports — reboot
+  before flying" + names the top UDP holder. Build only if the leaker can't simply be fixed. See memory
+  [[udp-port-exhaustion]].
 - **🎚️ AutoFPS TLOD band 250/400 — validated finding + envelope-card dataset (Dean 2026-09-18).** Dean's
   insight: high TLOD at cruise (FL430) is wasted (can't resolve terrain 8mi down); TLOD's visible payoff is
   LOW altitude (taxi/climb/approach). His traces confirmed AutoFPS did the opposite by default — pinned TLOD
