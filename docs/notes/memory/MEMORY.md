@@ -1,5 +1,7 @@
 # Memory Index
 
+- **⚑ [Port-watch duty — CHECK EVERY SESSION](port_watch_reminder.md) — read port_watch.jsonl + task status at session start; tell Dean when the port hog is named, then tell him to run tools/port-watch/uninstall.ps1**
+
 - [Process Lasso SI affinity fence](process_lasso_si_affinity_fence.md) — core map 0–7 MSFS / 8–13 Fenix / 14–15 SI+bg (Fenix fence added 2026-10-23; Defender via ABRP v6.24.0); near-crash 1s climb freezes = SayIntentions + its WebView2 helpers starving the sim's main thread (ProBalance blind to single-core contention); fixed by fencing SayIntentionsAI.exe + msedgewebview2.exe to cores 14-15; validated (climb clean, WebView2 gone from top spikes, SI capped ~100-215ms); Lasso UNLICENSED so verify rule persists
 
 - [UDP port exhaustion](udp_port_exhaustion.md) — Tcpip 4266 lines up with freeze storms (10-27 LIMC, 10-28 LSZH-EDDB ~1 min after); BURST by an in-flight process (ports back to 56 after sim closed, Plex normal) — needs in-flight per-process UDP sampling to name it
