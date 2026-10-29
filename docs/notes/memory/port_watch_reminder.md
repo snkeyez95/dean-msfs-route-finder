@@ -18,4 +18,4 @@ Dean asked (2026-10-28): don't build an in-app alert. Instead, remind him myself
 
 **When conclusive:** lead the reply with it — name the process, the port count, and when it happened. Then tell him the task isn't needed anymore and give him `tools\port-watch\uninstall.ps1` to run (Claude is blocked from removing persistence itself... same as install). After he confirms it's removed, update this memory to "done" and drop the duty.
 
-Status 2026-10-28: task NOT installed yet; no log. Related: [[udp-port-exhaustion]].
+Status 2026-10-29: task INSTALLED + verified (Ready, runs as MultiBotPC, interactive); log has one "manual" self-test line (ignore it). Waiting for the first real event+0s capture. Related: [[udp-port-exhaustion]].
