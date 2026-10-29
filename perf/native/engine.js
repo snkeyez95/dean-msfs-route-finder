@@ -22,7 +22,9 @@ const HEAD_TRIM_S = 5;
 // vatsim_traffic (v6.11.0) = VATSIM pilots within 40nm of own ship (vPilot's default injection
 // radius), sampled 1 Hz on online flights; blank offline. MUST stay in lockstep with the row-push
 // order in capture.js (the CSV writer is positional).
-const TELEMETRY_COLUMNS = ['wall_ms', 'phase', 'alt_ft', 'vram_mb', 'sys_ram_pct', 'sys_cpu_pct', 'top_proc', 'top_proc_cpu', 'gspeed_kt', 'vatsim_traffic'];
+// udp_total / udp_top (v6.25.0) = UDP endpoints in use + biggest holder ("name:count"), sampled every
+// 15s (udp_ports.js) — the port-exhaustion watch; blank until the first sample lands.
+const TELEMETRY_COLUMNS = ['wall_ms', 'phase', 'alt_ft', 'vram_mb', 'sys_ram_pct', 'sys_cpu_pct', 'top_proc', 'top_proc_cpu', 'gspeed_kt', 'vatsim_traffic', 'udp_total', 'udp_top'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const p2 = n => String(n).padStart(2, '0');
 
@@ -96,10 +98,18 @@ function updateIndex(sessionsDir, entry, now) {
 // recordingWallStart, stopTrimS, driverVersion, simVersion, sessionsDir}. Returns the session dir.
 function fileSession(opts) {
   const { rawCsvPath, settings, vram, startedAt, telemetryRows, phaseLog, recordingWallStart,
-    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir, manual, landing } = opts;
+    stopTrimS, brakeAnchorS, driverVersion, simVersion, sessionsDir, manual, landing, udpSamples } = opts;
   // v6.22.0: landing performance rides on settings (same flow as vatsim_traffic_*) → summary.settings.landing
   // + the report/debrief (which receive settings) + the index entry below. Absent on flights with no touchdown.
   if (landing) settings.landing = landing;
+  // v6.25.0: network-port watch — baseline/peak from the 15s samples + any Tcpip 4266 ("all UDP ports
+  // in use") logged during the recording, queried once here so a burst between samples still counts.
+  try {
+    const udpPorts = require('./udp_ports.js');
+    const ev = recordingWallStart ? udpPorts.exhaustionEvents(recordingWallStart, Date.now() / 1000) : [];
+    const u = udpPorts.summarize(udpSamples, ev, recordingWallStart);
+    if (u) settings.udp = u;
+  } catch (_) {}
   const now = startedAt || new Date();
   const tlodStr = settings.tlod != null ? 'TLOD' + settings.tlod : 'TLODna';
   const olodStr = settings.olod != null ? 'OLOD' + settings.olod : 'OLODna';
@@ -242,6 +252,9 @@ function fileSession(opts) {
     ...(settings.autofps_active ? { autofps_active: true } : {}),
     // v6.22.0: landing performance (touchdown FPM/G/gs/rating/bounce) — absent on flights with no touchdown
     ...(settings.landing ? { landing: settings.landing } : {}),
+    // v6.25.0: Windows ran out of UDP ports during this flight (count of Tcpip 4266 events)
+    ...(settings.udp && settings.udp.exhaustion_events && settings.udp.exhaustion_events.length
+      ? { udp_exhaustion: settings.udp.exhaustion_events.length } : {}),
     // graphics-settings fingerprint (v6.12.0 Settings A/B): hash of the curated watch keys — a change
     // between consecutive flights = a before/after card. Full snapshot lives in summary.settings.graphics.
     ...(settings.gfx_fp ? { gfx_fp: settings.gfx_fp } : {}),

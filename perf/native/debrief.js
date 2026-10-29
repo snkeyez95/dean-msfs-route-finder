@@ -145,6 +145,10 @@ function buildDebrief(opts) {
       tone: 'body' });
   }
 
+  // 6. network ports (v6.25.0) — only when Windows ran out of UDP ports, or came close
+  const ul = require('./udp_ports.js').debriefLine(settings.udp);
+  if (ul) lines.push({ text: ul, tone: 'bad' });
+
   return { word: GRADE_WORD[grade], color: GRADE_COL[grade], grade, headSub, rank, autofps: af, lines };
 }
 

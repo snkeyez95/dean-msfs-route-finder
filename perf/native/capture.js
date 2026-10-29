@@ -18,6 +18,7 @@ const { LiveFrametimeTail, writePerfLive, clearPerfLive } = require('./live_stat
 const { tailLatest: autofpsTailLatest } = require('./autofps_log.js');
 const { getDriverVersion, getSimVersion, getSimbriefRoute, normalizeAircraftTitle, vatsimConnected, fetchVatsimPilots } = require('./sysinfo.js');
 const { fileSession } = require('./engine.js');
+const { UdpSampler } = require('./udp_ports.js');
 
 const HEAD_TRIM_S = 5, STOP_BUFFER_S = 30, TAIL_FALLBACK_S = 60, MIN_TAIL_TRIM_S = 5;
 // v6.11.0: traffic-density radius = vPilot's default aircraft injection/draw distance, so the count
@@ -262,6 +263,10 @@ async function runAutoCapture(opts) {
     }, LATE_VATSIM_MS);
   }
 
+  // v6.25.0 network-port watch: async netstat every 15s (never blocks the 1 Hz tick) — the evidence
+  // for the UDP port-exhaustion freezes only exists while the burst is happening.
+  const udp = new UdpSampler(15000).start();
+
   const telemetryRows = [];
   const tick = setInterval(() => {
     const { gspeed: g, onGround: onG, alt, lat, lon, brake } = sampler.latest();   // nulls when the stream is stale
@@ -286,6 +291,7 @@ async function runAutoCapture(opts) {
       tCpu != null ? tCpu.toFixed(1) : '',
       g != null ? g.toFixed(1) : '',    // v6.9.5: ground speed persisted → movement-based end-trim anchor
       (() => { const c = trafficCount(trafficPilots, lat, lon); return c != null ? c : ''; })(),   // v6.11.0: pilots within 40nm
+      ...(() => { const u = udp.latest(); return u ? [u.total, u.top] : ['', '']; })(),   // v6.25.0: udp_total, udp_top
     ]);
   }, 1000);
 
@@ -323,7 +329,7 @@ async function runAutoCapture(opts) {
   clearInterval(liveIv); clearPerfLive(opts.dataRoot);   // strip disappears from the overlay at capture end
   if (trafficIv) clearInterval(trafficIv);
   if (lateIv) clearInterval(lateIv);
-  stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop();
+  stopPresentmon(proc); vram.stop(); telem.stop(); sampler.stop(); udp.stop();
   await sleep(1000);                            // CSV flush grace
 
   if (!fs.existsSync(tmpCsv) || fs.statSync(tmpCsv).size < 1024) {
@@ -353,6 +359,7 @@ async function runAutoCapture(opts) {
     stopTrimS: Math.round(trimS * 10) / 10, brakeAnchorS, driverVersion, simVersion: settings.sim_version,
     manual: recordNow,   // teardown-only trim: the ground-truth anchors assume a real flight
     landing: landing.result(),   // v6.22.0: touchdown FPM/G/gs/rating/bounce (null if no landing captured)
+    udpSamples: udp.samples,     // v6.25.0: port-watch samples → summary.settings.udp
     sessionsDir: opts.sessionsDir,
   });
 

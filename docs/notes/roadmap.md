@@ -1,3 +1,91 @@
+# v6.25.0 — NETWORK-PORT WATCH: catch the UDP port-exhaustion culprit (Dean 2026-10-28, plan)
+> ✅ BUILT 2026-10-28 (awaiting Dean release.bat). Layer B shipped: udp_ports.js parser + async
+> UdpSampler (netstat + tasklist both execFile) → telemetry udp_total/udp_top, summary.settings.udp
+> (+ index udp_exhaustion), debrief line (names a holder ONLY if a sample caught ≥25% of the pool,
+> else points at the port-watch log). Event query fixed: the provider is 'Tcpip', not
+> 'Microsoft-Windows-Tcpip' (the first version silently returned []). Proven against the real 10-28
+> event → "ran out of network ports at 57:35" in a real-report render. Layer A built (snapshot.js
+> self-tested; install/uninstall.ps1). ⚠ TASK NOT INSTALLED: auto mode blocked Claude from registering
+> it (persistence), so Dean runs install.ps1 himself. DROPPED: the spike-report join (spike report =
+> the frozen Python perf-engine.exe, no native port). tests/test_udp_ports.js 26/26; board 38 green.
+
+## Context
+Windows logged "all UDP ports in use" (Tcpip 4266) ~1 min after the freeze storms on 10-27 (LIMC)
+and 10-28 (LSZH-EDDB, P99 33 ms). Dean asked for a port monitor in the capture, but told me to
+question my own first idea. Doing that changed the design, and it also corrected my diagnosis:
+
+- **My idea alone would miss most events.** I cross-matched all 34 Tcpip 4266 events since
+  2026-07-12 against all 83 flights: **5 happened during a flight, 9 within 30 min of one, and 20 with
+  no flight anywhere near.** A sampler that runs only inside the capture would see about 15% of them.
+- **The link to freezes is weaker than I'd been saying.** 09-16 had an in-flight event at minute 67
+  and was smooth (P99 17.35). 10-28, 10-23 and 08-23 were rough. So exhaustion is a suspect, not a
+  proven cause. The monitor has to TEST that, not assume it.
+- **Order matters.** In both freezes the event came ~1 min AFTER the freeze started. That fits
+  "ports ran out → freeze" (the event is logged late or throttled), but it also fits "the freeze made
+  something open lots of ports". Only data taken before and during an event can tell which.
+- **It's a burst, not a slow leak.** The morning after, with the sim closed: 56 endpoints in use,
+  Plex 13 (normal). Whatever does it fills 16,384 ports and then gives them back.
+- Other facts checked (read-only): the pool is the default 49152 + 16384. Windows' Hyper-V network
+  service is running and holds ~860 reserved UDP ports (a known port-eater in other setups, so it's
+  worth watching). `netstat -ano` takes 28 ms.
+
+## Alternatives weighed
+| Option | Verdict |
+|---|---|
+| Sample only during the capture (my first idea) | Keep, but it can't stand alone (misses ~85%). It is the only piece that shows ORDER against the frametime timeline. |
+| **Windows Task Scheduler task that runs ON event 4266** | **Best "who" catcher.** Runs 24/7 whether ABRP is open or not, costs nothing between events, and takes its snapshot at the moment ports are exhausted, while the culprit still holds them. |
+| A background poller in ABRP | Only covers time when ABRP is open. The event trigger does that job better. |
+| Windows network tracing (`netsh trace`) | Huge files, has to run for days. Overkill. Fallback only if the snapshots are inconclusive. |
+| Per-process handle counts (sockets are handles) | Indirect and noisy. Netstat is cheap and exact. Not used. |
+| PowerShell `Get-NetUDPEndpoint` | ~1–2 s per call. `netstat -ano` (28 ms) is the sampler; parsing happens in Node (PS 5.1 rule). |
+
+## Design — two layers sharing one parser
+**Layer A: event-triggered snapshot, 24/7 (answers WHO).**
+- `tools/port-watch/snapshot.js` (Node, run by the task). Takes 3 samples (at trigger, +20 s, +60 s)
+  so we see who lets go. Each sample: total UDP/TCP endpoints, top-15 owning processes (name + exe
+  path), uptime, reserved-range count, and whether MSFS / SayIntentions / Fenix / vPilot / Plex /
+  qBittorrent are running. Appends one JSON line per sample to
+  `%APPDATA%\A Better Route Planner\port_watch\port_watch.jsonl` (USER_DATA, next to Sessions).
+- `tools/port-watch/install.ps1` registers task "ABRP Port Watch" (current user, trigger =
+  System log / Tcpip / EventID 4266, action = node snapshot.js). `uninstall.ps1` removes it. ⚠ This
+  is a persistent Windows setting. Approving this plan approves installing it. It's a diagnostic
+  and comes out once the culprit is named.
+
+**Layer B: in-capture sampling (answers WHEN, relative to the stutter).**
+- New `perf/native/udp_ports.js`: `parseNetstat(text)` → `{udp, tcp, byPid}`, `topHolders(byPid,n)`,
+  PID → name via a cached `tasklist /fo csv`. This module is shared with snapshot.js, so there is one
+  parser.
+- `capture.js`: async `netstat -ano` every 15 s (spawn, NOT spawnSync, so it can never block the
+  1 Hz tick). Two new telemetry columns, `udp_total` and `udp_top` ("name:count"), appended LAST in
+  lockstep with `TELEMETRY_COLUMNS` (engine.js). One baseline sample at recording start.
+- `engine.js` fileSession: `settings.udp = {baseline, peak, peak_top, exhaustion_events:[elapsed_s]}`.
+  The events come from ONE `wevtutil qe System` query bounded to the flight window, run at file time
+  (works even if sampling missed the burst).
+- `debrief.js`: one line, only when an exhaustion event landed in the flight or the peak passed 50%
+  of the pool. Example: "⚠ Windows ran out of network ports at 56:xx — biggest holder X (N ports)".
+  This is where Dean sees it.
+- Spike report: append `udp N` to each event's telemetry join, so a freeze shows the port load
+  next to it.
+
+## Files
+NEW perf/native/udp_ports.js · NEW tools/port-watch/{snapshot.js, install.ps1, uninstall.ps1} ·
+perf/native/capture.js · perf/native/engine.js (columns + summary) · perf/native/debrief.js ·
+the spike-report telemetry join · NEW tests/test_udp_ports.js · version v6.25.0 (package.json,
+index.html ×3, README changelog) · memory udp_port_exhaustion.md + roadmap backlog item → BUILT.
+
+## Verification
+- Tests: parser on real `netstat -ano` output plus synthetic v4/v6/`*:*` lines and a 16k-line burst;
+  top-holder ranking; telemetry column ↔ row lockstep; fileSession `udp` block; debrief line fires
+  for event/≥50% and stays silent otherwise; spike-join string. `node tests\run_all.js` full board.
+- Real runtime: run snapshot.js once by hand → one valid JSON line with real process names. Install
+  the task → `schtasks /query` shows it with the event trigger → fire a test run of the task
+  (`schtasks /run`) → a new line lands. (I can't fake a real 4266 event; the first real one is the
+  live proof.)
+- Capture: a short Record-Now capture (no flight needed) → telemetry.csv has udp_total/udp_top
+  filled every 15 s, summary has the `udp` block, and the debrief stays quiet when nothing happened.
+- Owed live: the next 4266 event → port_watch.jsonl names the process. The next flight with an
+  event → the debrief line plus port load in the spike report.
+
 # v6.24.0 — Defender exclusions (Maintenance tab) + "exclusions missing" banner
 > ✅ v6.24.1 REWORK 2026-10-23 (Dean reviewed his real Windows Security list). Apply now reads first and
 > adds ONLY what isn't covered (same entry, closest parent folder, or whole drive) — gate runs in PS 5.1,
