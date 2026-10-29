@@ -64,6 +64,21 @@ T('   UserCfg.opt InstalledPackagesPath parsed (packages can live on any drive)'
   T('   no Fenix → only FlightSimulator2024.exe', JSON.stringify(t2.processes) === '["FlightSimulator2024.exe"]');
   const t3 = D.buildTargets({ cfg: { folder: 'Q:\\Gone' }, appData: 'Q:\\No', steamRoots: [], hasFenix: false, io: fakeIo({}, []) });
   T('   folders that don\'t exist are never excluded', t3.paths.length === 0);
+  // v6.25.1 GSX Pro — only when its engine exe exists under Program Files (x86)\Addon Manager
+  const PF86 = 'C:\\Program Files (x86)', GSX = PF86 + '\\Addon Manager';
+  const gio = fakeIo({ [GSX + '\\couatl64\\couatl64_MSFS2024.exe']: 'x' }, dirs.concat([GSX, APPDATA + '\\Virtuali']));
+  const tg = D.buildTargets({ cfg, appData: APPDATA, localAppData: LOCAL, userData: UD, programFilesX86: PF86, steamRoots: [STEAM], hasFenix: true, aircraftRoot: AC, io: gio });
+  T('   GSX installed → program folder + Virtuali profiles + couatl64 process',
+    tg.paths.includes(GSX) && tg.paths.includes(APPDATA + '\\Virtuali') && tg.processes.includes('couatl64_MSFS2024.exe') && tg.processes.length === 8);
+  T('   GSX rows carry plain-English reasons', tg.labels[GSX] === 'GSX Pro program' && /GSX/.test(tg.labels[APPDATA + '\\Virtuali']));
+  const tng = D.buildTargets({ cfg, appData: APPDATA, localAppData: LOCAL, userData: UD, programFilesX86: PF86, steamRoots: [STEAM], hasFenix: true, aircraftRoot: AC,
+    io: fakeIo({}, dirs.concat([GSX, APPDATA + '\\Virtuali'])) });
+  T('   folder alone (no GSX engine exe) → nothing GSX added', !tng.paths.includes(GSX) && !tng.processes.includes('couatl64_MSFS2024.exe'));
+  T('   GSX process row labelled "GSX Pro engine" in the panel',
+    D.panelModel(tg, undefined, { canRead: true, paths: [], processes: [] }).rows.some(r => r.kind === 'process' && r.label === 'GSX Pro engine' && r.state === 'missing'));
+  const savedOld = D.savedAfterApply(undefined, t, { paths: [], processes: [] });
+  T('   applied before GSX existed → no launch banner nag (panel shows it as "to add")',
+    !D.bannerState(savedOld, { canRead: true, paths: t.paths, processes: t.processes }).show);
 }
 
 // ── 3. coverage = no duplicates ──
@@ -190,7 +205,7 @@ if (realCfg) {
   roots.push('C:\\Program Files (x86)\\Steam');
   let usercfgText = ''; try { usercfgText = fs.readFileSync(path.join(process.env.APPDATA, 'Microsoft Flight Simulator 2024', 'UserCfg.opt'), 'utf8'); } catch (_) {}
   const targets = D.buildTargets({ cfg: realCfg, appData: process.env.APPDATA, localAppData: process.env.LOCALAPPDATA, userData: X.APP_DATA,
-    usercfgText, steamRoots: roots, hasFenix, aircraftRoot,
+    usercfgText, steamRoots: roots, hasFenix, aircraftRoot, programFilesX86: process.env['ProgramFiles(x86)'],
     io: { exists: p => fs.existsSync(p), readFile: p => fs.readFileSync(p, 'utf8'), canon: p => { try { return fs.realpathSync.native(p); } catch (_) { return p; } } } });
   const els = sb._els;
   els['defender-status'] = { innerHTML: '' }; els['defender-list'] = { innerHTML: '' };
@@ -203,6 +218,9 @@ if (realCfg) {
   T('    real panel: shader caches + ABRP logs listed with reasons', /GPU shader cache \(NVIDIA\)/.test(list) && /GPU shader cache \(DirectX\)/.test(list) && /ABRP flight logs/.test(list));
   T('    real panel: capture file shown as a FILE', /file&nbsp;&nbsp;&nbsp; [^<]*_capture_tmp\.csv/.test(list));
   T('    real panel: Fenix processes listed (Fenix installed)', hasFenix ? /process FenixSystem\.exe/.test(list) && /process FenixDisplay\.exe/.test(list) : true);
+  const gsxHere = fs.existsSync(path.join(process.env['ProgramFiles(x86)'] || '', 'Addon Manager', 'couatl64', 'couatl64_MSFS2024.exe'));
+  T('    real panel: GSX Pro folder, profiles + engine listed (GSX installed)', gsxHere
+    ? /Addon Manager [^<]*<span[^>]*>&mdash; GSX Pro program/.test(list) && /Virtuali/.test(list) && /process couatl64_MSFS2024\.exe/.test(list) : true, list.slice(-600));
   T('    real status line: "N of M to add … no duplicates"', /of \d+ to add\. Anything you already have is skipped/.test(status), status);
   T('    no banner before he has applied', els['defender-banner'].style.display === 'none');
   // after apply, a Windows update strips the data-folder entry

@@ -23,6 +23,11 @@ const SIM_PROCESS = 'FlightSimulator2024.exe';
 // aircraft package is actually installed in the user's aircraft library.
 const FENIX_PROCESSES = ['Fenix.exe', 'FenixSystem.exe', 'FenixDisplay.exe', 'FenixCDU.exe',
   'Fenix.GqlGateway.exe', 'FenixBootstrapper.exe'];
+// GSX Pro (v6.25.1, Dean 2026-10-29): its engine runs as its own process beside the sim and reads its
+// program folder + %APPDATA%\Virtuali profiles at each airport load. Its scenery/vehicles live in the
+// Community folder (already covered). Only added when GSX is actually installed.
+const GSX_PROCESS = 'couatl64_MSFS2024.exe';
+const GSX_DIR = 'Addon Manager';
 // Defender answers a non-admin read with this text in place of the list.
 const NOT_ADMIN_RE = /^N\/A:/i;
 
@@ -110,6 +115,8 @@ function buildTargets(opts) {
   const msfs = findMsfs(opts.steamRoots, io);
   const simData = opts.appData ? path.join(opts.appData, 'Microsoft Flight Simulator 2024') : null;
   const localLow = opts.localAppData ? path.join(path.dirname(opts.localAppData), 'LocalLow') : null;
+  const gsxDir = opts.programFilesX86 ? path.join(opts.programFilesX86, GSX_DIR) : null;
+  const hasGsx = !!gsxDir && io.exists(normPath(path.join(gsxDir, 'couatl64', GSX_PROCESS)));
   // [path, why, mustExist]
   const cand = [
     [msfs && msfs.install, 'MSFS install'],
@@ -125,6 +132,8 @@ function buildTargets(opts) {
     [opts.userData && path.join(opts.userData, 'Sessions'), 'ABRP flight logs'],
     // Exists only while a capture is recording — PresentMon appends to it all flight.
     [opts.userData && path.join(opts.userData, '_capture_tmp.csv'), 'ABRP live capture file', false, 'file'],
+    [hasGsx && gsxDir, 'GSX Pro program'],
+    [hasGsx && opts.appData && path.join(opts.appData, 'Virtuali'), 'GSX Pro settings + airport profiles'],
   ];
   const kept = [], why = [], kindOf = [];
   for (const [p, label, mustExist, kind] of cand) {
@@ -145,7 +154,7 @@ function buildTargets(opts) {
     if (lower.some((o, j) => j !== i && o !== me && me.startsWith(o + '\\'))) return;
     paths.push(p); labels[p] = why[i]; kinds[p] = kindOf[i];
   });
-  const processes = [SIM_PROCESS].concat(opts.hasFenix ? FENIX_PROCESSES : []);
+  const processes = [SIM_PROCESS].concat(opts.hasFenix ? FENIX_PROCESSES : [], hasGsx ? [GSX_PROCESS] : []);
   return { paths, processes, labels, kinds, msfsInstall: msfs ? normPath(canon(msfs.install)) : null };
 }
 
@@ -245,7 +254,8 @@ function panelModel(targets, saved, status) {
   for (const p of t.processes || []) {
     const hit = canRead ? procCoveredBy(p, status.processes) : null;
     const mine = !!hit && addedR.has(String(hit).toLowerCase());
-    push('process', p, p === SIM_PROCESS ? 'MSFS (files the sim opens)' : 'Fenix avionics', hit, mine);
+    push('process', p, p === SIM_PROCESS ? 'MSFS (files the sim opens)'
+      : String(p).toLowerCase() === GSX_PROCESS.toLowerCase() ? 'GSX Pro engine' : 'Fenix avionics', hit, mine);
   }
   const missing = rows.filter(r => r.state === 'missing').length;
   const kind = !canRead ? (s.applied ? 'applied-unverified' : 'unknown')
@@ -299,4 +309,4 @@ function buildScript(mode, targets, opts) {
 
 module.exports = { buildTargets, findMsfs, findMsfsInstall, parseLibraryFolders, parseInstallDir,
   parseInstalledPackagesPath, parseStatus, missingFrom, pathCoveredBy, procCoveredBy, normSaved,
-  bannerState, savedAfterApply, panelModel, buildScript, normPath, SIM_PROCESS, FENIX_PROCESSES };
+  bannerState, savedAfterApply, panelModel, buildScript, normPath, SIM_PROCESS, FENIX_PROCESSES, GSX_PROCESS };

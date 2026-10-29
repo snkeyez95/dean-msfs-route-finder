@@ -1955,6 +1955,7 @@ function defTargets(){
   try { usercfgText = fs.readFileSync(path.join(process.env.APPDATA || '', 'Microsoft Flight Simulator 2024', 'UserCfg.opt'), 'utf8'); } catch(_){}
   return DEF.buildTargets({
     cfg, appData: process.env.APPDATA, localAppData: process.env.LOCALAPPDATA, userData: USER_DATA, usercfgText,
+    programFilesX86: process.env['ProgramFiles(x86)'],   // v6.25.1: GSX Pro lives under Addon Manager
     steamRoots: defSteamRoots(),
     aircraftRoot: pkgResolveRoot(cfg.aircraftFolder, 'aircraft'),
     hasFenix: !!readAircraftVersions(cfg.aircraftFolder || '').fenix,
