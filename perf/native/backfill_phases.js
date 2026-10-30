@@ -15,7 +15,8 @@
 // original logs. Readers (main.js perf-compare-data) prefer the corrected sidecar values.
 const fs = require('fs'), path = require('path');
 const { readChronological, readTelemetry } = require('./report_charts.js');
-const { trimHead, trimTail, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram } = require('./phases.js');
+const { trimHead, trimTail, trimTeardownTail, splitFrametimesByPhase, computePhaseStats, phaseLogFromTelemetry, computePhaseVram, debounceGroundBlips, taxiBoundaries, GROUND_BLIP_S } = require('./phases.js');
+const { BOUNCE_START_S } = require('./simconnect.js');
 const { buildReport } = require('./report_html.js');
 const { buildCombinedReport } = require('./report_combined.js');
 const { writeSidecar: writeAutofpsSidecar } = require('./autofps_log.js');
@@ -25,8 +26,9 @@ const { detectPeriodicStutter } = require('./periodicity.js');
 const HEAD = 5;
 const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-corrected metrics/phases
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
-const VRAM_V = 'anchor-trim';  // marker: bump to force a one-time sidecar recompute (v6.17.0: the end trim now reproduces the capture's own brake/movement anchor instead of re-deriving it, so max/spike/perceptible + the phase split match the flight's summary)
-const REPORT_V = 'fps-dots-all-visible-v6'; // marker: bump to force a one-time report.html regen for ALL flights (v6.19.5: FPS chart line reads from the smoothed series instead of reciprocated per-frame spikes)
+const VRAM_V = 'anchor-trim-deblip';  // v6.26.1: + gate-blip debounce (a 1-s "airborne" flicker while parked no longer drops a taxi phase). Earlier marker: bump to force a one-time sidecar recompute (v6.17.0: the end trim now reproduces the capture's own brake/movement anchor instead of re-deriving it, so max/spike/perceptible + the phase split match the flight's summary)
+const PHASE_V = 'deblip';      // v6.26.1: stamped on sidecars whose phase split ignores sub-10-s ground blips — main.js prefers these taxi phases
+const REPORT_V = 'deblip-v1'; // v6.26.1: one-time regen so the taxi rows + bounce count reflect the gate-blip fix. Earlier marker: bump to force a one-time report.html regen for ALL flights (v6.19.5: FPS chart line reads from the smoothed series instead of reciprocated per-frame spikes)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -80,7 +82,34 @@ function computeExt(dir, summary) {
   const pv = computePhaseVram(tel, HEAD, HEAD + keptMs / 1000);
   for (const ph of Object.keys(phases)) if (pv[ph]) { phases[ph].vram_peak = pv[ph].vram_peak; phases[ph].vram_avg = pv[ph].vram_avg; }
   const { dep_icao, arr_icao } = routeIcaos(summary);
-  return Object.assign({ v: 1, phases, dep_icao, arr_icao, teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V, vram_v: VRAM_V }, corrMetrics(t.ft));
+  return Object.assign({ v: 1, phases, dep_icao, arr_icao, teardown_trim_s: r1(t.teardownS), trim_v: TRIM_V, vram_v: VRAM_V, phase_v: PHASE_V,
+    landing_fake_bounces: fakeBounces(tel) }, corrMetrics(t.ft));
+}
+
+// v6.26.1: bounces the pre-fix LandingTracker counted that were really a 1-s "airborne" flicker while
+// parked/taxiing — any sub-GROUND_BLIP_S airborne run that starts more than BOUNCE_START_S after the
+// arrival ground began (a genuine bounce leaves the runway within seconds of touchdown). From the 1 Hz
+// telemetry, so it can only REMOVE bounces it can see; the tracker's frame-rate count stays otherwise.
+function fakeBounces(tel) {
+  const raw = phaseLogFromTelemetry(tel);
+  const { arr } = taxiBoundaries(debounceGroundBlips(raw));
+  if (!isFinite(arr)) return 0;
+  let n = 0;
+  for (let i = 1; i < raw.length; i++) {
+    const [ts, p] = raw[i];
+    if (p === 'ground' || raw[i - 1][1] !== 'ground' || ts < arr + BOUNCE_START_S) continue;
+    let j = i; while (j < raw.length && raw[j][1] !== 'ground') j++;
+    if (j < raw.length && raw[j][0] - ts < GROUND_BLIP_S) n++;
+  }
+  return n;
+}
+// Landing block with the gate-blip bounces taken out (summary.json itself is never edited).
+function correctedLanding(summary, ext) {
+  const ld = summary && summary.settings && summary.settings.landing;
+  if (!ld) return null;
+  const fake = (ext && ext.landing_fake_bounces) || 0;
+  if (!fake || !(ld.bounce_count > 0)) return ld;
+  return Object.assign({}, ld, { bounce_count: Math.max(0, ld.bounce_count - fake) });
 }
 
 // Ensure the sidecar carries the v6.6 teardown correction. Recomputes phases (when telemetry exists) +
@@ -124,6 +153,7 @@ function regenReport(dir, summary, ext, tpSet, history) {
     const arr_icao = (ext && ext.arr_icao) || (summary.settings && summary.settings.arr_icao) || routeIcaos(summary).arr_icao;
     const settings = Object.assign({}, summary.settings, {
       dep_icao, arr_icao,
+      ...(summary.settings && summary.settings.landing ? { landing: correctedLanding(summary, ext) } : {}),
       dep_scenery: (summary.settings && summary.settings.dep_scenery != null) ? summary.settings.dep_scenery
         : (ext && ext.dep_scenery != null) ? ext.dep_scenery : (dep_icao ? tpSet.has(dep_icao) : false),
       arr_scenery: (summary.settings && summary.settings.arr_scenery != null) ? summary.settings.arr_scenery
@@ -206,6 +236,9 @@ function runBackfill(sessionsDir, tpIcaos) {
       for (const k of Object.keys(want)) {
         if (want[k] != null && s[k] !== want[k]) { s[k] = want[k]; indexDirty = true; }
       }
+      // v6.26.1: the index's landing copy drops gate-blip bounces (summary.json stays as captured)
+      const ld = correctedLanding(summary, ext);
+      if (ld && s.landing && s.landing.bounce_count !== ld.bounce_count) { s.landing = Object.assign({}, s.landing, { bounce_count: ld.bounce_count }); indexDirty = true; }
     } catch (_) {}
     // regenerate the report from the trimmed data (idempotent via ext.report_trim_v)
     if (regenReport(dir, summary, ext, tpSet, priorOf(s))) {
@@ -220,7 +253,7 @@ function runBackfill(sessionsDir, tpIcaos) {
   return { corrected, skipped, noData, reports };
 }
 
-module.exports = { runBackfill, computeExt, backfillCorrection, readTrimmedFt, corrMetrics, TRIM_V };
+module.exports = { runBackfill, computeExt, backfillCorrection, readTrimmedFt, corrMetrics, fakeBounces, correctedLanding, TRIM_V, PHASE_V };
 
 if (require.main === module) {
   const dir = process.argv[2] || path.join(process.env.APPDATA, 'A Better Route Planner', 'Sessions');

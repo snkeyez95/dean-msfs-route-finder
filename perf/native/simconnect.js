@@ -53,6 +53,9 @@ function isRolling(gspeed, onGround, alt) {
 const MIN_AIRBORNE_S   = 30.0;   // must have flown this long before an on-ground transition counts as a
                                  // landing — ignores the takeoff ground roll and any pre-flight bump
 const BOUNCE_WINDOW_S  = 8.0;    // a re-touch within this long of going back airborne = a bounce (short hop)
+const BOUNCE_START_S   = 15.0;   // v6.26.1: a bounce must leave the ground within this long of the previous
+                                 // touchdown — a 1-s "airborne" flicker while parked at the gate minutes
+                                 // later (LOWW-LGKR 2026-10-30) is a sensor jolt, not a bounce
 const PEAK_G_WINDOW_S  = 2.0;    // track peak G for this long after a touchdown (the G spike lags on-ground)
 
 // Rating driven by PEAK G (v6.22.3, Dean 2026-10-06) — real airlines/manufacturers rate hard landings by
@@ -106,7 +109,9 @@ class LandingTracker {
         const dur = this._airborneSince != null ? (t - this._airborneSince) : 0;
         const first = this._touchdowns.length === 0;
         // first touchdown needs a real flight before it; a bounce is a short hop after one
-        const qualifies = first ? (dur >= MIN_AIRBORNE_S) : (dur <= BOUNCE_WINDOW_S);
+        const prevTd = first ? null : this._touchdowns[this._touchdowns.length - 1];
+        const qualifies = first ? (dur >= MIN_AIRBORNE_S)
+          : (dur <= BOUNCE_WINDOW_S && this._airborneSince != null && (this._airborneSince - prevTd.t) <= BOUNCE_START_S);
         if (qualifies) {
           // touchdown rate = VS from the last AIRBORNE frame (at the on-ground frame VS has already
           // arrested); fall back to the current read only if we somehow have no airborne sample.
@@ -410,7 +415,7 @@ function readTitle(handle, timeoutMs = 4000) {
 
 module.exports = {
   computeFpm, classifyPhase, isRolling, PhaseTracker, openWithRetry, attachSampler, readTitle,
-  armAndWaitForRolling, armAndConnect, ResilientSampler, attachLandingSampler, LandingTracker, rateLanding, windComponents,
+  armAndWaitForRolling, armAndConnect, ResilientSampler, attachLandingSampler, LandingTracker, rateLanding, windComponents, BOUNCE_START_S,
   AUTO_MIN_SPEED_KT, AUTO_CONFIRM_SECONDS, ALT_SANE_FT, PHASE_VS_FPM, AUTO_GIVEUP_SECONDS,
   AUTO_START_TIMEOUT_S, STALE_DATA_SECONDS,
 };

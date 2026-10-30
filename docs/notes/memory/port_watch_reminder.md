@@ -18,4 +18,4 @@ Dean asked (2026-10-28): don't build an in-app alert. Instead, remind him myself
 
 **When conclusive:** lead the reply with it — name the process, the port count, and when it happened. Then tell him the task isn't needed anymore and give him `tools\port-watch\uninstall.ps1` to run (Claude is blocked from removing persistence itself... same as install). After he confirms it's removed, update this memory to "done" and drop the duty.
 
-Status 2026-10-29: task INSTALLED + verified (Ready, runs as MultiBotPC, interactive); log has one "manual" self-test line (ignore it). Waiting for the first real event+0s capture. Related: [[udp-port-exhaustion]].
+Status 2026-10-30: task INSTALLED + Ready. FIRST real capture landed 2026-10-30 09:58 (LOWW-LGKR flight) — INCONCLUSIVE: only 82 UDP ports in use 2 s after the event, so the burst releases in <2 s and snapshots can't name it. Told Dean; keep it running for a 2nd capture. If the 2nd also shows a tiny count, propose a burst catcher (ETW trace / sub-second sampler) instead. Related: [[udp-port-exhaustion]].

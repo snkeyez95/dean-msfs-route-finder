@@ -159,6 +159,27 @@ function lastMovementEndS(telemetryRows) {
 // (simconnect.js), so we split by the TIMELINE: ground before the first airborne phase = departing
 // taxi (incl. takeoff roll); ground at/after the final landing = arrival taxi (incl. rollout);
 // any interior ground (go-around/touch-and-go) is dropped as ambiguous.
+// v6.26.1 (Dean 2026-10-30, LOWW-LGKR) — a parked aircraft can read "not on ground" for a second
+// (GSX/jetway/chocks/engine shutdown jolt). One such blip at the gate made the classifier log a 1-s
+// "cruise" mid-taxi, so the real arrival taxi became "interior ground" and was DROPPED, leaving only
+// the few seconds after the blip (under the trim → no arr_taxi at all). Any airborne run shorter than
+// GROUND_BLIP_S that sits between two ground runs is folded back into ground. Real flight between two
+// ground runs lasts minutes; a genuine landing bounce also lands here and correctly counts as rollout.
+const GROUND_BLIP_S = 10;
+function debounceGroundBlips(transitions, maxS = GROUND_BLIP_S) {
+  const out = [];
+  let i = 0;
+  while (i < transitions.length) {
+    if (transitions[i][1] !== 'ground' && out.length && out[out.length - 1][1] === 'ground') {
+      let j = i; while (j < transitions.length && transitions[j][1] !== 'ground') j++;
+      if (j < transitions.length && transitions[j][0] - transitions[i][0] < maxS) { i = j; continue; }   // blip: drop it, next ground merges
+    }
+    if (!out.length || out[out.length - 1][1] !== transitions[i][1]) out.push(transitions[i]);
+    i++;
+  }
+  return out;
+}
+
 function taxiBoundaries(transitions) {
   let dep = Infinity;                                  // ground before this elapsedS = departing taxi
   for (const [ts, p] of transitions) { if (p !== 'ground') { dep = ts; break; } }
@@ -173,9 +194,10 @@ function taxiBoundaries(transitions) {
 // Canonical phase keys: dep_taxi / climb / cruise / descent / arr_taxi (no combined "ground").
 function splitFrametimesByPhase(ftChron, phaseLog, recordingWallStart) {
   if (!phaseLog || !phaseLog.length || !ftChron.length) return {};
-  const transitions = phaseLog
+  const rawTrans = phaseLog
     .map(([t, p]) => [t - recordingWallStart, p])
     .sort((a, b) => a[0] - b[0]);
+  const transitions = debounceGroundBlips(rawTrans);
   const { dep, arr } = taxiBoundaries(transitions);
   const buckets = { dep_taxi: [], climb: [], cruise: [], descent: [], arr_taxi: [] };
   let elapsedMs = 0.0, transIdx = 0, current = transitions[0][1];
@@ -208,17 +230,20 @@ function splitFrametimesByPhase(ftChron, phaseLog, recordingWallStart) {
 // timeline); only the VRAM accumulation is windowed. Omit the bounds for the old unwindowed behavior.
 function computePhaseVram(telemetryRows, startS, endS) {
   if (!telemetryRows || !telemetryRows.length) return {};
-  const trans = phaseLogFromTelemetry(telemetryRows);
+  const trans = debounceGroundBlips(phaseLogFromTelemetry(telemetryRows));
   if (!trans.length) return {};
   const { dep, arr } = taxiBoundaries(trans);
   const lo = (startS == null) ? -Infinity : startS, hi = (endS == null) ? Infinity : endS;
   const acc = {};
   const add = (ph, v) => { if (v == null || isNaN(v)) return; if (!acc[ph]) acc[ph] = { sum: 0, n: 0, peak: 0 }; acc[ph].sum += v; acc[ph].n++; if (v > acc[ph].peak) acc[ph].peak = v; };
+  let k = 0;                                        // index into the de-blipped transitions (rows are chronological)
   for (const r of telemetryRows) {
     const v = r.vram_mb; if (v == null) continue;
     const s = r.wall_ms / 1000.0;
     if (s < lo || s > hi) continue;                 // outside the kept (trimmed) window — never averaged
-    let ph = r.phase;
+    if (!r.phase) continue;
+    while (k + 1 < trans.length && s >= trans[k + 1][0]) k++;
+    let ph = s >= trans[0][0] ? trans[k][1] : r.phase;   // de-blipped phase, not the raw 1-s flicker
     if (ph === 'ground') { ph = (s < dep) ? 'dep_taxi' : (s >= arr ? 'arr_taxi' : null); }
     if (!ph) continue;
     add(ph, v);
@@ -268,5 +293,5 @@ function phaseLogFromTelemetry(telemetryRows) {
 module.exports = {
   trimHead, trimTail, trimTeardownTail, trimAtElapsed, flightEndIndex, chartFlightEndIndex, trimChartTail,
   lastMovementEndS, splitFrametimesByPhase, computePhaseStats,
-  phaseLogFromTelemetry, taxiBoundaries, computePhaseVram, STUTTER_FRAMETIME_MS,
+  phaseLogFromTelemetry, taxiBoundaries, debounceGroundBlips, GROUND_BLIP_S, computePhaseVram, STUTTER_FRAMETIME_MS,
 };

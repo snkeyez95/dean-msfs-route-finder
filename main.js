@@ -1516,7 +1516,10 @@ ipcMain.handle('perf-compare-data', () => {
             const e = JSON.parse(fs.readFileSync(ext, 'utf8')); const p = e.phases || {};
             // teardown recompute corrects OLD flights, but never overrides a brake/movement-trimmed summary
             const corrected = e.trim_v === 'teardown' && !groundTruthTrim;
-            if ((corrected || (!dep_taxi && !arr_taxi)) && (p.dep_taxi || p.arr_taxi)) {
+            // v6.26.1: a 'deblip' sidecar re-splits the SAME trimmed frames ignoring 1-s gate blips — its
+            // taxi phases win even over a brake/movement-trimmed summary (that summary may have lost a taxi)
+            const deblipped = e.phase_v === 'deblip';
+            if ((corrected || deblipped || (!dep_taxi && !arr_taxi)) && (p.dep_taxi || p.arr_taxi)) {
               dep_taxi = p.dep_taxi || dep_taxi; arr_taxi = p.arr_taxi || arr_taxi;
             }
             if (dep_icao == null) dep_icao = e.dep_icao || null;
