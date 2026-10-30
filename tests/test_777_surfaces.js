@@ -89,9 +89,10 @@ console.log("surface sweep — Dean's real config (myFleet has NO B77W key):");
   T('   …and the Approaches free-plan button no longer forces A320', sb.fleetSbType() !== 'A320', sb.fleetSbType());
 
   // 7. Long-haul isn't filtered out by the duration control
-  const durOpts = (/<select id="dur-f"[\s\S]*?<\/select>/.exec(html) || [''])[0];
-  T('7. duration filter defaults to Any (a 14h 777 leg is not hidden)', /<option value="">Duration: Any<\/option>/.test(durOpts));
-  T('   …and offers 8h/12h buckets for long-haul', /value="8"/.test(durOpts) && /value="12"/.test(durOpts));
+  // v6.26.0: duration chips replaced the dropdown — default "All" (no band) hides nothing
+  const durRow = (/<div class="crow" id="dur-row">[\s\S]*?<\/div>\s*<\/div>/.exec(html) || [''])[0];
+  T('7. duration chips default to All (a 14h 777 leg is not hidden)', /class="chip sq on" data-dur="all"/.test(durRow));
+  T('   …and the 5h+ band has no ceiling for long-haul', /data-dur="5p"/.test(durRow) && /'5p':\[300,Infinity\]/.test(html));
   T('   …blockLen handles a long-haul flight_length', sb.blockLen(780) > 780, String(sb.blockLen(780)));
 }
 

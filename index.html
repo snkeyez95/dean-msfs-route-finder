@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.25.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.26.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.25.1</div>
+    <div class="sb-ver">v6.26.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -515,6 +515,15 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
         <div class="chip sq" data-region="africa" onclick="setRegion('africa')">Africa</div>
         <div class="chip sq" data-region="oceania" onclick="setRegion('oceania')">Oceania</div>
       </div>
+      <div class="crow" id="dur-row">
+        <span class="clbl">Duration</span>
+        <div class="chip sq on" data-dur="all" onclick="toggleDurBand('all')" title="Block time (gate to gate) as shown in the Duration column">All</div>
+        <div class="chip sq" data-dur="lt1" onclick="toggleDurBand('lt1')">&lt;1h</div>
+        <div class="chip sq" data-dur="1-2" onclick="toggleDurBand('1-2')">1&ndash;2h</div>
+        <div class="chip sq" data-dur="2-3" onclick="toggleDurBand('2-3')">2&ndash;3h</div>
+        <div class="chip sq" data-dur="3-5" onclick="toggleDurBand('3-5')">3&ndash;5h</div>
+        <div class="chip sq" data-dur="5p" onclick="toggleDurBand('5p')">5h+</div>
+      </div>
       <div class="crow" id="fresh-row">
         <div class="chip sq" id="vatsim-toggle-btn" style="margin-left:auto" onclick="toggleVatsimRoutes()" title="Score routes by live VATSIM ATC coverage (arrival-weighted: staffed arrival > departure > enroute Centers)">&#128225; VATSIM</div>
         <div class="chip sq" id="fresh-toggle-btn" onclick="toggleFreshOnly()" title="Hide city pairs you've flown recently (either direction)">&#10038; Fresh routes</div>
@@ -544,16 +553,6 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       <div class="srch" id="normal-srch"><span class="si">&#128269;</span><input type="text" id="rt-srch" placeholder="Search ICAO, airline, callsign..." oninput="renderRoutes()"></div>
       <select id="airline-f" onchange="setAirlineFilter(this.value)">
         <option value="">All Airlines</option>
-      </select>
-      <select id="dur-f" onchange="renderRoutes()">
-        <option value="">Duration: Any</option>
-        <option value="1">Under 1h</option>
-        <option value="2">Under 2h</option>
-        <option value="3">Under 3h</option>
-        <option value="4">Under 4h</option>
-        <option value="6">Under 6h</option>
-        <option value="8">Under 8h</option>
-        <option value="12">Under 12h</option>
       </select>
       <select id="sort-f" onchange="onSortChange()">
         <option value="dur">Sort: Duration</option>
@@ -1389,6 +1388,10 @@ window.addEventListener('DOMContentLoaded',async()=>{
   S.frAcft=S.cfg.frAcft||'';
   S.freshOnly=!!S.cfg.freshOnly;
   {const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);}
+  // ⏱ duration chips + route sort restore (v6.26.0)
+  S.durBands=(Array.isArray(S.cfg.durBands)?S.cfg.durBands:[]).filter(b=>DUR_BANDS[b]);
+  paintDurChips();
+  {const sel=document.getElementById('sort-f');if(sel&&S.cfg.routeSort&&sel.querySelector('option[value="'+S.cfg.routeSort+'"]'))sel.value=S.cfg.routeSort;}
   // 🌄 Challenging⟷Scenic mode restore (chips only; scenic winds load when the tab is opened)
   S.chMode=S.cfg.chMode==='scenic'?'scenic':'challenging';
   document.querySelectorAll('[data-chmode]').forEach(e=>e.classList.toggle('on',e.dataset.chmode===S.chMode));
@@ -2988,7 +2991,7 @@ const REGION_PREFIXES={
 };
 function getRoutes(){
   const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
-  const durMaxHrs=parseFloat((document.getElementById('dur-f')||{value:''}).value)||0;
+  const durBands=S.durBands||[];
   const srt=(document.getElementById('sort-f')||{value:'dur'}).value;
   const activeFleet=getActiveFleet();
   const allLib=new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao));
@@ -3007,7 +3010,7 @@ function getRoutes(){
     if(S.dirFilter==='arr'&&!ai)return false;
     if(S.acft!=='all'&&!fleetCodesFor(S.acft).has(r.aircraft_type))return false;
     const fl=blockLen(r.flight_length);
-    if(durMaxHrs&&fl>durMaxHrs*60)return false;
+    if(durBands.length&&!durBands.some(b=>inDurBand(fl,b)))return false;
     if(S.regionFilter!=='all'){
       const pfx=REGION_PREFIXES[S.regionFilter];
       if(pfx){ const inR=ic=>ic&&pfx.includes(ic[0]); if(!inR(dep)&&!inR(arr))return false; }
@@ -3191,6 +3194,23 @@ function setAirlineFilter(v){S.acFilter=v;S.openRoute=null;renderRoutes();}
 function setDirFilter(v){S.dirFilter=v;S.acFilter='';document.querySelectorAll('[data-dir]').forEach(e=>e.classList.toggle('on',e.dataset.dir===v));S.openRoute=null;renderRoutes();}
 function setAcft(v){S.acft=v;S.acFilter='';document.querySelectorAll('[data-acft]').forEach(e=>e.classList.toggle('on',e.dataset.acft===v));S.openRoute=null;renderRoutes();}
 function setMode(v){S.mode=v;S.acFilter='';document.querySelectorAll('[data-mode]').forEach(e=>e.classList.toggle('on',e.dataset.mode===v));S.openRoute=null;renderRoutes();}
+// ⏱ Duration chips (v6.26.0, Dean 2026-10-30): multi-select block-time bands, replacing the
+// "Under Xh" dropdown, so the very short hops can be skipped without scrolling. Remembered
+// between launches. Bands use the same block time (airborne + taxi pad) as the Duration column.
+const DUR_BANDS={ lt1:[0,60], '1-2':[60,120], '2-3':[120,180], '3-5':[180,300], '5p':[300,Infinity] };
+function inDurBand(min,b){ const r=DUR_BANDS[b]; return !!r && min>=r[0] && min<r[1]; }
+function paintDurChips(){
+  const on=S.durBands||[];
+  document.querySelectorAll('[data-dur]').forEach(e=>e.classList.toggle('on', e.dataset.dur==='all' ? !on.length : on.includes(e.dataset.dur)));
+}
+function toggleDurBand(b){
+  let on=(S.durBands||[]).slice();
+  if(b==='all') on=[];
+  else on=on.includes(b) ? on.filter(x=>x!==b) : on.concat(b);
+  if(on.length===Object.keys(DUR_BANDS).length) on=[];   // every band ticked = All
+  S.durBands=on; S.cfg.durBands=on; window.api.saveConfig(S.cfg);
+  paintDurChips(); S.acFilter=''; S.openRoute=null; renderRoutes();
+}
 function setRegion(v){S.regionFilter=v;S.acFilter='';document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
 function toggleFreshOnly(){
   S.freshOnly=!S.freshOnly;S.cfg.freshOnly=S.freshOnly;window.api.saveConfig(S.cfg);
@@ -3263,7 +3283,7 @@ function applyFreeRouteMode(){
   if(ne)ne.style.display=on?'none':'';
   const af=document.getElementById('airline-f');
   if(af)af.style.display=on?'none':'';
-  const df=document.getElementById('dur-f');
+  const df=document.getElementById('dur-row');
   if(df)df.style.display=on?'none':'';
   const btn=document.getElementById('fr-toggle-btn');
   if(btn)btn.classList.toggle('on',on);
@@ -3300,7 +3320,12 @@ function onFrAcftChange(v){
   renderFreeRouteResults();
 }
 
-function onSortChange(){renderRoutes();}
+function onSortChange(){
+  // v6.26.0: remember the sort between launches (the dynamic VATSIM option is restored by its own toggle)
+  const v=(document.getElementById('sort-f')||{}).value;
+  if(v&&v!=='vatsim'){ S.cfg.routeSort=v; window.api.saveConfig(S.cfg); }
+  renderRoutes();
+}
 
 function onFrInput(field){
   const inp=document.getElementById('fr-'+field);
@@ -6328,37 +6353,38 @@ const METAR_STALE_MIN=180;   // >3h old = don't trust it for ranking; flag it in
 const DATIS_STALE_MIN=180;   // >3h old D-ATIS → cross-check its runway against the live wind
 const DATIS_VERYSTALE_MIN=720; // >12h old → too stale to trust the runway even if the wind fits; suggest from wind instead (like a no-D-ATIS airport)
 const TAILWIND_MAX_KT=5;     // a tower switches the active runway only past ~5kt tailwind — the same tolerance we use before distrusting a stale D-ATIS runway
+// Weather "badness" score for one METAR — higher = worse. v6.26.0 (Dean 2026-10-30): PRECIPITATION
+// FIRST. "Worst weather" should surface rain / snow / storms, not dry murk. The old scoring weighted
+// the flight category (ceiling/visibility) most and matched weather codes exactly, so showers (SHRA),
+// mixed precip (RASN), drizzle and nearby storms (VCTS) scored nothing — dry LIFR fog (11) outranked
+// a thunderstorm with rain (8). Now each weather group is parsed as intensity (-/+/VC) + descriptor
+// (TS/SH/FZ/BL) + phenomena, precipitation carries the big weights, and ceiling/fog is a tiebreaker.
+const WX_PRECIP={GR:9,SN:8,PL:8,GS:7,RA:7,DZ:5,SG:4,UP:4,IC:3};
+const WX_OBSC={VA:5,FC:6,SS:5,DS:5,SQ:4,PO:3,FG:1,BR:1,HZ:1,FU:1,DU:1,SA:1};
+function scoreWxGroup(tok){
+  const g=String(tok||'').toUpperCase();
+  const m=/^(\+|-|VC)?(MI|PR|BC|DR|BL|SH|TS|FZ)?(MI|PR|BC|DR|BL|SH|TS|FZ)?((?:[A-Z]{2})*)$/.exec(g);
+  if(!m)return 0;
+  const inten=m[1]||'', desc=(m[2]||'')+(m[3]||''), ph=(m[4]||'').match(/.{2}/g)||[];
+  const mult=inten==='+'?1.4:inten==='-'?0.7:inten==='VC'?0.4:1;
+  const pw=ph.map(p=>WX_PRECIP[p]||0).filter(Boolean).sort((a,b)=>b-a);
+  let s=pw.length?(pw[0]+pw.slice(1).reduce((a,b)=>a+b*0.5,0))*mult:0;   // mixed precip: main + half the rest
+  if(desc.includes('TS'))s+=(inten==='+'?15:inten==='VC'?6:12);           // thunderstorm on top of its rain
+  if(desc.includes('SH')&&!pw.length)s+=2*mult;                            // VCSH: showers nearby, type unreported
+  if(desc.includes('FZ')&&pw.length)s+=4;                                  // freezing rain / drizzle
+  if(desc.includes('FZ')&&ph.includes('FG'))s+=2;                          // freezing fog
+  for(const p of ph)if(WX_OBSC[p])s+=WX_OBSC[p];
+  return s;
+}
 function scoreMETAR(m){
   if(!m)return 0;
-  let s={LIFR:8,IFR:6,MVFR:3,VFR:1}[(m.fltCat||'').toUpperCase()]||0;
-  const tokens=(m.wxString||'').split(/\s+/).filter(t=>t);
-  for(const t of tokens){
-    if(/\+TS|\+TSRA/.test(t))s+=6;
-    else if(/TS/.test(t))s+=5;
-    if(/FZRA/.test(t))s+=5;
-    if(t==='GR'||t==='+GR')s+=6;
-    if(!t.includes('TS')&&!t.includes('FZ')){
-      if(t==='+RA')s+=4;
-      else if(t==='RA')s+=2;
-      else if(t==='-RA')s+=1;
-    }
-    if(t==='+SN')s+=5;
-    else if(t==='SN')s+=3;
-    else if(t==='-SN')s+=2;
-    if(/FZDZ/.test(t))s+=3;
-    if(t==='PL'||t==='+PL')s+=4;
-    if(t==='VA')s+=5;
-    if(t==='FZFG')s+=4;
-    else if(t==='FG')s+=3;
-    if(t==='BR')s+=1;
-    if(t==='HZ')s+=1;
-    if(t==='DU'||t==='SA')s+=1;
-  }
+  let s={LIFR:3,IFR:2,MVFR:1,VFR:0}[(m.fltCat||'').toUpperCase()]||0;
+  for(const t of (m.wxString||'').split(/\s+/).filter(Boolean))s+=scoreWxGroup(t);
   const sp=m.wspd||0,gs=m.wgst||0;
   if(gs>40)s+=4;else if(gs>30)s+=3;else if(gs>20)s+=2;
   if(sp>30)s+=3;else if(sp>=20)s+=2;else if(sp>=15)s+=1;
   if((m.clouds||[]).some(c=>c.cover==='SKC'||c.cover==='CLR'||c.cover==='CAVOK')||/\bCAVOK\b/.test(m.rawOb||''))s-=1;
-  return Math.max(0,s);
+  return Math.max(0,Math.round(s));
 }
 
 function getWorstCategory(depICAO,arrICAO){
@@ -8653,5 +8679,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.25.1</div>
+  pointer-events:none;">v6.26.0</div>
 </body></html>

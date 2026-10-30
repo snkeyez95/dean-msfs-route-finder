@@ -10,4 +10,4 @@ Refresh with `node tools\sync-notes.js` (run before committing if the notes chan
 | `roadmap.md` | the master roadmap — every plan, decision, and lesson |
 | `memory` | Claude's persistent memory about this project |
 
-Last synced: 2026-10-29 18:55
+Last synced: 2026-10-30 14:16

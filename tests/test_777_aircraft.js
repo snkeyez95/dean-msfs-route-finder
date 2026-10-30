@@ -119,7 +119,8 @@ console.log('\nfleet + route wiring (index.html):');
     /fleet\[f\.code\]!==undefined\?fleet\[f\.code\]:f\.def/.test(html));
   T('SI_ACFT_MAP (the ingest gate) maps B77W + B773', /'B77W':'b77w','B773':'b77w'/.test(html));
   T('SIM_LBL/SIM_SB carry the b77w key', /"b77w":"PMDG 777-300ER"/.test(html) && /"b77w":"B77W"/.test(html));
-  T('duration filter offers long-haul buckets', /<option value="8">Under 8h<\/option>/.test(html) && /<option value="12">Under 12h<\/option>/.test(html));
+  // v6.26.0: the "Under Xh" dropdown became duration chips; long-haul lives in the uncapped 5h+ band
+  T('duration chips offer an uncapped long-haul band', /data-dur="5p"[^>]*>5h\+</.test(html) && /'5p':\[300,Infinity\]/.test(html));
   T('no hardcoded a320 SimBrief type left in Approaches', !/const sbType=SIM_SB\['a320'\]/.test(html));
 
   // aircraftGroupForType against the REAL post-move group layout

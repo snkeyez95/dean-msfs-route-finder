@@ -301,6 +301,8 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.26.0 IMPROVED: PLAN A FLIGHT — DURATION CHIPS + WEATHER THAT MEANS WEATHER. The "Under Xh" dropdown is replaced by a Duration chip row (<1h, 1–2h, 2–3h, 3–5h, 5h+). Pick one or several to skip the short hops without scrolling; your pick and your sort choice are remembered between launches. "Sort: Worst weather" now ranks by precipitation first: thunderstorms, snow, freezing rain and rain lead, and low cloud and fog only break ties. It also now reads the codes it used to miss (showers, rain-snow mix, drizzle, storms nearby), so a dry foggy airport no longer outranks a thunderstorm. The weather pill numbers shift to the new scale.
+
 v6.25.1 IMPROVED: DEFENDER EXCLUSIONS COVER GSX PRO. When GSX Pro is installed, the Maintenance panel now also lists its program folder (Addon Manager), its settings and airport profiles (AppData\Roaming\Virtuali) and its engine process (couatl64_MSFS2024.exe). GSX scenery and vehicles were already covered by the Community folder. Click Apply once to add them; anything already excluded is skipped.
 
 v6.25.0 NEW: NETWORK-PORT WATCH. Windows has been running out of network (UDP) ports every few days, and twice that lined up with a sim freeze. The culprit grabs thousands of ports and then gives them back, so the evidence vanishes. Two layers catch it: (1) every flight capture now records how many ports are in use and which program holds the most, every 15 seconds, and the debrief warns if Windows ran out during the flight (with the time, so you can match it to a freeze); (2) an optional Windows scheduled task (tools\port-watch\install.ps1) records a snapshot of who holds the ports the instant Windows logs the problem, flying or not. Remove it with uninstall.ps1.

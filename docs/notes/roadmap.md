@@ -1,3 +1,6 @@
+# v6.26.0 — Plan a Flight: duration chips + precipitation-first worst weather (Dean 2026-10-30)
+> ✅ BUILT (awaiting release.bat). Duration dropdown → multi-select chip row (<1h/1–2h/2–3h/3–5h/5h+, block time, half-open bands), saved in cfg.durBands; sort saved in cfg.routeSort. scoreMETAR rewritten: weather groups parsed as intensity+descriptor+phenomena (showers/RASN/DZ/VC no longer score 0), precip dominant (TSRA ~20, +SN ~14, SHRA ~7), fltCat cut to a tiebreaker (LIFR 3); dry LIFR fog 11→4. Real registry: 1–2h+2–3h = 10,196 of 15,000 routes. tests/test_route_dur_wx.js 32/32; two 777 tests updated to the chip contract. IDEA (not built): arrival weather from the TAF at ETA instead of the METAR now.
+
 # v6.25.0 — NETWORK-PORT WATCH: catch the UDP port-exhaustion culprit (Dean 2026-10-28, plan)
 > ✅ BUILT 2026-10-28 (awaiting Dean release.bat). Layer B shipped: udp_ports.js parser + async
 > UdpSampler (netstat + tasklist both execFile) → telemetry udp_total/udp_top, summary.settings.udp
