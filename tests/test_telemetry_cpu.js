@@ -49,9 +49,9 @@ function row(vals){ return vals.map(v => q(String(v))).join(','); }
   T('derives sys_cpu from Idle when Processor counter is gone', cpu === expected, 'got ' + cpu + ' expected ' + expected);
   T('derived value is sane (0–100)', cpu >= 0 && cpu <= 100, String(cpu));
   T('warns exactly once about the missing counter', logs.length === 1 && /Processor\(_Total\).*Idle/.test(logs[0]), logs.join(' | '));
-  // full idle → ~0% busy
+  // full idle → 0% busy: impossible while MSFS runs, so v6.26.2 records it as no reading (blank), not 0%
   feed(s, row(['ts', n * 100, 0, 40000]));
-  T('all-idle derives ~0% busy', s.latest()[0] === 0, String(s.latest()[0]));
+  T('all-idle (0% busy) is treated as a dead reading → blank, never a fake 0%', s.latest()[0] === null, String(s.latest()[0]));
 }
 
 // ── worst case: no Processor counter AND no Idle column → honest null + a distinct warning ──
@@ -104,6 +104,35 @@ function row(vals){ return vals.map(v => q(String(v))).join(','); }
   feed(s, header({ withCpu:true }));
   feed(s, row(['ts', n*100-200, 10, 12.5, 'x']));          // non-numeric
   T('garbage Available MBytes → sys_ram null', s.latest()[1] === null, String(s.latest()[1]));
+}
+
+// ── v6.26.2: DEAD counters mid-session (EHAM-LOWW 2026-11-06: sys_cpu 0% + a phantom top process all flight) ──
+{
+  const { s, logs, n } = makeSampler();
+  let starts = 0; s.start = function(){ starts++; this._proc = { kill(){} }; };   // stub: no real typeperf
+  s._proc = { kill(){} };
+  feed(s, header({ withCpu:true }));
+  feed(s, row(['ts', n*100 - 400, 50, 25.0, 40000]));
+  T('v6.26.2: healthy reading recorded normally', s.latest()[0] === 25 && /chrome/i.test(s.latest()[2]));
+  feed(s, row(['ts', n*100 - 400, 30, '', 40000]));
+  T('   blank _Total falls back to the Idle-derived value', s.latest()[0] != null && s.latest()[0] >= 2, String(s.latest()[0]));
+  for (let k = 0; k < 29; k++) feed(s, row(['ts', '', 30, 0, 40000]));
+  const l = s.latest();
+  T('   dead sample (0% system CPU) → CPU + top process blank, RAM kept', l[0] === null && l[2] === '' && l[3] === null && l[1] != null, JSON.stringify(l));
+  T('   no restart before 30 s of dead readings', starts === 0 && !logs.some(m => /went dead/.test(m)));
+  feed(s, row(['ts', '', 30, 0, 40000]));
+  T('   30th dead second → reader restarted once + one warning line', starts === 1 && logs.filter(m => /went dead/.test(m)).length === 1, logs.join(' | '));
+  T('   restart resets header parsing (new typeperf sends a new header)', s._procCols === null && s._cpuCol === -1);
+  feed(s, header({ withCpu:true })); feed(s, row(['ts', n*100 - 400, 50, 31.5, 40000]));
+  T('   readings resume after restart', s.latest()[0] === 31.5);
+  for (let r = 0; r < 10; r++) { feed(s, header({ withCpu:true })); for (let k = 0; k < 30; k++) feed(s, row(['ts', '', 30, 0, 40000])); }
+  T('   restarts are capped at ' + require(path.join(X.ROOT,'perf','native','telemetry.js')).MAX_RESTARTS, starts === require(path.join(X.ROOT,'perf','native','telemetry.js')).MAX_RESTARTS, String(starts));
+}
+{
+  // a killed typeperf's late output must not leak into the new session
+  const { TelemetrySampler: TS } = require(path.join(X.ROOT, 'perf', 'native', 'telemetry.js'));
+  const src = require('fs').readFileSync(path.join(X.ROOT, 'perf', 'native', 'telemetry.js'), 'utf8');
+  T('   stale output from a restarted-away typeperf is ignored', /if \(this\._proc !== proc\) return;/.test(src) && typeof TS === 'function');
 }
 
 process.exit(T.done() ? 1 : 0);

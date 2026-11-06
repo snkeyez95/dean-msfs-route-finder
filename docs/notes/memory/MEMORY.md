@@ -23,3 +23,4 @@
 - [Dean is red-green colorblind](dean_colorblind.md) — never let hue be the only cue on charts/UI; pair color with pattern; avoid green-vs-red/orange/purple pairings
 - [Scenery static/config check](scenery_static_config_check.md) — recurring "check static aircraft + settings" recipe: manifest package_version = only update signal (no MSFS log), iniBuilds scenery_config.json toggles, iniManager to flip safely
 - [DLSS setup → back to TAA](dlss_setup_preset_k.md) — 2026-10-29 Dean chose TAA over DLSS (felt worse); RHI/ReShade mod cleanup notes; AutoFPS OLOD leftovers land in UserCfg
+- [AirPods audio stutter](airpods_audio_stutter.md) — sim audio crackles on CPU-heavy climb-outs over Bluetooth AirPods (frames clean); AirPods mic for SI forces HFP; fix = wired or separate mic

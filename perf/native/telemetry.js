@@ -11,6 +11,16 @@ const os = require('os');
 const IGNORE = new Set(['_total', 'idle', 'system', 'secure system', 'memory compression',
                         'registry', 'flightsimulator2024', 'typeperf']);
 
+// v6.26.2 (Dean 2026-11-06, EHAM-LOWW): typeperf can go DEAD mid-session — every sample came back with
+// \Processor(_Total) at 0 for the whole 1h51m flight (sys_cpu logged 0%) while one process column
+// (gameoverlayui64) read a constant ~30%. The counters worked again right after, so it's a session
+// glitch. A capture only runs while MSFS is up, so a real system load under CPU_DEAD_PCT is impossible:
+// treat it as no reading (blank, never a fake 0%) and, after DEAD_RESTART_S such samples in a row,
+// restart typeperf — a fresh session normally reads fine.
+const CPU_DEAD_PCT = 2.0;
+const DEAD_RESTART_S = 30;
+const MAX_RESTARTS = 5;
+
 class TelemetrySampler {
   constructor(selfNames = [], log = null) {
     this.ncpu = os.cpus().length || 1;
@@ -25,16 +35,19 @@ class TelemetrySampler {
     this._warnedBadMem = false;
     this._log = typeof log === 'function' ? log : (() => {});
     this._latest = [null, null, '', null];
+    this._deadStreak = 0;
+    this._restarts = 0;
     this._ignore = new Set([...IGNORE, ...selfNames.map(s => s.toLowerCase())]);
   }
 
   start() {
     if (this._proc) return;
-    this._proc = spawn('typeperf',
+    const proc = this._proc = spawn('typeperf',
       ['\\Process(*)\\% Processor Time', '\\Processor(_Total)\\% Processor Time',
        '\\Memory\\Available MBytes', '-si', '1'],
       { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });   // stderr ignored: an unread pipe can wedge the child
-    this._proc.stdout.on('data', (d) => {
+    proc.stdout.on('data', (d) => {
+      if (this._proc !== proc) return;               // output from a typeperf we already restarted away from
       this._buf += d.toString();
       let nl;
       while ((nl = this._buf.indexOf('\n')) >= 0) {
@@ -42,7 +55,19 @@ class TelemetrySampler {
         this._onLine(line.trim());
       }
     });
-    this._proc.on('error', () => {});
+    proc.on('error', () => {});
+  }
+
+  // Kill the dead typeperf and start a fresh one; header parsing starts over.
+  _restart() {
+    this._restarts++;
+    this._log('[telemetry] CPU readings went dead (' + DEAD_RESTART_S + ' s of blank/0% system CPU) — restarting the reader (' +
+      this._restarts + '/' + MAX_RESTARTS + '); samples meanwhile are left blank, not 0%');
+    const old = this._proc; this._proc = null;
+    try { if (old) old.kill(); } catch (_) {}
+    this._buf = ''; this._procCols = null; this._cpuCol = -1; this._memCol = -1; this._idleCol = -1;
+    this._deadStreak = 0;
+    this.start();
   }
 
   _cells(line) {
@@ -77,11 +102,13 @@ class TelemetrySampler {
       return;
     }
     const num = i => { const v = parseFloat(cells[i]); return Number.isFinite(v) ? v : 0; };
+    const val = i => { const v = parseFloat(cells[i]); return Number.isFinite(v) ? v : null; };   // blank → null, never 0
     let sysCpu = null;
-    if (this._cpuCol >= 0) sysCpu = Math.round(num(this._cpuCol) * 10) / 10;
-    else if (this._idleCol >= 0) {                       // fallback: 100 − idle-fraction
-      sysCpu = Math.round(Math.max(0, Math.min(100, 100 - num(this._idleCol) / this.ncpu)) * 10) / 10;
+    if (this._cpuCol >= 0 && val(this._cpuCol) != null) sysCpu = Math.round(val(this._cpuCol) * 10) / 10;
+    else if (this._idleCol >= 0 && val(this._idleCol) != null) {   // fallback: 100 − idle-fraction
+      sysCpu = Math.round(Math.max(0, Math.min(100, 100 - val(this._idleCol) / this.ncpu)) * 10) / 10;
     }
+    const dead = sysCpu == null || sysCpu < CPU_DEAD_PCT;   // impossible while MSFS runs → the counters are dead
     let sysRam = null;
     if (this._memCol >= 0 && this.totalMemMb) {
       // Guard the stuck-100% bug (Dean 2026-10-05): a transient/disabled \Memory\Available MBytes counter
@@ -105,12 +132,17 @@ class TelemetrySampler {
       const v = num(i) / this.ncpu;
       if (v > topCpu) { topCpu = v; topName = this._procCols[i].replace(/#\d+$/, ''); }
     }
-    this._latest = [sysCpu, sysRam, topName ? topName + '.exe' : '',
-                    topName ? Math.round(topCpu * 10) / 10 : null];
+    // dead sample: the CPU columns are untrustworthy (the per-process ones too — EHAM-LOWW showed a
+    // phantom constant top process), so leave them all blank; RAM is a separate counter and stays.
+    this._latest = dead ? [null, sysRam, '', null]
+      : [sysCpu, sysRam, topName ? topName + '.exe' : '', topName ? Math.round(topCpu * 10) / 10 : null];
+    if (dead) {
+      if (++this._deadStreak >= DEAD_RESTART_S && this._restarts < MAX_RESTARTS && this._proc) this._restart();
+    } else this._deadStreak = 0;
   }
 
   latest() { return this._latest.slice(); }   // [sys_cpu, sys_ram, top_proc, top_proc_cpu]
   stop() { if (this._proc) { try { this._proc.kill(); } catch (_) {} this._proc = null; } }
 }
 
-module.exports = { TelemetrySampler };
+module.exports = { TelemetrySampler, CPU_DEAD_PCT, DEAD_RESTART_S, MAX_RESTARTS };
