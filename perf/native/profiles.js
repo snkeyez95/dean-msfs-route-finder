@@ -347,10 +347,237 @@ function suggest(flights, opts) {
     reasons, candidates, unrecorded, filled, runs: scored.map(r => ({ id: r.id, feltRatio: r.feltRatio, p99Delta: r.p99Delta })) };
 }
 
+// ── 🧪 EXPERIMENTS (v6.28.0) ─────────────────────────────────────────────────────────────────
+// An experiment = a named base profile + a few changed settings, flown for a small budget of flights
+// and judged against the base's own flights. These are the pure parts: the text format, the verdict,
+// and ABRP's own proposals. Storage / apply / keep / revert live in profiles_store.js.
+
+const HEADER = 'ABRP-PROFILE v1';
+
+// Parse a pasted block. ctx.resolveBase(name) → {id, name, values} | null (the store supplies it).
+// Returns { ok, kind:'experiment'|'profile', name, base, changes:[{id,label,to}], budget, why,
+//           errors:[line msgs], warnings:[] } — never touches a file.
+function parseChangeText(text, ctx) {
+  ctx = ctx || {};
+  const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  const out = { ok: false, kind: 'experiment', name: '', baseName: '', base: null, changes: [], budget: 3, why: '', errors: [], warnings: [] };
+  const hi = lines.findIndex(l => /^ABRP-PROFILE\b/i.test(l));
+  if (hi < 0) { out.errors.push('This doesn\'t look like an ABRP settings block (it should start with "' + HEADER + '").'); return out; }
+  const set = new Map();
+  for (const line of lines.slice(hi + 1)) {
+    const m = line.match(/^([a-z]+)\s*:\s*(.*)$/i);
+    if (!m) { out.errors.push('Not understood: "' + line + '"'); continue; }
+    const key = m[1].toLowerCase(), val = m[2].replace(/\s+\(.*\)\s*$/, '').trim();
+    if (key === 'name') out.name = val;
+    else if (key === 'base') out.baseName = val;
+    else if (key === 'why' || key === 'note') out.why = m[2].trim();
+    else if (key === 'type') out.kind = /profile/i.test(val) ? 'profile' : 'experiment';
+    else if (key === 'flights') { const n = parseInt(val, 10); if (n >= 1 && n <= 20) out.budget = n; else out.errors.push('flights: must be 1–20'); }
+    else if (key === 'set') {
+      const eq = val.lastIndexOf('=');
+      if (eq < 0) { out.errors.push('set: needs "setting = value" — got "' + val + '"'); continue; }
+      const name = val.slice(0, eq).trim(), v = val.slice(eq + 1).trim();
+      let k = S.findKey(name);
+      if (!k) { out.errors.push('Unknown setting "' + name + '"'); continue; }
+      // In-sim single rows that are two file settings: "Depth of field = Medium" means on + quality Medium.
+      if (k.key === 'Enabled' && k.labels === S.LABELS.ONOFF) {
+        const sib = S.BY_ID[k.id.replace(/\/Enabled$/, '/Quality')];
+        if (sib && !/^(on|off|0|1)$/i.test(v)) {
+          const pv = S.parseValue(sib, v);
+          if (!pv.ok) { out.errors.push(pv.reason); continue; }
+          set.set(k.id, 1); set.set(sib.id, pv.value); continue;
+        }
+      }
+      const pv = S.parseValue(k, v);
+      if (!pv.ok) { out.errors.push(pv.reason); continue; }
+      set.set(k.id, pv.value);
+    } else out.errors.push('Unknown field "' + key + ':"');
+  }
+  if (!set.size) out.errors.push('No "set:" lines — nothing to change.');
+  // base
+  if (out.kind === 'experiment') {
+    const b = ctx.resolveBase ? ctx.resolveBase(out.baseName || null) : null;
+    if (!b) out.errors.push(out.baseName ? ('No profile named "' + out.baseName + '" (use a saved profile\'s name, "ABRP Suggested" or "current")') : 'No base profile to start from.');
+    else out.base = b;
+  }
+  for (const [id, to] of set) {
+    const k = S.BY_ID[id];
+    const from = out.base ? out.base.values[id] : undefined;
+    out.changes.push({ id, label: k.label, to, from: from === undefined ? null : from, dir: from === undefined ? null : S.direction(k, from, to), same: from !== undefined && _equal(from, to) });
+  }
+  if (out.kind === 'experiment' && out.base) {
+    const real = out.changes.filter(c => !c.same);
+    if (!real.length && set.size) out.errors.push('Every change already matches "' + out.base.name + '" — nothing to test.');
+    // count in-sim rows, not file lines: "Depth of field = Medium" is one row (on flag + quality)
+    const rows = new Set(real.map(c => c.id.replace(/\/(Enabled|Quality)$/, '')));
+    if (rows.size > 1) out.warnings.push(rows.size + ' settings change at once — if the result moves, you won\'t know which one did it.');
+    const vr = out.base.vramPct;
+    for (const c of real) {
+      const k = S.BY_ID[c.id];
+      if (k.calib !== 'confirmed') out.warnings.push(k.label + ' has an unverified label — the value is written exactly, but its in-sim name may differ.');
+      if (k.cost === 'vram' && c.dir === 'up' && vr != null && vr >= 0.90) out.warnings.push(k.label + ' uses video memory, and this base already peaks at ' + Math.round(vr * 100) + '%.');
+    }
+  }
+  if (!out.name) {
+    const real = out.changes.filter(c => !c.same);
+    const ids = new Set(real.map(c => c.id));
+    out.name = real.filter(c => !(c.id.endsWith('/Enabled') && ids.has(c.id.replace(/\/Enabled$/, '/Quality'))))
+      .map(c => c.label.replace(/ quality$/, '') + ' ' + _word(c.id, c.to)).join(' + ') || 'Experiment';
+  }
+  out.ok = !out.errors.length;
+  return out;
+}
+
+// Any profile / experiment → the same text format (Copy as text). Experiments list only their
+// changes + base; plain profiles list every value (type: profile) so pasting recreates them exactly.
+function toChangeText(p) {
+  const L = [HEADER, 'name: ' + (p.name || 'Profile')];
+  // in-sim words where the label is confirmed ("Ultra", "On+Boost"); the raw stored value otherwise
+  const line = (id, v) => {
+    const k = S.BY_ID[id];
+    let shown;
+    if ((k.type === 'word' || k.type === 'enum') && k.labels && k.labels[k.type === 'word' ? String(v).toUpperCase() : v] != null && k.calib === 'confirmed') shown = k.labels[k.type === 'word' ? String(v).toUpperCase() : v];
+    else if (k.type === 'word' || k.type === 'enum') shown = String(v);
+    else shown = S.display(k, v).replace(/ frames$/, '').replace(/ · unverified$/, '');
+    // a word shared by two stored values can't round-trip — fall back to the raw value
+    if (k.labels && Object.values(k.labels).filter(w => w === shown).length > 1) shown = String(v);
+    return 'set: ' + k.label + ' = ' + shown;
+  };
+  if (p.changes && p.changes.length) {
+    if (p.baseName) L.push('base: ' + p.baseName);
+    for (const c of p.changes) L.push(line(c.id, c.to));
+    if (p.budget) L.push('flights: ' + p.budget);
+  } else {
+    L.push('type: profile');
+    for (const k of S.KEYS) if (!k.lod && p.values && p.values[k.id] != null) L.push(line(k.id, p.values[k.id]));
+  }
+  if (p.why || p.note) L.push('why: ' + (p.why || p.note));
+  return L.join('\n');
+}
+
+// Per-flight values, normalized by that aircraft's own usual — so a Citation-heavy side can't look
+// smoother than a Fenix-heavy side just because of the planes.
+function _flightMetrics(f, nm) {
+  const hrs = (f.dur || 0) / 3600;
+  return {
+    felt: nm && nm.feltHr > 0 && hrs > 0 ? (f.felt || 0) / hrs / nm.feltHr : null,     // 1.0 = your usual
+    p99: f.p99 != null && nm && nm.p99 != null ? f.p99 - nm.p99 : null,                   // ms vs usual
+    gpu: f.gpu != null ? f.gpu : null,                                                     // avg GPU busy ms
+    vram: f.vram && f.vramTotal ? f.vram / f.vramTotal : null,                             // peak fraction
+    taxi: f.taxiStut != null ? f.taxiStut : null
+  };
+}
+const _mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+const _sd = a => { if (a.length < 2) return 0; const m = _mean(a); return Math.sqrt(a.reduce((s, v) => s + (v - m) * (v - m), 0) / a.length); };
+const EXP_METRICS = [
+  { k: 'felt', label: 'Felt stutters (vs your usual)', judge: true, unit: '×', dec: 2 },
+  { k: 'p99', label: 'P99 frametime (vs your usual)', judge: true, unit: 'ms', dec: 2 },
+  { k: 'taxi', label: 'Taxi stutter', judge: true, unit: '%', dec: 3 },
+  { k: 'gpu', label: 'GPU busy per frame', judge: false, unit: 'ms', dec: 1 },
+  { k: 'vram', label: 'Peak video memory', judge: false, unit: '%', dec: 0, pct: true }
+];
+
+// Verdict for an experiment vs its base, on flights matched by their logged settings.
+// Same vocabulary as Settings A/B: collecting · free · saves · noeffect · costs · mixed.
+function experimentVerdict(exp, flights) {
+  const all = (flights || []).filter(f => !f.excluded);
+  const norms = _aircraftNorms(all);
+  const on = vals => all.filter(f => { const v = fromSnapshot(f.settings); return v && _sameSetup(vals, v) && _sameSetup(v, vals); });
+  const ef = on(exp.values), bf = on(exp.baseValues || {});
+  const budget = exp.budget || 3;
+  const em = ef.map(f => _flightMetrics(f, norms[f.aircraft || '?'])), bm = bf.map(f => _flightMetrics(f, norms[f.aircraft || '?']));
+  const rows = []; let worse = false, better = false, gpuUp = false, vramOver = false;
+  const collecting = ef.length < 2 || bf.length < 2;
+  for (const m of EXP_METRICS) {
+    const a = em.map(x => x[m.k]).filter(v => v != null), b = bm.map(x => x[m.k]).filter(v => v != null);
+    if (!a.length || !b.length) continue;
+    const am = _mean(a), bmn = _mean(b), delta = am - bmn, sigma = b.length >= 2 ? _sd(b) : null;
+    const beyond = sigma != null && sigma > 0 ? Math.abs(delta) > sigma : false;
+    if (!collecting && beyond && m.judge) { if (delta > 0) worse = true; else better = true; }
+    if (!collecting && m.k === 'gpu' && delta > 0) gpuUp = true;
+    if (m.k === 'vram' && am > VRAM_CAP) vramOver = true;
+    rows.push({ k: m.k, label: m.label, base: bmn, exp: am, delta, sigma, within: m.judge ? (sigma > 0 ? !beyond : null) : null, unit: m.unit, dec: m.dec, pct: !!m.pct });
+  }
+  let verdict, sentence;
+  if (collecting) { verdict = 'collecting'; sentence = 'Collecting: ' + ef.length + ' of ' + budget + ' experiment flights' + (bf.length < 2 ? (' (the base needs 2 flights too; it has ' + bf.length + ')') : '') + '.'; }
+  else if (worse && better) { verdict = 'mixed'; sentence = 'Trade-off: some measures improved and others got worse, beyond your normal flight-to-flight variation.'; }
+  else if (worse || vramOver) { verdict = 'costs'; sentence = worse ? 'Measurably rougher than the base — worth reverting.' : 'Smoothness held, but video memory ran past the ' + Math.round(VRAM_CAP * 100) + '% line.'; }
+  else if (better) { verdict = 'saves'; sentence = 'Smoother than the base, beyond normal variation.'; }
+  else if (gpuUp) { verdict = 'free'; sentence = 'Free upgrade: the GPU took the extra work and smoothness held.'; }
+  else { verdict = 'noeffect'; sentence = 'No measurable effect: everything stayed within your normal flight-to-flight variation.'; }
+  // honesty notes: things that changed between the two sides besides the setting
+  const notes = [];
+  const set = (fl, f) => [...new Set(fl.map(f))].filter(Boolean);
+  const ea = set(ef, f => f.afps), ba = set(bf, f => f.afps);
+  if (ea.length && ba.length && ea.join() !== ba.join()) notes.push('AutoFPS range differs: base ' + ba.join('/') + ', experiment ' + ea.join('/') + '.');
+  const es = set(ef, f => f.sim), bs = set(bf, f => f.sim);
+  if (es.length && bs.length && es.some(s => !bs.includes(s))) notes.push('Sim version differs: base ' + bs.join('/') + ', experiment ' + es.join('/') + '.');
+  const et = set(ef, f => f.traffic), bt = set(bf, f => f.traffic);
+  if (et.length && bt.length && et.join() !== bt.join()) notes.push('Online traffic differs: base ' + bt.join('/') + ', experiment ' + et.join('/') + '.');
+  return { verdict, sentence, rows, n: ef.length, baseN: bf.length, budget, done: ef.length >= budget, notes,
+    lastExpFlight: ef.length ? ef[ef.length - 1].timestamp : null };
+}
+
+// Compact block for pasting into a chat with Claude ("Copy results for Claude").
+function experimentResultsText(exp, v) {
+  const fmt = r => { const d = r.pct ? Math.round(r.delta * 100) + ' pts' : (r.delta >= 0 ? '+' : '') + r.delta.toFixed(r.dec) + ' ' + r.unit;
+    return '  ' + r.label + ': base ' + (r.pct ? Math.round(r.base * 100) + '%' : r.base.toFixed(r.dec)) + ' → ' + (r.pct ? Math.round(r.exp * 100) + '%' : r.exp.toFixed(r.dec)) + ' (' + d + (r.within == null ? '' : r.within ? ', within noise' : ', BEYOND noise') + ')'; };
+  return ['ABRP-EXPERIMENT-RESULTS v1',
+    'experiment: ' + exp.name, 'base: ' + (exp.baseName || '?'),
+    'changes: ' + (exp.changes || []).map(c => S.BY_ID[c.id].label + ' ' + S.display(S.BY_ID[c.id], c.from) + ' → ' + S.display(S.BY_ID[c.id], c.to)).join('; '),
+    'flights: ' + v.n + ' experiment / ' + v.baseN + ' base (budget ' + v.budget + ')',
+    'verdict: ' + v.verdict.toUpperCase() + ' — ' + v.sentence,
+    ...v.rows.map(fmt), ...(v.notes.length ? ['notes: ' + v.notes.join(' ')] : []),
+    'status: ' + (exp.status || 'draft')].join('\n');
+}
+
+// ABRP's own proposals: one-step-up changes to GPU-cost settings, offered only when the GPU clearly
+// has headroom (CPU-bound rig). Never VRAM-cost or CPU-cost settings, never unverified labels, never
+// a setting already under test or one that measurably cost something in the last 30 days.
+const PROPOSE_ORDER = ['Graphics/VolumetricLights/Quality', 'Graphics/ContactShadows/Quality', 'Graphics/SSR/Quality',
+  'Graphics/SSAO/Quality', 'Graphics/VolumetricClouds/Quality', 'Graphics/WindShield/Quality', 'Graphics/RaytracedShadows/Enabled',
+  'Graphics/DisplacementMapping/Enabled'];
+function proposeExperiments(flights, current, opts) {
+  opts = opts || {};
+  const out = { ok: false, reason: '', gpu: null, budgetMs: null, cpuBound: null, proposals: [] };
+  if (!current) { out.reason = 'Your sim settings file couldn\'t be read.'; return out; }
+  const recent = (flights || []).filter(f => !f.excluded && f.gpu != null).slice(-10);
+  if (recent.length < 3) { out.reason = 'Needs a few more logged flights to judge GPU headroom.'; return out; }
+  const tf = Number(current['Video/TargetFrameRate']) || 30;
+  const frame = 1000 / tf;
+  out.gpu = _med(recent.map(f => f.gpu)); out.budgetMs = frame; out.cpuBound = _med(recent.map(f => f.cpuBound));
+  if (out.gpu > frame * 0.6) { out.reason = 'Your GPU is already busy ' + out.gpu.toFixed(1) + ' ms of each ' + frame.toFixed(1) + ' ms frame — no clear headroom to spend.'; return out; }
+  const busy = new Set((opts.experiments || []).filter(e => e.status === 'draft' || e.status === 'active').flatMap(e => (e.changes || []).map(c => c.id)));
+  const cutoff = Date.now() - 30 * 86400e3;
+  const burned = new Set((opts.experiments || []).filter(e => e.verdict === 'costs' && Date.parse(e.finished || e.created) > cutoff).flatMap(e => (e.changes || []).map(c => c.id)));
+  for (const id of PROPOSE_ORDER) {
+    const k = S.BY_ID[id];
+    if (!k || k.cost !== 'gpu' || k.calib !== 'confirmed' || busy.has(id) || burned.has(id)) continue;
+    const cur = current[id]; if (cur == null) continue;
+    // a quality row whose feature is switched off isn't a one-step change
+    const en = current[id.replace(/\/Quality$/, '/Enabled')]; if (id.endsWith('/Quality') && en === 0) continue;
+    const steps = Object.keys(k.labels || {}).map(Number).filter(n => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
+    const max = k.max != null ? k.max : steps[steps.length - 1];
+    const next = steps.find(s => s > Number(cur) && s <= max);
+    if (next == null) continue;
+    const word = _word(id, next);
+    const p = { id: 'prop-' + id.replace(/\W+/g, '-'), name: k.label.replace(/ quality$/, '') + ' ' + word,
+      changes: [{ id, from: cur, to: next }],
+      why: 'GPU busy ~' + out.gpu.toFixed(1) + ' ms of a ' + frame.toFixed(1) + ' ms frame' + (out.cpuBound != null ? ', ' + Math.round(out.cpuBound) + '% of frames CPU-bound' : '') + '; ' + k.label.replace(/ quality$/, '').toLowerCase() + ' costs GPU time, not video memory.' };
+    p.text = toChangeText({ name: p.name, baseName: opts.baseName || '', changes: p.changes, budget: 3, why: p.why });
+    out.proposals.push(p);
+    if (out.proposals.length >= (opts.max || 3)) break;
+  }
+  out.ok = true;
+  if (!out.proposals.length) out.reason = 'Every GPU setting worth testing is already at its top step or under test.';
+  return out;
+}
+
 function fmtRange(a, b) {
   const f = s => { const d = new Date(String(s).slice(0, 10) + 'T12:00:00'); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   return a && b && String(a).slice(0, 10) !== String(b).slice(0, 10) ? f(a) + ' – ' + f(b) : f(a || b);
 }
 
 module.exports = { readProfileable, applyToText, verify, diff, matches, profileName, fromSnapshot, historyRuns, trackRecord, suggest, fmtRange,
+  parseChangeText, toChangeText, experimentVerdict, experimentResultsText, proposeExperiments, HEADER, EXP_METRICS,
   _equal, MIN_BASE, MIN_CANDIDATE, VRAM_CAP };

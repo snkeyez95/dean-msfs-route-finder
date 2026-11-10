@@ -134,10 +134,12 @@ try {
 
 // ── 5. SURFACE: the real renderer from index.html, fed by the store ──
 {
-  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable'];
+  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel'];
   const els = {};
   const src = 'let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;\n'
+    + 'let _spPaste={open:false,text:"",preview:null}, _spShowFinished=false;\n'
     + 'const document={getElementById:id=>(els[id]=els[id]||{innerHTML:"",focus(){},select(){}}),querySelector:()=>null};\n'
+    + X.html.match(/const _LABV=\{[\s\S]*?\n\};/)[0] + '\n' + X.html.match(/const _SP_EXP_STATUS=[^\n]*/)[0] + '\n'
     + X.grab('esc') + '\n' + names.map(n => X.grab(n)).join('\n')
     + '\nreturn { set:(o)=>{ for(const k in o){ eval(k+"=o[k]"); } }, render:()=>{ _SP._keys={}; for(const k of _SP.schema.keys)_SP._keys[k.id]=k; _spRender(); return els["prof-body"].innerHTML; } };';
   const R = new Function('els', src)(els);

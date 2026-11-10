@@ -55,7 +55,7 @@ const PARTICLES = { 0: 'Low', 1: 'High' };                               // own 
 const WATER = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512 = High confirmed
 const ONOFF = { 0: 'Off', 1: 'On' };
 const AA = { TAA: 'TAA', DLSS: 'DLSS',    // in-sim: 'NVIDIA DLSS Super Resolution'
-  DLAA: 'DLAA', FSR3: 'AMD FSR', FSR: 'AMD FSR', NONE: 'Off' };   // in-sim: 'AMD FSR 3.1' (file word FSR)
+  DLAA: 'DLAA', FSR: 'AMD FSR', NONE: 'Off' };   // in-sim: 'AMD FSR 3.1' (file word FSR — confirmed)
 const DLSS_MODE = { AUTO: 'Auto', DLAA: 'DLAA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FSR_MODE = { NATIVEAA: 'Native AA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FG = { NONE: 'Off', FSRFG: 'AMD FSR', DLSSFG: 'NVIDIA DLSS' };      // in-sim reads 'AMD FSR 1.1' for FSRFG
@@ -73,7 +73,7 @@ function g(section, key, label, page, group, type, extra) {
 }
 
 // ── {Video}: upscaling / frame generation / image ────────────────────────────────────────────
-v('AntiAliasing', 'Anti-aliasing / upscaler', 'Upscaling', 'word', { labels: AA, calib: 'confirmed', cost: 'gpu' });
+v('AntiAliasing', 'Anti-aliasing / upscaler', 'Upscaling', 'word', { labels: AA, calib: 'confirmed', cost: 'gpu', aka: ['Anti-aliasing', 'Upscaler'] });
 v('DLSSMode', 'DLSS mode', 'Upscaling', 'word', { labels: DLSS_MODE, calib: 'confirmed', cost: 'gpu' });
 v('FSRMode', 'AMD FSR mode', 'Upscaling', 'word', { labels: FSR_MODE, calib: 'confirmed', cost: 'gpu' });
 v('PrimaryScaling', 'Render scaling', 'Upscaling', 'pct', { calib: 'confirmed', cost: 'gpu' });
@@ -103,7 +103,7 @@ g('Procedural', 'GrassQuality', 'Grass', W, 'Vegetation', 'enum', { labels: Q, c
 g('Procedural', 'RocksQuality', 'Rocks', W, 'Vegetation', 'enum', { labels: Q, calib: 'confirmed', cost: 'mixed' });
 g('Texture', 'Quality', 'Texture resolution', W, 'Textures', 'enum', { labels: TEXTURE, calib: 'confirmed', cost: 'vram' });
 g('Texture', 'MaxAnisotropy', 'Anisotropic filtering', W, 'Textures', 'num', { more: true, calib: 'confirmed', cost: 'gpu', suffix: 'X' });
-g('Water', 'FFTSize', 'Water waves', W, 'Water', 'enum', { labels: WATER, calib: 'confirmed', cost: 'gpu' });
+g('Water', 'FFTSize', 'Water waves', W, 'Water', 'enum', { labels: WATER, calib: 'confirmed', cost: 'gpu', max: 512 });   // the in-sim Ultra preset leaves it at High
 
 // ── lighting, shadows, effects ───────────────────────────────────────────────────────────────
 g('VolumetricClouds', 'Enabled', 'Volumetric clouds on (file only)', L, 'Sky', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
@@ -121,13 +121,13 @@ g('SSR', 'Enabled', 'Raymarched reflections on (file only)', L, 'Lighting', 'enu
 g('SSR', 'Quality', 'Raymarched reflections quality', L, 'Lighting', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('SSR', 'HalfRes', 'Reflections half resolution', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('ReflectionProbe', 'Size', 'Cubemap reflections', L, 'Lighting', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
-g('WindShield', 'Quality', 'Windshield effects', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
+g('WindShield', 'Quality', 'Windshield effects', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu', max: 2 });   // Ultra preset leaves it at High
 g('Particles', 'Quality', 'Visual effects particles quality', L, 'Effects', 'enum', { labels: PARTICLES, calib: 'confirmed', cost: 'gpu' });
 g('DOF', 'Enabled', 'Depth of field', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('DOF', 'Quality', 'Depth of field quality', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('MotionBlur', 'Enabled', 'Motion blur', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('MotionBlur', 'Quality', 'Motion blur quality', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
-g('GlassCockpitsRefreshRate', 'Quality', 'Glass cockpit refresh rate', L, 'Cockpit', 'enum', { labels: Q, calib: 'confirmed', cost: 'cpu' });
+g('GlassCockpitsRefreshRate', 'Quality', 'Glass cockpit refresh rate', L, 'Cockpit', 'enum', { labels: Q, calib: 'confirmed', cost: 'cpu', max: 2 });
 g('Seatbelts', 'Enabled', 'Seatbelt visibility', L, 'Cockpit', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'none' });
 
 // ── traffic & life (-1 Off / 0 Low / 1 Medium / 2 High / 3 Ultra — all CONFIRMED 2026-11-10) ──
@@ -188,11 +188,61 @@ function direction(k, from, to) {
   return null;
 }
 
+// ── text → stored value (v6.28.0 experiments: pasted "set:" lines) ──────────────────────────
+// Find a setting by its id ("Graphics/SSR/Quality"), its ABRP label, or the in-sim row name (label
+// without a trailing " quality", e.g. "Light shafts"). Case-insensitive. Returns the key or null.
+function findKey(name) {
+  const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!n) return null;
+  const exact = K.find(k => k.id.toLowerCase() === n || k.label.toLowerCase() === n || (k.aka || []).some(a => a.toLowerCase() === n));
+  if (exact) return exact;
+  const alias = K.filter(k => k.label.toLowerCase().replace(/ quality$/, '') === n);
+  return alias.length === 1 ? alias[0] : null;
+}
+// Turn typed text into the value the file stores, for key k. Accepts the in-sim word ("Ultra",
+// "On+Boost", "AMD FSR"), the raw stored value ("3", "BOOST", "0.3"), or the ABRP display form
+// ("120%", "30" for sharpening, "2X", "16X"). Returns { ok, value } or { ok:false, reason }.
+function parseValue(k, text) {
+  const raw = String(text == null ? '' : text).trim();
+  if (!raw) return { ok: false, reason: 'no value given' };
+  const low = raw.toLowerCase().replace(/\s+/g, ' ');
+  const num = s => { const m = String(s).match(/^-?\d+(\.\d+)?$/); return m ? parseFloat(s) : null; };
+  const fromLabels = () => {
+    if (!k.labels) return null;
+    for (const [stored, word] of Object.entries(k.labels)) if (String(word).toLowerCase() === low) return k.type === 'word' ? stored : Number(stored);
+    return null;
+  };
+  let v = null;
+  switch (k.type) {
+    case 'word': {
+      v = fromLabels();
+      if (v == null && Object.keys(k.labels || {}).some(s => s.toLowerCase() === low)) v = raw.toUpperCase();
+      break;
+    }
+    case 'enum': {
+      v = fromLabels();
+      if (v == null) { const n = num(raw); if (n != null && k.labels && n in k.labels) v = n; }
+      break;
+    }
+    case 'pct': { const n = num(raw.replace(/%$/, '')); if (n != null) v = /%$/.test(raw) || n > 4 ? n / 100 : n; break; }
+    case 'x100': { const n = num(raw); if (n != null) v = n > 1 ? n / 100 : n; break; }
+    case 'mult': { const n = num(raw.replace(/x$/i, '').replace(/×.*$/, '').trim()); if (n != null) v = /x$|×/i.test(raw) ? n - 1 : n; break; }
+    case 'lod': return { ok: false, reason: 'TLOD/OLOD are left to AutoFPS and are not set by experiments' };
+    default: { const n = num(raw.replace(/x$/i, '')); if (n != null) v = n; }
+  }
+  if (v == null) {
+    const opts = k.labels ? Object.values(k.labels).filter((w, i, a) => a.indexOf(w) === i).join(', ') : null;
+    return { ok: false, reason: '"' + raw + '" is not a value for ' + k.label + (opts ? ' (options: ' + opts + ')' : '') };
+  }
+  if (k.max != null && typeof v === 'number' && v > k.max) return { ok: false, reason: k.label + ' tops out at ' + display(k, k.max) + ' in the sim' };
+  return { ok: true, value: v };
+}
+
 function schemaMeta() {
   return { pages: PAGES, keys: K.map(k => ({ id: k.id, label: k.label, page: k.page, group: k.group, type: k.type,
     labels: k.labels || null, calib: k.calib, cost: k.cost, lod: !!k.lod, advanced: !!k.advanced, suffix: k.suffix || '', more: !!k.more,
-    inverted: k.labels === TEXTURE })) };
+    inverted: k.labels === TEXTURE, max: k.max != null ? k.max : null })) };
 }
 
-module.exports = { KEYS: K, BY_ID, PAGES, display, direction, schemaMeta,
+module.exports = { KEYS: K, BY_ID, PAGES, display, direction, schemaMeta, findKey, parseValue,
   LABELS: { Q, TEXTURE, PARTICLES, WATER, ONOFF, AA, DLSS_MODE, FSR_MODE, FG, REFLEX } };

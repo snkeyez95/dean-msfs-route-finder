@@ -1,3 +1,148 @@
+# v6.28.0 — SIM PROFILES: 🧪 EXPERIMENTS (paste-in changes, auto-verdict, ABRP-proposed experiments) (Dean 2026-11-10, plan)
+> ✅ BUILT 2026-11-10 (awaiting Dean release.bat). All 6 lifecycle steps shipped as designed: parseChangeText/toChangeText
+> (in-sim words, raw ids, %, x100, 2X; DOF/motion-blur one-row combo; caps from the Ultra preset incl. water High),
+> experimentVerdict (per-aircraft, ±1σ, honesty notes), proposeExperiments (Dean today: Light shafts / Contact shadows /
+> Reflections Ultra at GPU 11.4/33.3 ms), store create/keep/revert/end + nudges (finished / drifted) + menu badge,
+> clipboard auto-offer (remembered per text in localStorage so a saved block is never re-offered — bug caught in the
+> preview), drag & drop, Copy results for Claude / Copy as text round-trip. tests/test_sim_experiments.js 59/59 (synthetic
+> flight logs + copy of real UserCfg; apply changes exactly 1 line; revert byte-identical) + test_sim_profiles 65/65.
+> Browser-preview verified against the real store on copies: auto-offer, save, apply (1 line), revert (byte-identical),
+> drop, finished card, results text. Draft cards show no Keep/Revert (fixed during preview). Memory: sim_profile_experiments.md.
+
+## Context
+Sim Profiles (v6.27.x) can save, apply and undo whole setups, verified live on Dean's machine. Dean wants
+the next step: when the data shows a likely win (e.g. "the GPU has headroom, try Light shafts Ultra"),
+Claude hands him a **copy/paste text** that ABRP turns into an **experimental profile**. The experiment is
+his current baseline with only the suggested change(s), and he applies it in one click instead of editing
+in-sim. He asked me to "play it out": take it further on efficiency and automation.
+
+Pieces that already exist and get reused:
+- **profiles.js:** applyToText (only existing lines), verify, diff, matches, trackRecord, _aircraftNorms,
+  _score (per-aircraft felt-stutter ratio + P99 delta), fromSnapshot.
+- **profiles_store.js:** save, apply with backup → verify → undo, automatic backups.
+- **usercfg_schema.js:** every key, its in-sim label, its allowed values, a calib status, and a cost tag
+  (gpu / vram / cpu).
+- **index.html Settings A/B:** the _LABV verdict palette, _labDeltaRow (bar drawn over a ±1σ noise band),
+  _pstdev. Note that _abCard uses raw means, NOT per-aircraft normalized; experiments use the engine's
+  normalized scoring instead.
+- **Capture:** already logs every Video and Graphics key per flight (v6.27.0), so each flight can be
+  matched to the exact profile it ran.
+
+## The design: an experiment's lifecycle
+**1. Create** (three ways in; all produce the same experiment object):
+- **Paste**: Sim Profiles → **＋ New experiment** → a paste box. ABRP auto-detects an `ABRP-PROFILE`
+  block on the clipboard and pre-fills it.
+- **Drag & drop** a `.abrp.txt` file onto the Sim Profiles page.
+- **ABRP-proposed**: a "Suggested experiments" list (see 4). One click creates it, no paste needed.
+
+**Text format** (human-readable, tolerant; labels or raw ids both accepted):
+```
+ABRP-PROFILE v1
+name: Light shafts Ultra
+base: ABRP Suggested            (or any saved profile name; default = the profile matching the sim)
+set: Light shafts quality = Ultra
+set: Graphics/SSR/Quality = 3   (raw id/number also fine)
+flights: 3                      (optional test budget; default 3)
+why: GPU busy ~10 ms of a 33 ms frame; light shafts cost GPU, not video memory.
+```
+Parser (`profiles.js parseChangeText`):
+- Matches labels case-insensitively against the schema, including in-sim word values ("Ultra", "On+Boost",
+  "AMD FSR"), via the schema's label maps reversed.
+- **Rejects** unknown settings, values that don't exist for a setting, display / window / VR keys, and
+  TLOD/OLOD (left to AutoFPS) with a plain error per line.
+- **Never** applies on import; it only creates the profile.
+
+**2. Preview + save:** the parse result shows a confirm card:
+"Base: ABRP Suggested · 1 change: Light shafts High → Ultra ▲ more (GPU cost)".
+- Warnings, never blocks:
+  - 2+ changes: "can't tell which one did what".
+  - A video-memory-cost setting going up while the base's typical peak is ≥ 90%.
+  - Any change on a setting still marked ≈.
+- Save creates `{source:'experiment', baseId, changes, budget, created, why, status:'draft'}`.
+- Values = the base profile's values + the changes. Base values are copied at creation, so later base
+  edits don't move the experiment.
+
+**3. Fly + auto-verdict** (the automation core, no manual bookkeeping):
+- Flights are attributed to the experiment automatically by matching their logged settings (trackRecord).
+  The base's flights come from its own record.
+- New engine fn `profiles.js experimentVerdict(exp, base, flights)`:
+  - Per-aircraft normalized (the same _aircraftNorms/_score as Suggested), so plane mix can't fake a
+    result.
+  - Metrics: felt stutters/hr ratio, P99 Δ, avg GPU busy Δ, peak video memory, plus taxi stutter.
+  - Noise band = ±1σ of the base flights.
+  - Verdict words reuse Settings A/B's: COLLECTING n/budget · FREE UPGRADE · SAVES · NO EFFECT · COSTS ·
+    MIXED.
+- The card shows a status strip: "Flying 2 of 3 · so far: no measurable cost".
+
+**4. ABRP-proposed experiments** (the further step: it notices the opportunity itself):
+- `profiles.js proposeExperiments(flights, schema, current)`. Candidate rules:
+  - Only GPU-cost, VRAM-light settings (schema cost tag), one step up from current.
+  - Never re-propose a setting whose experiment ended in COSTS within the last 30 days.
+  - Never propose ≈ settings.
+  - Gate: only when the newest well-flown setup shows real GPU headroom. Avg GPU busy < 60% of the frame
+    budget (33.3 ms at a 30 fps target) and mostly CPU-bound: Dean's data today is ~10 ms and 85%
+    CPU-bound, so it qualifies.
+- Ranked by expected value. Ultra steps of light shafts / contact shadows / reflections / shadow maps are
+  the obvious first candidates. Shows at most 3, each with a one-line why.
+- Each candidate renders as the same text block (so I can also hand it out) and gets a **Start
+  experiment** button.
+
+**5. Finish + decide** (closes the loop):
+- When the budget is reached, the card offers **Keep** / **Revert**:
+  - **Keep** folds the change into a new version of the base profile (or saves it as a new profile if
+    the base is ABRP Suggested).
+  - **Revert** applies the base.
+- Status moves to `kept` / `reverted` with its verdict; it stays listed under a collapsed "Finished" group.
+- **Suggested learns automatically:** a kept FREE/SAVES experiment's change becomes adoptable evidence
+  for ABRP Suggested, using the existing candidate logic. A COSTS result marks the setting so it isn't
+  re-proposed.
+- A gentle **nudge**:
+  - When budget is reached: a one-line banner on the Performance and Sim Profiles tabs ("Experiment
+    'Light shafts Ultra' finished: no measurable cost. Keep or revert?").
+  - If ABRP sees you flew 2 flights *off* the experiment while it's active: "Still testing? Apply it
+    again or end it."
+
+**6. Round-trip to chat** (efficiency: no screenshots needed):
+- **Copy results for Claude** on any experiment card copies a compact text block: experiment,
+  base, changes, flights, per-metric deltas vs noise, verdict, sim version, AutoFPS band. Dean pastes it
+  here and I can analyze without screenshots or file digging.
+- **Copy as text** on any profile exports it in the same ABRP-PROFILE format (`set:` lines for every
+  value). It works as a backup or for sharing, and pasting it back recreates the profile.
+
+**Confound guards** (honesty; each shown as a one-line note on the card, never silent):
+- **AutoFPS band** different between the base flights and the experiment flights (autofps_cfg is logged
+  per flight) → note "AutoFPS range changed during this test".
+- **sim_version** changed mid-test → note it.
+- **Online-traffic mix** differs (VATSIM vs offline) → note it.
+
+## Files
+- `perf/native/profiles.js`: parseChangeText, toChangeText, experimentVerdict, proposeExperiments.
+- `perf/native/profiles_store.js`: experiment create / keep / revert / end; status; budget; list adds
+  experiments, proposals and the finished nudge.
+- `main.js` + `preload.js`: IPCs profiles-experiment-* (thin wrappers, same pattern as profiles-*).
+- `index.html`:
+  - Sim Profiles gets a 🧪 Experiments section between ABRP Suggested and My profiles: new-experiment
+    paste box (+ clipboard auto-detect, drag & drop), experiment cards with status strip, delta rows
+    (reuse _labDeltaRow / _LABV), Keep / Revert, Copy results.
+  - "Suggested experiments" list; nudge banner; "Copy as text" on every profile card.
+- `perf/native/usercfg_schema.js`: reverse label lookup helper.
+- `tests/test_sim_experiments.js` (new); README guide + changelog; version v6.28.0.
+
+## Verification
+- **Desk** (real data, copies only, live-file hash guard):
+  - Parser: labels, words, raw ids, rejects (unknown / VR / display / TLOD / bad value), warnings.
+  - Round-trip: toChangeText → parseChangeText gives identical values.
+  - experimentVerdict on synthetic flights: collecting / free / costs / no effect; a heavy-aircraft mix
+    can't fake a verdict.
+  - proposeExperiments on Dean's real flights proposes only GPU-cost, non-≈ settings, one step up.
+  - Store: create → apply → simulated flights → verdict → keep (base updated) / revert (file matches base
+    byte-for-byte).
+- **Surface:** render the real Sim Profiles functions with Dean's real store copy: experiment card, status
+  strip, proposal list, nudge, paste preview errors. Then click through the browser preview against a
+  scratch copy of UserCfg, the same method used for v6.27.0: paste → preview → save → apply → undo.
+- **Live (Dean):** paste a block I give him → save → apply (sim closed) → open the sim and confirm the one
+  row changed → fly 3 → card shows the verdict → Keep or Revert.
+
 # v6.27.0 — SIM PROFILES: save / name / apply in-sim graphics setups + "ABRP Suggested" (Dean 2026-11-10, plan)
 > ✅ BUILT 2026-11-10 (awaiting Dean release.bat + screenshot calibration). usercfg_schema.js (one dictionary,
 > calib status per key; gfx_watch re-exports its maps), profiles.js (read/apply/verify/historyRuns/suggest),

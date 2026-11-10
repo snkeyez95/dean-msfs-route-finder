@@ -25,3 +25,4 @@
 - [DLSS setup → back to TAA](dlss_setup_preset_k.md) — 2026-10-29 Dean chose TAA over DLSS (felt worse); RHI/ReShade mod cleanup notes; AutoFPS OLOD leftovers land in UserCfg
 - [AirPods audio stutter](airpods_audio_stutter.md) — sim audio crackles on CPU-heavy climb-outs over Bluetooth AirPods (frames clean); AirPods mic for SI forces HFP; fix = wired or separate mic
 - [UserCfg scale gotchas](usercfg_scale_gotchas.md) — Texture Quality INVERTED (2=Medium, 1=High); check gfx_watch.js calibration before saying a setting went up/down
+- [Sim Profile experiments](sim_profile_experiments.md) — hand Dean settings changes as ABRP-PROFILE paste blocks (Sim Profiles → 🧪 Experiments); read his ABRP-EXPERIMENT-RESULTS pastes

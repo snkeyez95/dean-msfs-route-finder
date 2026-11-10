@@ -2551,6 +2551,15 @@ ipcMain.handle('profiles-save',   (_, a) => _profCall('save', a));
 ipcMain.handle('profiles-rename', (_, a) => _profCall('rename', a));
 ipcMain.handle('profiles-delete', (_, a) => _profCall('del', a));
 ipcMain.handle('profiles-apply',  (_, a) => _profCall('apply', a));
+// v6.28.0 experiments: paste a change → preview → save; finish with keep / revert / end.
+ipcMain.handle('profiles-exp-preview', (_, a) => _profCall('experimentPreview', a));
+ipcMain.handle('profiles-exp-create',  (_, a) => _profCall('experimentCreate', a));
+ipcMain.handle('profiles-exp-finish',  (_, a) => _profCall('experimentFinish', a));
+ipcMain.handle('profiles-export-text', (_, a) => _profCall('exportText', a));
+// Clipboard via the main process (reliable in Electron; the renderer's navigator.clipboard can be
+// permission-gated). Read is only used to offer "Paste from clipboard" when it holds an ABRP block.
+ipcMain.handle('clipboard-read-text',  () => { try { return require('electron').clipboard.readText() || ''; } catch(_) { return ''; } });
+ipcMain.handle('clipboard-write-text', (_, t) => { try { require('electron').clipboard.writeText(String(t||'')); return true; } catch(_) { return false; } });
 
 // Capture status for the title-bar badge. v1: active = engine process running. state (armed /
 // recording) is read from a status file the engine writes when present (engine pass adds it).

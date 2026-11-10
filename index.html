@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.27.5</div>
+  <div class="tname">A Better Route Planner &mdash; v6.28.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.27.5</div>
+    <div class="sb-ver">v6.28.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1377,6 +1377,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   window.api.msfsDetect().then(_det=>{ S.is2024 = !(_det && _det.edition==='2020'); }).catch(()=>{});
   document.documentElement.setAttribute('data-theme',S.cfg.theme||'dark');
   applyNavOrder(); initNavDnd();   // restore the user's sidebar order + enable drag-to-reorder
+  setTimeout(spCheckNudges, 6000); // v6.28.0: menu badge when an experiment is waiting for Keep/Revert
   startVpilotWatch();              // if 'auto-start Live ATC with vPilot' is on, begin watching
   if(S.cfg.resolvedAirports){Object.entries(S.cfg.resolvedAirports).forEach(([k,v])=>{AI[k]=v;COMMERCIAL_EXTRA.add(k);});}
   if(S.cfg.folder){S.folderPath=S.cfg.folder;setFD(S.cfg.folder);document.getElementById('scan-btn').disabled=false;}
@@ -1585,6 +1586,7 @@ function sw(t){
 // (profiles-*); labels come from usercfg_schema.js via _SP.schema — the renderer never declares its
 // own number→word maps. Colour-blind safe: every change is marked ▲ more / ▼ less in words.
 let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;
+let _spPaste={open:false,text:'',preview:null}, _spShowFinished=false, _spPrevT=null;
 function _spK(id){ return _SP&&_SP._keys&&_SP._keys[id]; }
 function _spEq(a,b){ if(a==null||b==null)return false; if(typeof a==='number'||typeof b==='number')return Math.abs(Number(a)-Number(b))<1e-6; return String(a).toUpperCase()===String(b).toUpperCase(); }
 function _spDisp(k,v){
@@ -1637,7 +1639,13 @@ async function renderProfilesPane(){
   let r=null; try{ r=await window.api.profilesList(); }catch(e){ r={ok:false,msg:e.message}; }
   if(!r||!r.ok){ body.innerHTML='<div class="api-pan" style="color:var(--red)">Couldn&rsquo;t load profiles: '+esc((r&&r.msg)||'unknown error')+'</div>'; return; }
   _SP=r; _SP._keys={}; for(const k of r.schema.keys)_SP._keys[k.id]=k;
-  _spRender();
+  _spRender(); _spInitDrop(); _spBadge((r.nudges||[]).length);
+  // offer the clipboard: if it holds an ABRP block, open the paste box pre-filled (it never saves by itself)
+  // Offered once per distinct text, remembered across restarts, and never for text already saved.
+  try{
+    const t=await window.api.clipboardReadText();
+    if(/^\s*ABRP-PROFILE v1/m.test(t||'')&&!_spPaste.open&&!_spClipSeen(t)){ _spClipMark(t); _spPaste={open:true,text:t,preview:null,fromClip:true}; spPasteInput(t); }
+  }catch(_){}
 }
 function profilesRange(a,b){
   const f=s=>{ const d=new Date(String(s).slice(0,10)+'T12:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
@@ -1662,9 +1670,13 @@ function _spRender(){
   h+='</div>'+(_SP.found?'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spSave(\'captured\')">＋ Save as profile</button>':'')+'</div>';
   if(_SP.simRunning) h+='<div id="sp-simrunning" style="background:var(--acc3);border:1px solid var(--acc2);border-radius:var(--r2);padding:9px 14px;margin:-4px 0 14px;font-size:12.5px;color:var(--acc)">⏸ MSFS is running. You can browse and save, but profiles apply only when the sim is closed (it reads its settings at launch and overwrites them when it exits).</div>';
   if(_SP.lastApply&&!(_spMsg&&_spMsg.undo)) h+='<div style="font-size:12px;color:var(--ink3);margin:-4px 0 12px">Last applied: <b style="color:var(--ink1)">'+esc(_SP.lastApply.name)+'</b> · <span style="color:var(--blu);cursor:pointer" onclick="spUndo()">↶ Undo</span></div>';
+  // reminders: a finished experiment waiting for a decision, or one you've stopped flying
+  for(const n of (_SP.nudges||[])) h+='<div class="sp-nudge" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--acc3);border:1px solid var(--acc);border-radius:var(--r2);padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--ink1)"><span style="flex:1">🧪 '+esc(n.text)+'</span><button class="btn bg bxs" onclick="spOpenCard(\''+n.id+'\')">Open</button></div>';
   // 2 · ABRP Suggested
   h+=_spSuggestedCard();
-  // 3 · my profiles
+  // 3 · experiments
+  h+=_spExperimentsSection();
+  // 4 · my profiles
   h+=_spSection('My profiles');
   if(!mine.length) h+='<div style="font-size:13px;color:var(--ink3);margin-bottom:12px">No profiles yet. Save your current settings above, or rebuild a past setup from your flight history below.</div>';
   for(const p of mine) h+=_spCard({key:p.id,id:p.id,kind:'profile',name:p.name,note:p.note,values:p.values,track:p.track});
@@ -1713,7 +1725,7 @@ function _spCard(o){
     +(isCur?' <span class="sp-cur" style="font-size:10px;font-weight:700;color:var(--blu);border:1px solid var(--blu);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:2px">✓ CURRENT</span>':'')+'</div>';
   if(o.sub) h+='<div style="font-size:11.5px;color:var(--ink3);margin-top:4px">'+o.sub+'</div>';
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">'+_spChips(o.values)+'</div>'
-    +'<div class="sp-track" style="font-size:11.5px;color:var(--ink2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">'+_spTrack(o.track)+'</div></div>'
+    +(o.noTrack?'':'<div class="sp-track" style="font-size:11.5px;color:var(--ink2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">'+_spTrack(o.track)+'</div>')+'</div>'
     +'<div style="font-size:11.5px;color:var(--ink3);text-align:right;padding-top:2px">'+(cur?(isCur?'matches your sim':(d.length+' setting'+(d.length===1?'':'s')+' differ'+(d.length===1?'s':''))):'')+'</div></div>';
   if(open){
     h+='<div class="sp-body" style="border-top:1px solid var(--sep);padding:12px 16px">';
@@ -1735,17 +1747,180 @@ function _spCard(o){
     } else {
       h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
         +'<button class="btn bsm sp-apply" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled title="Close MSFS first"':'')+' onclick="_spConfirm=\''+o.key+'\';_spRender()">Apply…</button>';
-      if(o.kind==='profile'||o.kind==='safety') h+='<button class="btn bg bsm" onclick="_spRenaming=\''+o.key+'\';_spRender()">Rename</button>';
+      if(o.kind==='profile'||o.kind==='safety'||o.kind==='experiment') h+='<button class="btn bg bsm" onclick="_spRenaming=\''+o.key+'\';_spRender()">Rename</button>';
       if(o.kind==='profile') h+='<button class="btn bg bsm" onclick="spSave(\'copy\',\''+o.id+'\')">Duplicate</button>';
       if(o.kind==='run') h+='<button class="btn bg bsm" onclick="spSave(\'history\',\''+o.id+'\')">＋ Save as profile</button>';
       if(o.kind==='suggested') h+='<button class="btn bg bsm" onclick="spSave(\'suggested\')">＋ Save a copy</button>';
-      if(o.kind==='profile'||o.kind==='safety') h+='<button class="btn bg bsm" style="margin-left:auto;color:var(--red)" onclick="spDelete(\''+o.id+'\')">Delete</button>';
+      if(o.kind==='experiment'&&o.active) h+='<button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'keep\')" title="Keep the change: it is folded into the base profile, or saved as a new profile">✓ Keep</button>'
+        +'<button class="btn bg bsm" '+(_SP.simRunning?'disabled title="Close MSFS first"':'title="Apply the base profile again"')+' onclick="spExpFinish(\''+o.id+'\',\'revert\')">↶ Revert to base</button>'
+        +'<button class="btn bg bsm" title="Close the experiment without changing your sim" onclick="spExpFinish(\''+o.id+'\',\'end\')">End</button>';
+      if(o.kind==='experiment') h+='<button class="btn bg bsm" title="Copies a short results summary to paste into a chat with Claude" onclick="spCopyResults(\''+o.id+'\')">📋 Copy results for Claude</button>';
+      if(o.kind==='profile'||o.kind==='suggested'||o.kind==='experiment') h+='<button class="btn bg bsm" title="Copies this as ABRP text; paste it under New experiment to recreate it" onclick="spCopyText(\''+o.id+'\')">Copy as text</button>';
+      if(o.kind==='profile'||o.kind==='safety'||o.kind==='experiment') h+='<button class="btn bg bsm" style="margin-left:auto;color:var(--red)" onclick="spDelete(\''+o.id+'\')">Delete</button>';
       h+='</div>';
     }
     h+='</div>';
   }
   return h+'</div>';
 }
+// ── 🧪 EXPERIMENTS (v6.28.0) ──────────────────────────────────────────────────
+// An experiment = a base profile + one (or a few) changed settings, flown for a small flight budget and
+// judged against the base's own flights (per-aircraft, ±1σ noise). Created by pasting ABRP text, dropping
+// a .txt file, or one click on an ABRP proposal. Verdict words reuse Settings A/B's (_LABV).
+const _SP_EXP_STATUS={draft:'READY TO APPLY',active:'TESTING',kept:'KEPT',reverted:'REVERTED',ended:'ENDED'};
+function _spExperimentsSection(){
+  const exps=(_SP.experiments||[]).slice().reverse();
+  const live=exps.filter(e=>e.status==='draft'||e.status==='active'), done=exps.filter(e=>!(e.status==='draft'||e.status==='active'));
+  let h='<div style="display:flex;align-items:center;gap:10px;margin:18px 0 8px">'
+    +'<span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">🧪 Experiments</span>'
+    +'<span style="font-size:11px;color:var(--ink3)">— test one change against a base profile; ABRP judges it from your flights</span>'
+    +'<button class="btn bg bxs" style="margin-left:auto" onclick="spNewExp()">＋ New experiment</button></div>';
+  if(_spPaste.open) h+=_spPastePanel();
+  for(const e of live) h+=_spExpCard(e);
+  // ABRP's own ideas (only when the GPU clearly has headroom)
+  const pr=_SP.proposals||{};
+  if(pr.ok&&pr.proposals&&pr.proposals.length){
+    h+='<div class="api-pan" style="padding:12px 16px">'
+      +'<div style="font-size:12.5px;color:var(--ink1);margin-bottom:8px"><b>Suggested experiments</b> <span style="color:var(--ink3)">— your GPU is busy about '+Number(pr.gpu).toFixed(1)+' ms of each '+Number(pr.budgetMs).toFixed(1)+' ms frame'+(pr.cpuBound!=null?(' and '+Math.round(pr.cpuBound)+'% of frames wait on the CPU'):'')+', so there is room for GPU-only detail that doesn&rsquo;t use video memory.</span></div>';
+    for(const p of pr.proposals){
+      const c=p.changes[0], k=_spK(c.id);
+      h+='<div class="sp-prop" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--sep);font-size:12.5px">'
+        +'<span style="flex:1;color:var(--ink1)"><b>'+esc(p.name)+'</b> <span style="color:var(--ink3);font-family:\'JetBrains Mono\',monospace;font-size:11.5px">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to))+'</span>'
+        +'<button class="btn bg bxs" onclick="spExpPropose(\''+p.id+'\')">Start experiment</button>'
+        +'<button class="btn bg bxs" title="Copy as ABRP text" onclick="spCopyProposal(\''+p.id+'\')">Copy text</button></div>';
+    }
+    h+='</div>';
+  } else if(!live.length&&!_spPaste.open){
+    h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:10px">No experiments running. '+esc(pr.reason||'')+' Paste a change from Claude with <b>＋ New experiment</b>, or drop a .txt file on this page.</div>';
+  }
+  if(done.length){
+    h+='<div style="margin:8px 0;cursor:pointer" onclick="_spShowFinished=!_spShowFinished;_spRender()"><span style="font-size:11px;color:var(--ink3)">'+(_spShowFinished?'▾':'▸')+' Finished experiments ('+done.length+')</span></div>';
+    if(_spShowFinished) for(const e of done) h+=_spExpCard(e);
+  }
+  return h;
+}
+function _spExpCard(e){
+  const r=e.result||{}, live=e.status==='draft'||e.status==='active';
+  const vk=live?r.verdict:(e.verdict||r.verdict);
+  let v=(typeof _LABV!=='undefined'&&_LABV[vk])||{c:'var(--ink3)',t:''};
+  if(!live&&vk==='collecting') v={c:'var(--ink3)',t:'NOT ENOUGH FLIGHTS'};   // finished before it had data
+  const chg=(e.changes||[]).map(c=>{ const k=_spK(c.id); return esc(k?k.label:c.id)+' <span style="font-family:\'JetBrains Mono\',monospace">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to)); }).join(' · ');
+  const status=live?(e.status==='active'?('TESTING '+Math.min(r.n||0,r.budget||3)+' OF '+(r.budget||3)):_SP_EXP_STATUS.draft):_SP_EXP_STATUS[e.status];
+  const sub='<span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:var(--acc);border:1px solid var(--acc);border-radius:5px;padding:1px 7px">'+esc(status)+'</span>'
+    +(r.verdict&&r.verdict!=='collecting'||!live?' <span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:1px 7px">'+esc(v.t)+'</span>':'')
+    +' &nbsp;on <b style="color:var(--ink1)">'+esc(e.baseName||'?')+'</b><div style="margin-top:4px">'+chg+'</div>';
+  let extra='<div class="sp-exp-verdict" style="font-size:12.5px;color:var(--ink1);line-height:1.6;margin-bottom:8px">'+esc(r.sentence||'')+'</div>';
+  if(e.status==='draft') extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Apply it (sim closed), then fly normally with capture on. ABRP matches each flight to this experiment by its settings, so there is nothing to tag.</div>';
+  if(r.rows&&r.rows.length){
+    extra+='<div style="border:1px solid var(--sep);border-radius:var(--r3);overflow:hidden;margin-bottom:8px">';
+    r.rows.forEach((x,i)=>{
+      const f=val=>x.pct?Math.round(val*100)+'%':Number(val).toFixed(x.dec)+(x.unit==='ms'?' ms':x.unit==='×'?'×':x.unit==='%'?'%':'');
+      const d=x.pct?((x.delta>=0?'+':'')+Math.round(x.delta*100)+' pts'):((x.delta>=0?'+':'')+Number(x.delta).toFixed(x.dec)+(x.unit==='ms'?' ms':x.unit==='%'?' pts':''));
+      const tag=x.within==null?'<span style="color:var(--ink3)">info</span>':x.within?'<span style="color:var(--ink3)">within normal variation</span>':'<b style="color:var(--acc)">beyond normal variation</b>';
+      extra+='<div style="display:flex;gap:10px;align-items:center;padding:6px 10px;font-size:12px;'+(i?'border-top:1px solid var(--sep)':'')+'"><span style="flex:1;color:var(--ink1)">'+esc(x.label)+'</span>'
+        +'<span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+esc(f(x.base))+' → '+esc(f(x.exp))+'</span>'
+        +'<span style="font-family:\'JetBrains Mono\',monospace;min-width:80px;text-align:right">'+esc(d)+'</span><span style="min-width:150px;text-align:right">'+tag+'</span></div>';
+    });
+    extra+='</div><div style="font-size:11px;color:var(--ink3);margin-bottom:8px">Base: '+(r.baseN||0)+' flight'+(r.baseN===1?'':'s')+' · experiment: '+(r.n||0)+'. Felt stutters and P99 are measured against your usual for the same aircraft, so the plane mix can&rsquo;t fake a result.</div>';
+  }
+  for(const n of (r.notes||[])) extra+='<div style="font-size:12px;color:var(--acc);margin-bottom:6px">⚠ '+esc(n)+'</div>';
+  for(const w of (e.warnings||[])) extra+='<div style="font-size:11.5px;color:var(--ink3);margin-bottom:6px">Note from setup: '+esc(w)+'</div>';
+  if(e.why) extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Why: '+esc(e.why)+'</div>';
+  return _spCard({key:e.id,id:e.id,kind:'experiment',live,active:e.status==='active',name:e.name,values:e.values,track:null,sub,extra,accent:false,dim:!live,noTrack:true});
+}
+function _spPastePanel(){
+  const pv=_spPaste.preview;
+  let h='<div class="api-pan sp-paste" style="padding:14px 16px;border-color:var(--acc)">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:13px;color:var(--ink0)">New experiment</b>'
+    +(_spPaste.fromClip?'<span style="font-size:11.5px;color:var(--ink3)">— filled from your clipboard</span>':'')
+    +'<button class="btn bg bxs" style="margin-left:auto" onclick="spPasteFromClipboard()">Paste from clipboard</button>'
+    +'<button class="btn bg bxs" onclick="_spPaste={open:false,text:\'\',preview:null};_spRender()">Cancel</button></div>'
+    +'<textarea id="sp-paste-text" spellcheck="false" oninput="spPasteInput(this.value)" placeholder="ABRP-PROFILE v1&#10;name: Light shafts Ultra&#10;base: ABRP Suggested&#10;set: Light shafts = Ultra&#10;flights: 3" style="width:100%;min-height:120px;font-family:\'JetBrains Mono\',monospace;font-size:12px;background:var(--bg3);color:var(--ink0);border:1px solid var(--sep);border-radius:var(--r3);padding:8px 10px;resize:vertical">'+esc(_spPaste.text||'')+'</textarea>';
+  if(pv){
+    if(pv.errors&&pv.errors.length) h+='<div class="sp-paste-errors" style="margin-top:8px">'+pv.errors.map(t=>'<div style="font-size:12px;color:var(--red);line-height:1.6">✕ '+esc(t)+'</div>').join('')+'</div>';
+    if(pv.ok||(pv.changes&&pv.changes.length)){
+      h+='<div class="sp-paste-preview" style="margin-top:10px;font-size:12.5px;color:var(--ink1);line-height:1.7">'
+        +(pv.kind==='profile'?'<b>Full profile</b> “'+esc(pv.name)+'” · '+pv.changes.length+' settings':'<b>“'+esc(pv.name)+'”</b> on <b>'+esc(pv.base?pv.base.name:'?')+'</b> · test budget '+pv.budget+' flights')
+        +(pv.kind==='profile'?'':'<br>'+pv.changes.map(c=>{ const k=_spK(c.id); return c.same?'<span style="color:var(--ink3)">'+esc(k.label)+': already '+esc(_spDisp(k,c.to))+' (no change)</span>':esc(k.label)+': '+esc(_spDisp(k,c.from))+' → <b>'+esc(_spDisp(k,c.to))+'</b> '+_spDirTag(c.dir); }).join('<br>'))
+        +'</div>';
+      for(const w of (pv.warnings||[])) h+='<div style="font-size:12px;color:var(--acc);margin-top:4px">⚠ '+esc(w)+'</div>';
+      if(pv.why) h+='<div style="font-size:12px;color:var(--ink3);margin-top:4px">Why: '+esc(pv.why)+'</div>';
+    }
+  }
+  h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn bsm sp-paste-save" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(pv&&pv.ok?'':'disabled')+' onclick="spExpSave()">'+(pv&&pv.kind==='profile'?'Save profile':'Save experiment')+'</button>'
+    +'<span style="font-size:11.5px;color:var(--ink3);align-self:center">Saving never changes your sim. You apply it afterwards, like any profile.</span></div></div>';
+  return h;
+}
+function _spClipKey(t){ let h=5381; const s=String(t||'').replace(/\s+/g,' ').trim(); for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(16); }
+function _spClipSeen(t){ try{ return (JSON.parse(localStorage.getItem('spClipSeen')||'[]')).includes(_spClipKey(t)); }catch(_){ return false; } }
+function _spClipMark(t){ try{ const a=JSON.parse(localStorage.getItem('spClipSeen')||'[]'); const k=_spClipKey(t); if(!a.includes(k)){ a.push(k); localStorage.setItem('spClipSeen',JSON.stringify(a.slice(-50))); } }catch(_){} }
+function spOpenCard(id){ _spOpen[id]=true; _spShowFinished=true; _spRender(); const el=document.querySelector('.sp-card[data-key="'+id+'"]'); if(el)el.scrollIntoView({block:'center'}); }
+function spNewExp(){ _spPaste={open:true,text:'',preview:null}; _spRender(); const t=document.getElementById('sp-paste-text'); if(t)t.focus(); }
+function spPasteInput(t){
+  _spPaste.text=t; clearTimeout(_spPrevT);
+  _spPrevT=setTimeout(async()=>{
+    if(!String(t).trim()){ _spPaste.preview=null; return _spRenderKeepCaret(); }
+    try{ _spPaste.preview=await window.api.profilesExpPreview({text:t}); }catch(e){ _spPaste.preview={ok:false,errors:[e.message]}; }
+    _spRenderKeepCaret();
+  },250);
+}
+function _spRenderKeepCaret(){
+  const ta=document.getElementById('sp-paste-text'), focused=ta&&document.activeElement===ta, pos=ta?ta.selectionStart:0;
+  _spRender();
+  const nt=document.getElementById('sp-paste-text'); if(nt&&focused){ nt.focus(); try{ nt.setSelectionRange(pos,pos); }catch(_){} }
+}
+async function spPasteFromClipboard(){
+  let t=''; try{ t=await window.api.clipboardReadText(); }catch(_){}
+  if(!t){ _spMsg={ok:false,text:'Your clipboard is empty.'}; return _spRender(); }
+  _spPaste.open=true; _spPaste.fromClip=true; _spPaste.text=t; _spRender(); spPasteInput(t);
+}
+async function spExpSave(){
+  const r=await window.api.profilesExpCreate({text:_spPaste.text});
+  if(r&&r.ok){
+    _spClipMark(_spPaste.text);   // so the same clipboard text isn't offered again
+    _spPaste={open:false,text:'',preview:null};
+    const id=r.kind==='profile'?r.profile.id:r.experiment.id; _spOpen[id]=true;
+    _spMsg={ok:true,text:r.kind==='profile'?('Saved profile “'+r.profile.name+'”.'):('Saved experiment “'+r.experiment.name+'”. Apply it (sim closed) when you are ready to test.')};
+  } else _spMsg={ok:false,text:(r&&r.msg)||'Could not save.'};
+  await renderProfilesPane(); _spTop();
+}
+async function spExpPropose(pid){
+  const r=await window.api.profilesExpCreate({proposalId:pid});
+  _spMsg=r&&r.ok?{ok:true,text:'Saved experiment “'+r.experiment.name+'”. Apply it (sim closed) when you are ready to test.'}:{ok:false,text:(r&&r.msg)||'Could not start it.'};
+  if(r&&r.ok)_spOpen[r.experiment.id]=true;
+  await renderProfilesPane(); _spTop();
+}
+async function spExpFinish(id,action){
+  const e=(_SP.experiments||[]).find(x=>x.id===id); if(!e)return;
+  const q={keep:'Keep “'+e.name+'”?\n\nThe change is folded into "'+e.baseName+'" (or saved as a new profile if the base was ABRP Suggested). Your sim is not changed.',
+    revert:'Revert “'+e.name+'”?\n\nABRP applies the base profile "'+e.baseName+'" again (backup + undo as usual).',
+    end:'End “'+e.name+'” without changing anything?'}[action];
+  if(!confirm(q))return;
+  const r=await window.api.profilesExpFinish({id,action});
+  _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Failed.',undo:action==='revert'&&r&&r.ok};
+  await renderProfilesPane(); _spTop();
+}
+async function spCopyRaw(t){ const ok=await window.api.clipboardWriteText(t); _spMsg={ok:!!ok,text:ok?'Copied to the clipboard.':'Could not copy.'}; _spRender(); _spTop(); }
+async function spCopyText(id){ const r=await window.api.profilesExportText({id}); if(r&&r.ok) return spCopyRaw(r.text); _spMsg={ok:false,text:'Could not export that profile.'}; _spRender(); }
+async function spCopyProposal(pid){ const p=((_SP.proposals||{}).proposals||[]).find(x=>x.id===pid); if(p) return spCopyRaw(p.text); }
+async function spCopyResults(id){ const e=(_SP.experiments||[]).find(x=>x.id===id); if(e) return spCopyRaw(e.resultsText); }
+// drag & drop a .txt / .abrp file anywhere on the Sim Profiles page → paste box
+function _spInitDrop(){
+  const pane=document.getElementById('pane-profiles'); if(!pane||pane._spDrop)return; pane._spDrop=true;
+  pane.addEventListener('dragover',ev=>{ ev.preventDefault(); });
+  pane.addEventListener('drop',ev=>{
+    ev.preventDefault(); const f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(!f)return;
+    if(f.size>200000){ _spMsg={ok:false,text:'That file is too big to be ABRP text.'}; return _spRender(); }
+    const rd=new FileReader(); rd.onload=()=>{ _spPaste={open:true,text:String(rd.result||''),preview:null}; _spRender(); spPasteInput(_spPaste.text); }; rd.readAsText(f);
+  });
+}
+// small dot on the Sim Profiles menu item when an experiment needs a decision
+function _spBadge(n){
+  const it=document.querySelector('.sb-item[data-tab="profiles"]'); if(!it)return;
+  let b=it.querySelector('.tbadge'); if(!n){ if(b)b.remove(); return; }
+  if(!b){ b=document.createElement('span'); b.className='tbadge'; it.appendChild(b); } b.textContent=n;
+}
+async function spCheckNudges(){ try{ const r=await window.api.profilesList(); if(r&&r.ok)_spBadge((r.nudges||[]).length); }catch(_){} }
 function _spSettingsTable(values,cur){
   const keys=_SP.schema.keys, pages=_SP.schema.pages;
   let h='', shown=0;
@@ -1783,11 +1958,11 @@ async function spSave(source,id){
 }
 async function spRenameSave(id,name){
   if(_spRenaming!==id)return; _spRenaming=null;
-  const p=_SP.profiles.find(x=>x.id===id);
+  const p=_SP.profiles.concat(_SP.experiments||[]).find(x=>x.id===id);
   if(p&&name&&name.trim()&&name.trim()!==p.name){ await window.api.profilesRename({id,name}); await renderProfilesPane(); } else _spRender();
 }
 async function spDelete(id){
-  const p=_SP.profiles.find(x=>x.id===id); if(!p)return;
+  const p=_SP.profiles.concat(_SP.experiments||[]).find(x=>x.id===id); if(!p)return;
   if(!confirm('Delete the profile "'+p.name+'"?\n\nThis only removes the saved profile from ABRP. Your sim settings are not changed.'))return;
   await window.api.profilesDelete({id}); delete _spOpen[id]; await renderProfilesPane();
 }
@@ -8914,5 +9089,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.27.5</div>
+  pointer-events:none;">v6.28.0</div>
 </body></html>

@@ -80,6 +80,11 @@ Save your MSFS graphics settings as named profiles and switch between them in on
 - **My profiles:** click a card to see what's inside, laid out like the sim's own menu, with the raw number next to every label. By default it shows only what differs from your sim now, marked ▲ more / ▼ less. **Apply…** lists every change before anything is written.
 - **From your flight history:** every stretch of flights you flew on the same settings, rebuilt from what each flight logged, with its smoothness record. Your pre-DLSS TAA baseline (Aug 27 – Oct 7) is in here.
 - **Safe by design:** ABRP only applies while MSFS is closed. It backs up your settings file first, checks every value after writing, keeps an automatic backup of what you had, and offers one-click **Undo**. Your display, window and VR settings are never touched. TLOD/OLOD are left to AutoFPS unless you tick the box.
+- **🧪 Experiments:** test one setting change against a base profile and let your flights decide.
+  - Create one three ways: paste an `ABRP-PROFILE v1` text block under **＋ New experiment** (ABRP spots one on your clipboard and offers it), drop a .txt file on the page, or click **Start experiment** on one of ABRP's own suggestions (offered only when your GPU has clear headroom; GPU-only settings that don't use video memory, one step at a time).
+  - Apply it (sim closed) and fly normally. Flights are matched to the experiment by their logged settings, so there's nothing to tag. After the flight budget (default 3) the card shows a verdict, scored per aircraft against the base's own flights: Free upgrade, Real improvement, No effect, Costs you or Trade-off. It also flags AutoFPS-range, sim-version or online-traffic differences.
+  - Then **Keep** (the change is folded into the base profile, or saved as a new one), **Revert to base** (applied with backup and Undo) or **End**. A reminder appears on the page and a badge on the menu when a test is ready to decide, or if you've stopped flying it.
+  - **Copy results for Claude** copies a short results summary for a chat. **Copy as text** exports any profile in the same format, and pasting it back recreates it.
 
 ### Live ATC (VATSIM frequency helper)
 For VATSIM flying. It answers the one question that trips people up — *"which frequency should I be on right now?"* — and loads the answer into your standby radio with one click.
@@ -115,6 +120,8 @@ Five practical tools: **Export/Import My Setup** (your whole configuration as on
 **Added new scenery?** — My Airports → Scan Now. New airports are matched, GSX profiles bundled inside them install (or update) automatically, and routes for them appear in Plan a Flight immediately.
 
 **Fly a VATSIM flight** — save your CID once in Settings → VATSIM (optional but recommended). Open **Live ATC** → toggle **Live mode** before you connect with vPilot → the Route briefing shows your frequency stack for the whole flight. In the air, ABRP recommends the frequency for each phase and loads it to your COM1 standby on one click; you swap when ready. Prefer it hands-off? Turn on *auto-start with vPilot* so opening your pilot client turns the helper on for you.
+
+**Try a suggested setting safely** — Sim Profiles → 🧪 Experiments → paste the block (or click Start experiment) → Save → **Apply…** (sim closed) → fly 3 flights → Keep or Revert.
 
 **Go back to a setup that worked** — Sim Profiles → *From your flight history* → open the stretch you liked → **Apply…** (sim closed). Or apply **⭐ ABRP Suggested**. Changed your mind? **Undo**.
 
@@ -311,6 +318,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.28.0 NEW: SIM PROFILES · 🧪 EXPERIMENTS. Test one setting change against a base profile and let your flights decide. Paste an ABRP-PROFILE text block (auto-detected on the clipboard), drop a .txt file, or start one of ABRP's own suggestions, offered only when your GPU has headroom (today: light shafts, contact shadows, reflections at Ultra). ABRP checks every line (unknown settings, values the sim doesn't have, TLOD/OLOD, display/VR keys are refused with a plain reason) and previews the change before saving. Experiments stay drafts until you apply them. Flights are matched by their logged settings; after the budget, a per-aircraft verdict against the base's own flights (Free upgrade / Real improvement / No effect / Costs you / Trade-off) with honesty notes. Keep folds the change into the base, Revert re-applies the base with Undo, and a menu badge flags tests waiting for a decision. "Copy results for Claude" and "Copy as text" round-trip with a chat. Water waves now capped at High (the in-sim Ultra preset never goes past it).
 v6.27.5 Sim Profiles: AMD FSR upscaling and its mode confirmed against the sim. Every row on the in-sim graphics pages now has a verified label; only settings with no menu row stay marked approximate.
 v6.27.4 FIXED: ABRP Suggested now restores sharpening, exposure, Reflex and the DLSS/FSR mode too. Your baseline flights never logged those, so Apply used to leave whatever the sim had. They now come from the newest place ABRP knows them (a logged flight, else your newest saved profile), and "Why this profile?" names the source for each.
 v6.27.3 FIXED: applying a profile after you'd picked an in-sim preset (e.g. Ultra) left the sim file saying "Preset Ultra", so the sim could put the preset back over your profile at launch. Applying now also sets the preset to Custom (your VR preset is untouched). Labels: every traffic, people and wildlife step (Off through Ultra), Texture Ultra, Motion blur, DLSS Performance and Reflex On are now confirmed against the sim, so only settings with no in-sim row are still marked approximate.

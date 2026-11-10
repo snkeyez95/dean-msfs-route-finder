@@ -70,6 +70,12 @@ contextBridge.exposeInMainWorld('api', {
   profilesRename:     (a)   => ipcRenderer.invoke('profiles-rename', a||{}),
   profilesDelete:     (a)   => ipcRenderer.invoke('profiles-delete', a||{}),
   profilesApply:      (a)   => ipcRenderer.invoke('profiles-apply', a||{}),
+  profilesExpPreview: (a)   => ipcRenderer.invoke('profiles-exp-preview', a||{}),
+  profilesExpCreate:  (a)   => ipcRenderer.invoke('profiles-exp-create', a||{}),
+  profilesExpFinish:  (a)   => ipcRenderer.invoke('profiles-exp-finish', a||{}),
+  profilesExportText: (a)   => ipcRenderer.invoke('profiles-export-text', a||{}),
+  clipboardReadText:  ()    => ipcRenderer.invoke('clipboard-read-text'),
+  clipboardWriteText: (t)   => ipcRenderer.invoke('clipboard-write-text', t),
   perfArchiveRaw:     ()    => ipcRenderer.invoke('perf-archive-raw'),
   dataBackupStatus:   ()    => ipcRenderer.invoke('data-backup-status'),   // v6.13.0: flight-log + settings backup
   dataBackupRun:      ()    => ipcRenderer.invoke('data-backup-run'),
