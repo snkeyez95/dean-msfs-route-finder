@@ -1,6 +1,6 @@
 # Memory Index
 
-- **⚑ [Port-watch duty — CHECK EVERY SESSION](port_watch_reminder.md) — read port_watch.jsonl + task status at session start; tell Dean when the port hog is named, then tell him to run tools/port-watch/uninstall.ps1**
+- [Port-watch — DONE](port_watch_reminder.md) — task uninstalled 2026-11-10; snapshots never named the culprit (burst <2 s); no per-session check
 
 - [Process Lasso SI affinity fence](process_lasso_si_affinity_fence.md) — core map 0–7 MSFS / 8–13 Fenix / 14–15 SI+bg (Fenix fence added 2026-10-23; Defender via ABRP v6.24.0); near-crash 1s climb freezes = SayIntentions + its WebView2 helpers starving the sim's main thread (ProBalance blind to single-core contention); fixed by fencing SayIntentionsAI.exe + msedgewebview2.exe to cores 14-15; validated (climb clean, WebView2 gone from top spikes, SI capped ~100-215ms); Lasso UNLICENSED so verify rule persists
 
@@ -24,3 +24,4 @@
 - [Scenery static/config check](scenery_static_config_check.md) — recurring "check static aircraft + settings" recipe: manifest package_version = only update signal (no MSFS log), iniBuilds scenery_config.json toggles, iniManager to flip safely
 - [DLSS setup → back to TAA](dlss_setup_preset_k.md) — 2026-10-29 Dean chose TAA over DLSS (felt worse); RHI/ReShade mod cleanup notes; AutoFPS OLOD leftovers land in UserCfg
 - [AirPods audio stutter](airpods_audio_stutter.md) — sim audio crackles on CPU-heavy climb-outs over Bluetooth AirPods (frames clean); AirPods mic for SI forces HFP; fix = wired or separate mic
+- [UserCfg scale gotchas](usercfg_scale_gotchas.md) — Texture Quality INVERTED (2=Medium, 1=High); check gfx_watch.js calibration before saying a setting went up/down
