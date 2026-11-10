@@ -26,3 +26,4 @@
 - [AirPods audio stutter](airpods_audio_stutter.md) — sim audio crackles on CPU-heavy climb-outs over Bluetooth AirPods (frames clean); AirPods mic for SI forces HFP; fix = wired or separate mic
 - [UserCfg scale gotchas](usercfg_scale_gotchas.md) — Texture Quality INVERTED (2=Medium, 1=High); check gfx_watch.js calibration before saying a setting went up/down
 - [Sim Profile experiments](sim_profile_experiments.md) — hand Dean settings changes as ABRP-PROFILE paste blocks (Sim Profiles → 🧪 Experiments); read his ABRP-EXPERIMENT-RESULTS pastes
+- [Flight-review experiment suggestions](flight_review_experiment_suggestions.md) — each "new flight" review: suggest an experiment only on real evidence, one at a time, never while one is active; silence when nothing
