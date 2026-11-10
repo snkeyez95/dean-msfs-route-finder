@@ -40,6 +40,8 @@
 //               0.5 = "50"; precache 2 = High; Shadow maps 2048, Terrain shadows 1024, Cubemap 384.
 //               The preset also rewrote two file-only keys (POMSubsplitsMaxDist 7.5→10, Omni culling
 //               0.02→0) and set "Preset Ultra" — profiles now force "Preset Custom" on apply.
+//   2026-11-10  FOURTH PASS: Anti-aliasing "AMD FSR 3.1" is stored as the word FSR; FSRMode BALANCED =
+//               "Balanced". Every row on the in-sim graphics pages is now confirmed.
 //               Still inferred (not on screen while inactive): DLSS/FSR mode, secondary scaling,
 //               DOF/motion-blur quality, the Enabled flags of quality rows, the file-only Advanced keys.
 //
@@ -53,7 +55,7 @@ const PARTICLES = { 0: 'Low', 1: 'High' };                               // own 
 const WATER = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512 = High confirmed
 const ONOFF = { 0: 'Off', 1: 'On' };
 const AA = { TAA: 'TAA', DLSS: 'DLSS',    // in-sim: 'NVIDIA DLSS Super Resolution'
-  DLAA: 'DLAA', FSR3: 'FSR 3', FSR: 'FSR', NONE: 'Off' };
+  DLAA: 'DLAA', FSR3: 'AMD FSR', FSR: 'AMD FSR', NONE: 'Off' };   // in-sim: 'AMD FSR 3.1' (file word FSR)
 const DLSS_MODE = { AUTO: 'Auto', DLAA: 'DLAA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FSR_MODE = { NATIVEAA: 'Native AA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FG = { NONE: 'Off', FSRFG: 'AMD FSR', DLSSFG: 'NVIDIA DLSS' };      // in-sim reads 'AMD FSR 1.1' for FSRFG
@@ -73,7 +75,7 @@ function g(section, key, label, page, group, type, extra) {
 // ── {Video}: upscaling / frame generation / image ────────────────────────────────────────────
 v('AntiAliasing', 'Anti-aliasing / upscaler', 'Upscaling', 'word', { labels: AA, calib: 'confirmed', cost: 'gpu' });
 v('DLSSMode', 'DLSS mode', 'Upscaling', 'word', { labels: DLSS_MODE, calib: 'confirmed', cost: 'gpu' });
-v('FSRMode', 'FSR mode', 'Upscaling', 'word', { labels: FSR_MODE, calib: 'inferred', cost: 'gpu' });
+v('FSRMode', 'AMD FSR mode', 'Upscaling', 'word', { labels: FSR_MODE, calib: 'confirmed', cost: 'gpu' });
 v('PrimaryScaling', 'Render scaling', 'Upscaling', 'pct', { calib: 'confirmed', cost: 'gpu' });
 v('SecondaryScaling', 'Secondary render scaling', 'Upscaling', 'pct', { calib: 'inferred', cost: 'gpu', advanced: true });
 v('SharpenAmount', 'AMD FidelityFX sharpening', 'Image', 'x100', { calib: 'confirmed', cost: 'none' });

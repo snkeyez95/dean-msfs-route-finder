@@ -311,6 +311,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.27.5 Sim Profiles: AMD FSR upscaling and its mode confirmed against the sim. Every row on the in-sim graphics pages now has a verified label; only settings with no menu row stay marked approximate.
 v6.27.4 FIXED: ABRP Suggested now restores sharpening, exposure, Reflex and the DLSS/FSR mode too. Your baseline flights never logged those, so Apply used to leave whatever the sim had. They now come from the newest place ABRP knows them (a logged flight, else your newest saved profile), and "Why this profile?" names the source for each.
 v6.27.3 FIXED: applying a profile after you'd picked an in-sim preset (e.g. Ultra) left the sim file saying "Preset Ultra", so the sim could put the preset back over your profile at launch. Applying now also sets the preset to Custom (your VR preset is untouched). Labels: every traffic, people and wildlife step (Off through Ultra), Texture Ultra, Motion blur, DLSS Performance and Reflex On are now confirmed against the sim, so only settings with no in-sim row are still marked approximate.
 v6.27.2 FIXED: Sim Profiles stopped reading the seatbelt-visibility setting in v6.27.1 (a label edit overwrote its internal name), so profiles saved on 6.27.1 don't include it. A new test checks every setting against your real sim file so this can't slip through again. Also confirmed more labels with a hands-on in-sim test: DLSS mode, depth-of-field quality, road traffic, characters quality. The per-feature "on" flags (clouds, light shafts, AO…) have no menu control, so they moved to Advanced.
