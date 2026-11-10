@@ -27,6 +27,12 @@
 //               NBFramesToGenerate 1 = "2X"; FrameLimiter 30 = "Max Frame Rate" 30.
 //               Traffic & life: quantity -1 = "Off", variety/quality 0 = "Low", Road 0 = "Low"
 //               (higher steps follow the shared Low/Medium/High scale — inferred, not yet seen).
+//   2026-11-10  SECOND PASS (Dean changed rows in-sim, exited, ABRP diffed the file):
+//               AntiAliasing DLSS = "NVIDIA DLSS Super Resolution"; DLSSMode QUALITY = "Quality";
+//               DOF Medium → Enabled 1 + Quality 1 (Off = Enabled 0, shared scale); Road traffic High = 2;
+//               Characters quality Medium = 1; Terrain shadows 128. Light shafts / contact shadows /
+//               AO / reflections / clouds / terrain shadows have NO "Off" in the menu — their Enabled
+//               flags are file-only (moved to Advanced).
 //               Still inferred (not on screen while inactive): DLSS/FSR mode, secondary scaling,
 //               DOF/motion-blur quality, the Enabled flags of quality rows, the file-only Advanced keys.
 //
@@ -39,7 +45,8 @@ const TEXTURE = { 0: 'Ultra', 1: 'High', 2: 'Medium', 3: 'Low' };         // INV
 const PARTICLES = { 0: 'Low', 1: 'High' };                               // own short scale (1 = High confirmed)
 const WATER = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512 = High confirmed
 const ONOFF = { 0: 'Off', 1: 'On' };
-const AA = { TAA: 'TAA', DLSS: 'DLSS', DLAA: 'DLAA', FSR3: 'FSR 3', FSR: 'FSR', NONE: 'Off' };
+const AA = { TAA: 'TAA', DLSS: 'DLSS',    // in-sim: 'NVIDIA DLSS Super Resolution'
+  DLAA: 'DLAA', FSR3: 'FSR 3', FSR: 'FSR', NONE: 'Off' };
 const DLSS_MODE = { AUTO: 'Auto', DLAA: 'DLAA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FSR_MODE = { NATIVEAA: 'Native AA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FG = { NONE: 'Off', FSRFG: 'AMD FSR', DLSSFG: 'NVIDIA DLSS' };      // in-sim reads 'AMD FSR 1.1' for FSRFG
@@ -58,7 +65,7 @@ function g(section, key, label, page, group, type, extra) {
 
 // ── {Video}: upscaling / frame generation / image ────────────────────────────────────────────
 v('AntiAliasing', 'Anti-aliasing / upscaler', 'Upscaling', 'word', { labels: AA, calib: 'confirmed', cost: 'gpu' });
-v('DLSSMode', 'DLSS mode', 'Upscaling', 'word', { labels: DLSS_MODE, calib: 'inferred', cost: 'gpu' });
+v('DLSSMode', 'DLSS mode', 'Upscaling', 'word', { labels: DLSS_MODE, calib: 'confirmed', cost: 'gpu' });
 v('FSRMode', 'FSR mode', 'Upscaling', 'word', { labels: FSR_MODE, calib: 'inferred', cost: 'gpu' });
 v('PrimaryScaling', 'Render scaling', 'Upscaling', 'pct', { calib: 'confirmed', cost: 'gpu' });
 v('SecondaryScaling', 'Secondary render scaling', 'Upscaling', 'pct', { calib: 'inferred', cost: 'gpu', advanced: true });
@@ -76,7 +83,7 @@ const W = 'World', L = 'Lighting & effects', T = 'Traffic & life', A = 'Advanced
 g('Terrain', 'LoDFactor', 'Terrain level of detail (TLOD)', W, 'Terrain', 'lod', { calib: 'confirmed', cost: 'cpu', lod: true });
 g('OffscreenTerrainPreCaching', 'Enabled', 'Off-screen terrain pre-caching', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'vram' });
 g('OffscreenTerrainPreCaching', 'Quality', 'Pre-caching quality', W, 'Terrain', 'enum', { labels: Q, calib: 'confirmed', cost: 'vram' });
-g('HeightFieldShadows', 'Enabled', 'Terrain shadows', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('HeightFieldShadows', 'Enabled', 'Terrain shadows on (file only)', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('HeightFieldShadows', 'Size', 'Terrain shadows', W, 'Terrain', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
 g('DisplacementMapping', 'Enabled', 'Displacement mapping', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('ObjectsLoD', 'LoDFactor', 'Objects level of detail (OLOD)', W, 'Objects', 'lod', { calib: 'confirmed', cost: 'cpu', lod: true });
@@ -90,29 +97,29 @@ g('Texture', 'MaxAnisotropy', 'Anisotropic filtering', W, 'Textures', 'num', { m
 g('Water', 'FFTSize', 'Water waves', W, 'Water', 'enum', { labels: WATER, calib: 'confirmed', cost: 'gpu' });
 
 // ── lighting, shadows, effects ───────────────────────────────────────────────────────────────
-g('VolumetricClouds', 'Enabled', 'Volumetric clouds', L, 'Sky', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('VolumetricClouds', 'Enabled', 'Volumetric clouds on (file only)', L, 'Sky', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('VolumetricClouds', 'Quality', 'Volumetric clouds quality', L, 'Sky', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
-g('VolumetricLights', 'Enabled', 'Light shafts', L, 'Sky', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('VolumetricLights', 'Enabled', 'Light shafts on (file only)', L, 'Sky', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('VolumetricLights', 'Quality', 'Light shafts quality', L, 'Sky', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('Shadows', 'Size', 'Shadow maps', L, 'Shadows', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
-g('ContactShadows', 'Enabled', 'Contact shadows', L, 'Shadows', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('ContactShadows', 'Enabled', 'Contact shadows on (file only)', L, 'Shadows', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('ContactShadows', 'Quality', 'Contact shadows quality', L, 'Shadows', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('RaytracedShadows', 'Enabled', 'Raytraced shadows', L, 'Shadows', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
-g('SSAO', 'Enabled', 'Ambient occlusion', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('SSAO', 'Enabled', 'Ambient occlusion on (file only)', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('SSAO', 'Quality', 'Ambient occlusion quality', L, 'Lighting', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('SSAO', 'FullRes', 'Ambient occlusion full resolution', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
-g('SSR', 'Enabled', 'Raymarched reflections', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('SSR', 'Enabled', 'Raymarched reflections on (file only)', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('SSR', 'Quality', 'Raymarched reflections quality', L, 'Lighting', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('SSR', 'HalfRes', 'Reflections half resolution', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
 g('ReflectionProbe', 'Size', 'Cubemap reflections', L, 'Lighting', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
 g('WindShield', 'Quality', 'Windshield effects', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('Particles', 'Quality', 'Visual effects particles quality', L, 'Effects', 'enum', { labels: PARTICLES, calib: 'confirmed', cost: 'gpu' });
 g('DOF', 'Enabled', 'Depth of field', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
-g('DOF', 'Quality', 'Depth of field quality', L, 'Effects', 'enum', { labels: Q, calib: 'inferred', cost: 'gpu' });
+g('DOF', 'Quality', 'Depth of field quality', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('MotionBlur', 'Enabled', 'Motion blur', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('MotionBlur', 'Quality', 'Motion blur quality', L, 'Effects', 'enum', { labels: Q, calib: 'inferred', cost: 'gpu' });
 g('GlassCockpitsRefreshRate', 'Quality', 'Glass cockpit refresh rate', L, 'Cockpit', 'enum', { labels: Q, calib: 'confirmed', cost: 'cpu' });
-g('Seatbelt visibility', 'Enabled', 'Seatbelt visibility', L, 'Cockpit', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'none' });
+g('Seatbelts', 'Enabled', 'Seatbelt visibility', L, 'Cockpit', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'none' });
 
 // ── traffic & life (−1 = Off, 0 = Low CONFIRMED 2026-11-10; higher steps inferred) ──
 g('Traffic', 'AircraftTrafficQuantity', 'Aircraft traffic quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });

@@ -21,7 +21,8 @@ const liveHashBefore = require('crypto').createHash('sha1').update(liveText).dig
 // Fixed starting point for the store + surface tests: Dean's real file with the Nov 9-10 "Textures High"
 // setup forced in, so the tests don't depend on which profile he happens to have applied today.
 const startText = P.applyToText(liveText, { 'Graphics/Texture/Quality': 1, 'Graphics/SSAO/Quality': 1, 'Graphics/SSR/Quality': 1,
-  'Graphics/RaytracedShadows/Enabled': 0, 'Graphics/Buildings/Quality': 2, 'Graphics/Water/FFTSize': 256 }).text;
+  'Graphics/RaytracedShadows/Enabled': 0, 'Graphics/Buildings/Quality': 2, 'Graphics/Water/FFTSize': 256,
+  'Graphics/VolumetricClouds/Quality': 3, 'Video/AntiAliasing': 'TAA' }).text;
 
 // ── 1. dictionary ──
 {
@@ -35,6 +36,7 @@ const startText = P.applyToText(liveText, { 'Graphics/Texture/Quality': 1, 'Grap
   T('   traffic & life calibrated (2026-11-10 screenshots): -1 = Off, 0 = Low', S.display(S.BY_ID['Graphics/Traffic/AircraftTrafficQuantity'], -1) === '-1 · Off' && S.display(S.BY_ID['Graphics/Traffic/RoadQuality'], 0) === '0 · Low');
   T('   shows values the way the sim does: sharpening 0.3 → "30", BOOST → "On+Boost", 16 → "16X"', S.display(S.BY_ID['Video/SharpenAmount'], 0.3) === '30' && S.display(S.BY_ID['Video/Reflex'], 'BOOST') === 'On+Boost' && S.display(S.BY_ID['Graphics/Texture/MaxAnisotropy'], 16) === '16X');
   T('   no key is left "unverified" after the screenshot pass', !S.KEYS.some(k => k.calib === 'unverified'));
+  T('   every schema key exists in the real UserCfg (catches a mangled section name)', S.KEYS.every(k => k.id in P.readProfileable(liveText)), S.KEYS.filter(k => !(k.id in P.readProfileable(liveText))).map(k => k.id).join(', '));
   T('   no display / window / VR key is in the schema', !ids.some(id => /Resolution|Windowed|Monitor|Adapter|PosX|VSync|HDR10|VR$|InstalledPackages/.test(id)));
 }
 
@@ -42,7 +44,7 @@ const startText = P.applyToText(liveText, { 'Graphics/Texture/Quality': 1, 'Grap
 const cur = P.readProfileable(liveText);
 {
   T('2. reads Dean\'s real UserCfg (60+ settings)', Object.keys(cur).length >= 60, String(Object.keys(cur).length));
-  T('   desktop values, not VR (Texture from {Graphics}, not {GraphicsVR})', cur['Graphics/VolumetricClouds/Quality'] === 3 && cur['Video/AntiAliasing'] != null);
+  T('   desktop values, not VR (Texture from {Graphics}, not {GraphicsVR})', cur['Graphics/VolumetricClouds/Quality'] === require('../perf/native/gfx_watch.js').readAllGraphics(liveText)['Graphics/VolumetricClouds/Quality'] && cur['Graphics/Texture/MaxAnisotropy'] === 16 && cur['Video/AntiAliasing'] != null);
   T('   applying the current values is a byte-identical no-op', P.applyToText(liveText, cur).text === liveText);
   const want = Object.assign({}, cur, { 'Graphics/Texture/Quality': cur['Graphics/Texture/Quality'] === 1 ? 2 : 1, 'Video/SharpenAmount': 0.2, 'Graphics/Terrain/LoDFactor': 3 });
   const r = P.applyToText(liveText, want);
