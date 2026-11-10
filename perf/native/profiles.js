@@ -324,9 +324,27 @@ function suggest(flights, opts) {
   if (curSim && !baseSims.includes(curSim)) {
     reasons.push('Measured on sim ' + baseSims.join('/') + '; you\'re on ' + curSim + ' now. The suggestion re-checks itself as you fly.');
   }
+  // Settings the base flights never logged (sharpening, exposure, Reflex, DLSS/FSR mode — logged only
+  // from v6.27.0). Leaving them alone made "Apply" keep whatever the sim had (Dean 2026-11-10: exposure
+  // stayed -0.45 after a test). Fill each from the NEWEST place it's known: (1) a logged flight, else
+  // (2) the newest saved profile (opts.profiles, newest first). Every fill is named in Why.
+  const filled = [];
+  for (const k of S.KEYS) {
+    if (k.lod || k.id in values) continue;
+    let val = null, from = null;
+    for (let i = (flights || []).length - 1; i >= 0 && val == null; i--) {
+      const f = flights[i]; if (f.excluded) continue;
+      const v = fromSnapshot(f.settings); if (v && v[k.id] != null) { val = v[k.id]; from = 'your ' + fmtRange(f.timestamp, f.timestamp) + ' flight'; }
+    }
+    for (const p of (opts.profiles || [])) { if (val != null) break; if (p.values && p.values[k.id] != null) { val = p.values[k.id]; from = 'your profile "' + p.name + '"'; } }
+    if (val != null) { values[k.id] = val; filled.push({ id: k.id, label: k.label, value: val, from }); }
+  }
+  const bySrc = {};
+  for (const f of filled) (bySrc[f.from] = bySrc[f.from] || []).push(f.label + ' ' + S.display(S.BY_ID[f.id], f.value));
+  for (const [src, items] of Object.entries(bySrc)) reasons.push('Not logged on the base flights, so taken from ' + src + ': ' + items.join('; ') + '.');
   const unrecorded = S.KEYS.filter(k => !k.lod && !(k.id in values)).map(k => k.label);
   return { ok: true, values, name: 'ABRP Suggested', confidence: conf, base: { id: base.id, first: base.first, last: base.last, n: base.n, p99: base.p99, feltHr: base.feltHr },
-    reasons, candidates, unrecorded, runs: scored.map(r => ({ id: r.id, feltRatio: r.feltRatio, p99Delta: r.p99Delta })) };
+    reasons, candidates, unrecorded, filled, runs: scored.map(r => ({ id: r.id, feltRatio: r.feltRatio, p99Delta: r.p99Delta })) };
 }
 
 function fmtRange(a, b) {

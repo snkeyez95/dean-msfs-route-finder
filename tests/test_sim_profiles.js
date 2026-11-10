@@ -86,6 +86,12 @@ const base = runs.find(r => String(r.first).startsWith('2026-08-27') && String(r
   // aircraft-mix honesty: shuffling which run each flight belongs to must not change per-aircraft norms
   const noFenix = flights.map(f => Object.assign({}, f, { aircraft: f.aircraft === 'Fenix' ? 'Fenix' : f.aircraft }));
   T('   suggestion is deterministic', JSON.stringify(P.suggest(noFenix, {}).values) === JSON.stringify(P.suggest(flights, {}).values));
+  // Dean 2026-11-10: sharpening/exposure/Reflex weren't logged on the baseline flights, so Apply left
+  // his test values (50 / -0.45 / On) in place. They must now come from his newest saved profile.
+  const sgP = P.suggest(flights, { profiles: [{ name: 'My setup', values: { 'Video/SharpenAmount': 0.3, 'Video/ExposureBias': -0.6, 'Video/Reflex': 'BOOST' } }] });
+  T('   never-logged settings are filled from your newest saved profile', sgP.values['Video/SharpenAmount'] === 0.3 && sgP.values['Video/ExposureBias'] === -0.6 && sgP.values['Video/Reflex'] === 'BOOST');
+  T('   …and Why names where each came from', sgP.reasons.some(t => /taken from your profile "My setup".*sharpening 30.*-0\.6.*On\+Boost/.test(t)));
+  T('   values the base flights DID log are never overridden by a profile', P.suggest(flights, { profiles: [{ name: 'X', values: { 'Graphics/Texture/Quality': 0 } }] }).values['Graphics/Texture/Quality'] === 2);
 }
 
 // ── 4. the store, end to end, on a COPY ──

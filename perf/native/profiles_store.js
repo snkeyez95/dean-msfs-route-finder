@@ -55,13 +55,19 @@ function createStore(o) {
     return { v: 1, profiles: [], lastApply: null };
   }
   function save(st) { write(file(), JSON.stringify(st, null, 2)); }
+  // The suggestion fills never-logged settings from your newest saved profile (automatic backups
+  // excluded — they hold whatever was there, including test settings).
+  function buildSuggestion(fl, extra) {
+    const prof = load().profiles.filter(p => p.source !== 'safety' && p.source !== 'suggested').slice().reverse();
+    return P.suggest(fl, Object.assign({ profiles: prof }, extra || {}));
+  }
   function current() { try { return P.readProfileable(fs.readFileSync(ucfg(), 'utf8')); } catch (_) { return null; } }
 
   function list() {
     const st = load(), fl = flights(), cur = current();
     const runs = P.historyRuns(fl).map(r => Object.assign({}, r, { flights: undefined }));
     const latestSim = (fl[fl.length - 1] || {}).sim || null;
-    const suggestion = P.suggest(fl, { currentSim: latestSim });
+    const suggestion = buildSuggestion(fl, { currentSim: latestSim });
     delete suggestion.runs;
     return { ok: true, found: !!cur, current: cur, currentName: cur ? P.profileName(cur) : null,
       profiles: st.profiles.map(p => Object.assign({}, p, { track: P.trackRecord(p.values, fl) })),
@@ -79,7 +85,7 @@ function createStore(o) {
       const run = P.historyRuns(flights()).find(r => r.id === a.runId);
       if (run) { values = run.values; note = note || ('Rebuilt from ' + run.n + ' logged flight' + (run.n === 1 ? '' : 's') + ', ' + P.fmtRange(run.first, run.last) + '.'); }
     } else if (source === 'suggested') {
-      const sg = P.suggest(flights(), {}); if (sg.ok) { values = sg.values; note = note || ('ABRP Suggested as of ' + new Date().toLocaleDateString('en-US') + ' (based on your ' + P.fmtRange(sg.base.first, sg.base.last) + ' setup).'); }
+      const sg = buildSuggestion(flights()); if (sg.ok) { values = sg.values; note = note || ('ABRP Suggested as of ' + new Date().toLocaleDateString('en-US') + ' (based on your ' + P.fmtRange(sg.base.first, sg.base.last) + ' setup).'); }
     } else if (source === 'copy') {
       const src = st.profiles.find(p => p.id === a.id); if (src) { values = src.values; note = src.note; }
     }
@@ -115,7 +121,7 @@ function createStore(o) {
     if (a.undo) {
       if (!st.lastApply || !st.lastApply.prevValues) return { ok: false, msg: 'Nothing to undo.' };
       values = st.lastApply.prevValues; name = 'your settings from before "' + st.lastApply.name + '"';
-    } else if (a.id === 'suggested') { const sg = P.suggest(flights(), {}); if (sg.ok) { values = sg.values; name = 'ABRP Suggested'; } }
+    } else if (a.id === 'suggested') { const sg = buildSuggestion(flights()); if (sg.ok) { values = sg.values; name = 'ABRP Suggested'; } }
     else if (/^run-/.test(a.id || '')) { const r = P.historyRuns(flights()).find(x => x.id === a.id); if (r) { values = r.values; name = r.name; } }
     else { const p = st.profiles.find(x => x.id === a.id); if (p) { values = p.values; name = p.name; } }
     if (!values) return { ok: false, msg: 'Profile not found.' };
