@@ -96,7 +96,22 @@ function applyToText(text, values, opts) {
     t = t.slice(0, range.start) + nb + t.slice(range.end);
     changed.push({ id, from, to: _parse(tok) });
   }
-  return { text: crlf ? t.replace(/\n/g, '\r\n') : t, changed, skipped };
+  // A profile is a custom setup. If the file still names a preset ("Preset Ultra" after picking the
+  // in-sim Ultra preset), the sim could re-impose that preset's values over ours at launch — so any
+  // graphics change also sets the desktop block's "Preset" line to Custom (VR block untouched).
+  let preset = null;
+  if (changed.some(c => c.id.startsWith('Graphics/'))) {
+    const gb = _block(t, 'Graphics');
+    if (gb) {
+      const body = t.slice(gb.start, gb.end);
+      const m = body.match(/^(\tPreset )(\S+)$/m);
+      if (m && m[2] !== 'Custom') {
+        preset = { from: m[2], to: 'Custom' };
+        t = t.slice(0, gb.start) + body.replace(/^(\tPreset )(\S+)$/m, (_, pre) => pre + 'Custom') + t.slice(gb.end);
+      }
+    }
+  }
+  return { text: crlf ? t.replace(/\n/g, '\r\n') : t, changed, skipped, preset };
 }
 
 // Every applied key must read back as intended. Returns the list of mismatches (empty = verified).

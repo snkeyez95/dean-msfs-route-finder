@@ -50,7 +50,7 @@ const cur = P.readProfileable(liveText);
   const r = P.applyToText(liveText, want);
   const a = liveText.replace(/\r/g, '').split('\n'), b = r.text.replace(/\r/g, '').split('\n');
   const changedLines = a.map((l, i) => l !== b[i] ? i : -1).filter(i => i >= 0);
-  T('   only the 2 intended lines change (TLOD skipped: AutoFPS-managed)', changedLines.length === 2 && r.changed.length === 2, changedLines.length + ' lines');
+  T('   only the 2 intended lines change (+ the Preset line if the sim named one; TLOD skipped)', changedLines.length === 2 + (r.preset ? 1 : 0) && r.changed.length === 2, changedLines.length + ' lines');
   T('   number format kept (sharpening written as 0.200000)', /\tSharpenAmount 0\.200000/.test(r.text));
   const vr = t => t.slice(t.indexOf('{GraphicsVR'));
   T('   the VR block is byte-identical', vr(r.text) === vr(liveText));
@@ -59,6 +59,11 @@ const cur = P.readProfileable(liveText);
   T('   a setting missing from the file is skipped, never inserted', P.applyToText(liveText.replace(/\tSharpenAmount [^\n]*\n/, ''), { 'Video/SharpenAmount': 0.5 }).skipped.length === 1);
   const crlf = liveText.replace(/\r?\n/g, '\r\n');
   T('   Windows line endings are preserved', /\r\n/.test(P.applyToText(crlf, want).text) && !/[^\r]\n/.test(P.applyToText(crlf, want).text));
+  { const ultra = liveText.replace(/(\{Graphics\r?\n[^\n]*\n\tPreset )\S+/, '$1Ultra');
+    const ru = P.applyToText(ultra, { 'Graphics/SSAO/Quality': cur['Graphics/SSAO/Quality'] === 1 ? 2 : 1 });
+    T('   an in-sim preset name ("Preset Ultra") is switched to Custom on apply', !!ru.preset && ru.preset.from === 'Ultra' && /\{Graphics\r?\n[^\n]*\n\tPreset Custom\r?\n/.test(ru.text), JSON.stringify(ru.preset));
+    T('   …while the VR block keeps its own preset', /\tPreset VRMedium/.test(ru.text));
+    T('   …and a Video-only change leaves the preset line alone', !P.applyToText(ultra, { 'Video/SharpenAmount': 0.9 }).preset); }
   T('   verify() catches a wrong read-back', P.verify(liveText, { 'Graphics/VolumetricClouds/Quality': 0 }).length === 1);
 }
 

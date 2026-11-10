@@ -33,6 +33,13 @@
 //               Characters quality Medium = 1; Terrain shadows 128. Light shafts / contact shadows /
 //               AO / reflections / clouds / terrain shadows have NO "Off" in the menu — their Enabled
 //               flags are file-only (moved to Advanced).
+//   2026-11-10  THIRD PASS (Dean picked the in-sim Ultra preset + DLSS Performance, sharpening 50,
+//               exposure -0.45, Reflex On): Texture 0 = Ultra; every traffic/people/fauna row 3 = Ultra
+//               (so the LIFE scale -1 Off / 0 Low / 1 Medium / 2 High / 3 Ultra is now fully seen);
+//               Motion blur 3 = Ultra; DLSS PERFORMANCE = "Performance"; Reflex ON = "On"; Sharpening
+//               0.5 = "50"; precache 2 = High; Shadow maps 2048, Terrain shadows 1024, Cubemap 384.
+//               The preset also rewrote two file-only keys (POMSubsplitsMaxDist 7.5→10, Omni culling
+//               0.02→0) and set "Preset Ultra" — profiles now force "Preset Custom" on apply.
 //               Still inferred (not on screen while inactive): DLSS/FSR mode, secondary scaling,
 //               DOF/motion-blur quality, the Enabled flags of quality rows, the file-only Advanced keys.
 //
@@ -41,7 +48,7 @@
 // {GraphicsVR} block, InstalledPackagesPath. Those are machine/monitor facts, not a "look".
 
 const Q = { 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };               // the shared quality scale
-const TEXTURE = { 0: 'Ultra', 1: 'High', 2: 'Medium', 3: 'Low' };         // INVERTED (2/1 confirmed; 0/3 inferred)
+const TEXTURE = { 0: 'Ultra', 1: 'High', 2: 'Medium', 3: 'Low' };         // INVERTED (0/1/2 confirmed; 3 inferred)
 const PARTICLES = { 0: 'Low', 1: 'High' };                               // own short scale (1 = High confirmed)
 const WATER = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512 = High confirmed
 const ONOFF = { 0: 'Off', 1: 'On' };
@@ -51,7 +58,7 @@ const DLSS_MODE = { AUTO: 'Auto', DLAA: 'DLAA', QUALITY: 'Quality', BALANCED: 'B
 const FSR_MODE = { NATIVEAA: 'Native AA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FG = { NONE: 'Off', FSRFG: 'AMD FSR', DLSSFG: 'NVIDIA DLSS' };      // in-sim reads 'AMD FSR 1.1' for FSRFG
 const REFLEX = { OFF: 'Off', ON: 'On', BOOST: 'On+Boost' };
-const LIFE = { '-1': 'Off', 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };   // traffic/people/fauna (-1, 0 confirmed)
+const LIFE = { '-1': 'Off', 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };   // traffic/people/fauna (all steps confirmed)
 
 // type:  'enum' (numeric with labels) · 'word' (text value, labels map) · 'lod' (float ×100, "125") ·
 //        'pct' (float ×100 %) · 'x100' (float ×100, no %) · 'num' (plain number) · 'mult' (NBFramesToGenerate → "2×")
@@ -117,23 +124,23 @@ g('Particles', 'Quality', 'Visual effects particles quality', L, 'Effects', 'enu
 g('DOF', 'Enabled', 'Depth of field', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('DOF', 'Quality', 'Depth of field quality', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('MotionBlur', 'Enabled', 'Motion blur', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
-g('MotionBlur', 'Quality', 'Motion blur quality', L, 'Effects', 'enum', { labels: Q, calib: 'inferred', cost: 'gpu' });
+g('MotionBlur', 'Quality', 'Motion blur quality', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('GlassCockpitsRefreshRate', 'Quality', 'Glass cockpit refresh rate', L, 'Cockpit', 'enum', { labels: Q, calib: 'confirmed', cost: 'cpu' });
 g('Seatbelts', 'Enabled', 'Seatbelt visibility', L, 'Cockpit', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'none' });
 
-// ── traffic & life (−1 = Off, 0 = Low CONFIRMED 2026-11-10; higher steps inferred) ──
-g('Traffic', 'AircraftTrafficQuantity', 'Aircraft traffic quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'AircraftTrafficVariety', 'Aircraft traffic variety', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'ParkedAircraftQuantity', 'Parked aircraft quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'ParkedAircraftVariety', 'Parked aircraft variety', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'AirportsServicesQuantity', 'Airport services quantity', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'AirportsServicesVariety', 'Airport services variety', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'RoadQuality', 'Road traffic', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Traffic', 'SeaQuality', 'Sea traffic', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Characters', 'Quantity', 'Characters quantity', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Characters', 'Quality', 'Characters quality', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Characters', 'Variety', 'Characters variety', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
-g('Fauna', 'Quantity', 'Fauna density', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+// ── traffic & life (-1 Off / 0 Low / 1 Medium / 2 High / 3 Ultra — all CONFIRMED 2026-11-10) ──
+g('Traffic', 'AircraftTrafficQuantity', 'Aircraft traffic quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'AircraftTrafficVariety', 'Aircraft traffic variety', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'ParkedAircraftQuantity', 'Parked aircraft quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'ParkedAircraftVariety', 'Parked aircraft variety', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'AirportsServicesQuantity', 'Airport services quantity', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'AirportsServicesVariety', 'Airport services variety', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'RoadQuality', 'Road traffic', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Traffic', 'SeaQuality', 'Sea traffic', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Characters', 'Quantity', 'Characters quantity', T, 'Life', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Characters', 'Quality', 'Characters quality', T, 'Life', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Characters', 'Variety', 'Characters variety', T, 'Life', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
+g('Fauna', 'Quantity', 'Fauna density', T, 'Life', 'enum', { labels: LIFE, calib: 'confirmed', cost: 'cpu' });
 
 // ── advanced: in the file, not on the in-sim menu ─────────────────────────────────────────────
 g('Terrain', 'POMMaxDist', 'Parallax mapping distance', A, 'Advanced', 'num', { calib: 'inferred', cost: 'gpu', advanced: true });
