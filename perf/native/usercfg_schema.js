@@ -18,8 +18,17 @@
 //               precache 3 = Ultra; rocks 0 = Low; Particles 1 = "High" (own short scale);
 //               Water FFTSize 512 = "High".
 //   2026-11-10  Texture Quality: 2 = Medium, 1 = High (Dean raised Medium→High, file went 2→1).
-//   PENDING     Dean's screenshot pass of every in-sim graphics page (build step 1) — flips the
-//               remaining 'inferred' / 'unverified' entries.
+//   2026-11-10  FULL PASS — Dean applied ABRP Suggested, opened the sim, screenshotted every page;
+//               every value matched the file. Confirmed: Buildings/Trees/Plants/Grass 1 = Medium;
+//               Terrain shadows = HeightFieldShadows Size (256); Cubemap Reflections = ReflectionProbe
+//               Size (192); Anisotropic 16 = "16X"; DOF/Motion blur Enabled 0 = Off; Seatbelt 0 = off;
+//               Glass cockpit 2 = High; Reflex BOOST = "On+Boost"; Sharpening stored 0.3, shown "30";
+//               Exposure -0.6 = "Exposure Compensation EV"; FrameGeneration FSRFG shows "AMD FSR 1.1";
+//               NBFramesToGenerate 1 = "2X"; FrameLimiter 30 = "Max Frame Rate" 30.
+//               Traffic & life: quantity -1 = "Off", variety/quality 0 = "Low", Road 0 = "Low"
+//               (higher steps follow the shared Low/Medium/High scale — inferred, not yet seen).
+//               Still inferred (not on screen while inactive): DLSS/FSR mode, secondary scaling,
+//               DOF/motion-blur quality, the Enabled flags of quality rows, the file-only Advanced keys.
 //
 // SCOPE: the desktop {Graphics} block + the rendering part of {Video}. NEVER in a profile: display /
 // window keys (Adapter, Monitor, Windowed, Resolution, PosX/Y, VSync, HDR10…), every *VR key, the
@@ -33,11 +42,12 @@ const ONOFF = { 0: 'Off', 1: 'On' };
 const AA = { TAA: 'TAA', DLSS: 'DLSS', DLAA: 'DLAA', FSR3: 'FSR 3', FSR: 'FSR', NONE: 'Off' };
 const DLSS_MODE = { AUTO: 'Auto', DLAA: 'DLAA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
 const FSR_MODE = { NATIVEAA: 'Native AA', QUALITY: 'Quality', BALANCED: 'Balanced', PERFORMANCE: 'Performance', ULTRAPERFORMANCE: 'Ultra performance' };
-const FG = { NONE: 'Off', FSRFG: 'FSR 3 frame gen', DLSSFG: 'DLSS frame gen' };
-const REFLEX = { OFF: 'Off', ON: 'On', BOOST: 'On + Boost' };
+const FG = { NONE: 'Off', FSRFG: 'AMD FSR', DLSSFG: 'NVIDIA DLSS' };      // in-sim reads 'AMD FSR 1.1' for FSRFG
+const REFLEX = { OFF: 'Off', ON: 'On', BOOST: 'On+Boost' };
+const LIFE = { '-1': 'Off', 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };   // traffic/people/fauna (-1, 0 confirmed)
 
 // type:  'enum' (numeric with labels) · 'word' (text value, labels map) · 'lod' (float ×100, "125") ·
-//        'pct' (float ×100 %) · 'num' (plain number) · 'mult' (NBFramesToGenerate → "2×")
+//        'pct' (float ×100 %) · 'x100' (float ×100, no %) · 'num' (plain number) · 'mult' (NBFramesToGenerate → "2×")
 // cost:  what the setting mainly spends — 'gpu' | 'vram' | 'cpu' | 'mixed' | 'none'
 // lod:   AutoFPS drives it in flight → excluded from "matches current" and only applied on request
 const K = [];
@@ -52,14 +62,14 @@ v('DLSSMode', 'DLSS mode', 'Upscaling', 'word', { labels: DLSS_MODE, calib: 'inf
 v('FSRMode', 'FSR mode', 'Upscaling', 'word', { labels: FSR_MODE, calib: 'inferred', cost: 'gpu' });
 v('PrimaryScaling', 'Render scaling', 'Upscaling', 'pct', { calib: 'confirmed', cost: 'gpu' });
 v('SecondaryScaling', 'Secondary render scaling', 'Upscaling', 'pct', { calib: 'inferred', cost: 'gpu', advanced: true });
-v('SharpenAmount', 'Sharpening', 'Image', 'num', { calib: 'inferred', cost: 'none' });
-v('ExposureBias', 'Exposure', 'Image', 'num', { calib: 'inferred', cost: 'none' });
+v('SharpenAmount', 'AMD FidelityFX sharpening', 'Image', 'x100', { calib: 'confirmed', cost: 'none' });
+v('ExposureBias', 'Exposure compensation (EV)', 'Image', 'num', { calib: 'confirmed', cost: 'none' });
 v('FrameGeneration', 'Frame generation', 'Frame rate', 'word', { labels: FG, calib: 'confirmed', cost: 'gpu' });
-v('NBFramesToGenerate', 'Generated frames', 'Frame rate', 'mult', { calib: 'inferred', cost: 'gpu' });
-v('Reflex', 'NVIDIA Reflex', 'Frame rate', 'word', { labels: REFLEX, calib: 'inferred', cost: 'none' });
+v('NBFramesToGenerate', 'Frame rate multiplier', 'Frame rate', 'mult', { calib: 'confirmed', cost: 'gpu' });
+v('Reflex', 'NVIDIA Reflex low latency', 'Frame rate', 'word', { labels: REFLEX, calib: 'confirmed', cost: 'none' });
 v('TargetFrameRate', 'Target frame rate', 'Frame rate', 'num', { calib: 'confirmed', cost: 'none' });
-v('FrameLimiter', 'Frame rate limit', 'Frame rate', 'num', { calib: 'inferred', cost: 'none' });
-v('DynamicSettings', 'Dynamic settings', 'Frame rate', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'none' });
+v('FrameLimiter', 'Max frame rate', 'Frame rate', 'num', { calib: 'confirmed', cost: 'none' });
+v('DynamicSettings', 'Dynamic settings', 'Frame rate', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'none' });
 
 // ── {Graphics}: terrain & objects ────────────────────────────────────────────────────────────
 const W = 'World', L = 'Lighting & effects', T = 'Traffic & life', A = 'Advanced (file only)';
@@ -67,16 +77,16 @@ g('Terrain', 'LoDFactor', 'Terrain level of detail (TLOD)', W, 'Terrain', 'lod',
 g('OffscreenTerrainPreCaching', 'Enabled', 'Off-screen terrain pre-caching', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'vram' });
 g('OffscreenTerrainPreCaching', 'Quality', 'Pre-caching quality', W, 'Terrain', 'enum', { labels: Q, calib: 'confirmed', cost: 'vram' });
 g('HeightFieldShadows', 'Enabled', 'Terrain shadows', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
-g('HeightFieldShadows', 'Size', 'Terrain shadow size', W, 'Terrain', 'num', { more: true, calib: 'inferred', cost: 'gpu' });
+g('HeightFieldShadows', 'Size', 'Terrain shadows', W, 'Terrain', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
 g('DisplacementMapping', 'Enabled', 'Displacement mapping', W, 'Terrain', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('ObjectsLoD', 'LoDFactor', 'Objects level of detail (OLOD)', W, 'Objects', 'lod', { calib: 'confirmed', cost: 'cpu', lod: true });
-g('Buildings', 'Quality', 'Buildings', W, 'Objects', 'enum', { labels: Q, calib: 'inferred', cost: 'mixed' });
-g('Procedural', 'TreesQuality', 'Trees', W, 'Vegetation', 'enum', { labels: Q, calib: 'inferred', cost: 'mixed' });
-g('Procedural', 'PlantsQuality', 'Plants', W, 'Vegetation', 'enum', { labels: Q, calib: 'inferred', cost: 'mixed' });
-g('Procedural', 'GrassQuality', 'Grass and bushes', W, 'Vegetation', 'enum', { labels: Q, calib: 'inferred', cost: 'mixed' });
+g('Buildings', 'Quality', 'Buildings', W, 'Objects', 'enum', { labels: Q, calib: 'confirmed', cost: 'mixed' });
+g('Procedural', 'TreesQuality', 'Trees', W, 'Vegetation', 'enum', { labels: Q, calib: 'confirmed', cost: 'mixed' });
+g('Procedural', 'PlantsQuality', 'Plants', W, 'Vegetation', 'enum', { labels: Q, calib: 'confirmed', cost: 'mixed' });
+g('Procedural', 'GrassQuality', 'Grass', W, 'Vegetation', 'enum', { labels: Q, calib: 'confirmed', cost: 'mixed' });
 g('Procedural', 'RocksQuality', 'Rocks', W, 'Vegetation', 'enum', { labels: Q, calib: 'confirmed', cost: 'mixed' });
 g('Texture', 'Quality', 'Texture resolution', W, 'Textures', 'enum', { labels: TEXTURE, calib: 'confirmed', cost: 'vram' });
-g('Texture', 'MaxAnisotropy', 'Anisotropic filtering', W, 'Textures', 'num', { more: true, calib: 'inferred', cost: 'gpu', suffix: '×' });
+g('Texture', 'MaxAnisotropy', 'Anisotropic filtering', W, 'Textures', 'num', { more: true, calib: 'confirmed', cost: 'gpu', suffix: 'X' });
 g('Water', 'FFTSize', 'Water waves', W, 'Water', 'enum', { labels: WATER, calib: 'confirmed', cost: 'gpu' });
 
 // ── lighting, shadows, effects ───────────────────────────────────────────────────────────────
@@ -84,7 +94,7 @@ g('VolumetricClouds', 'Enabled', 'Volumetric clouds', L, 'Sky', 'enum', { labels
 g('VolumetricClouds', 'Quality', 'Volumetric clouds quality', L, 'Sky', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('VolumetricLights', 'Enabled', 'Light shafts', L, 'Sky', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
 g('VolumetricLights', 'Quality', 'Light shafts quality', L, 'Sky', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
-g('Shadows', 'Size', 'Shadow maps', L, 'Shadows', 'num', { more: true, calib: 'inferred', cost: 'gpu' });
+g('Shadows', 'Size', 'Shadow maps', L, 'Shadows', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
 g('ContactShadows', 'Enabled', 'Contact shadows', L, 'Shadows', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
 g('ContactShadows', 'Quality', 'Contact shadows quality', L, 'Shadows', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('RaytracedShadows', 'Enabled', 'Raytraced shadows', L, 'Shadows', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
@@ -94,29 +104,29 @@ g('SSAO', 'FullRes', 'Ambient occlusion full resolution', L, 'Lighting', 'enum',
 g('SSR', 'Enabled', 'Raymarched reflections', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
 g('SSR', 'Quality', 'Raymarched reflections quality', L, 'Lighting', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
 g('SSR', 'HalfRes', 'Reflections half resolution', L, 'Lighting', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu', advanced: true });
-g('ReflectionProbe', 'Size', 'Reflection probes', L, 'Lighting', 'num', { more: true, calib: 'inferred', cost: 'gpu' });
+g('ReflectionProbe', 'Size', 'Cubemap reflections', L, 'Lighting', 'num', { more: true, calib: 'confirmed', cost: 'gpu' });
 g('WindShield', 'Quality', 'Windshield effects', L, 'Effects', 'enum', { labels: Q, calib: 'confirmed', cost: 'gpu' });
-g('Particles', 'Quality', 'Particles (visual effects)', L, 'Effects', 'enum', { labels: PARTICLES, calib: 'confirmed', cost: 'gpu' });
-g('DOF', 'Enabled', 'Depth of field', L, 'Effects', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('Particles', 'Quality', 'Visual effects particles quality', L, 'Effects', 'enum', { labels: PARTICLES, calib: 'confirmed', cost: 'gpu' });
+g('DOF', 'Enabled', 'Depth of field', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('DOF', 'Quality', 'Depth of field quality', L, 'Effects', 'enum', { labels: Q, calib: 'inferred', cost: 'gpu' });
-g('MotionBlur', 'Enabled', 'Motion blur', L, 'Effects', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'gpu' });
+g('MotionBlur', 'Enabled', 'Motion blur', L, 'Effects', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'gpu' });
 g('MotionBlur', 'Quality', 'Motion blur quality', L, 'Effects', 'enum', { labels: Q, calib: 'inferred', cost: 'gpu' });
 g('GlassCockpitsRefreshRate', 'Quality', 'Glass cockpit refresh rate', L, 'Cockpit', 'enum', { labels: Q, calib: 'confirmed', cost: 'cpu' });
-g('Seatbelts', 'Enabled', 'Seatbelts', L, 'Cockpit', 'enum', { labels: ONOFF, calib: 'inferred', cost: 'none' });
+g('Seatbelt visibility', 'Enabled', 'Seatbelt visibility', L, 'Cockpit', 'enum', { labels: ONOFF, calib: 'confirmed', cost: 'none' });
 
-// ── traffic & life (−1 = the sim's own default/"auto"; scale unverified until the screenshot pass) ──
-g('Traffic', 'AircraftTrafficQuantity', 'Aircraft traffic', T, 'Air traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'AircraftTrafficVariety', 'Aircraft traffic variety', T, 'Air traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'ParkedAircraftQuantity', 'Parked aircraft', T, 'Air traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'ParkedAircraftVariety', 'Parked aircraft variety', T, 'Air traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'AirportsServicesQuantity', 'Airport services', T, 'Ground traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'AirportsServicesVariety', 'Airport services variety', T, 'Ground traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'RoadQuality', 'Road traffic', T, 'Ground traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Traffic', 'SeaQuality', 'Boat traffic', T, 'Ground traffic', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Characters', 'Quantity', 'People', T, 'Life', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Characters', 'Quality', 'People quality', T, 'Life', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Characters', 'Variety', 'People variety', T, 'Life', 'num', { calib: 'unverified', cost: 'cpu' });
-g('Fauna', 'Quantity', 'Wildlife', T, 'Life', 'num', { calib: 'unverified', cost: 'cpu' });
+// ── traffic & life (−1 = Off, 0 = Low CONFIRMED 2026-11-10; higher steps inferred) ──
+g('Traffic', 'AircraftTrafficQuantity', 'Aircraft traffic quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'AircraftTrafficVariety', 'Aircraft traffic variety', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'ParkedAircraftQuantity', 'Parked aircraft quantity', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'ParkedAircraftVariety', 'Parked aircraft variety', T, 'Air traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'AirportsServicesQuantity', 'Airport services quantity', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'AirportsServicesVariety', 'Airport services variety', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'RoadQuality', 'Road traffic', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Traffic', 'SeaQuality', 'Sea traffic', T, 'Ground traffic', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Characters', 'Quantity', 'Characters quantity', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Characters', 'Quality', 'Characters quality', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Characters', 'Variety', 'Characters variety', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
+g('Fauna', 'Quantity', 'Fauna density', T, 'Life', 'enum', { labels: LIFE, calib: 'inferred', cost: 'cpu' });
 
 // ── advanced: in the file, not on the in-sim menu ─────────────────────────────────────────────
 g('Terrain', 'POMMaxDist', 'Parallax mapping distance', A, 'Advanced', 'num', { calib: 'inferred', cost: 'gpu', advanced: true });
@@ -142,6 +152,7 @@ function display(k, value) {
     }
     case 'lod': return String(Math.round(Number(value) * 100));
     case 'pct': return Math.round(Number(value) * 100) + '%';
+    case 'x100': return String(Math.round(Number(value) * 100));
     case 'mult': return (Math.trunc(Number(value)) + 1) + '× frames';
     default: return String(value) + (k.suffix || '') + (k.calib === 'unverified' ? ' · unverified' : '');
   }
@@ -157,7 +168,7 @@ function direction(k, from, to) {
     if (k.labels === ONOFF) return Number(to) > Number(from) ? 'up' : 'down';
     return Number(to) > Number(from) ? 'up' : 'down';
   }
-  if (k.type === 'lod' || k.type === 'pct' || k.type === 'mult' || k.more) return Number(to) > Number(from) ? 'up' : 'down';
+  if (k.type === 'lod' || k.type === 'pct' || k.type === 'x100' || k.type === 'mult' || k.more) return Number(to) > Number(from) ? 'up' : 'down';
   return null;
 }
 

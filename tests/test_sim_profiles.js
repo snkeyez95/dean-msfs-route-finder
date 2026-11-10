@@ -18,6 +18,10 @@ const SESS = path.join(X.APP_DATA, 'Sessions');
 if (!fs.existsSync(LIVE) || !fs.existsSync(path.join(SESS, 'index.json'))) { console.log('SKIP — needs the real UserCfg.opt + Sessions'); process.exit(0); }
 const liveText = fs.readFileSync(LIVE, 'utf8');
 const liveHashBefore = require('crypto').createHash('sha1').update(liveText).digest('hex');
+// Fixed starting point for the store + surface tests: Dean's real file with the Nov 9-10 "Textures High"
+// setup forced in, so the tests don't depend on which profile he happens to have applied today.
+const startText = P.applyToText(liveText, { 'Graphics/Texture/Quality': 1, 'Graphics/SSAO/Quality': 1, 'Graphics/SSR/Quality': 1,
+  'Graphics/RaytracedShadows/Enabled': 0, 'Graphics/Buildings/Quality': 2, 'Graphics/Water/FFTSize': 256 }).text;
 
 // ── 1. dictionary ──
 {
@@ -28,7 +32,9 @@ const liveHashBefore = require('crypto').createHash('sha1').update(liveText).dig
   T('   Texture 2 → 1 is an INCREASE, 1 → 2 a decrease', S.direction(tex, 2, 1) === 'up' && S.direction(tex, 1, 2) === 'down');
   T('   clouds 3 = Ultra, particles 1 = High, water 512 = High', S.display(S.BY_ID['Graphics/VolumetricClouds/Quality'], 3) === '3 · Ultra'
     && S.display(S.BY_ID['Graphics/Particles/Quality'], 1) === '1 · High' && S.display(S.BY_ID['Graphics/Water/FFTSize'], 512) === '512 · High');
-  T('   an unverified setting shows its number, never a guessed word', S.display(S.BY_ID['Graphics/Traffic/RoadQuality'], 0) === '0 · unverified');
+  T('   traffic & life calibrated (2026-11-10 screenshots): -1 = Off, 0 = Low', S.display(S.BY_ID['Graphics/Traffic/AircraftTrafficQuantity'], -1) === '-1 · Off' && S.display(S.BY_ID['Graphics/Traffic/RoadQuality'], 0) === '0 · Low');
+  T('   shows values the way the sim does: sharpening 0.3 → "30", BOOST → "On+Boost", 16 → "16X"', S.display(S.BY_ID['Video/SharpenAmount'], 0.3) === '30' && S.display(S.BY_ID['Video/Reflex'], 'BOOST') === 'On+Boost' && S.display(S.BY_ID['Graphics/Texture/MaxAnisotropy'], 16) === '16X');
+  T('   no key is left "unverified" after the screenshot pass', !S.KEYS.some(k => k.calib === 'unverified'));
   T('   no display / window / VR key is in the schema', !ids.some(id => /Resolution|Windowed|Monitor|Adapter|PosX|VSync|HDR10|VR$|InstalledPackages/.test(id)));
 }
 
@@ -78,7 +84,7 @@ const base = runs.find(r => String(r.first).startsWith('2026-08-27') && String(r
 // ── 4. the store, end to end, on a COPY ──
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'abrp-prof-'));
 const copy = path.join(tmp, 'UserCfg.opt');
-fs.writeFileSync(copy, liveText);
+fs.writeFileSync(copy, startText);
 let simRunning = false;
 const store = createStore({ userData: tmp, usercfgPath: copy, sessionsDir: SESS, isSimRunning: () => simRunning });
 let listed;
@@ -86,30 +92,30 @@ try {
   listed = store.list();
   T('4. list(): current settings found, runs + suggestion present', listed.ok && listed.found && listed.runs.length >= 5 && listed.suggestion.ok);
   const s1 = store.save({ source: 'captured' });
-  T('   save current → a named profile', s1.ok && s1.profile.name === P.profileName(cur), s1.profile && s1.profile.name);
+  T('   save current → a named profile', s1.ok && s1.profile.name === P.profileName(P.readProfileable(startText)), s1.profile && s1.profile.name);
   const s2 = store.save({ source: 'history', runId: base.id });
   T('   save the baseline run → a profile with a "rebuilt from 36 flights" note', s2.ok && /36 logged flights/.test(s2.profile.note), s2.profile && s2.profile.note);
   T('   rename works', store.rename({ id: s2.profile.id, name: 'TAA baseline (pre-DLSS)' }).ok && store.load().profiles.find(p => p.id === s2.profile.id).name === 'TAA baseline (pre-DLSS)');
   simRunning = true;
   const blocked = store.apply({ id: s2.profile.id });
-  T('   apply is REFUSED while MSFS runs, file untouched', !blocked.ok && /MSFS is running/.test(blocked.msg) && fs.readFileSync(copy, 'utf8') === liveText);
+  T('   apply is REFUSED while MSFS runs, file untouched', !blocked.ok && /MSFS is running/.test(blocked.msg) && fs.readFileSync(copy, 'utf8') === startText);
   simRunning = false;
   const ap = store.apply({ id: s2.profile.id });
   const after = P.readProfileable(fs.readFileSync(copy, 'utf8'));
   T('   apply baseline: changed + verified', ap.ok && ap.changed.length > 0, ap.msg);
   T('   the file now reads Textures 2 · Medium, raytraced shadows On, SSAO Ultra', after['Graphics/Texture/Quality'] === 2 && after['Graphics/RaytracedShadows/Enabled'] === 1 && after['Graphics/SSAO/Quality'] === 3);
-  T('   TLOD/OLOD left alone (AutoFPS-managed)', P._equal(after['Graphics/Terrain/LoDFactor'], cur['Graphics/Terrain/LoDFactor']));
+  T('   TLOD/OLOD left alone (AutoFPS-managed)', P._equal(after['Graphics/Terrain/LoDFactor'], P.readProfileable(startText)['Graphics/Terrain/LoDFactor']));
   T('   a backup of the original was written first', fs.readdirSync(path.join(tmp, 'usercfg_backups')).some(f => /^UserCfg_\d/.test(f)));
-  T('   an automatic "Before …" backup profile was kept', store.load().profiles.some(p => p.source === 'safety' && P._equal(p.values['Graphics/Texture/Quality'], cur['Graphics/Texture/Quality'])));
+  T('   an automatic "Before …" backup profile was kept', store.load().profiles.some(p => p.source === 'safety' && P._equal(p.values['Graphics/Texture/Quality'], 1)));
   T('   list() now says the baseline is current', P.matches(store.load().profiles.find(p => p.id === s2.profile.id).values, store.list().current));
   const un = store.apply({ undo: true });
-  T('   UNDO restores the file BYTE-IDENTICAL', un.ok && fs.readFileSync(copy, 'utf8') === liveText, un.msg);
+  T('   UNDO restores the file BYTE-IDENTICAL', un.ok && fs.readFileSync(copy, 'utf8') === startText, un.msg);
   T('   undo can\'t run twice', !store.apply({ undo: true }).ok);
   T('   applying what\'s already there changes nothing', store.apply({ id: s1.profile.id }).changed.length === 0);
   for (let i = 0; i < 5; i++) { store.apply({ id: s2.profile.id }); store.apply({ undo: true }); }
   T('   automatic backups are capped at 3', store.load().profiles.filter(p => p.source === 'safety').length === 3);
-  T('   delete removes only the profile', store.del({ id: s1.profile.id }).ok && fs.readFileSync(copy, 'utf8') === liveText);
-  T('   apply ABRP Suggested by id works', store.apply({ id: 'suggested' }).ok && store.apply({ undo: true }).ok && fs.readFileSync(copy, 'utf8') === liveText);
+  T('   delete removes only the profile', store.del({ id: s1.profile.id }).ok && fs.readFileSync(copy, 'utf8') === startText);
+  T('   apply ABRP Suggested by id works', store.apply({ id: 'suggested' }).ok && store.apply({ undo: true }).ok && fs.readFileSync(copy, 'utf8') === startText);
   listed = store.list();
 } catch (e) { T('store threw: ' + e.stack, false); }
 
