@@ -1,3 +1,224 @@
+# v6.27.0 — SIM PROFILES: save / name / apply in-sim graphics setups + "ABRP Suggested" (Dean 2026-11-10, plan)
+> ✅ BUILT 2026-11-10 (awaiting Dean release.bat + screenshot calibration). usercfg_schema.js (one dictionary,
+> calib status per key; gfx_watch re-exports its maps), profiles.js (read/apply/verify/historyRuns/suggest),
+> profiles_store.js (file side; main.js IPCs are thin wrappers so tests run the same code), new 🎛 Sim Profiles
+> tab (lands under Performance in Dean's saved nav order), capture logs the extra {Video} keys.
+> REAL DATA: baseline run = Aug 27 – Oct 7, 36 counted (+4 mid-flight exits excluded, as everywhere) — the plan's
+> "40" counted those. Suggested = that run + Rocks 0→1 (adopted, 5 Fenix flights), High confidence; VRAM cap raised
+> to 96% (AutoFPS hold line) because every good setup peaks ~93%. tests/test_sim_profiles.js 56/56 (incl. renderer
+> surface + live-file hash guard); full board 41 green. Visually verified in the browser pane against the REAL store
+> on a COPY of UserCfg: render, Why panel, apply→confirm→verify, undo (byte-identical), history save, rename,
+> sim-running state, light theme. OWED: Dean's in-sim screenshots → flip 'inferred'/'unverified' labels to confirmed.
+
+## Context
+Dean wants to capture his in-sim graphics settings as named profiles (e.g. "TAA baseline", "DLSS",
+"Experimental"), see what's inside each one through a collapsible list, and switch between them quickly.
+He also wants an "ABRP Suggested" profile built entirely from his flight data, and wants back the baseline
+he had before the DLSS / ReShade period. It has to be intuitive, look like the rest of ABRP, and labels must
+never be backwards again (the Texture 1=High / 2=Medium mix-up).
+
+**Locked decisions (Dean, 2026-11-10):**
+- Profiles cover **sim settings only**. AutoFPS's own config is not touched.
+- **No Launch + Capture picker.** Profiles are applied from their own tab.
+- **New left-menu tab "🎛 Sim Profiles".**
+- Dean **will send screenshots of the in-sim graphics pages** so every label gets verified.
+
+**What the investigation found (read-only, 2026-11-10):**
+- **UserCfg.opt** (the sim's settings file) has four parts:
+  - `{Video}`: 44 lines. Display, upscaler and frame generation settings.
+  - `{Graphics}`: 59 desktop graphics values across 29 sections.
+  - `{GraphicsVR}`: the VR copy of the graphics settings.
+  - `InstalledPackagesPath`.
+- MSFS reads UserCfg.opt when it launches and **rewrites it when it closes**. So a profile can only be
+  applied while the sim is closed. The auto-TLOD feature has already proven that pre-launch writes stick.
+- **Every flight since 2026-07-16 stored its full graphics snapshot** (`summary.settings.graphics`,
+  59–61 keys, plus upscaler, frame gen and FPS target). So **the pre-DLSS baseline is recoverable**:
+  - It's the 2026-08-27 → 2026-10-07 run: **40 flights, median P99 17.66 ms, 7.6 felt stutters/hr.**
+  - It is the longest and best-sampled settings run he has.
+  - For comparison, the DLSS run (Oct 13–27, 9 flights) averaged 36.8 felt stutters/hr.
+  - The values are fully known (diff checked). Today's file differs from it in 15 keys: Texture,
+    Terrain LoD, precache, objects LoD, shadow size, contact shadows, water, light shafts, raytraced
+    shadows, SSR, SSAO, DOF, buildings, trees and glass cockpit refresh. Rocks 0→1 happened Oct 30.
+- **One honest gap:** past snapshots did NOT log `SharpenAmount`, `ExposureBias`, `Reflex`, `FSRMode` or
+  `DLSSMode`. Known values for sharpening/exposure: 0.2 / 0.0 on Aug 17 (backup file), 0.3 / −0.6 today.
+  Their Oct 7 values can't be recovered. The rebuilt baseline keeps today's values for those, says so, and
+  lets Dean edit them. Going forward the capture logs them.
+- Existing building blocks to reuse:
+  - `perf/native/gfx_watch.js`: readAllGraphics; the calibrated label maps (Q_LABELS / PARTICLE /
+    WATER / ONOFF).
+  - `perf/native/lab.js`: _gfxSplit, readKeyInBlock, writeKeyInBlock.
+  - `perf/native/prep.js`: backupUsercfg (`usercfg_backups/`, keeps UserCfg_ORIGINAL).
+  - `main.js`: USERCFG_PATH (:2314), isMsfsRunning (:1065), writeFileAtomic (:581).
+  - `index.html`: the Settings A/B renderer `_labDeltaRow` + verdict palette, the `.sb-item`/`sw()` tab
+    pattern (:401-411 / :1552), and the Setup Export SETUP_FILES list.
+
+## Design
+
+### 1. Settings dictionary: one source of truth for every key (fixes the backwards-label class of bug)
+NEW `perf/native/usercfg_schema.js` with one entry per profile-able key:
+- `{ id, block:'Video'|'Graphics', section, key, page, group, label, type, labels, calib, cost }`
+- `page`/`group` follow the **in-sim menu layout and row names**, so the expanded view reads like the sim.
+- `labels` = an explicit numeral → in-sim word map for each key. Texture gets its own inverted map.
+- `calib` = `'confirmed'` (seen in-sim), `'inferred'` (from research) or `'unverified'`.
+- `cost` = GPU / VRAM / CPU tag, used for the suggestion's reasoning and as a small chip in the UI.
+
+**Rules:**
+- The UI **always shows the raw stored number beside the word**.
+- An unverified key shows "4 · unverified", never a guessed word.
+- gfx_watch.js moves its label maps here (re-exported), so the A/B view and Profiles can't disagree.
+
+**Calibration:**
+- Dean's screenshots of each in-sim graphics page, compared against his live UserCfg, set every
+  `calib` to confirmed.
+- This is a build step, recorded in the schema header (same method as the 2026-07-14 pass).
+
+**Profile scope:**
+- All `{Graphics}` keys.
+- From `{Video}`: AntiAliasing, DLSSMode, FSRMode, FrameGeneration, NBFramesToGenerate, PrimaryScaling,
+  SecondaryScaling, SharpenAmount, ExposureBias, Reflex, TargetFrameRate, FrameLimiter, DynamicSettings.
+
+**Never touched:**
+- Adapter, Monitor, Windowed/Borderless, Resolution, PosX/Y, VSync, HDR10.
+- Every `*VR` key, the whole `{GraphicsVR}` block, and InstalledPackagesPath.
+
+**TLOD/OLOD:**
+- Stored in profiles, but **AutoFPS-managed**.
+- They're excluded from "matches current" (AutoFPS saves its in-flight OLOD on sim exit, a known false
+  "change").
+- Applied only if Dean ticks "also set TLOD/OLOD" on that profile.
+
+### 2. Engine module `perf/native/profiles.js` (pure, desk-testable)
+- `readProfileable(text)`: reads the live file into `{id: value}` for the scoped keys, using a generalized
+  reader that handles both Video top-level lines and Graphics sections.
+- `applyToText(text, values)`:
+  - Surgical, line-by-line replacement inside the right block only (reuses the _gfxSplit approach,
+    extended to `{Video}`).
+  - **Only replaces keys that already exist**, never inserts lines.
+  - Number formatting matches the file (6-decimal floats, ints, enum words like TAA/FSRFG).
+  - Returns `{text, changed[], skipped[]}`.
+- `profileName(values)`: auto-name from the distinctive keys, e.g. "TAA 120% · Textures High · Clouds
+  Ultra · FSR FG".
+- `diff(a, b)`: the changed keys, with labels.
+- `matches(values, current)`: ignores the AutoFPS-managed keys.
+- `historyRuns(sessions)`: groups logged flights into consecutive full-settings runs (graphics map +
+  upscaler; LoD excluded). Each run carries date range, n, aircraft mix, and median P99 / felt-per-hour /
+  peak VRAM.
+
+### 3. Main-process IPCs (main.js) + preload
+- Storage: `USER_DATA/sim_profiles.json` (atomic), `{v:1, profiles:[{id, name, source:'captured'|'history'|
+  'suggested'|'safety', created, values, note, applyLod:false}], lastApply:{prevValues, profileId, ts}}`.
+- `profiles-list` returns the stored profiles, the live current values, the history runs, and the
+  suggestion.
+- `profiles-capture` / `profiles-rename` / `profiles-delete` (delete asks to confirm in the UI) /
+  `profiles-from-run`.
+- `profiles-apply`:
+  - **Refuses while MSFS is running.**
+  - Backs up first (backupUsercfg), writes atomically, then **re-reads and verifies every key**.
+  - Records `lastApply.prevValues` for one-click **Undo**.
+  - Returns changed / skipped / verified.
+- Add `sim_profiles.json` to Setup Export (SETUP_FILES).
+- capture.js also logs the missing Video keys (Sharpen, Exposure, Reflex, FSR/DLSS mode) into
+  `settings.graphics` under `Video/` from now on. This is additive, and **gfx_fp is unchanged** because
+  the fingerprint only hashes the watched keys.
+
+### 4. The "🎛 Sim Profiles" tab (index.html), clean and on-theme
+Top to bottom:
+1. **Current sim settings strip:** "Your sim right now: TAA 120% · Textures High · …", plus a "matches:
+   <profile>" badge or "unsaved changes", and **[Save as profile]**. A line under it says "MSFS is running
+   — profiles apply when the sim is closed" whenever it is.
+2. **⭐ ABRP Suggested** card, pinned, with a distinct accent border and a "Why?" expander (section 5).
+3. **My profiles:** collapsible cards.
+   - **Collapsed:** name (rename in place), 4–5 key chips, "✓ current" badge, and the evidence line when
+     flights exist: "Flown 40× · P99 17.7 · 7.6 felt/hr · VRAM 93%".
+   - **Expanded:** grouped by in-sim page/group; each row shows label, word + raw number, and a
+     calibration tick.
+   - A "Show only differences from current" toggle, **on by default**, keeps it short.
+   - Changed rows are marked with **▲/▼ + bold, never colour alone** (Dean is colour-blind).
+   - Buttons: **[Apply]** [Duplicate] [Delete].
+   - Apply opens a confirm listing the exact changes ("15 settings change: Textures High → Medium …").
+     After applying: a toast plus a visible **[Undo]**.
+4. **From your flight history** (collapsed by default): the runs from historyRuns, each with
+   "Save as profile". This is where Dean finds **"TAA baseline · Aug 27 – Oct 7 · 40 flights"**.
+   - Excluded/test flights and runs with n<2 are listed but greyed.
+5. **Auto-safety:** applying any profile first saves the current settings as a "Before <name> — <date>"
+   safety profile (keep the last 3). Nothing is ever lost.
+
+Visuals:
+- Reuse the existing card, chip and mono-number styles and the theme tokens (--bg2 / --sep / --acc /
+  --ink*).
+- One new nav item. No new chart libraries.
+
+### 5. ⭐ ABRP Suggested: data-backed, honest, low-maintenance
+- **Base:** the historical settings run with the best smoothness that is well-sampled (n ≥ 8,
+  non-excluded) and kept peak VRAM under 92%. Ranking:
+  - Per-aircraft-normalized felt/hr, then P99, compared within the same aircraft where both runs have
+    flights.
+  - This is the aircraft-mix honesty rule: Aug–Oct was Citation X-heavy. A run is only ranked against
+    another on aircraft both have flown, otherwise it's marked "aircraft mix differs".
+  - **Today that resolves to the Aug 27 – Oct 7 TAA run.**
+- **Adjustments:** only per-setting changes with real evidence. A change is folded in only if a Settings
+  A/B card with n ≥ 2 per side found it FREE or SAVES, beyond the ±1σ noise band.
+  - Today: Rocks 0→1 (Oct 30 run, n=5, no measurable cost) appears as "candidate — collecting".
+  - Textures High: n=2, collecting. VRAM was 94% at EGLL.
+- **Why? panel:** one line per decision, e.g. "Base: TAA run, 40 flights, P99 17.7, 7.6 felt/hr".
+  Confidence: **High** (n ≥ 15) / **Medium** / **Preliminary**.
+- **Re-evaluated automatically** whenever profiles opens (pure computation over existing data). No
+  scheduling, nothing to maintain.
+- **Sim-update awareness:** if the newest sim_version's flights on a profile are worse than its earlier
+  flights beyond noise (same machinery as the drift banner), the card says "Sim 1.9.x changed this
+  profile's performance — suggestion re-checks as you fly". It does **not** auto-switch anything.
+- It's a profile like any other (Apply / Duplicate). It never applies itself.
+
+### 6. Ideas folded in (small, worth it)
+- **Undo** after every apply, plus auto-safety snapshots.
+- **"Matches current"** detection, so Dean always knows which profile he's on.
+- **Per-profile performance** pulled from logged flights (exact match on values), so each profile carries
+  its own track record.
+- **Unknown keys after a sim update:** keys in a profile but missing from the file are skipped and listed
+  ("2 settings no longer exist after the sim update"); new keys in the file are left alone.
+- Logged, not built: an aircraft/airport-aware nudge ("heavy hub → your Medium-textures profile").
+  That's a follow-up once profiles exist.
+
+## Files
+- NEW: `perf/native/usercfg_schema.js`, `perf/native/profiles.js`, `tests/test_sim_profiles.js`.
+- Edit:
+  - `perf/native/gfx_watch.js` (re-export the schema labels; no behaviour change)
+  - `perf/native/capture.js` (extra Video keys)
+  - `main.js` (6 IPCs, SETUP_FILES)
+  - `preload.js`
+  - `index.html` (nav item, pane, renderers)
+  - version v6.27.0 in package.json, index.html ×3 and the README changelog plus a guide section
+  - roadmap/memory; `node tools\sync-notes.js`
+
+## Build order
+1. **Calibration first:** Dean sends the in-sim page screenshots. Map every key and lock the schema.
+2. Schema + profiles.js + desk tests (round-trip on a COPY of Dean's real UserCfg).
+3. IPCs + apply/verify/undo, tested against a copied file in the scratch area, never the live file.
+4. The tab UI.
+5. Suggested engine.
+6. Surface verification (below), full test board, commit/push, then Dean runs release.bat.
+
+## Verification (as the user, not just the code)
+- **Desk tests (tests/test_sim_profiles.js):**
+  - readProfileable ↔ applyToText round-trip on a copy of the real UserCfg: unchanged keys stay
+    byte-identical; VR, display and InstalledPackagesPath are untouched.
+  - Texture inverted label; 6-decimal float formatting; enum words.
+  - Skip-missing-key; matches() ignores TLOD/OLOD.
+  - historyRuns on Dean's real Sessions **finds the Aug 27 – Oct 7 run with n=40**.
+  - Building a profile from that run reproduces the Oct 7 snapshot values exactly.
+  - The suggestion picks that run today; confidence High.
+- **Real-renderer surface test** (test_777_surfaces.js pattern):
+  - Render the tab from Dean's real config/data.
+  - Assert the current strip, the Suggested card + Why lines, a history row reading "Aug 27 – Oct 7 · 40
+    flights", the expanded diff rows showing "Textures 1 · High → 2 · Medium", and the Apply confirm text.
+- **Live apply test on a scratch COPY of UserCfg** (path override): apply the baseline, verify all keys,
+  undo, and confirm the file is byte-identical to the original.
+  - The MSFS-running guard is tested by faking isMsfsRunning.
+- **Dean's real check (only he can do it):**
+  - Close MSFS → Sim Profiles → apply "TAA baseline".
+  - Launch MSFS → the graphics page shows the baseline values.
+  - Fly → the Settings A/B card and the profile's track record pick it up.
+
 # v6.26.2 — Dead CPU counters: blank not 0%, auto-restart typeperf (Dean 2026-11-06)
 > ✅ BUILT (awaiting release.bat). EHAM-LOWW (first flight on sim 1.9.24): typeperf returned \Processor(_Total)=0 + a phantom constant gameoverlayui64 ~30% for all 6,668 s; first time in 20 flights; counters fine right after. telemetry.js: blank→null (no coercion to 0), sys CPU <2% while MSFS runs = dead sample → CPU + top proc blank (RAM kept); 30 dead s in a row → kill + respawn typeperf (stale-output guard, max 5/session) + one log line. test_telemetry_cpu.js 26/26 (old "all-idle = 0%" expectation flipped to blank); real sampler verified live. Port flood: Dean needs Proton daily → will close it manually before flights; ABRP auto-close rejected (client-only kill leaves the tunnel services up; Proton→port→qbPortWeaver ordering).
 

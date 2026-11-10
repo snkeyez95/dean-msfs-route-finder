@@ -73,6 +73,14 @@ The app's measurement lab, and it works in plain English:
 
 Also here: **Compare** (group your flights by sim version, GPU driver, aircraft, or TLOD and see if the numbers actually moved) and **CapFrameX** export.
 
+### Sim Profiles
+Save your MSFS graphics settings as named profiles and switch between them in one click (sim closed).
+- **Your sim right now:** what MSFS is set to, and which saved profile it matches. **＋ Save as profile** stores it.
+- **⭐ ABRP Suggested:** built from your own flight logs. It picks the setup you've flown most smoothly (scored per aircraft, so a run of light-aircraft flights can't flatter it), keeps only changes your later flights proved free, and explains every decision under *Why this profile?* It recalculates each time you open the page and never applies itself.
+- **My profiles:** click a card to see what's inside, laid out like the sim's own menu, with the raw number next to every label. By default it shows only what differs from your sim now, marked ▲ more / ▼ less. **Apply…** lists every change before anything is written.
+- **From your flight history:** every stretch of flights you flew on the same settings, rebuilt from what each flight logged, with its smoothness record. Your pre-DLSS TAA baseline (Aug 27 – Oct 7) is in here.
+- **Safe by design:** ABRP only applies while MSFS is closed. It backs up your settings file first, checks every value after writing, keeps an automatic backup of what you had, and offers one-click **Undo**. Your display, window and VR settings are never touched. TLOD/OLOD are left to AutoFPS unless you tick the box.
+
 ### Live ATC (VATSIM frequency helper)
 For VATSIM flying. It answers the one question that trips people up — *"which frequency should I be on right now?"* — and loads the answer into your standby radio with one click.
 
@@ -107,6 +115,8 @@ Five practical tools: **Export/Import My Setup** (your whole configuration as on
 **Added new scenery?** — My Airports → Scan Now. New airports are matched, GSX profiles bundled inside them install (or update) automatically, and routes for them appear in Plan a Flight immediately.
 
 **Fly a VATSIM flight** — save your CID once in Settings → VATSIM (optional but recommended). Open **Live ATC** → toggle **Live mode** before you connect with vPilot → the Route briefing shows your frequency stack for the whole flight. In the air, ABRP recommends the frequency for each phase and loads it to your COM1 standby on one click; you swap when ready. Prefer it hands-off? Turn on *auto-start with vPilot* so opening your pilot client turns the helper on for you.
+
+**Go back to a setup that worked** — Sim Profiles → *From your flight history* → open the stretch you liked → **Apply…** (sim closed). Or apply **⭐ ABRP Suggested**. Changed your mind? **Undo**.
 
 **Moving to a new PC** — Maintenance → 📋 Export My Setup on the old machine; install ABRP on the new one; 📂 Import Setup. Flight logs are separate (they're big) — copy `%APPDATA%\A Better Route Planner\Sessions\` if you want the history along.
 
@@ -301,6 +311,7 @@ Key log prefixes:
 ## Changelog
 
 ```
+v6.27.0 NEW: SIM PROFILES (new left-menu tab). Save your MSFS graphics settings as named profiles and switch between them in one click while the sim is closed. Every card opens into the sim's own menu layout with the raw stored number beside each label. A new settings dictionary fixes inverted scales like Texture 1 = High / 2 = Medium for good, and unverified labels show the number only. "From your flight history" rebuilds every past setup from your per-flight logs with its smoothness record, including your pre-DLSS TAA baseline (Aug 27 – Oct 7). "⭐ ABRP Suggested" picks your smoothest well-flown setup, scored per aircraft, adds only changes your flights proved free, and explains why. Apply backs up first, verifies every value, keeps an automatic backup and offers one-click Undo. It never touches display/window/VR settings and leaves TLOD/OLOD to AutoFPS unless asked. Captures now also log sharpening, exposure, Reflex and the DLSS/FSR mode so future setups rebuild completely. Profiles are included in Export My Setup.
 v6.26.2 FIXED: CPU READINGS THAT GO DEAD MID-FLIGHT. Windows' CPU counters occasionally stop reporting during a session (EHAM-LOWW logged 0% system CPU and a phantom top process for the whole flight). ABRP now records those seconds as blank instead of a fake 0%, restarts the reader after 30 seconds of dead readings (it normally recovers), and writes one warning line in the capture log. Smoothness, VRAM and landing data were never affected.
 
 v6.26.1 FIXED: GATE BLIP NO LONGER ERASES A TAXI OR INVENTS A BOUNCE. When the sim briefly reads "not on ground" for a second while you are parked or taxiing (a GSX, jetway or shutdown jolt), the flight log used to treat it as a takeoff: the arrival (or departure) taxi was dropped from the phase breakdown, and the landing card counted a bounce that never happened. Short blips under 10 seconds are now ignored, and a bounce only counts if you leave the runway again within 15 seconds of touchdown. Past flights are corrected automatically on first launch (Oct 30 LOWW-LGKR gets its arrival taxi back and "no bounce"; Oct 23 EDDM-EDDB gets its full departure taxi); original logs are never edited.

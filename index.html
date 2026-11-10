@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.26.2</div>
+  <div class="tname">A Better Route Planner &mdash; v6.27.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.26.2</div>
+    <div class="sb-ver">v6.27.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -406,6 +406,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
     <div class="sb-item" data-tab="addons" onclick="sw('addons')"><span class="sb-ic">&#128279;</span> Aircraft &amp; Util</div>
     <div class="sb-item" data-tab="companions" onclick="sw('companions')"><span class="sb-ic">&#9654;</span> Companion Apps</div>
     <div class="sb-item" data-tab="perf" onclick="sw('perf')"><span class="sb-ic">&#128202;</span> Performance</div>
+    <div class="sb-item" data-tab="profiles" onclick="sw('profiles')"><span class="sb-ic">&#127899;</span> Sim Profiles</div>
     <div class="sb-item" data-tab="liveatc" onclick="sw('liveatc')"><span class="sb-ic">&#128251;</span> Live ATC</div>
     <div class="sb-item" data-tab="settings" onclick="sw('settings')"><span class="sb-ic">&#9881;</span> Settings</div>
     <div class="sb-item" data-tab="maintenance" onclick="sw('maintenance')"><span class="sb-ic">&#128295;</span> Maintenance</div>
@@ -947,6 +948,12 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Performance</div>
   <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Your MSFS smoothness logs &mdash; TLOD/OLOD test flights captured by the performance logger.</div>
   <div id="perf-body"><div style="font-size:13px;color:var(--ink3)">Loading&hellip;</div></div>
+</div></div>
+<!-- ── SIM PROFILES (v6.27.0) ── -->
+<div class="pane" id="pane-profiles"><div class="scroll">
+  <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Sim Profiles</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Save your MSFS graphics settings as named profiles and switch between them. ABRP changes only the sim&rsquo;s graphics and upscaling settings, never your display, window or VR setup, and only while the sim is closed.</div>
+  <div id="prof-body"><div style="font-size:13px;color:var(--ink3)">Loading&hellip;</div></div>
 </div></div>
 <div class="pane" id="pane-liveatc"><div class="scroll">
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Live ATC <span style="font-size:11px;color:var(--ink3);font-weight:400">&middot; VATSIM frequency helper</span></div>
@@ -1567,9 +1574,233 @@ function sw(t){
   if(t==='addons')renderAddonsPane();
   if(t==='companions')renderCompanionsPane();
   if(t==='perf')renderPerfPane();
+  if(t==='profiles')renderProfilesPane();
   if(t==='settings'){renderFlightApps();enhanceSettingsSections();renderVatsimSettings();renderDisplayResSettings();}
   if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();renderBackupPanel();}
   if(t==='liveatc')renderLiveAtc();
+}
+
+// ── SIM PROFILES (v6.27.0) ───────────────────────────────────────────────────
+// Named copies of the sim's graphics settings. Data + all file writes come from main.js
+// (profiles-*); labels come from usercfg_schema.js via _SP.schema — the renderer never declares its
+// own number→word maps. Colour-blind safe: every change is marked ▲ more / ▼ less in words.
+let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;
+function _spK(id){ return _SP&&_SP._keys&&_SP._keys[id]; }
+function _spEq(a,b){ if(a==null||b==null)return false; if(typeof a==='number'||typeof b==='number')return Math.abs(Number(a)-Number(b))<1e-6; return String(a).toUpperCase()===String(b).toUpperCase(); }
+function _spDisp(k,v){
+  if(v==null||v==='')return '—'; if(!k)return String(v);
+  const L=k.labels||{};
+  switch(k.type){
+    case 'word': return L[String(v).toUpperCase()]||String(v);
+    case 'enum': { const w=L[v]; if(!w||k.calib==='unverified')return String(v)+(k.calib==='unverified'?' · unverified':''); return v+' · '+w; }
+    case 'lod': return String(Math.round(Number(v)*100));
+    case 'pct': return Math.round(Number(v)*100)+'%';
+    case 'mult': return (Math.trunc(Number(v))+1)+'× frames';
+    default: return String(v)+(k.suffix||'')+(k.calib==='unverified'?' · unverified':'');
+  }
+}
+function _spDir(k,a,b){
+  if(!k||a==null||b==null||_spEq(a,b)||k.calib==='unverified')return null;
+  if(k.type==='enum'&&k.labels) return (k.inverted?Number(b)<Number(a):Number(b)>Number(a))?'up':'down';
+  if(k.type==='lod'||k.type==='pct'||k.type==='mult'||k.more) return Number(b)>Number(a)?'up':'down';
+  return null;
+}
+function _spDirTag(d){ return d==='up'?'<span style="color:var(--blu);font-weight:700" title="more quality / more load">▲ more</span>'
+  :d==='down'?'<span style="color:var(--acc);font-weight:700" title="less quality / less load">▼ less</span>'
+  :'<span style="color:var(--ink3)" title="direction not known for this setting">changed</span>'; }
+function _spMatches(values,cur){
+  if(!values||!cur)return false; let n=0;
+  for(const id of Object.keys(values)){ const k=_spK(id); if(!k||k.lod||!(id in cur))continue; if(!_spEq(values[id],cur[id]))return false; n++; }
+  return n>0;
+}
+function _spDiff(values,cur,lod){
+  const out=[]; if(!values||!cur)return out;
+  for(const k of _SP.schema.keys){ if(k.lod&&!lod)continue; if(!(k.id in values)||!(k.id in cur))continue;
+    if(!_spEq(values[k.id],cur[k.id]))out.push({k,from:cur[k.id],to:values[k.id],dir:_spDir(k,cur[k.id],values[k.id])}); }
+  return out;
+}
+function _spChips(v){
+  const ids=['Video/AntiAliasing','Video/PrimaryScaling','Graphics/Texture/Quality','Graphics/VolumetricClouds/Quality','Video/FrameGeneration'];
+  const pre={ 'Graphics/Texture/Quality':'Textures ', 'Graphics/VolumetricClouds/Quality':'Clouds ', 'Video/PrimaryScaling':'Scale ' };
+  return ids.filter(id=>v&&v[id]!=null).map(id=>{ const k=_spK(id); let d=_spDisp(k,v[id]); if(d.includes(' · '))d=d.split(' · ')[1];
+    if(id==='Video/AntiAliasing'&&/^DLSS$/i.test(v[id])&&v['Video/DLSSMode']!=null)d+=' '+_spDisp(_spK('Video/DLSSMode'),v['Video/DLSSMode']);
+    return '<span style="font-size:10.5px;font-family:\'JetBrains Mono\',monospace;color:var(--ink2);background:var(--bg3);border:1px solid var(--sep);border-radius:5px;padding:2px 7px">'+esc((pre[id]||'')+d)+'</span>'; }).join(' ');
+}
+function _spTrack(t){
+  if(!t||!t.n)return '<span style="color:var(--ink3)">Not flown yet</span>';
+  const vp=(t.vram&&t.vramTotal)?(' · video memory '+Math.round(t.vram/t.vramTotal*100)+'%'):'';
+  return 'Flown '+t.n+'× · P99 '+(t.p99!=null?Number(t.p99).toFixed(1):'—')+' ms · '+(t.feltHr!=null?t.feltHr:'—')+' felt stutters/hr'+vp;
+}
+async function renderProfilesPane(){
+  const body=document.getElementById('prof-body'); if(!body)return;
+  let r=null; try{ r=await window.api.profilesList(); }catch(e){ r={ok:false,msg:e.message}; }
+  if(!r||!r.ok){ body.innerHTML='<div class="api-pan" style="color:var(--red)">Couldn&rsquo;t load profiles: '+esc((r&&r.msg)||'unknown error')+'</div>'; return; }
+  _SP=r; _SP._keys={}; for(const k of r.schema.keys)_SP._keys[k.id]=k;
+  _spRender();
+}
+function profilesRange(a,b){
+  const f=s=>{ const d=new Date(String(s).slice(0,10)+'T12:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+  return (a&&b&&String(a).slice(0,10)!==String(b).slice(0,10))?(f(a)+' – '+f(b)):f(a||b);
+}
+function _spSection(t,sub){ return '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:18px 0 8px">'+t+(sub?' <span style="text-transform:none;letter-spacing:0">'+sub+'</span>':'')+'</div>'; }
+function _spRender(){
+  const body=document.getElementById('prof-body'); if(!body||!_SP)return;
+  const cur=_SP.current, mine=_SP.profiles.filter(p=>p.source!=='safety').slice().reverse(), safety=_SP.profiles.filter(p=>p.source==='safety').slice().reverse();
+  let h='';
+  if(_spMsg) h+='<div id="sp-msg" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:'+(_spMsg.ok?'var(--blu2)':'var(--red2)')+';border:1px solid '+(_spMsg.ok?'var(--blu)':'var(--red)')+';border-radius:var(--r2);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink1)">'
+    +'<span style="flex:1">'+(_spMsg.ok?'✓ ':'⚠ ')+esc(_spMsg.text)+'</span>'
+    +(_spMsg.undo&&_SP.lastApply?'<button class="btn bg bxs" onclick="spUndo()">↶ Undo</button>':'')
+    +'<button class="btn bg bxs" onclick="_spMsg=null;_spRender()">✕</button></div>';
+  // 1 · what the sim is set to right now
+  const curMatch=cur?mine.filter(p=>_spMatches(p.values,cur)).map(p=>p.name):[];
+  h+='<div class="api-pan" style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:260px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:5px">Your sim right now</div>';
+  if(!_SP.found) h+='<div style="font-size:13px;color:var(--red)">Couldn&rsquo;t find your MSFS settings file (UserCfg.opt).</div>';
+  else h+='<div id="sp-current-name" style="font-size:15px;font-weight:600;color:var(--ink0);margin-bottom:6px">'+esc(_SP.currentName||'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+_spChips(cur)+'</div>'
+    +'<div id="sp-current-match" style="font-size:12px;color:var(--ink3);margin-top:7px">'+(curMatch.length?('✓ Matches your profile <b style="color:var(--ink1)">'+esc(curMatch[0])+'</b>'):'Not saved as a profile yet.')+'</div>';
+  h+='</div>'+(_SP.found?'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spSave(\'captured\')">＋ Save as profile</button>':'')+'</div>';
+  if(_SP.simRunning) h+='<div id="sp-simrunning" style="background:var(--acc3);border:1px solid var(--acc2);border-radius:var(--r2);padding:9px 14px;margin:-4px 0 14px;font-size:12.5px;color:var(--acc)">⏸ MSFS is running. You can browse and save, but profiles apply only when the sim is closed (it reads its settings at launch and overwrites them when it exits).</div>';
+  if(_SP.lastApply&&!(_spMsg&&_spMsg.undo)) h+='<div style="font-size:12px;color:var(--ink3);margin:-4px 0 12px">Last applied: <b style="color:var(--ink1)">'+esc(_SP.lastApply.name)+'</b> · <span style="color:var(--blu);cursor:pointer" onclick="spUndo()">↶ Undo</span></div>';
+  // 2 · ABRP Suggested
+  h+=_spSuggestedCard();
+  // 3 · my profiles
+  h+=_spSection('My profiles');
+  if(!mine.length) h+='<div style="font-size:13px;color:var(--ink3);margin-bottom:12px">No profiles yet. Save your current settings above, or rebuild a past setup from your flight history below.</div>';
+  for(const p of mine) h+=_spCard({key:p.id,id:p.id,kind:'profile',name:p.name,note:p.note,values:p.values,track:p.track});
+  // 4 · rebuilt from flight history
+  const runs=(_SP.runs||[]).slice().reverse();
+  h+='<div style="margin:18px 0 8px;cursor:pointer" onclick="_spShowRuns=!_spShowRuns;_spRender()"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">'+(_spShowRuns?'▾':'▸')+' From your flight history</span>'
+    +' <span style="font-size:11px;color:var(--ink3)">— '+runs.length+' past setups, rebuilt from what each flight logged</span></div>';
+  if(_spShowRuns){
+    h+='<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:10px">Each row is a stretch of flights flown on the same settings, newest first. Sharpening, exposure, Reflex and the DLSS/FSR mode weren&rsquo;t logged before v6.27.0, so applying an older setup leaves those as they are now.</div>';
+    for(const r of runs) h+=_spCard({key:r.id,id:r.id,kind:'run',name:r.name,values:r.values,track:{n:r.n,p99:r.p99,feltHr:r.feltHr,vram:r.vram,vramTotal:r.vramTotal},
+      sub:esc(profilesRange(r.first,r.last))+' · '+r.n+' flight'+(r.n===1?'':'s')+(r.total>r.n?(' (+'+(r.total-r.n)+' excluded)'):''), dim:r.n<2});
+  }
+  // 5 · automatic backups made before each apply
+  if(safety.length){
+    h+='<div style="margin:18px 0 8px;cursor:pointer" onclick="_spShowSafety=!_spShowSafety;_spRender()"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">'+(_spShowSafety?'▾':'▸')+' Automatic backups</span> <span style="font-size:11px;color:var(--ink3)">— your settings as they were before each apply (last '+safety.length+')</span></div>';
+    if(_spShowSafety) for(const p of safety) h+=_spCard({key:p.id,id:p.id,kind:'safety',name:p.name,note:p.note,values:p.values,track:p.track});
+  }
+  body.innerHTML=h;
+  if(_spRenaming){ const el=document.getElementById('sp-rename-'+_spRenaming); if(el){ el.focus(); el.select(); } }
+}
+function _spSuggestedCard(){
+  const sg=_SP.suggestion;
+  let h=_spSection('⭐ ABRP Suggested');
+  if(!sg||!sg.ok) return h+'<div class="api-pan" style="font-size:13px;color:var(--ink3)">'+esc((sg&&sg.reason)||'Not enough flight data yet.')+'</div>';
+  const why=!!_spOpen.__why, confC=sg.confidence==='High'?'var(--blu)':'var(--acc)';
+  let extra='<div style="margin:2px 0 10px"><span id="sp-why-toggle" style="cursor:pointer;font-size:12.5px;color:var(--blu)" onclick="event.stopPropagation();_spOpen.__why=!_spOpen.__why;_spRender()">'+(why?'▾':'▸')+' Why this profile?</span></div>';
+  if(why){
+    extra+='<div id="sp-why" style="background:var(--bg3);border:1px solid var(--sep);border-radius:var(--r2);padding:10px 14px;margin-bottom:10px">'
+      +sg.reasons.map(t=>'<div style="font-size:12.5px;color:var(--ink1);line-height:1.6;padding:2px 0">• '+esc(t)+'</div>').join('')
+      +(sg.unrecorded&&sg.unrecorded.length?('<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">Not logged on those flights, so applying leaves them as they are now: '+esc(sg.unrecorded.join(', '))+'.</div>'):'')
+      +'<div style="font-size:11px;color:var(--ink3);margin-top:6px">Recomputed from your flights every time you open this page. It never applies itself.</div></div>';
+  }
+  return h+_spCard({key:'suggested',id:'suggested',kind:'suggested',name:sg.name,values:sg.values,
+    track:{n:sg.base.n,p99:sg.base.p99,feltHr:sg.base.feltHr},
+    sub:'<span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:'+confC+';border:1px solid '+confC+';border-radius:5px;padding:1px 7px">'+esc(String(sg.confidence).toUpperCase())+' CONFIDENCE</span> &nbsp;based on your '+esc(profilesRange(sg.base.first,sg.base.last))+' setup',
+    extra, accent:true});
+}
+function _spCard(o){
+  const cur=_SP.current, open=!!_spOpen[o.key], isCur=cur&&_spMatches(o.values,cur);
+  const d=_spDiff(o.values,cur,false);
+  let h='<div class="sp-card" data-key="'+esc(o.key)+'" style="background:var(--bg2);border:1px solid '+(o.accent?'var(--blu)':'var(--sep)')+';border-radius:var(--r);margin-bottom:10px;overflow:hidden'+(o.dim?';opacity:.6':'')+'">';
+  h+='<div class="sp-head" style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:12px 16px;cursor:pointer" onclick="spToggle(\''+o.key+'\')">'
+    +'<span style="color:var(--ink3);font-size:12px;width:10px;padding-top:2px">'+(open?'▾':'▸')+'</span><div style="flex:1;min-width:220px">';
+  if(_spRenaming===o.key) h+='<input id="sp-rename-'+o.key+'" value="'+esc(o.name)+'" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\')this.blur();if(event.key===\'Escape\'){_spRenaming=null;_spRender()}" onblur="spRenameSave(\''+o.key+'\',this.value)" style="font-size:14px;font-weight:600;background:var(--bg3);color:var(--ink0);border:1px solid var(--acc);border-radius:6px;padding:4px 8px;width:100%">';
+  else h+='<div class="sp-name" style="font-size:14px;font-weight:600;color:var(--ink0)">'+(o.accent?'⭐ ':'')+esc(o.name)
+    +(isCur?' <span class="sp-cur" style="font-size:10px;font-weight:700;color:var(--blu);border:1px solid var(--blu);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:2px">✓ CURRENT</span>':'')+'</div>';
+  if(o.sub) h+='<div style="font-size:11.5px;color:var(--ink3);margin-top:4px">'+o.sub+'</div>';
+  h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">'+_spChips(o.values)+'</div>'
+    +'<div class="sp-track" style="font-size:11.5px;color:var(--ink2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">'+_spTrack(o.track)+'</div></div>'
+    +'<div style="font-size:11.5px;color:var(--ink3);text-align:right;padding-top:2px">'+(cur?(isCur?'matches your sim':(d.length+' setting'+(d.length===1?'':'s')+' differ'+(d.length===1?'s':''))):'')+'</div></div>';
+  if(open){
+    h+='<div class="sp-body" style="border-top:1px solid var(--sep);padding:12px 16px">';
+    if(o.extra) h+=o.extra;
+    if(o.note) h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">'+esc(o.note)+'</div>';
+    h+='<label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);margin-bottom:6px;cursor:pointer">'
+      +'<input type="checkbox" '+(_spDiffOnly?'checked':'')+' onchange="_spDiffOnly=this.checked;_spRender()"> Only show what differs from your sim now</label>';
+    h+=_spSettingsTable(o.values,cur);
+    if(_spConfirm===o.key){
+      const lodDiff=_spDiff(o.values,cur,true).filter(x=>x.k.lod);
+      h+='<div class="sp-confirm" style="background:var(--acc3);border:1px solid var(--acc);border-radius:var(--r2);padding:12px 14px;margin-top:12px">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--ink0);margin-bottom:6px">Apply &ldquo;'+esc(o.name)+'&rdquo;? '+(d.length?(d.length+' setting'+(d.length===1?'':'s')+' will change:'):'')+'</div>'
+        +'<div style="font-size:12px;color:var(--ink1);line-height:1.7;max-height:240px;overflow:auto;margin-bottom:8px">'
+        +(d.length?d.map(x=>esc(x.k.label)+': '+esc(_spDisp(x.k,x.from))+' → <b>'+esc(_spDisp(x.k,x.to))+'</b> '+_spDirTag(x.dir)).join('<br>'):'Nothing: your sim already matches.')+'</div>'
+        +(lodDiff.length?('<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);margin-bottom:8px"><input type="checkbox" id="sp-lod"> Also set '+lodDiff.map(x=>esc(x.k.label)+' '+esc(_spDisp(x.k,x.from))+' → '+esc(_spDisp(x.k,x.to))).join(', ')+'. Usually leave off: AutoFPS sets these in flight.</label>'):'')
+        +'<div style="font-size:11.5px;color:var(--ink3);margin-bottom:10px">ABRP backs up your settings file first and keeps your current settings as an automatic backup. One click undoes it.</div>'
+        +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(d.length||lodDiff.length?'':'disabled')+' onclick="spApply(\''+o.id+'\')">Apply</button> '
+        +'<button class="btn bg bsm" onclick="_spConfirm=null;_spRender()">Cancel</button></div>';
+    } else {
+      h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+        +'<button class="btn bsm sp-apply" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled title="Close MSFS first"':'')+' onclick="_spConfirm=\''+o.key+'\';_spRender()">Apply…</button>';
+      if(o.kind==='profile'||o.kind==='safety') h+='<button class="btn bg bsm" onclick="_spRenaming=\''+o.key+'\';_spRender()">Rename</button>';
+      if(o.kind==='profile') h+='<button class="btn bg bsm" onclick="spSave(\'copy\',\''+o.id+'\')">Duplicate</button>';
+      if(o.kind==='run') h+='<button class="btn bg bsm" onclick="spSave(\'history\',\''+o.id+'\')">＋ Save as profile</button>';
+      if(o.kind==='suggested') h+='<button class="btn bg bsm" onclick="spSave(\'suggested\')">＋ Save a copy</button>';
+      if(o.kind==='profile'||o.kind==='safety') h+='<button class="btn bg bsm" style="margin-left:auto;color:var(--red)" onclick="spDelete(\''+o.id+'\')">Delete</button>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  return h+'</div>';
+}
+function _spSettingsTable(values,cur){
+  const keys=_SP.schema.keys, pages=_SP.schema.pages;
+  let h='', shown=0;
+  for(const pg of pages){
+    // differences view leaves out TLOD/OLOD: AutoFPS sets them in flight and Apply skips them unless ticked
+    const rows=keys.filter(k=>k.page===pg&&(k.id in values)).filter(k=>!_spDiffOnly||!cur||(!k.lod&&k.id in cur&&!_spEq(values[k.id],cur[k.id])));
+    if(!rows.length)continue;
+    h+='<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:10px 0 4px">'+esc(pg)+'</div>'
+      +'<div style="border:1px solid var(--sep);border-radius:var(--r3);overflow:hidden">';
+    let first=true;
+    for(const k of rows){
+      shown++;
+      const v=values[k.id], c=cur?cur[k.id]:null, differs=cur&&(k.id in cur)&&!_spEq(v,c);
+      const cal=k.calib==='inferred'?' <span title="Label from published references; not yet checked against your in-sim menu" style="color:var(--ink3);cursor:help">≈</span>':'';
+      h+='<div class="sp-row" style="display:flex;align-items:center;gap:10px;padding:6px 10px;'+(first?'':'border-top:1px solid var(--sep);')+'font-size:12.5px'+(differs?';background:var(--acc3)':'')+'">'
+        +'<div style="flex:1;color:var(--ink1)'+(differs?';font-weight:600':'')+'">'+esc(k.label)+cal+(k.lod?' <span style="font-size:10px;color:var(--ink3)">(AutoFPS sets this in flight)</span>':'')+'</div>'
+        +(differs?('<div style="font-family:\'JetBrains Mono\',monospace;font-size:11.5px;color:var(--ink3)">now '+esc(_spDisp(k,c))+' →</div>'):'')
+        +'<div class="sp-val" style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--ink0);min-width:110px;text-align:right'+(differs?';font-weight:700':'')+'">'+esc(_spDisp(k,v))+'</div>'
+        +(differs?('<div style="min-width:62px;font-size:11px">'+_spDirTag(_spDir(k,c,v))+'</div>'):'')+'</div>';
+      first=false;
+    }
+    h+='</div>';
+  }
+  if(!shown) h+='<div style="font-size:12.5px;color:var(--ink3);padding:6px 0">'+(_spDiffOnly&&cur?'✓ Matches your sim exactly. Untick the box above to see every setting.':'No settings recorded.')+'</div>';
+  return h;
+}
+function spToggle(key){ if(_spRenaming)return; _spOpen[key]=!_spOpen[key]; if(!_spOpen[key]&&_spConfirm===key)_spConfirm=null; _spRender(); }
+function _spTop(){ const el=document.querySelector('#pane-profiles .scroll'); if(el)el.scrollTop=0; }
+async function spSave(source,id){
+  const a={source}; if(source==='history')a.runId=id; if(source==='copy')a.id=id;
+  const r=await window.api.profilesSave(a);
+  _spMsg=r&&r.ok?{ok:true,text:'Saved “'+r.profile.name+'” under My profiles. Use Rename to give it your own name.'}:{ok:false,text:(r&&r.msg)||'Save failed.'};
+  if(r&&r.ok)_spOpen[r.profile.id]=true;
+  await renderProfilesPane(); _spTop();
+}
+async function spRenameSave(id,name){
+  if(_spRenaming!==id)return; _spRenaming=null;
+  const p=_SP.profiles.find(x=>x.id===id);
+  if(p&&name&&name.trim()&&name.trim()!==p.name){ await window.api.profilesRename({id,name}); await renderProfilesPane(); } else _spRender();
+}
+async function spDelete(id){
+  const p=_SP.profiles.find(x=>x.id===id); if(!p)return;
+  if(!confirm('Delete the profile "'+p.name+'"?\n\nThis only removes the saved profile from ABRP. Your sim settings are not changed.'))return;
+  await window.api.profilesDelete({id}); delete _spOpen[id]; await renderProfilesPane();
+}
+async function spApply(id){
+  const lodEl=document.getElementById('sp-lod');
+  const r=await window.api.profilesApply({id,includeLod:!!(lodEl&&lodEl.checked)});
+  _spConfirm=null;
+  _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Apply failed.',undo:!!(r&&r.ok&&r.changed&&r.changed.length)};
+  await renderProfilesPane(); _spTop();
+}
+async function spUndo(){
+  const r=await window.api.profilesApply({undo:true});
+  _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Undo failed.'};
+  await renderProfilesPane(); _spTop();
 }
 
 // ── LEFT-NAV DRAG-TO-REORDER (Dean 2026-07-08) ───────────────────────────────
@@ -1581,7 +1812,10 @@ function applyNavOrder(){
   const order=(S.cfg&&Array.isArray(S.cfg.navOrder))?S.cfg.navOrder:null; if(!order||!order.length)return;
   const items=Array.from(nav.querySelectorAll('.sb-item')), byTab={}; items.forEach(el=>byTab[el.dataset.tab]=el);
   order.forEach(t=>{ if(byTab[t]){ nav.appendChild(byTab[t]); delete byTab[t]; } });   // saved order first
-  items.forEach(el=>{ if(byTab[el.dataset.tab]) nav.appendChild(el); });                // then any new/unsaved tabs, default order
+  // then any new/unsaved tab (one a newer version added): right after the tab it follows by default,
+  // so e.g. Sim Profiles lands under Performance instead of at the very bottom
+  items.forEach((el,i)=>{ if(!byTab[el.dataset.tab])return;
+    const prev=items[i-1]; if(prev&&prev.parentNode===nav&&!byTab[prev.dataset.tab]) prev.after(el); else nav.appendChild(el); });
 }
 function _navSaveOrder(){
   const nav=document.querySelector('.sb-nav'); if(!nav)return;
@@ -8679,5 +8913,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.26.2</div>
+  pointer-events:none;">v6.27.0</div>
 </body></html>

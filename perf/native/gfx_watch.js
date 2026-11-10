@@ -19,10 +19,13 @@
 // off is a tracked change, not a blind spot.
 const fs = require('fs'), path = require('path');
 
-const Q_LABELS = { '-1': 'Off', 0: 'Low', 1: 'Medium', 2: 'High', 3: 'Ultra' };
-const PARTICLE_LABELS = { '-1': 'Off', 0: 'Low', 1: 'High' };                    // 1=High IN-SIM CONFIRMED
-const WATER_LABELS = { 128: 'Low', 256: 'Medium', 512: 'High', 1024: 'Ultra' };  // 512=High IN-SIM CONFIRMED; rest inferred
-const ONOFF_LABELS = { 0: 'Off', 1: 'On' };   // in-sim checkbox rows (Raytraced Shadows, Displacement Mapping)
+// v6.27.0: the number→word maps now live in usercfg_schema.js (the ONE dictionary Sim Profiles uses
+// too), so the A/B view and Profiles can never show two different words for the same stored value.
+const { LABELS: SL } = require('./usercfg_schema.js');
+const Q_LABELS = Object.assign({ '-1': 'Off' }, SL.Q);
+const PARTICLE_LABELS = Object.assign({ '-1': 'Off' }, SL.PARTICLES);            // 1=High IN-SIM CONFIRMED
+const WATER_LABELS = SL.WATER;                                                     // 512=High IN-SIM CONFIRMED
+const ONOFF_LABELS = SL.ONOFF;   // in-sim checkbox rows (Raytraced Shadows, Displacement Mapping)
 
 // The watch list (Dean-scoped 2026-07-14, from his REAL UserCfg): GPU-work levers that don't feed
 // VRAM. Excluded deliberately: Texture (VRAM), Terrain/ObjectsLoD (machine-driven + the TLOD study),

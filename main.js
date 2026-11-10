@@ -2051,7 +2051,7 @@ ipcMain.handle('defender-change', async (_, { action, saved }) => {
 // One .zip of the three files that define an ABRP install: config.json (all settings) +
 // routeRegistry.json + routeSnapshot.json. Flight logs (Sessions, GBs) are deliberately excluded.
 // Import validates first, backs up the current files, then swaps in — reload finishes it.
-const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json','lab_state.json'];
+const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json','lab_state.json','sim_profiles.json'];
 function psq(s){ return `'${String(s).replace(/'/g,"''")}'`; }
 ipcMain.handle('setup-export', async () => {
   try {
@@ -2535,6 +2535,22 @@ ipcMain.handle('perf-lab-apply', (_, args) => {
     return r;
   } catch (e) { LOG.error('[LAB] perf-lab-apply failed: '+e.message); return { ok:false, msg:e.message }; }
 });
+
+// ── v6.27.0 SIM PROFILES ──────────────────────────────────────────────────────────────────────
+// Named, re-appliable copies of the sim's graphics settings (UserCfg.opt), stored in
+// USER_DATA/sim_profiles.json. All logic + file I/O lives in perf/native/profiles_store.js (so the
+// test suite runs the same code); these are thin IPC wrappers. Never writes while MSFS is running.
+function _profStore(){
+  return require(path.join(perfDir(), 'native', 'profiles_store.js')).createStore({
+    userData: USER_DATA, usercfgPath: USERCFG_PATH, isSimRunning: isMsfsRunning,
+    writeAtomic: writeFileAtomic, log: m => LOG.info(m) });
+}
+function _profCall(fn, a){ try { return _profStore()[fn](a); } catch (e) { LOG.error('[PROFILES] '+fn+' failed: '+e.message); return { ok:false, msg:e.message }; } }
+ipcMain.handle('profiles-list',   ()     => _profCall('list'));
+ipcMain.handle('profiles-save',   (_, a) => _profCall('save', a));
+ipcMain.handle('profiles-rename', (_, a) => _profCall('rename', a));
+ipcMain.handle('profiles-delete', (_, a) => _profCall('del', a));
+ipcMain.handle('profiles-apply',  (_, a) => _profCall('apply', a));
 
 // Capture status for the title-bar badge. v1: active = engine process running. state (armed /
 // recording) is read from a status file the engine writes when present (engine pass adds it).

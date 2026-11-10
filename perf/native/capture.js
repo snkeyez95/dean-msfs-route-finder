@@ -130,8 +130,16 @@ async function runAutoCapture(opts) {
   // avoids mid-flight settings changes; the sim only re-reads UserCfg at launch anyway).
   try {
     if (fresh.usercfg_found) {
-      const g = gfxWatch.readAllGraphics(fs.readFileSync(opts.usercfgPath, 'utf8'));
+      const ucText = fs.readFileSync(opts.usercfgPath, 'utf8');
+      const g = gfxWatch.readAllGraphics(ucText);
       if (g) {
+        // v6.27.0 SIM PROFILES: also log the rest of the rendering {Video} keys (upscaler word, DLSS/
+        // FSR mode, sharpening, exposure, Reflex, frame-gen count, limiter). Before this, a past setup
+        // could be rebuilt from history EXCEPT these. Additive: gfx_fp hashes only the watch list.
+        try {
+          const pv = require('./profiles.js').readProfileable(ucText);
+          for (const [id, val] of Object.entries(pv)) if (id.startsWith('Video/') && g[id] == null) g[id] = val;
+        } catch (_) {}
         // v6.15.8: frame generation and the FPS target live OUTSIDE the {Graphics} block, so the
         // snapshot never saw them — fold in what readSettings already parsed. Proved necessary
         // 2026-07-31: Dean's frame-gen-OFF flight fingerprinted identically to the FG-on flight

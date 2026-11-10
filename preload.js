@@ -64,6 +64,12 @@ contextBridge.exposeInMainWorld('api', {
   perfLabNext:        (a)   => ipcRenderer.invoke('perf-lab-next', a||{}),
   perfLabReport:      ()    => ipcRenderer.invoke('perf-lab-report'),
   perfLabApply:       (a)   => ipcRenderer.invoke('perf-lab-apply', a||{}),
+  // v6.27.0 Sim Profiles
+  profilesList:       ()    => ipcRenderer.invoke('profiles-list'),
+  profilesSave:       (a)   => ipcRenderer.invoke('profiles-save', a||{}),
+  profilesRename:     (a)   => ipcRenderer.invoke('profiles-rename', a||{}),
+  profilesDelete:     (a)   => ipcRenderer.invoke('profiles-delete', a||{}),
+  profilesApply:      (a)   => ipcRenderer.invoke('profiles-apply', a||{}),
   perfArchiveRaw:     ()    => ipcRenderer.invoke('perf-archive-raw'),
   dataBackupStatus:   ()    => ipcRenderer.invoke('data-backup-status'),   // v6.13.0: flight-log + settings backup
   dataBackupRun:      ()    => ipcRenderer.invoke('data-backup-run'),
