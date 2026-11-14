@@ -43,3 +43,13 @@ mismatch, layout.json can be rebuilt. NEVER edit payware packages without Dean's
 **Why it matters for Dean:** 12GB VRAM, arrival-taxi is his VRAM-peak phase; disabling Static Aircraft
 at big hubs (esp. if flying AI/online traffic, which makes scenery statics redundant) is a real VRAM
 lever. See [[dean_colorblind]] is unrelated; relevant perf context in the roadmap AutoFPS notes.
+
+**2026-11-14 per-airport disabled objects (Dean's rule: static aircraft + only items GSX Pro replaces). Scenery updates REVERT these — reapply after any update (Dean said: no ABRP feature for now):**
+- KDFW 1.0.4: statics, gse, gse_extra (inibuilds-scene\kdfw-scene-*.bgl)
+- KJFK 1.1.1: statics, gse
+- KORD 1.0.3: vdgs, gse (VDGS off because GSX Pro drives its own docking guidance)
+- KPSP 1.1.1: statics, gse
+- EGLL 1.1.1: GSE; T1 + T4 swapped to LowDetail (HD textures KEPT by Dean's choice — SD is the next lever if Heathrow VRAM stays tight)
+- LEIB 1.0.3: gse · LOWI 1.0.3: gse
+- KBFM 1.1.0 (Drzewiecki): nothing; unlisted KBFM_Static.BGL untouched (unknown contents)
+Medium items without a GSX substitute (clutter, people) stay ON. Source note: Dean uses sceneryaddons.org only as a readme reference (keeps the iniBuilds installer uninstalled).
