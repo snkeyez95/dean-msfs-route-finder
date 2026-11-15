@@ -239,10 +239,21 @@ function moveToBackup(dir, base, opts){
 // ── 4/5. Folders that hold GSX profiles but no MSFS package ────────────────────────────────────────
 // A scenery package has a manifest.json at its top (or one level down, for a wrapper like
 // "KLAS FlyTampa"). A folder with neither is not scenery — My Airports must not list it.
+// An MSFS package's manifest.json carries package_version / content_type. Plenty of other software
+// ships a manifest.json too (WebView2/Chromium component folders like "120.0.6050.0" inside a desktop
+// app in the Util folder showed up as fake utilities — v6.30.0), so the file alone isn't enough.
+// Checked against all 123 real manifests in Dean's Scenery/Aircraft/Util/Community: every one has them.
+function isMsfsPackageDir(dir){
+  let text;
+  try { text = fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'); } catch (e) { return false; }
+  text = text.replace(/^﻿/, '');
+  try { const j = JSON.parse(text); return !!(j && (j.package_version != null || j.content_type != null)); }
+  catch (e) { return /"(package_version|content_type)"\s*:/.test(text); }   // a slightly malformed real manifest
+}
 function hasPackage(dir){
   try {
-    if (fs.existsSync(path.join(dir, 'manifest.json'))) return true;
-    return fs.readdirSync(dir, { withFileTypes: true }).some(e => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'manifest.json')));
+    if (isMsfsPackageDir(dir)) return true;
+    return fs.readdirSync(dir, { withFileTypes: true }).some(e => e.isDirectory() && isMsfsPackageDir(path.join(dir, e.name)));
   } catch (e) { return false; }
 }
 // Profile-only download: no manifest anywhere in the first few levels, at least one .ini/.py.
@@ -261,5 +272,5 @@ function editionsIn(fileList){
   return by;
 }
 
-module.exports = { iniVersion, cmpVer, icaoOf, stemOf, iniMeta, placeSet, healthCheck, moveToBackup, backupDirFor,
+module.exports = { isMsfsPackageDir, iniVersion, cmpVer, icaoOf, stemOf, iniMeta, placeSet, healthCheck, moveToBackup, backupDirFor,
   hasPackage, isProfileOnly, editionsIn, ledgerAdd, ledgerIndex, removedSet, removedAdd, removedDel, walk };

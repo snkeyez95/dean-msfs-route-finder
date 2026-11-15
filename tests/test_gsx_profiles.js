@@ -99,8 +99,8 @@ try {
   ok(/not installed by ABRP/.test(egccItem.origin), 'origin says when ABRP has no record of a file');
 
   console.log('5. scenery vs GSX-download folders');
-  mk('lib/pkg/manifest.json', '{}'); mk('lib/wrap/inner/manifest.json', '{}'); mk('lib/dl/x.ini', ini(null)); mk('lib/dl/x.py', 'x');
-  mk('lib/scn-with-gsx/manifest.json', '{}'); mk('lib/scn-with-gsx/Official GSX Profile/y.ini', ini(null)); mk('lib/empty/readme.txt', 'x');
+  mk('lib/pkg/manifest.json', '{"package_version":"1.0.0","content_type":"SCENERY"}'); mk('lib/wrap/inner/manifest.json', '{"package_version":"1.0.0","content_type":"SCENERY"}'); mk('lib/dl/x.ini', ini(null)); mk('lib/dl/x.py', 'x');
+  mk('lib/scn-with-gsx/manifest.json', '{"package_version":"1.0.0","content_type":"SCENERY"}'); mk('lib/scn-with-gsx/Official GSX Profile/y.ini', ini(null)); mk('lib/empty/readme.txt', 'x');
   ok(G.hasPackage(path.join(TMP, 'lib/pkg')) && G.hasPackage(path.join(TMP, 'lib/wrap')), 'package and wrapper count as scenery');
   ok(!G.hasPackage(path.join(TMP, 'lib/dl')) && !G.hasPackage(path.join(TMP, 'lib/empty')), 'a GSX download / an empty folder is not scenery');
   ok(G.isProfileOnly(path.join(TMP, 'lib/dl')) && !G.isProfileOnly(path.join(TMP, 'lib/scn-with-gsx')) && !G.isProfileOnly(path.join(TMP, 'lib/empty')), 'profile-only download recognised; scenery that bundles a profile is not');

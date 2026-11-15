@@ -1000,9 +1000,8 @@ function pkgDefaultRoots(){
 function pkgResolveRoot(root, which){
   return (root && root.trim()) ? root.trim() : pkgDefaultRoots()[which];
 }
-function pkgIsPackageDir(dir){
-  try{ return fs.existsSync(path.join(dir, 'manifest.json')); }catch(e){ return false; }
-}
+// v6.30.0: a manifest.json with MSFS package fields — not just any manifest.json (see gsx_profiles).
+function pkgIsPackageDir(dir){ return GSXP.isMsfsPackageDir(dir); }
 
 ipcMain.handle('pkg-default-roots', () => pkgDefaultRoots());
 
@@ -1343,7 +1342,6 @@ ipcMain.handle('msfs-detect', () => {
 
 ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
   try {
-    try { displayApplyForLaunch(); } catch(_){}   // v6.21.0: set the desktop to the DLDSR res before MSFS reads it; restored on sim close
     if (version === 'store') {
       // Microsoft Store version — launch via Windows shell protocol (no storefront)
       const child = spawn('explorer.exe', ['shell:AppsFolder\\Microsoft.Limitless_8wekyb3d8bbwe!App'], {
@@ -1367,9 +1365,6 @@ ipcMain.handle('launch-msfs', (_, {version, steamExePath}) => {
   }
 });
 
-ipcMain.handle('display-list-modes', () => { try { return displayListModes(); } catch(_){ return []; } });
-ipcMain.handle('display-get-current', () => { try { return displayGetCurrent(); } catch(_){ return null; } });
-ipcMain.handle('display-restore-now', () => { try { displayRestore(); return {ok:true}; } catch(e){ return {ok:false, error:e.message}; } });
 
 ipcMain.handle('get-world-map', () => {
   try {
@@ -1649,14 +1644,18 @@ ipcMain.handle('list-running-apps', () => new Promise((resolve) => {
 // ABRP stays open through the flight, so ABRP closes the chosen apps before a capture and
 // reopens them once the sim closes (watched here). The reopen list persists to disk so a
 // catch-up on next launch can recover if ABRP/sim ended unexpectedly.
-// ── DISPLAY RESOLUTION (v6.21.0) ─────────────────────────────────────────────
+// ── DISPLAY RESOLUTION — leftover restore only ───────────────────────────────
+// v6.30.0: the "set the desktop resolution when MSFS launches" feature (v6.21.0) was removed at Dean's
+// request. Only the restore half stays: if a run of an older version left display_res.json behind
+// (desktop still at the DLDSR resolution), createWindow / before-quit put the original back. It does
+// nothing when that file doesn't exist. Notes on the original design follow.
 // Dean's DLDSR-fullscreen fix: MSFS 2024 only downsamples a DLDSR resolution in fullscreen when the
 // Windows desktop is ALREADY at that resolution. So set the desktop to the configured res before MSFS
 // launches and restore it on sim close. FAIL-SAFE by design: never applies without a successful current-
 // mode read AND a passing CDS_TEST; the change is DYNAMIC (flags=0, not written to the registry) so a
 // reboot self-reverts any stuck state. Single-monitor / primary display (Dean's setup, 2026-08-27).
 const DISPLAY_STATE = () => path.join(USER_DATA, 'display_res.json');
-let _displayWatch = null, _displayRestorePending = false;
+let _displayRestorePending = false;
 // The whole EnumDisplaySettings/ChangeDisplaySettings loop lives INSIDE C# — PowerShell's [ref]$struct
 // marshaling of DEVMODE fails with ERROR_INVALID_PARAMETER (87), which was why the picker came up empty
 // (verified on Dean's machine 2026-08-27). PS only calls the static helpers and prints their strings.
@@ -1691,37 +1690,12 @@ function _dispPs(body){
     return (r && r.stdout || '').trim();
   } catch(e){ try{LOG.warn('[DISPLAY] ps failed: '+e.message);}catch(_){} return ''; }
 }
-function displayListModes(){
-  const out = _dispPs('Write-Output ([ABRPDisp]::ListModes())');
-  const modes=[]; for(const ln of out.split(/\r?\n/)){ const m=ln.trim().match(/^(\d+)x(\d+)x(\d+)$/); if(m)modes.push({w:+m[1],h:+m[2],hz:+m[3]}); }
-  return modes;
-}
-function displayGetCurrent(){
-  const out = _dispPs('Write-Output ([ABRPDisp]::Current())');
-  const m = out.match(/(\d+)x(\d+)x(\d+)/); if(!m)return null;
-  const r={w:+m[1],h:+m[2],hz:+m[3]}; return (r.w>0&&r.h>0)?r:null;
-}
 function displaySet(w,h,hz,test){
   w=+w|0; h=+h|0; hz=+hz|0; const flag=test?2:0;   // 2 = CDS_TEST (validate only); 0 = apply dynamically (not persisted → reboot reverts)
   const out = _dispPs('Write-Output ([ABRPDisp]::SetMode('+w+','+h+','+hz+','+flag+'))');
   const m = out.match(/-?\d+/); return m?parseInt(m[0],10):-999;
 }
 // Set the desktop to the configured res before MSFS, remembering the original. No-ops safely on any failure.
-function displayApplyForLaunch(){
-  try {
-    const c = JSON.parse(fs.readFileSync(CFG,'utf8')); const dr = c.displayRes;
-    if(!dr || !dr.enabled || !(dr.w>0) || !(dr.h>0)) return;
-    const cur = displayGetCurrent();
-    if(!cur){ LOG.warn('[DISPLAY] could not read current mode — skipping'); return; }
-    if(cur.w===dr.w && cur.h===dr.h){ LOG.info('[DISPLAY] desktop already at '+dr.w+'x'+dr.h+' — no change'); return; }
-    const hz = dr.hz||cur.hz;
-    if(displaySet(dr.w,dr.h,hz,true)!==0){ LOG.warn('[DISPLAY] target '+dr.w+'x'+dr.h+'@'+hz+' failed CDS_TEST — skipping (is DLDSR still enabled?)'); return; }
-    fs.writeFileSync(DISPLAY_STATE(), JSON.stringify(cur));
-    const rc = displaySet(dr.w,dr.h,hz,false);
-    LOG.info('[DISPLAY] set '+dr.w+'x'+dr.h+'@'+hz+' (rc='+rc+'); original '+cur.w+'x'+cur.h+'@'+cur.hz+' saved for restore');
-    _displayRestorePending=true; startDisplayWatch();
-  } catch(e){ try{LOG.warn('[DISPLAY] apply failed: '+e.message);}catch(_){} }
-}
 function displayRestore(){
   try {
     const sf = DISPLAY_STATE(); if(!fs.existsSync(sf)) return;
@@ -1730,17 +1704,6 @@ function displayRestore(){
     try{ fs.unlinkSync(sf); }catch(_){}
     _displayRestorePending=false;
   } catch(e){ try{LOG.warn('[DISPLAY] restore failed: '+e.message);}catch(_){} }
-}
-function startDisplayWatch(){
-  if(_displayWatch) return;
-  let sawSim=false, ticks=0;
-  _displayWatch = setInterval(() => {
-    ticks++;
-    let up=false; try{ up=isMsfsRunning(); }catch(_){}
-    if(up){ sawSim=true; return; }
-    if(sawSim && !up){ clearInterval(_displayWatch); _displayWatch=null; if(_displayRestorePending)displayRestore(); return; }
-    if(!sawSim && ticks>=50){ clearInterval(_displayWatch); _displayWatch=null; if(_displayRestorePending){ displayRestore(); LOG.info('[DISPLAY] MSFS never launched — resolution restored'); } }   // ~5-min safety net
-  }, 6000);
 }
 
 const FLIGHT_STATE = () => path.join(USER_DATA, 'flight_closed_apps.json');

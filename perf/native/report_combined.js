@@ -179,7 +179,7 @@ function buildCombinedReport(sessions){
 <title>Performance — All Flights</title>
 <style>${A.THEME_BASE_CSS}${A.DASH_CSS}</style>
 </head>
-<body>
+<body data-dash-v="2">
   <header>
     <div>
       <div class="title">Performance — All Flights</div>
@@ -190,42 +190,47 @@ function buildCombinedReport(sessions){
     <button class="toggle" id="themeBtn" onclick="toggleTheme()">◐ Light</button>
   </header>
 
-  <div class="cards">${cardsHtml}</div>
-  ${refCardsHtml}
-
-  ${coveragePanel}
-
-  <div class="ctrls">
-    <div class="seg">
-      <button id="segCombined" class="active" onclick="setView('combined')">Combined</button>
-      <button id="segByAc" onclick="setView('byac')">By aircraft</button>
-    </div>
-    <div class="spacer" style="flex:1"></div>
-    ${refToggleHtml}
-    <span style="font-size:11px;color:var(--text-faint)">Show TLOD:</span>
-    <div class="tlodf" id="tlodFilter"></div>
-  </div>
-
-  <div class="charts">
-    <div class="panel">
-      <div class="panel-h">Avg P99 frametime by TLOD · ms (lower = smoother)</div>
-      <div class="graph-wrap"><div id="chartP99"></div></div>
-      <div class="legend" id="legP99"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-h">Avg peak VRAM by TLOD · GB (headroom to 12 GB)</div>
-      <div class="graph-wrap"><div id="chartVram"></div></div>
-      <div class="legend" id="legVram"></div>
-    </div>
-  </div>
-
-  <div class="note">${knee}</div>
-
   <table>
     <thead><tr><th>When</th><th>Aircraft</th><th>Route</th><th>Driver</th><th>TLOD</th>
       <th>P99</th><th>Stutter</th><th>VRAM peak</th><th></th></tr></thead>
     <tbody id="tbody">${rows}</tbody>
   </table>
+
+  <!-- v6.30.0 (Dean 2026-11-14): the flight table comes first — that's what gets used. The fleet cards,
+       coverage, TLOD filter and the two bar charts are folded away here, closed by default. -->
+  <details class="summ" id="fleetSummary">
+    <summary>Fleet summary &amp; TLOD charts</summary>
+    <div class="cards">${cardsHtml}</div>
+    ${refCardsHtml}
+
+    ${coveragePanel}
+
+    <div class="ctrls">
+      <div class="seg">
+        <button id="segCombined" class="active" onclick="setView('combined')">Combined</button>
+        <button id="segByAc" onclick="setView('byac')">By aircraft</button>
+      </div>
+      <div class="spacer" style="flex:1"></div>
+      ${refToggleHtml}
+      <span style="font-size:11px;color:var(--text-faint)">Show TLOD:</span>
+      <div class="tlodf" id="tlodFilter"></div>
+    </div>
+
+    <div class="charts">
+      <div class="panel">
+        <div class="panel-h">Avg P99 frametime by TLOD · ms (lower = smoother)</div>
+        <div class="graph-wrap"><div id="chartP99"></div></div>
+        <div class="legend" id="legP99"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">Avg peak VRAM by TLOD · GB (headroom to 12 GB)</div>
+        <div class="graph-wrap"><div id="chartVram"></div></div>
+        <div class="legend" id="legVram"></div>
+      </div>
+    </div>
+
+    <div class="note">${knee}</div>
+  </details>
 
 <script>var DD = ${ddJson};</script>
 <script>${A.THEME_JS}</script>

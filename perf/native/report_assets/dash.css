@@ -45,3 +45,11 @@
   .cov3 { background:rgba(91,191,91,0.18); color:var(--good); }
   .covnext { font-size:12px; color:var(--text-dim); margin-top:4px; }
   .covnote { font-size:11px; color:var(--text-faint); margin-top:6px; }
+
+/* v6.30.0: flight table first; fleet cards + TLOD charts folded below, closed by default */
+details.summ{margin-top:16px;border:1px solid var(--border);border-radius:8px;padding:0 12px}
+details.summ>summary{cursor:pointer;list-style:none;padding:10px 0;font-size:12px;font-weight:600;color:var(--text-dim);letter-spacing:.02em}
+details.summ>summary::-webkit-details-marker{display:none}
+details.summ>summary::before{content:'▸';display:inline-block;width:14px;color:var(--text-faint);transition:transform .15s}
+details.summ[open]>summary::before{transform:rotate(90deg)}
+details.summ[open]{padding-bottom:12px}

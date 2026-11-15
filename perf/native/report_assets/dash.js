@@ -58,7 +58,7 @@
       Array.prototype.forEach.call(document.querySelectorAll('#tbody tr'),function(tr){
         var t=tr.getAttribute('data-tlod');
         var isRef=tr.getAttribute('data-primary')==='0';
-        var tlodOk=(t==null||t==='n/a'||SELECTED[t]);
+        var tlodOk=(t==null||t==='n/a'||!(t in SELECTED)||SELECTED[t]);   // v6.30.0: a TLOD with no filter chip (e.g. an old TLOD-80 test) is never hidden
         tr.style.display=(tlodOk && (!isRef||SHOW_REF))?'':'none';});
     }
     window.toggleRefRows=function(on){SHOW_REF=on;render();};
@@ -75,5 +75,10 @@
       var c=document.getElementById('refCards'),b=document.getElementById('refShowBtn');
       if(c){c.style.display='none';if(b)b.style.display='';}
     }}catch(e){}
+    // v6.30.0: remember whether the folded "Fleet summary & TLOD charts" section was left open.
+    try{var fs=document.getElementById('fleetSummary');
+      if(fs){ if(localStorage.getItem('cfxSummOpen')==='1')fs.open=true;
+        fs.addEventListener('toggle',function(){try{localStorage.setItem('cfxSummOpen',fs.open?'1':'0');}catch(e){}}); }
+    }catch(e){}
     buildFilter();render();
   })();

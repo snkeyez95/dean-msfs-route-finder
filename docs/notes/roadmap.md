@@ -1,4 +1,4 @@
-# 🧹 DECLUTTER CATALOG (Dean 2026-11-14) — collect only; full debrief before ANY change
+# 🧹 DECLUTTER CATALOG (Dean 2026-11-14) — items 1–3 ✅ BUILT v6.30.0 (awaiting release.bat); new items: catalog first, debrief before change
 > Running list lives in memory abrp_declutter_catalog.md (synced to docs/notes). Items so far: (1) Performance
 > dashboard cards/charts unused — Dean only opens per-flight reports from the table; (2) Utilities list shows
 > version-number rows = WebView2/runtime folders inside desktop apps in Util mis-detected as packages (bug);

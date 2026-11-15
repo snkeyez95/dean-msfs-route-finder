@@ -28,6 +28,7 @@ const TRIM_V = 'teardown';   // marker: this sidecar carries the v6.6 teardown-c
 const PERIODIC_V = 'skip1-bridge'; // classifier version stamped into the sidecar; a change forces a one-time reclassification of every flight (v6.12.2 = dropped-spike bridging)
 const VRAM_V = 'anchor-trim-deblip';  // v6.26.1: + gate-blip debounce (a 1-s "airborne" flicker while parked no longer drops a taxi phase). Earlier marker: bump to force a one-time sidecar recompute (v6.17.0: the end trim now reproduces the capture's own brake/movement anchor instead of re-deriving it, so max/spike/perceptible + the phase split match the flight's summary)
 const PHASE_V = 'deblip';      // v6.26.1: stamped on sidecars whose phase split ignores sub-10-s ground blips — main.js prefers these taxi phases
+const DASH_V = '2';   // must match data-dash-v in report_combined.js
 const REPORT_V = 'deblip-v1'; // v6.26.1: one-time regen so the taxi rows + bounce count reflect the gate-blip fix. Earlier marker: bump to force a one-time report.html regen for ALL flights (v6.19.5: FPS chart line reads from the smoothed series instead of reciprocated per-frame spikes)
 const r2 = n => Math.round(n * 100) / 100;
 const r1 = n => Math.round(n * 10) / 10;
@@ -249,7 +250,12 @@ function runBackfill(sessionsDir, tpIcaos) {
   if (indexDirty) { try { fs.writeFileSync(path.join(sessionsDir, 'index.json'), JSON.stringify(idx, null, 2)); } catch (_) {} }
   // If any per-flight report regenerated, rebuild the dashboard too so its table reflects the same
   // builders (e.g. the AutoFPS 'dynamic TLOD' flag). combined_report.html is derived/regenerable.
-  if (reports > 0) { try { fs.writeFileSync(path.join(sessionsDir, 'combined_report.html'), buildCombinedReport(idx.sessions || [])); } catch (_) {} }
+  // v6.30.0: also rebuild once when the existing dashboard predates the current layout (DASH_V marker:
+  // flight table first, fleet cards + charts folded) — so the new layout shows without waiting for a flight.
+  let dashStale = false;
+  try { dashStale = (idx.sessions || []).length > 0 && !fs.readFileSync(path.join(sessionsDir, 'combined_report.html'), 'utf8').includes('data-dash-v="' + DASH_V + '"'); }
+  catch (_) { dashStale = (idx.sessions || []).length > 0; }
+  if (reports > 0 || dashStale) { try { fs.writeFileSync(path.join(sessionsDir, 'combined_report.html'), buildCombinedReport(idx.sessions || [])); } catch (_) {} }
   return { corrected, skipped, noData, reports };
 }
 
