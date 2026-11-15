@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-11-15T02:54:21.941Z
+  modified: 2026-11-15T02:54:33.606Z
 ---
 
 Dean 2026-11-14: he keeps finding ABRP areas he no longer needs or uses. He'll share screenshots over time;
@@ -24,6 +24,8 @@ I **catalog only**. Nothing gets changed until he asks for a full debrief, which
    the Combined/By-aircraft P99 + VRAM bar charts and the TLOD filter chips are never looked at. He scrolls
    straight to the per-flight table at the bottom and opens individual flight reports. Ties to the parked
    "Performance v7 blueprint" (FLIGHTS view first) in the roadmap.
+   **KEEP (Dean said "this is fine"):** the Performance toolbar row — Dashboard, Compare, Baseline,
+   Settings A/B, Scenery, ↗, Arm Capture, Record Now, Stop & file, CapFrameX, Show coverage.
 2. **Utilities list shows version-number rows (2026-11-14)**, e.g. 1.0.0.12, 120.0.6050.0, 73.0.0.0. Found:
    the Util folder also holds desktop apps (Nusantara Cinema, Flight Recorder, SimpleUI, FlightSimDispatch,
    GSX Profile Manager…). ABRP counts any folder holding a manifest.json as a package, and versioned
