@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.28.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.29.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.28.1</div>
+    <div class="sb-ver">v6.29.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -894,6 +894,15 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       <button class="btn bg bsm" onclick="defenderRemoveUi()">Remove exclusions</button>
     </div>
     <div id="defender-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
+  </div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-t">GSX Profile Check</div>
+    <div style="font-size:12px;color:var(--ink3);margin:8px 0 10px;font-family:'JetBrains Mono',monospace;line-height:1.6">Looks through your GSX profile folder for airports with more than one profile (an old version beside a new one, or two editions), scripts with no profile, and airports you&rsquo;ve flown with 3rd-party scenery but no profile. <b>Move to backup</b> puts a file in a folder GSX can&rsquo;t see, and Scan Now won&rsquo;t reinstall it. Close MSFS first.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn bg bsm" id="gsxh-btn" onclick="gsxHealthRun()">&#128269; Check GSX profiles</button>
+      <span id="gsxh-stamp" style="font-size:11px;color:var(--ink3);font-family:'JetBrains Mono',monospace"></span>
+    </div>
+    <div id="gsxh-result" style="font-size:12px;color:var(--ink2);font-family:'JetBrains Mono',monospace;margin-top:10px;line-height:1.6"></div>
   </div>
   <div class="api-pan" style="margin-bottom:14px">
     <div class="api-t">Aircraft WASM Cache (PMDG / Fenix)</div>
@@ -1486,7 +1495,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
         const removed=[...savedFolders].filter(f=>!newFolders.has(f));
         if(added.length||removed.length){
           S.allRows=[];S.selICAOs=new Set();
-          await procFolders(res.folders);
+          await procFolders(res.folders,res.pkgMap);   // pkgMap: keep wrapper rows (KLAS) linking their inner packages
           const n=added.length;
           setScanNote(n>0
             ?'Library updated — '+n+' new airport'+(n!==1?'s':'')+' detected'
@@ -2255,7 +2264,8 @@ function renderApts(){
 
 // ── GSX PRO PROFILES ──────────────────────────────────────────────────────────
 function gsxInstalled(icao){
-  return !!(icao && S.gsxFiles.some(f=>f.startsWith(icao.toLowerCase())));
+  // v6.29.0: needs a profile (.ini). A lone script (e.g. an orphan cyyz.py) used to show "GSX ✓".
+  return !!(icao && S.gsxFiles.some(f=>f.startsWith(icao.toLowerCase())&&f.endsWith('.ini')));
 }
 // Tag a flightsim.to search/browse link with the MSFS 2024 filter (base=msfs2024) so results skip
 // MSFS 2020 content — but only when the user is on 2024 (S.is2024). Direct /file//addon/ links (no
@@ -6415,6 +6425,74 @@ async function perfArchiveUi(){
   } else alert('Archive failed: '+((r&&r.error)||'unknown'));
 }
 
+// ── GSX Profile Check (Maintenance, v6.29.0) ─────────────────────────────────────────────────────
+// Report-only until Dean clicks "Move to backup" on a file (confirmed). Never picks for him except
+// where the answer is clear (same profile, different version numbers → suggests the newest).
+function gsxOwnedIcaos(){ return [...new Set((S.allRows||[]).filter(r=>r.icao&&r.method!=='noise').map(r=>r.icao))]; }
+async function gsxHealthRun(){
+  const out=document.getElementById('gsxh-result'), btn=document.getElementById('gsxh-btn');
+  if(!out)return;
+  if(btn)btn.disabled=true;
+  out.innerHTML='Checking&hellip;';
+  try{
+    const r=await window.api.gsxHealth({gsxFolder:S.cfg.gsxFolder||'', owned:gsxOwnedIcaos()});
+    if(!r||!r.ok){ out.innerHTML='&#9888; Check failed: '+esc((r&&r.error)||'unknown'); return; }
+    out.innerHTML=gsxHealthHtml(r);
+    const st=document.getElementById('gsxh-stamp'); if(st) st.textContent=r.fileCount+' profile files · checked '+new Date().toLocaleTimeString();
+  }catch(e){ out.innerHTML='&#9888; Check failed: '+esc(e.message); }
+  finally{ if(btn)btn.disabled=false; }
+}
+function gsxHealthHtml(r){
+  const q=s=>esc(JSON.stringify(s));   // safe inside an onclick="…" attribute
+  const mv=f=>'<button class="btn bg bsm" style="padding:2px 8px;font-size:11px" onclick="gsxHealthMove('+q(f)+')">Move to backup</button>';
+  const cell='padding:3px 8px 3px 0;vertical-align:top';
+  const n=r.duplicates.length+r.orphans.length+r.missing.length;
+  let h='';
+  if(!n) h+='<div style="color:var(--grn)">&#10003; No problems found — one profile per airport, every script has its profile, and every airport you&rsquo;ve flown with 3rd-party scenery has a GSX profile.</div>';
+  else h+='<div style="margin-bottom:8px">'+[
+      r.duplicates.length?'<b>'+r.duplicates.length+'</b> airport'+(r.duplicates.length>1?'s':'')+' with more than one profile':'',
+      r.orphans.length?'<b>'+r.orphans.length+'</b> script'+(r.orphans.length>1?'s':'')+' with no profile':'',
+      r.missing.length?'<b>'+r.missing.length+'</b> flown airport'+(r.missing.length>1?'s':'')+' with no profile':''
+    ].filter(Boolean).join(' · ')+'</div>';
+  for(const d of r.duplicates){
+    const title = d.kind==='older-version'
+      ? '&#9888; <b>'+esc(d.icao)+'</b> — older version beside the newer one. Suggest keeping <b>'+esc(d.keep)+'</b>.'
+      : '&#9888; <b>'+esc(d.icao)+'</b> — '+d.items.length+' different profiles. GSX may load any of them; keep the one you want.';
+    h+='<div style="margin-top:10px">'+title+'<table style="border-collapse:collapse;margin-top:4px;font-size:11px">';
+    for(const it of d.items){
+      const keep=d.keep&&it.file===d.keep;
+      h+='<tr><td style="'+cell+'">'+(keep?'&#10003; KEEP':'')+'</td>'
+        +'<td style="'+cell+'"><b>'+esc(it.file)+'</b>'+(it.olderThan&&!keep?'<br><span>&#9660; older version of '+esc(it.olderThan)+'</span>':'')+(it.scripts.length?'<br><span style="color:var(--ink3)">+ '+it.scripts.map(esc).join(', ')+'</span>':'')+'</td>'
+        +'<td style="'+cell+'">'+(it.version?'v'+esc(it.version):'no version')+'</td>'
+        +'<td style="'+cell+'">'+esc(it.creator||'')+'</td>'
+        +'<td style="'+cell+'">'+esc(it.date)+'</td>'
+        +'<td style="'+cell+';color:var(--ink3)">'+esc(it.origin)+'</td>'
+        +'<td style="'+cell+'">'+(keep?'':mv(it.file))+'</td></tr>';
+    }
+    h+='</table></div>';
+  }
+  if(r.orphans.length){
+    h+='<div style="margin-top:12px">&#9888; Scripts with no profile (GSX ignores them):<table style="border-collapse:collapse;margin-top:4px;font-size:11px">';
+    for(const o of r.orphans) h+='<tr><td style="'+cell+'"><b>'+esc(o.file)+'</b></td><td style="'+cell+';color:var(--ink3)">'+esc(o.origin)+'</td><td style="'+cell+'">'+mv(o.file)+'</td></tr>';
+    h+='</table></div>';
+  }
+  if(r.missing.length){
+    h+='<div style="margin-top:12px">&#8505; Flown with your 3rd-party scenery, but no GSX profile installed:<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">'
+      +r.missing.map(m=>'<button class="btn bg bsm" style="padding:2px 8px;font-size:11px" title="Search flightsim.to for a GSX profile" onclick="window.api.openExternal('+esc(JSON.stringify(fsUrl('https://flightsim.to/miscellaneous/gsx-pro?q='+encodeURIComponent(m.icao.toLowerCase()))))+')">'+esc(m.icao)+' · '+m.flights+' flight'+(m.flights>1?'s':'')+' &#8599;</button>').join('')
+      +'</div><div style="color:var(--ink3);margin-top:4px">Got one? Drop the download on Settings → GSX Pro.</div></div>';
+  }
+  h+='<div style="color:var(--ink3);margin-top:12px">Backups go to <code>'+esc(r.backupDir)+'</code>.'+(r.removedCount?' '+r.removedCount+' file(s) you moved there are kept out of Scan Now.':'')+'</div>';
+  return h;
+}
+async function gsxHealthMove(file){
+  if(!confirm('Move "'+file+'" (and its own scripts) to the GSX backup folder?\n\nGSX stops loading it, and Scan Now won’t reinstall it. Nothing is deleted — you can move it back any time.'))return;
+  const r=await window.api.gsxMoveToBackup({gsxFolder:S.cfg.gsxFolder||'', file});
+  if(!r||!r.ok){ alert('Couldn’t move it: '+((r&&r.error)||'unknown')); return; }
+  gsxToast('Moved '+r.moved.length+' file(s) to the GSX backup');
+  await gsxRefresh(); renderApts();
+  await gsxHealthRun();
+}
+
 async function nvcpRefreshStatus(){
   const el=document.getElementById('nvcp-stamp'); if(!el)return;
   let s; try{ s=await window.api.nvcpStatus(); }catch(e){ return; }
@@ -6566,35 +6644,69 @@ async function onGsxDrop(e){
   const paths=[...(e.dataTransfer.files||[])].map(f=>f.path).filter(Boolean);
   const rd=document.getElementById('gsx-drop-result');
   if(!paths.length){if(rd){rd.style.display='block';rd.style.color='var(--acc)';rd.textContent='Nothing detected in that drop — try the files, folder, or archive again.';}return;}
-  if(rd){rd.style.display='block';rd.style.color='var(--ink3)';rd.textContent='Installing GSX profile…';}
+  await gsxInstallPaths(paths, rd);
+}
+// Install dropped GSX profile files/folders/archives (both drop zones use this — v6.29.0). Asks first
+// when the drop holds (a) the same file name in two subfolders (a variant pack: normal vs winter), or
+// (b) two differently-named profiles for one airport (two editions, e.g. LEIB GSXVDGS + NOOLVDGS).
+let _gsxDrop=null;   // {paths, rd, variant, picks:{ICAO:ini}, choices}
+async function gsxInstallPaths(paths, rd, opts){
+  opts=opts||{};
+  _gsxDrop={paths, rd, variant:opts.variant||null, picks:opts.picks||{}, prefix:opts.prefix||''};
+  return gsxDropContinue();
+}
+async function gsxDropContinue(){
+  const st=_gsxDrop; if(!st) return;
+  const rd=st.rd;
+  const say=(html,c)=>{ if(rd){ rd.style.display='block'; rd.style.color=c||'var(--ink3)'; rd.innerHTML=st.prefix+html; } };
+  say('Installing GSX profile…');
   try{
-    const res=await window.api.gsxInstallDropped({paths,gsxFolder:S.cfg.gsxFolder||''});
-    // Duplicate profile filenames across subfolders (a variant pack) — ask which to install instead of
-    // silently overwriting with whichever sorted last (the winter-EPWA bug). Dean 2026-07-14.
+    const pickIni=Object.values(st.picks);
+    const res=await window.api.gsxInstallDropped({paths:st.paths, gsxFolder:S.cfg.gsxFolder||'', variant:st.variant||undefined, pickIni:pickIni.length?pickIni:undefined});
     if(res&&res.dupes){
-      _gsxDropPaths=paths;
-      if(rd){ rd.style.color='var(--acc)';
-        rd.innerHTML='&#9888; This drop has <b>'+res.variants.length+' variants</b> with the same profile filename'
-          +' (e.g. a normal vs winter set). Pick one — installing all would overwrite:<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
-          +res.variants.map(v=>'<button class="btn bp bsm" onclick="gsxInstallVariant('+JSON.stringify(v).replace(/"/g,'&quot;')+')">'+esc(v)+'</button>').join('')
-          +'<button class="btn bg bsm" onclick="gsxInstallVariant(null)" title="Install everything (later files overwrite earlier)">Install all anyway</button></div>';
-      }
+      say('&#9888; This drop has <b>'+res.variants.length+' variants</b> with the same profile filename'
+        +' (e.g. a normal vs winter set). Pick one — installing all would overwrite:<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+        +res.variants.map(v=>'<button class="btn bp bsm" onclick="gsxPickVariant('+JSON.stringify(v).replace(/"/g,'&quot;')+')">'+esc(v)+'</button>').join('')
+        +'<button class="btn bg bsm" onclick="gsxPickVariant(null)" title="Install everything (later files overwrite earlier)">Install all anyway</button></div>','var(--acc)');
+      return;
+    }
+    if(res&&res.editions){
+      st.choices=res.choices;
+      const rows=Object.entries(res.choices).filter(([ic])=>!st.picks[ic]).map(([ic,list])=>
+        '<div style="margin-top:8px"><b>'+esc(ic)+'</b> — '+list.length+' editions of its profile. GSX should only have one; pick the one to install:'
+        +'<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">'
+        +list.map(b=>'<button class="btn bp bsm" onclick="gsxPickEdition('+JSON.stringify(ic).replace(/"/g,'&quot;')+','+JSON.stringify(b).replace(/"/g,'&quot;')+')">'+esc(b)+(/gsx[\s_-]*vdgs/i.test(b)?' &#10003; GSX docking boards':'')+'</button>').join('')
+        +'</div></div>').join('');
+      say('&#9888; Two profiles for the same airport in this drop.'+rows,'var(--acc)');
       return;
     }
     const n=(res&&res.copied&&res.copied.length)||0;
     if(n){
-      await gsxRefresh();renderApts();
-      if(rd){rd.style.color='var(--grn)';rd.textContent='Installed '+n+' GSX file(s) into your GSX folder.';}
+      await gsxRefresh(); renderApts();
+      say('&#10003; Installed '+n+' GSX file(s) into your GSX folder: '+res.copied.map(esc).join(', '),'var(--grn)');
       gsxToast('Installed '+n+' GSX file(s)');
     }else if(res&&res.needTool){
-      if(rd){rd.style.color='var(--acc)';rd.textContent='Couldn’t open that .rar/.7z — install 7-Zip (free) or WinRAR, or extract the archive yourself and drop the files/folder.';}
+      say('Couldn’t open that .rar/.7z — install 7-Zip (free) or WinRAR, or extract the archive yourself and drop the files/folder.','var(--acc)');
     }else{
-      if(rd){rd.style.color='var(--acc)';rd.textContent='No GSX profile files (.py / .ini) were found in that drop.';}
+      say('No GSX profile files (.py / .ini) were found in that drop.','var(--acc)');
     }
     if(res&&res.errors&&res.errors.length)RLOG('[GSX] drop errors: '+res.errors.join('; '));
-  }catch(err){
-    if(rd){rd.style.color='var(--acc)';rd.textContent='Install failed: '+err.message;}
-  }
+    _gsxDrop=null;
+  }catch(err){ say('Install failed: '+esc(err.message),'var(--acc)'); _gsxDrop=null; }
+}
+// "Install all anyway" sends '*' (main: install every variant). Before v6.29.0 it sent null, which
+// main read as "no choice yet" and asked again, so the button did nothing.
+function gsxPickVariant(v){ if(!_gsxDrop)return; _gsxDrop.variant=(v===null)?'*':v; gsxDropContinue(); }
+// Every airport with two editions must be decided before installing (a partial pick would drop the
+// undecided airport's profiles entirely), so keep asking locally until all are chosen.
+function gsxPickEdition(icao, ini){
+  const st=_gsxDrop; if(!st)return;
+  st.picks[icao]=ini;
+  const left=Object.keys(st.choices||{}).filter(ic=>!st.picks[ic]);
+  if(!left.length){ gsxDropContinue(); return; }
+  const rows=left.map(ic=>'<div style="margin-top:8px"><b>'+esc(ic)+'</b> — pick the edition to install:<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">'
+    +st.choices[ic].map(b=>'<button class="btn bp bsm" onclick="gsxPickEdition('+JSON.stringify(ic).replace(/"/g,'&quot;')+','+JSON.stringify(b).replace(/"/g,'&quot;')+')">'+esc(b)+'</button>').join('')+'</div></div>').join('');
+  if(st.rd){ st.rd.innerHTML=st.prefix+'&#9888; Still to choose:'+rows; }
 }
 // ── Scenery drag-and-drop (v6.11.4) — drop a folder/archive into the library, then auto-scan ──────
 function onSceneryDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='copy'; const z=document.getElementById('scenery-drop-zone'); if(z)z.classList.add('drag-over'); }
@@ -6611,6 +6723,16 @@ async function onSceneryDrop(e){
   try{
     const res=await window.api.sceneryAdd({paths, libraryFolder:S.folderPath});
     const added=(res&&res.added)||[], skipped=(res&&res.skipped)||[];
+    // v6.29.0: a GSX profile download (no MSFS package inside) dropped here goes to GSX, not the library.
+    const gsxPaths=(res&&res.gsxPaths)||[];
+    if(gsxPaths.length){
+      if(added.length) await doScan();
+      const pre=(added.length?'✓ Added '+added.map(esc).join(', ')+' to your library.<br>':'')
+        +'&#8505; '+gsxPaths.length+' item'+(gsxPaths.length>1?'s are GSX profiles':' is a GSX profile')+', not scenery — installing into your GSX folder instead (GSX profiles have their own drop box under Settings → GSX Pro).<br>';
+      await gsxInstallPaths(gsxPaths, rd, {prefix:pre});
+      if(res&&res.errors&&res.errors.length) RLOG('[SCN] drop errors: '+res.errors.join('; '));
+      return;
+    }
     if(added.length){
       show('Added '+added.length+' scenery folder'+(added.length>1?'s':'')+' — scanning…','var(--grn)');
       await doScan();   // full re-scan picks up the new folder(s) + wrapper detection
@@ -6626,23 +6748,6 @@ async function onSceneryDrop(e){
     }
     if(res&&res.errors&&res.errors.length) RLOG('[SCN] drop errors: '+res.errors.join('; '));
   }catch(err){ show('Add failed: '+esc(err.message),'var(--acc)'); }
-}
-// GSX variant picker: when a dropped archive has the same profile filename in two subfolders
-// (e.g. normal/ + winter/), install only the chosen variant instead of silently overwriting.
-let _gsxDropPaths=null;
-async function gsxInstallVariant(variant){
-  const rd=document.getElementById('gsx-drop-result');
-  if(!_gsxDropPaths){ return; }
-  if(rd){ rd.style.color='var(--ink3)'; rd.textContent='Installing '+(variant||'all')+'…'; }
-  try{
-    const res=await window.api.gsxInstallDropped({paths:_gsxDropPaths, gsxFolder:S.cfg.gsxFolder||'', variant});
-    const n=(res&&res.copied&&res.copied.length)||0;
-    if(n){ await gsxRefresh(); renderApts();
-      if(rd){ rd.style.color='var(--grn)'; rd.textContent='Installed '+n+' GSX file(s)'+(variant?(' from “'+variant+'”'):'')+'.'; }
-      gsxToast('Installed '+n+' GSX file(s)');
-    } else if(rd){ rd.style.color='var(--acc)'; rd.textContent='Nothing installed.'; }
-  }catch(err){ if(rd){ rd.style.color='var(--acc)'; rd.textContent='Install failed: '+err.message; } }
-  _gsxDropPaths=null;
 }
 function updateSimDetectStatus(){
   const el=document.getElementById('sim-detect-status');
@@ -9099,5 +9204,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.28.1</div>
+  pointer-events:none;">v6.29.0</div>
 </body></html>

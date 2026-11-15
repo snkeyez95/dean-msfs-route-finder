@@ -320,7 +320,12 @@ ipcMain.handle('scan-folder', async (_,p)=>{
   LOG.info('scan-folder:', p);
   try{
     const entries=fs.readdirSync(p,{withFileTypes:true});
-    const folders=entries.filter(e=>e.isDirectory()).map(e=>e.name);
+    // v6.29.0: a folder with no MSFS package in it (no manifest.json at its top or one level down) isn't
+    // scenery — e.g. a GSX profile download dropped in the library. Listing it made a fake second airport.
+    const all=entries.filter(e=>e.isDirectory()).map(e=>e.name);
+    const notScenery=all.filter(f=>!GSXP.hasPackage(path.join(p,f)));
+    const folders=all.filter(f=>!notScenery.includes(f));
+    if(notScenery.length) LOG.info('scan-folder ignored', notScenery.length, 'non-scenery folder(s):', notScenery.join(', '));
     // Wrapper detection: a folder with no manifest.json of its OWN, but whose immediate subfolders ARE
     // packages (each has manifest.json), is a WRAPPER (e.g. "KLAS FlyTampa" → airport + city). MSFS only
     // loads a package that sits DIRECTLY in Community, so a wrapper's inner packages must be linked
@@ -334,7 +339,7 @@ ipcMain.handle('scan-folder', async (_,p)=>{
       if(inner.length)pkgMap[f]=inner;                   // wrapper → link each inner package directly
     }
     LOG.info('scan-folder found', folders.length, 'subfolders,', Object.keys(pkgMap).length, 'wrapper(s)');
-    return {success:true,folders,pkgMap};
+    return {success:true,folders,pkgMap,notScenery};
   }catch(e){
     LOG.error('scan-folder failed:', e.message);
     return {success:false,error:e.message};
@@ -413,37 +418,49 @@ ipcMain.handle('gsx-scan-bundled', (_, {sceneryFolder, icao})=>{
   }catch(e){ LOG.error('[GSX] scan-bundled failed:', e.message); return {ok:false, error:e.message, files:[]}; }
 });
 
-// Place one bundled profile file into the GSX folder, update-aware (Dean, 2026-07-06 — real case:
-// iniBuilds KJFK scenery shipped a newer kjfk-24-inibuilds.ini than the installed 2025 copy and the
-// old name-match logic silently kept the stale one). If a file with the same name already exists
-// ANYWHERE in the GSX tree (profiles sit in subfolders too — never create a flat duplicate):
-//   identical content        -> 'current'    (nothing to do)
-//   yours is newer than src  -> 'kept-local' (an old scenery can't stomp a newer profile)
-//   scenery copy is newer    -> 'updated'    (replaced in place — no .bak clutter, per Dean)
-function gsxSha(p){ return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
-function gsxPlaceFile(src, dir){
-  const base=path.basename(src);
-  const existing=gsxWalkFiles(dir, 4, null).find(f=>f.base.toLowerCase()===base.toLowerCase());
-  if(!existing){ fs.copyFileSync(src, path.join(dir, base)); return {action:'installed', base}; }
-  const dest=existing.abs;
-  if(gsxSha(src)===gsxSha(dest)) return {action:'current', base};
-  if(fs.statSync(src).mtimeMs<=fs.statSync(dest).mtimeMs) return {action:'kept-local', base};
-  fs.copyFileSync(src, dest);
-  return {action:'updated', base};
-}
+// Place bundled profile files into the GSX folder (v6.29.0: gsx_profiles.placeSet). Same file name
+// already installed → identical = nothing; otherwise the VERSION inside the .ini decides ("notes = v1.3"),
+// file date only when either version is unknown; scripts follow their profile's decision. Files Dean
+// moved to backup (GSX check) are never reinstalled. Every install/update goes in gsx_ledger.json.
+const GSXP = require('./gsx_profiles');
+const GSX_LEDGER = () => path.join(USER_DATA, 'gsx_ledger.json');
+const GSX_REMOVED = () => path.join(USER_DATA, 'gsx_removed.json');
 ipcMain.handle('gsx-install-bundled', (_, {files, gsxFolder})=>{
   const dir=gsxResolveDir(gsxFolder);
   const copied=[], updated=[], errors=[];
   try{ fs.mkdirSync(dir,{recursive:true}); }catch(e){}
-  for(const src of (files||[])){
-    try{
-      const r=gsxPlaceFile(src, dir);
+  try{
+    const res=GSXP.placeSet(files||[], dir, {ledgerPath:GSX_LEDGER(), removedPath:GSX_REMOVED(), via:'scenery'});
+    for(const r of res){
       if(r.action==='installed'){ copied.push(r.base); LOG.info('[GSX] installed', r.base, '->', dir); }
-      else if(r.action==='updated'){ updated.push(r.base); LOG.info('[GSX] UPDATED', r.base, '(newer copy bundled with scenery)'); }
-      else if(r.action==='kept-local'){ LOG.info('[GSX] kept local', r.base, '(installed copy is newer than the bundled one)'); }
-    }catch(e){ errors.push(path.basename(src)+': '+e.message); LOG.error('[GSX] install failed:', e.message); }
-  }
+      else if(r.action==='updated'){ updated.push(r.base); LOG.info('[GSX] UPDATED', r.base, '('+r.why+')'); }
+      else if(r.action==='kept-local'){ LOG.info('[GSX] kept local', r.base, '('+r.why+')'); }
+      else if(r.action==='skipped-removed'){ LOG.info('[GSX] skipped', r.base, '(you moved it to backup)'); }
+    }
+  }catch(e){ errors.push(e.message); LOG.error('[GSX] install failed:', e.message); }
   return {ok:errors.length===0, copied, updated, errors};
+});
+// GSX profile check (Maintenance). owned = ICAOs of airports with 3rd-party scenery; flown counts come
+// from the flight index (dep + arr).
+ipcMain.handle('gsx-health', (_, {gsxFolder, owned})=>{
+  try{
+    const flown={};
+    try{
+      const idx=JSON.parse(fs.readFileSync(path.join(USER_DATA,'Sessions','index.json'),'utf8'));
+      for(const e of (idx.sessions||[])){ if(e.excluded) continue; for(const k of [e.dep_icao,e.arr_icao]){ if(!k) continue; const K=String(k).toUpperCase(); flown[K]=(flown[K]||0)+1; } }
+    }catch(e){}
+    const r=GSXP.healthCheck(gsxResolveDir(gsxFolder), {ledgerPath:GSX_LEDGER(), removedPath:GSX_REMOVED(), owned:owned||[], flown});
+    LOG.info('[GSX] check:', r.fileCount, 'files,', r.duplicates.length, 'duplicate airport(s),', r.orphans.length, 'orphan script(s),', r.missing.length, 'flown without a profile');
+    return Object.assign({ok:true, backupDir:GSXP.backupDirFor(r.dir)}, r);
+  }catch(e){ LOG.error('[GSX] check failed:', e.message); return {ok:false, error:e.message}; }
+});
+ipcMain.handle('gsx-move-to-backup', (_, {gsxFolder, file})=>{
+  if(isMsfsRunning()) return {ok:false, error:'MSFS is running — close it first.'};
+  try{
+    const r=GSXP.moveToBackup(gsxResolveDir(gsxFolder), file, {removedPath:GSX_REMOVED()});
+    if(r.ok) LOG.info('[GSX] moved to backup:', r.moved.join(', '), '->', r.backupDir);
+    return r;
+  }catch(e){ LOG.error('[GSX] move failed:', e.message); return {ok:false, error:e.message}; }
 });
 
 const GSX_ARCHIVE_RE=/\.(zip|rar|7z)$/i;
@@ -488,7 +505,7 @@ function gsxExtractArchive(archivePath, tmp){
 
 // Manual drag-and-drop install: accepts loose .py/.ini files, a folder, or a
 // .zip/.rar/.7z archive (downloaded straight from flightsim.to).
-ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant})=>{
+ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant, pickIni})=>{
   const dir=gsxResolveDir(gsxFolder);
   const copied=[], skipped=[], errors=[], tmpDirs=[];
   let needTool=false;
@@ -531,12 +548,26 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant})=>{
   }
   // Install: everything, OR (when a variant was chosen) the non-duplicated files + only the chosen
   // variant's copies of the duplicated ones.
-  const toInstall = variant ? meta.filter(m => byBase[m.base].length===1 || m.parent===variant) : meta;
+  let toInstall = (variant && variant!=='*') ? meta.filter(m => byBase[m.base].length===1 || m.parent===variant) : meta;   // '*' = install every variant
+  // Two DIFFERENTLY-named .ini files for one airport = two editions of a profile (v6.29.0 — e.g. LEIB
+  // "…-GSXVDGS.ini" + "…-NOOLVDGS.ini"). Installing both gives GSX two profiles for the airport, so ask.
+  const eds=GSXP.editionsIn(toInstall.map(m=>m.abs));
+  if(Object.keys(eds).length && !pickIni){
+    for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
+    return {ok:false, editions:true, choices:eds};
+  }
+  if(pickIni && Object.keys(eds).length){
+    const keep=new Set([].concat(pickIni).map(x=>String(x).toLowerCase()));
+    const drop=new Set(); for(const list of Object.values(eds)) for(const b of list) if(!keep.has(b.toLowerCase())) drop.add(b.toLowerCase());
+    toInstall=toInstall.filter(m=>!drop.has(m.base));
+  }
   for(const m of toInstall){
     try{
       const destName=path.basename(m.abs);
       fs.copyFileSync(m.abs, path.join(dir, destName));
       copied.push(destName);
+      GSXP.removedDel(GSX_REMOVED(), [destName]);   // dropping it yourself overrides an earlier "moved to backup"
+      GSXP.ledgerAdd(GSX_LEDGER(), [{ts:new Date().toISOString(), file:destName, action:'installed', from:m.abs, via:'drop'}]);
       LOG.info('[GSX] dropped install', destName, variant?('(variant: '+variant+')'):'', '->', dir);
     }catch(e){ errors.push(path.basename(m.abs)+': '+e.message); LOG.error('[GSX] dropped copy failed:', e.message); }
   }
@@ -549,12 +580,13 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant})=>{
 // named after the archive. Skips folders already present. Dean 2026-07-14.
 ipcMain.handle('scenery-add', (_, {paths, libraryFolder})=>{
   const root=libraryFolder;
-  const added=[], skipped=[], errors=[], tmpDirs=[]; let needTool=false;
+  const added=[], skipped=[], errors=[], tmpDirs=[], gsxPaths=[]; let needTool=false;
   if(!root || !fs.existsSync(root)) return {ok:false, added, skipped, errors:['no scenery library folder set'], needTool, noLib:true};
   for(const p of (paths||[])){
     try{
       const st=fs.statSync(p);
       if(st.isDirectory()){
+        if(GSXP.isProfileOnly(p)){ gsxPaths.push(p); continue; }   // a GSX profile download, not scenery (v6.29.0)
         const dest=path.join(root, path.basename(p));
         if(fs.existsSync(dest)){ skipped.push(path.basename(p)); continue; }
         fs.cpSync(p, dest, {recursive:true});
@@ -565,6 +597,7 @@ ipcMain.handle('scenery-add', (_, {paths, libraryFolder})=>{
         tmpDirs.push(tmp);
         const ex=gsxExtractArchive(p, tmp);
         if(!ex.ok){ if(ex.needTool) needTool=true; errors.push(path.basename(p)+(ex.needTool?': no .rar/.7z extractor installed':': extract failed')); continue; }
+        if(GSXP.isProfileOnly(tmp)){ gsxPaths.push(p); continue; }   // archive holds only a GSX profile
         const entries=fs.readdirSync(tmp,{withFileTypes:true});
         const dirs=entries.filter(e=>e.isDirectory());
         const srcRoots = dirs.length>=1 ? dirs.map(d=>path.join(tmp,d.name)) : [tmp];  // ≥1 folder → each is a package (ignore root readmes); no folder → wrap loose files
@@ -582,7 +615,7 @@ ipcMain.handle('scenery-add', (_, {paths, libraryFolder})=>{
     }catch(e){ errors.push(path.basename(p)+': '+e.message); LOG.error('[SCN] scenery-add failed:', e.message); }
   }
   for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
-  return {ok:errors.length===0, added, skipped, errors, needTool};
+  return {ok:errors.length===0, added, skipped, errors, needTool, gsxPaths};
 });
 
 const CFG = path.join(USER_DATA, 'config.json');
@@ -2062,7 +2095,7 @@ ipcMain.handle('defender-change', async (_, { action, saved }) => {
 // One .zip of the three files that define an ABRP install: config.json (all settings) +
 // routeRegistry.json + routeSnapshot.json. Flight logs (Sessions, GBs) are deliberately excluded.
 // Import validates first, backs up the current files, then swaps in — reload finishes it.
-const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json','lab_state.json','sim_profiles.json'];
+const SETUP_FILES = ['config.json','routeRegistry.json','routeSnapshot.json','lab_state.json','sim_profiles.json','gsx_ledger.json','gsx_removed.json'];
 function psq(s){ return `'${String(s).replace(/'/g,"''")}'`; }
 ipcMain.handle('setup-export', async () => {
   try {

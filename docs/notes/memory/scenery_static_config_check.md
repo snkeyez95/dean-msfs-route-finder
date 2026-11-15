@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-11-15T02:00:29.302Z
+  modified: 2026-11-15T02:19:12.401Z
 ---
 
 Dean periodically asks to "check for static aircraft and other settings" on his newest/updated
@@ -31,6 +31,11 @@ payware airports (scenery folder: C:\Users\MultiBotPC\Documents\MSFS\Scenery). T
   scan skips "Aerosoft VDGS" folders when the package also has a "GSX VDGS" folder. 2026-11-14 the
   AS-VDGS GSX profiles for EDDB/EDDM/LIMC + 4 old `_airport_` dupes went to
   %APPDATA%\Virtuali\GSX\MSFS_cleanup_2026-11-14 (backup, nothing deleted).
+  v6.29.0 (built 2026-11-14): version-aware placement (notes = vX inside the .ini), install record
+  USER_DATA\gsx_ledger.json, removed list gsx_removed.json (Scan Now never reinstalls), Maintenance →
+  GSX Profile Check, non-package library folders ignored, GSX downloads dropped on the SCENERY box get
+  routed to GSX. Dean once dropped 6 flightsim.to downloads on the scenery box (they became fake
+  airports) — the GSX drop box is Settings → GSX Pro. Code: gsx_profiles.js.
 
 **VERIFY against https://sceneryaddons.org** — Dean's preferred source. Its front page lists each
 addon's LATEST version (compare to installed package_version to confirm current) and each airport's

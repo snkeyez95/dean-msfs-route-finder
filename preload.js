@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('api', {
   gsxScanBundled:     (o)   => ipcRenderer.invoke('gsx-scan-bundled', o),
   gsxInstallBundled:  (o)   => ipcRenderer.invoke('gsx-install-bundled', o),
   gsxInstallDropped:  (o)   => ipcRenderer.invoke('gsx-install-dropped', o),
+  gsxHealth:          (o)   => ipcRenderer.invoke('gsx-health', o),
+  gsxMoveToBackup:    (o)   => ipcRenderer.invoke('gsx-move-to-backup', o),
   loadConfig:         ()    => ipcRenderer.invoke('load-config'),
   saveConfig:         (c)   => ipcRenderer.invoke('save-config', c),
   siFetchPage:        (o)   => ipcRenderer.invoke('si-fetch-page', o),

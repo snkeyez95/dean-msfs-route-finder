@@ -1,3 +1,15 @@
+# v6.29.0 — GSX PROFILE HOUSEKEEPING (Dean 2026-11-14)
+> ✅ BUILT 2026-11-14 (awaiting Dean release.bat). After a manual GSX folder clean-up (13 exact dupes from a
+> Jun 5 external batch copy, 4 old `_airport_` versions, AS-VDGS editions): gsx_profiles.js — (1) version-aware
+> placeSet (notes = vX; date only when unknown; scripts follow their .ini), (2) gsx_ledger.json install record,
+> (3) Maintenance → GSX Profile Check (dupes/older/orphans/flown-without-profile) + Move to backup (sibling
+> MSFS_backup folder, gsx_removed.json so Scan Now never reinstalls), (4) scan-folder ignores folders with no
+> MSFS package, (5) scenery drop routes GSX-only downloads to GSX. Also: two-editions drop picker, broken
+> "Install all anyway" fixed, gsxInstalled needs an .ini, launch diff-check keeps pkgMap (KLAS). v6.28.1
+> (GSX-VDGS over Aerosoft-VDGS bundled editions) ships in the same release. tests/test_gsx_profiles.js 67/67.
+> OWED after update: move LIMC ASXVDGS ×3 + LEIB NOOLVDGS to backup (record as removed), move the 7 GSX
+> download folders out of the scenery library. Open: EGKK (5 profiles), cyyz.py orphan.
+
 # v6.28.0 — SIM PROFILES: 🧪 EXPERIMENTS (paste-in changes, auto-verdict, ABRP-proposed experiments) (Dean 2026-11-10, plan)
 > ✅ BUILT 2026-11-10 (awaiting Dean release.bat). All 6 lifecycle steps shipped as designed: parseChangeText/toChangeText
 > (in-sim words, raw ids, %, x100, 2X; DOF/motion-blur one-row combo; caps from the Ultra preset incl. water High),
