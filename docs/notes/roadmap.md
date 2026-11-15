@@ -1,3 +1,10 @@
+# v6.31.0 — ✱ FRESH ROUTES, THREE STRENGTHS (Dean 2026-11-14)
+> ✅ BUILT (awaiting release.bat). Plan a Flight chip: Off · Same route · Same dep/arr · Any airport. Level 1 = last N
+> SimBriefed pairs (history cap 30→100); 2 = route departs a recent departure OR arrives at a recent arrival; 3 = touches any
+> recent airport, except departures from the last-landed airport (toggle). Levels 2-3 count FLOWN flights (perf index
+> dep/arr). Settings → Fresh Routes: routeN 30 / depArrN 10 / airportN 10 (1–100) + keepCurrentDep. Session-protected pairs
+> stay visible at every level. Real data (4,339 both-in-library routes): hides 872 / 1,305 / 2,227. tests/test_fresh_levels.js 31/31.
+
 # 🧹 DECLUTTER CATALOG (Dean 2026-11-14) — items 1–3 ✅ BUILT v6.30.0 (awaiting release.bat); new items: catalog first, debrief before change
 > Running list lives in memory abrp_declutter_catalog.md (synced to docs/notes). Items so far: (1) Performance
 > dashboard cards/charts unused — Dean only opens per-flight reports from the table; (2) Utilities list shows

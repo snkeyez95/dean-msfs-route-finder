@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.30.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.31.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.30.0</div>
+    <div class="sb-ver">v6.31.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -527,8 +527,13 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       </div>
       <div class="crow" id="fresh-row">
         <div class="chip sq" id="vatsim-toggle-btn" style="margin-left:auto" onclick="toggleVatsimRoutes()" title="Score routes by live VATSIM ATC coverage (arrival-weighted: staffed arrival > departure > enroute Centers)">&#128225; VATSIM</div>
-        <div class="chip sq" id="fresh-toggle-btn" onclick="toggleFreshOnly()" title="Hide city pairs you've flown recently (either direction)">&#10038; Fresh routes</div>
+        <span style="font-size:11px;color:var(--ink3);margin-left:10px" title="Hide routes you've done recently. Each level hides more; set how far back each looks in Settings → Fresh Routes.">&#10038; Fresh:</span>
+        <div class="chip sq" data-fresh="0" onclick="setFreshLevel(0)" title="Show every route">Off</div>
+        <div class="chip sq" data-fresh="1" onclick="setFreshLevel(1)" title="Hide city pairs you've SimBriefed recently (either direction)">Same route</div>
+        <div class="chip sq" data-fresh="2" onclick="setFreshLevel(2)" title="Hide routes leaving an airport you recently departed from, or landing where you recently arrived">Same dep / arr</div>
+        <div class="chip sq" data-fresh="3" onclick="setFreshLevel(3)" title="Hide every route that touches an airport from your recent flights (departures from where you last landed stay visible)">Any airport</div>
       </div>
+      <div id="fresh-note" style="display:none;font-size:11px;color:var(--ink3);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace;line-height:1.5"></div>
     </div>
     <div id="fr-inputs-wrap" style="display:none;margin-bottom:12px">
       <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
@@ -720,6 +725,11 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       </label>
       <div id="max-routes-st" style="margin-top:5px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);line-height:1.7"></div>
     </div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin:24px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">Fresh Routes</div>
+  <div class="api-pan" style="margin-bottom:14px">
+    <div class="api-s" style="margin-bottom:12px">How far back each <b>&#10038; Fresh</b> level in Plan a Flight looks. <b>Same route</b> counts your SimBriefed plans; <b>Same dep / arr</b> and <b>Any airport</b> count flights you actually flew (from the performance log). Bigger numbers hide more routes.</div>
+    <div id="fresh-settings"></div>
   </div>
   <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,166,35,.55);font-family:'JetBrains Mono',monospace;margin:24px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--sep)">VATSIM Live ATC</div>
   <div class="api-pan" style="margin-bottom:14px">
@@ -1398,8 +1408,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderFleetChips();
   S.freeRouteMode=!!S.cfg.freeRouteMode;
   S.frAcft=S.cfg.frAcft||'';
-  S.freshOnly=!!S.cfg.freshOnly;
-  {const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);}
+  // v6.31.0: Fresh routes has 4 levels (cfg.freshLevel 0-3). Older configs only had the on/off freshOnly.
+  if(typeof S.cfg.freshLevel!=='number')S.cfg.freshLevel=S.cfg.freshOnly?1:0;
+  S.freshOnly=S.cfg.freshLevel>0;
+  paintFreshChips();
+  loadFlownLog();
   // ⏱ duration chips + route sort restore (v6.26.0)
   S.durBands=(Array.isArray(S.cfg.durBands)?S.cfg.durBands:[]).filter(b=>DUR_BANDS[b]);
   paintDurChips();
@@ -1567,6 +1580,7 @@ function sw(t){
   if(t==='routes'){
     (async()=>{
       S.routeRegistry=await window.api.siGetRegistry();
+      if((S.cfg.freshLevel||0)>=2)await loadFlownLog();   // pick up a flight filed since the last look
       renderRoutes();updateStats();
       fetchMetarBatch();
       // 📡 lazy VATSIM-score boot: a restored-on toggle costs nothing until Plan a Flight opens
@@ -1580,7 +1594,7 @@ function sw(t){
   if(t==='companions')renderCompanionsPane();
   if(t==='perf')renderPerfPane();
   if(t==='profiles')renderProfilesPane();
-  if(t==='settings'){renderFlightApps();enhanceSettingsSections();renderVatsimSettings();}
+  if(t==='settings'){renderFreshSettings();renderFlightApps();enhanceSettingsSections();renderVatsimSettings();}
   if(t==='maintenance'){nvcpRefreshStatus();updateStorageStat();renderBackupPanel();}
   if(t==='liveatc')renderLiveAtc();
 }
@@ -3416,6 +3430,57 @@ const REGION_PREFIXES={
   africa:['D','F','G','H'],        // D/F/G/H=Africa
   oceania:['Y','N'],               // Y=Australia · N=NZ & South Pacific
 };
+// ── ✱ FRESH ROUTES (v6.31.0, Dean 2026-11-14) ───────────────────────────────────────────────────
+// Four levels, each stricter. 1 Same route: city pairs from your last N SimBriefs (the original).
+// 2 Same dep/arr: a route leaving an airport you recently departed from, or landing where you recently
+// arrived. 3 Any airport: a route touching any airport from your recent flights — except departures
+// from where you last landed (so you can always fly onward). Levels 2-3 count FLOWN flights from the
+// performance log (the same list as Recent Routes). A pair you SimBrief/activate this session stays
+// visible until the next launch at every level. Look-backs are set in Settings → Fresh Routes.
+const FRESH_DEFAULTS={routeN:30, depArrN:10, airportN:10, keepCurrentDep:true};
+const FRESH_MAX=100;   // recentSimBriefRoutes keeps this many, so level 1 can look back up to 100
+function freshCfg(){ const c=Object.assign({},FRESH_DEFAULTS,S.cfg.freshCfg||{});
+  for(const k of ['routeN','depArrN','airportN']) c[k]=Math.max(1,Math.min(FRESH_MAX,Math.round(+c[k]||FRESH_DEFAULTS[k])));
+  c.keepCurrentDep=c.keepCurrentDep!==false; return c; }
+// flown: [{dep,arr,ts}] newest first. Pure (tests run it directly).
+function freshBuild(level, cfg, recentSB, flown, session){
+  if(!level) return null;
+  const key=(a,b)=>[a,b].sort().join('>');
+  const f={level, session, pairs:null, deps:null, arrs:null, any:null, cur:null, airports:[], flights:0};
+  if(level===1){ f.pairs=new Set((recentSB||[]).slice(0,cfg.routeN).map(e=>key(e.dep,e.arr))); f.flights=Math.min((recentSB||[]).length,cfg.routeN); return f; }
+  const n=level===2?cfg.depArrN:cfg.airportN;
+  const fl=(flown||[]).slice(0,n); f.flights=fl.length;
+  if(level===2){ f.deps=new Set(fl.map(x=>x.dep)); f.arrs=new Set(fl.map(x=>x.arr)); }
+  else { f.any=new Set(fl.flatMap(x=>[x.dep,x.arr])); f.cur=cfg.keepCurrentDep&&flown&&flown[0]?flown[0].arr:null; }
+  f.airports=[...new Set(fl.flatMap(x=>[x.dep,x.arr]))];
+  return f;
+}
+function freshHides(f, dep, arr){
+  if(f.session&&f.session.has([dep,arr].sort().join('>'))) return false;
+  if(f.level===1) return f.pairs.has([dep,arr].sort().join('>'));
+  if(f.level===2) return f.deps.has(dep)||f.arrs.has(arr);
+  return (f.any.has(dep)&&dep!==f.cur)||f.any.has(arr);
+}
+// Flown flights (newest first) from the performance log — read once, refreshed when Plan a Flight opens.
+async function loadFlownLog(){
+  try{ const r=await window.api.perfListSessions();
+    S.flownLog=((r&&r.sessions)||[]).filter(x=>x.dep_icao&&x.arr_icao&&x.dep_icao!==x.arr_icao&&x.timestamp)
+      .map(x=>({dep:String(x.dep_icao).toUpperCase(),arr:String(x.arr_icao).toUpperCase(),ts:new Date(x.timestamp).getTime()}))
+      .filter(x=>!isNaN(x.ts)).sort((a,b)=>b.ts-a.ts);
+  }catch(e){ if(!S.flownLog)S.flownLog=[]; }
+  return S.flownLog;
+}
+function freshNoteHtml(){
+  const lv=S.cfg.freshLevel||0; if(!lv) return '';
+  const c=freshCfg(), n=S.freshHidden||0, routes=n+' route'+(n!==1?'s':'');
+  if(lv===1) return '&#10038; Hiding '+routes+' you SimBriefed (last '+c.routeN+' plans, either direction).';
+  const f=freshBuild(lv,c,[],S.flownLog||[],new Set());
+  if(!f||!f.flights) return '&#10038; No logged flights yet — nothing to hide.';
+  const ap=f.airports, list=ap.slice(0,12).join(', ')+(ap.length>12?' +'+(ap.length-12)+' more':'');
+  if(lv===2) return '&#10038; Hiding '+routes+' that leave an airport you departed from, or land where you arrived, in your last '+f.flights+' flight'+(f.flights!==1?'s':'')+': '+list+'.';
+  return '&#10038; Hiding '+routes+' that touch '+ap.length+' airports from your last '+f.flights+' flight'+(f.flights!==1?'s':'')+': '+list+'.'+(f.cur?' Departures from '+f.cur+' (where you last landed) stay visible.':'');
+}
+
 function getRoutes(){
   const q=(document.getElementById('rt-srch')||{value:''}).value.toLowerCase().trim();
   const durBands=S.durBands||[];
@@ -3425,11 +3490,12 @@ function getRoutes(){
   // Fresh-routes filter hides previously-SimBriefed pairs — but NOT ones SimBriefed this session,
   // so a route you just sent to SimBrief stays referenceable while planning; it only starts hiding
   // next launch (S.sessionSimBrief resets each run).
-  const flownPairs=S.freshOnly?(()=>{const s=new Set((S.cfg.recentSimBriefRoutes||[]).map(e=>[e.dep,e.arr].sort().join('>')));(S.sessionSimBrief||new Set()).forEach(k=>s.delete(k));return s;})():null;
+  const fresh=freshBuild(S.cfg.freshLevel||0, freshCfg(), S.cfg.recentSimBriefRoutes||[], S.flownLog||[], S.sessionSimBrief||new Set());
+  S.freshHidden=0;
   let rs=Object.values(S.routeRegistry).filter(r=>{
     if(!activeFleet.has(r.aircraft_type))return false;
     const dep=r.departure_airport,arr=r.arrival_airport;
-    if(flownPairs&&flownPairs.has([dep,arr].sort().join('>')))return false;
+    if(fresh&&freshHides(fresh,dep,arr)){S.freshHidden++;return false;}
     const di=allLib.has(dep),ai=allLib.has(arr);
     if(S.mode==='2'&&!(di&&ai))return false;
     if(S.mode==='1'&&!(di||ai))return false;
@@ -3495,6 +3561,7 @@ function renderRoutes(){
   console.log('[WX] buildRouteList: metarCache has',Object.keys(S.metarCache||{}).length,'entries');
   populateAirlineDropdown();
   const rs=getRoutes();
+  {const fn=document.getElementById('fresh-note'); if(fn){ const h=freshNoteHtml(); fn.innerHTML=h; fn.style.display=h?'block':'none'; }}
   const cnt=rs.length;
   const regSize=Object.keys(S.routeRegistry).length;
   document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(regSize?'':' — paste cookie and click Refresh Routes');
@@ -3639,11 +3706,33 @@ function toggleDurBand(b){
   paintDurChips(); S.acFilter=''; S.openRoute=null; renderRoutes();
 }
 function setRegion(v){S.regionFilter=v;S.acFilter='';document.querySelectorAll('[data-region]').forEach(e=>e.classList.toggle('on',e.dataset.region===v));S.openRoute=null;renderRoutes();}
-function toggleFreshOnly(){
-  S.freshOnly=!S.freshOnly;S.cfg.freshOnly=S.freshOnly;window.api.saveConfig(S.cfg);
-  const b=document.getElementById('fresh-toggle-btn');if(b)b.classList.toggle('on',S.freshOnly);
+function setFreshLevel(n){
+  n=Math.max(0,Math.min(3,+n||0));
+  S.cfg.freshLevel=n; S.cfg.freshOnly=n>0; S.freshOnly=n>0; window.api.saveConfig(S.cfg);
+  paintFreshChips();
+  if(n>=2&&!S.flownLog)loadFlownLog().then(()=>renderRoutes());
   S.openRoute=null;renderRoutes();
 }
+function toggleFreshOnly(){ setFreshLevel(S.cfg.freshLevel>0?0:1); }   // kept for any old caller
+function renderFreshSettings(){
+  const el=document.getElementById('fresh-settings'); if(!el)return;
+  const c=freshCfg();
+  const row=(k,label,unit)=>'<label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink1);padding:4px 0">'
+    +'<span style="min-width:150px">'+label+'</span><input type="number" min="1" max="'+FRESH_MAX+'" step="1" value="'+c[k]+'" onchange="freshSet(\''+k+'\',this.value)" '
+    +'style="width:64px;background:var(--bg2);color:var(--ink1);border:1px solid var(--sep);border-radius:6px;padding:4px 6px;font-family:\'JetBrains Mono\',monospace">'
+    +'<span style="font-size:12px;color:var(--ink3)">'+unit+'</span></label>';
+  el.innerHTML=row('routeN','Same route','last SimBriefed plans')+row('depArrN','Same dep / arr','last flights flown')+row('airportN','Any airport','last flights flown')
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink1);cursor:pointer;padding:6px 0 0"><input type="checkbox" '+(c.keepCurrentDep?'checked':'')+' onchange="freshSet(\'keepCurrentDep\',this.checked)" style="accent-color:var(--acc)">'
+    +'Any airport: keep departures from the airport I last landed at</label>'
+    +'<div style="font-size:11px;color:var(--ink3);margin-top:8px">Defaults: 30 · 10 · 10. Range 1–'+FRESH_MAX+'.</div>';
+}
+function freshSet(k,v){
+  const c=Object.assign({},S.cfg.freshCfg||{});
+  if(k==='keepCurrentDep') c[k]=!!v; else c[k]=Math.max(1,Math.min(FRESH_MAX,Math.round(+v)||FRESH_DEFAULTS[k]));
+  S.cfg.freshCfg=c; window.api.saveConfig(S.cfg); renderFreshSettings();
+  if(S.freshOnly)renderRoutes();
+}
+function paintFreshChips(){ const n=S.cfg.freshLevel||0; document.querySelectorAll('[data-fresh]').forEach(e=>e.classList.toggle('on',+e.dataset.fresh===n)); }
 
 // 📡 VATSIM route score toggle (v6.10.0). ON: load deps (feed + airport DB + polygons; honest "…"
 // while loading), add + select the "Best VATSIM coverage" sort. OFF: restore the previous sort and
@@ -6046,7 +6135,7 @@ function openSimBrief(dep,arr,type,url){
   const entry={dep,arr,type,ts:Date.now()};
   const recent=S.cfg.recentSimBriefRoutes||[];
   const filtered=recent.filter(e=>!(e.dep===dep&&e.arr===arr));
-  S.cfg.recentSimBriefRoutes=[entry,...filtered].slice(0,30);
+  S.cfg.recentSimBriefRoutes=[entry,...filtered].slice(0,FRESH_MAX);   // v6.31.0: was 30; Fresh 'Same route' look-back is now adjustable up to 100
   // Track this pair as SimBriefed THIS session so the fresh-routes filter keeps showing it in
   // Plan a Flight until next launch (it still appears in the dashboard recent list immediately).
   (S.sessionSimBrief||(S.sessionSimBrief=new Set())).add([dep,arr].sort().join('>'));
@@ -9172,5 +9261,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.30.0</div>
+  pointer-events:none;">v6.31.0</div>
 </body></html>

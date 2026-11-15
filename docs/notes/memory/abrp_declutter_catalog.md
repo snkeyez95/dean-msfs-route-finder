@@ -19,7 +19,7 @@ I **catalog only**. Nothing gets changed until he asks for a full debrief, which
 - At debrief time, give each item a verdict: remove / hide behind a toggle / fix / keep. Note what else
   depends on it (tests, settings, other tabs).
 
-**Catalog** — items 1–3 DONE in v6.30.0 (2026-11-14): dashboard table-first with fleet cards/charts folded; Util list requires an MSFS manifest; Display Resolution on Launch removed (leftover-restore kept). Fresh-routes observation still open (Dean didn't pick it). New items go below.
+**Catalog** — items 1–3 DONE in v6.30.0 (2026-11-14): dashboard table-first with fleet cards/charts folded; Util list requires an MSFS manifest; Display Resolution on Launch removed (leftover-restore kept). Fresh routes became 4 levels in v6.31.0 (Same route = SimBriefs, Same dep/arr + Any airport = flown flights; look-backs in Settings → Fresh Routes) — the SimBrief-vs-flown mismatch now only applies to the Same route level. New items go below.
 1. **Performance tab dashboard (2026-11-14).** The aircraft cards (Fenix/PMDG/Citation…), "Hide reference",
    the Combined/By-aircraft P99 + VRAM bar charts and the TLOD filter chips are never looked at. He scrolls
    straight to the per-flight table at the bottom and opens individual flight reports. Ties to the parked
