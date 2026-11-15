@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.28.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.28.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.28.0</div>
+    <div class="sb-ver">v6.28.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -2335,6 +2335,16 @@ async function gsxEvaluate(){
   const present=new Set(S.allRows.map(r=>r.folder));
   let dirty=false;
   for(const f of Object.keys(cache)){ if(!present.has(f)){ delete cache[f]; dirty=true; } }
+  // One-time (v6.28.1): entries cached before the scan learned to prefer a scenery's "GSX VDGS"
+  // edition over its "Aerosoft VDGS" one still list the Aerosoft files, and this loop would
+  // reinstall them on every launch. Drop those entries once so they're rescanned with the new rule.
+  if(!S.cfg.gsxVdgsPickV1){
+    for(const f of Object.keys(cache)){
+      const fl=(cache[f]&&cache[f].files)||[];
+      if(fl.some(x=>/[\\/]aerosoft[\s_-]*vdgs[\\/]/i.test((x&&x.abs)||x||''))){ delete cache[f]; RLOG('[GSX] rescan '+f+' (VDGS edition rule)'); }
+    }
+    S.cfg.gsxVdgsPickV1=true; dirty=true;
+  }
   // Apply what we already know (no disk walk). Installed airports are included on purpose —
   // the install handler is update-aware (identical = no-op, newer bundled copy = refresh w/ backup),
   // so a scenery update shipping a newer profile gets picked up instead of silently skipped.
@@ -9089,5 +9099,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.28.0</div>
+  pointer-events:none;">v6.28.1</div>
 </body></html>

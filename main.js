@@ -393,10 +393,21 @@ ipcMain.handle('gsx-list-profiles', (_, gsxFolder)=>{
   }catch(e){ LOG.error('[GSX] list-profiles failed:', e.message); return {ok:false, error:e.message, files:[]}; }
 });
 
+// Some sceneries ship TWO editions of one profile: one for Aerosoft's separate VDGS app and one where
+// GSX draws the docking boards (Aerosoft LIMC: "Aerosoft VDGS\" + "GSX VDGS\"). Installing both leaves
+// GSX with duplicate profiles for the airport. When a package carries a GSX-VDGS folder, drop the
+// files under any Aerosoft-VDGS folder (Dean 2026-11-14 — the Aerosoft VDGS app isn't installed, so
+// those editions show dead boards). Packages without a GSX-VDGS folder are untouched.
+const GSX_VDGS_DIR = /gsx[\s_-]*vdgs/i, AS_VDGS_DIR = /aerosoft[\s_-]*vdgs/i;
+function gsxPreferGsxVdgs(files, root){
+  const dirsOf = f => path.relative(root, path.dirname(f.abs)).split(/[\\/]/);
+  if(!files.some(f=>dirsOf(f).some(d=>GSX_VDGS_DIR.test(d)))) return files;
+  return files.filter(f=>!dirsOf(f).some(d=>AS_VDGS_DIR.test(d)));
+}
 ipcMain.handle('gsx-scan-bundled', (_, {sceneryFolder, icao})=>{
   try{
     if(!sceneryFolder || !fs.existsSync(sceneryFolder)) return {ok:true, files:[]};
-    const files=gsxWalkFiles(sceneryFolder, 6, GSX_SKIP_DIRS).filter(f=>gsxLooksBundled(f.base, icao));
+    const files=gsxPreferGsxVdgs(gsxWalkFiles(sceneryFolder, 6, GSX_SKIP_DIRS).filter(f=>gsxLooksBundled(f.base, icao)), sceneryFolder);
     if(files.length) LOG.info('[GSX] scan-bundled', icao, '→', files.length, 'file(s)');
     return {ok:true, files};
   }catch(e){ LOG.error('[GSX] scan-bundled failed:', e.message); return {ok:false, error:e.message, files:[]}; }

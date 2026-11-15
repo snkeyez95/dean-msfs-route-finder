@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-07-21T00:09:51.102Z
+  modified: 2026-11-15T02:00:29.302Z
 ---
 
 Dean periodically asks to "check for static aircraft and other settings" on his newest/updated
@@ -26,7 +26,11 @@ payware airports (scenery folder: C:\Users\MultiBotPC\Documents\MSFS\Scenery). T
 - Other devs (FlyTampa, MK-Studios, DRS/Aerosoft) usually BAKE statics into the scene BGL or into
   Scenarii/*.spb world-scripts (MK-Studios calls parked planes "Civilian_*") — no clean user toggle.
 - DRS/Aerosoft airports may ship TWO VDGS variants (Aerosoft VDGS vs GSX VDGS folders) — pick the one
-  matching the user's setup (GSX if they run GSX).
+  matching the user's setup (GSX if they run GSX). Dean = GSX editions: the Aerosoft VDGS app
+  (Community\aerosoft-vdgs-driver) is NOT installed (checked 2026-11-14). Since v6.28.1 ABRP's GSX
+  scan skips "Aerosoft VDGS" folders when the package also has a "GSX VDGS" folder. 2026-11-14 the
+  AS-VDGS GSX profiles for EDDB/EDDM/LIMC + 4 old `_airport_` dupes went to
+  %APPDATA%\Virtuali\GSX\MSFS_cleanup_2026-11-14 (backup, nothing deleted).
 
 **VERIFY against https://sceneryaddons.org** — Dean's preferred source. Its front page lists each
 addon's LATEST version (compare to installed package_version to confirm current) and each airport's
