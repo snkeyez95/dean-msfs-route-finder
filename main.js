@@ -505,12 +505,13 @@ function gsxExtractArchive(archivePath, tmp){
 
 // Manual drag-and-drop install: accepts loose .py/.ini files, a folder, or a
 // .zip/.rar/.7z archive (downloaded straight from flightsim.to).
-ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant, pickIni})=>{
+ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant, pickIni, olderChoice})=>{
   const dir=gsxResolveDir(gsxFolder);
   const copied=[], skipped=[], errors=[], tmpDirs=[];
   let needTool=false;
   try{ fs.mkdirSync(dir,{recursive:true}); }catch(e){}
   const collect=[];
+  const origin={};   // v6.32.0: extracted file → the .zip it came from ("x.zip › sub/y.ini") for the install record
   for(const p of (paths||[])){
     try{
       const st=fs.statSync(p);
@@ -526,7 +527,7 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant, pickIni})=
           LOG.error('[GSX] extract failed:', p, ex.needTool?'(no tool)':'');
           continue;
         }
-        gsxWalkFiles(tmp, 8, GSX_SKIP_DIRS).forEach(f=>{ if(gsxIsProfileFile(f.base)) collect.push(f.abs); });
+        gsxWalkFiles(tmp, 8, GSX_SKIP_DIRS).forEach(f=>{ if(gsxIsProfileFile(f.base)){ collect.push(f.abs); origin[f.abs]=p+' \u203a '+path.relative(tmp, f.abs).split(path.sep).join('/'); } });
       } else if(gsxIsProfileFile(path.basename(p))){
         collect.push(p);
       } else {
@@ -561,18 +562,37 @@ ipcMain.handle('gsx-install-dropped', (_, {paths, gsxFolder, variant, pickIni})=
     const drop=new Set(); for(const list of Object.values(eds)) for(const b of list) if(!keep.has(b.toLowerCase())) drop.add(b.toLowerCase());
     toInstall=toInstall.filter(m=>!drop.has(m.base));
   }
+  // v6.32.0 version check (same idea as Scan Now): an identical file is left alone ("already up to
+  // date"); a dropped profile whose version is LOWER than the installed one is not installed until
+  // the user says so. olderChoice: 'keep' = skip the older profiles (+ their own scripts), 'install' =
+  // install anyway, undefined = ask.
+  const cmp=GSXP.compareDrop(toInstall.map(m=>m.abs), dir);
+  if(cmp.older.length && !olderChoice){
+    for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
+    return {ok:false, older:cmp.older};
+  }
+  const olderStems=new Set(olderChoice==='keep' ? cmp.older.map(o=>GSXP.stemOf(o.file)) : []);
+  const unchanged=[], keptYours=[];
   for(const m of toInstall){
     try{
       const destName=path.basename(m.abs);
-      fs.copyFileSync(m.abs, path.join(dir, destName));
+      if(olderStems.has(GSXP.stemOf(destName))){ keptYours.push(destName); continue; }
+      if(cmp.byBase[m.base]==='same'){ unchanged.push(destName); GSXP.removedDel(GSX_REMOVED(), [destName]); continue; }
+      // Same file name anywhere in the GSX tree → replace that copy (never create a second one).
+      const existing=GSXP.walk(dir, 4).find(f=>f.base.toLowerCase()===m.base);
+      fs.copyFileSync(m.abs, existing ? existing.abs : path.join(dir, destName));
       copied.push(destName);
       GSXP.removedDel(GSX_REMOVED(), [destName]);   // dropping it yourself overrides an earlier "moved to backup"
-      GSXP.ledgerAdd(GSX_LEDGER(), [{ts:new Date().toISOString(), file:destName, action:'installed', from:m.abs, via:'drop'}]);
-      LOG.info('[GSX] dropped install', destName, variant?('(variant: '+variant+')'):'', '->', dir);
+      const o=cmp.older.find(x=>x.file.toLowerCase()===m.base);
+      GSXP.ledgerAdd(GSX_LEDGER(), [Object.assign({ts:new Date().toISOString(), file:destName, action:existing?'updated':'installed', from:origin[m.abs]||m.abs, via:'drop'},
+        o ? {why:'you chose to install v'+o.dropped+' over v'+o.installed} : {})]);
+      LOG.info('[GSX] dropped install', destName, existing?'(replaced)':'', variant?('(variant: '+variant+')'):'', '->', dir);
     }catch(e){ errors.push(path.basename(m.abs)+': '+e.message); LOG.error('[GSX] dropped copy failed:', e.message); }
   }
+  if(unchanged.length) LOG.info('[GSX] drop: already up to date:', unchanged.join(', '));
+  if(keptYours.length) LOG.info('[GSX] drop: kept your newer copy of', keptYours.join(', '));
   for(const t of tmpDirs){ try{ fs.rmSync(t,{recursive:true,force:true}); }catch(e){} }
-  return {ok:errors.length===0, copied, skipped, errors, needTool, variant:variant||null};
+  return {ok:errors.length===0, copied, unchanged, keptYours, skipped, errors, needTool, variant:variant||null};
 });
 // Drag-and-drop a scenery package into the library folder (v6.11.4). Mirrors util-add but FLATTENS a
 // wrapping archive folder so scan-folder sees the scenery at the top level: one inner folder → use it

@@ -1,3 +1,9 @@
+# v6.32.0 — GSX DROP ZONE VERSION CHECK (Dean 2026-11-15)
+> ✅ BUILT (awaiting release.bat). gsx-install-dropped: GSXP.compareDrop → identical = "already up to date" (no rewrite, no
+> record), newer = replace in place (incl. subfolder copy), OLDER .ini = ask (olderChoice keep|install; scripts follow by stem).
+> Ledger `from` = "<zip> › <path inside>" instead of the temp extract dir; action installed/updated (+why on a chosen downgrade).
+> tests/test_gsx_drop_version.js 17/17 (real handler, real PS-5.1 zips).
+
 # v6.31.0 — ✱ FRESH ROUTES, THREE STRENGTHS (Dean 2026-11-14)
 > ✅ BUILT (awaiting release.bat). Plan a Flight chip: Off · Same route · Same dep/arr · Any airport. Level 1 = last N
 > SimBriefed pairs (history cap 30→100); 2 = route departs a recent departure OR arrives at a recent arrival; 3 = touches any

@@ -150,6 +150,28 @@ function placeSet(files, dir, opts){
   return results;
 }
 
+// Drop-zone version check (v6.32.0). For each dropped file with the same name already installed:
+// identical → 'same' (skip, nothing to do); different → 'different'. A dropped .ini whose version is
+// LOWER than the installed one is reported in `older` so the user is asked before downgrading.
+// Returns {byBase:{lowercase base: 'new'|'same'|'different'}, older:[{file, dropped, installed}]}.
+function compareDrop(files, dir){
+  const installed = walk(dir, 4);
+  const byBase = {}, older = [];
+  for (const src of files){
+    const base = path.basename(src), key = base.toLowerCase();
+    const ex = installed.find(f => f.base.toLowerCase() === key);
+    if (!ex){ byBase[key] = 'new'; continue; }
+    let same = false;
+    try { same = fs.readFileSync(src).equals(fs.readFileSync(ex.abs)); } catch (e) {}
+    byBase[key] = same ? 'same' : 'different';
+    if (!same && isIni(base)){
+      const vd = iniMeta(src).version, vi = iniMeta(ex.abs).version;
+      if (vd && vi && cmpVer(vd, vi) < 0) older.push({ file: base, dropped: fmtVer(vd), installed: fmtVer(vi) });
+    }
+  }
+  return { byBase, older };
+}
+
 // ── 3. Health check ────────────────────────────────────────────────────────────────────────────────
 // opts: {ledgerPath, removedPath, owned: [ICAO of airports with 3rd-party scenery], flown: {ICAO: n}}
 function healthCheck(dir, opts){
@@ -272,5 +294,5 @@ function editionsIn(fileList){
   return by;
 }
 
-module.exports = { isMsfsPackageDir, iniVersion, cmpVer, icaoOf, stemOf, iniMeta, placeSet, healthCheck, moveToBackup, backupDirFor,
+module.exports = { compareDrop, isMsfsPackageDir, iniVersion, cmpVer, icaoOf, stemOf, iniMeta, placeSet, healthCheck, moveToBackup, backupDirFor,
   hasPackage, isProfileOnly, editionsIn, ledgerAdd, ledgerIndex, removedSet, removedAdd, removedDel, walk };
