@@ -1,3 +1,9 @@
+# 🧹 DECLUTTER CATALOG (Dean 2026-11-14) — collect only; full debrief before ANY change
+> Running list lives in memory abrp_declutter_catalog.md (synced to docs/notes). Items so far: (1) Performance
+> dashboard cards/charts unused — Dean only opens per-flight reports from the table; (2) Utilities list shows
+> version-number rows = WebView2/runtime folders inside desktop apps in Util mis-detected as packages (bug);
+> (3) Settings → Display Resolution on Launch not needed.
+
 # v6.29.0 — GSX PROFILE HOUSEKEEPING (Dean 2026-11-14)
 > ✅ BUILT 2026-11-14 (awaiting Dean release.bat). After a manual GSX folder clean-up (13 exact dupes from a
 > Jun 5 external batch copy, 4 old `_airport_` versions, AS-VDGS editions): gsx_profiles.js — (1) version-aware
