@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.32.1</div>
+  <div class="tname">A Better Route Planner &mdash; v6.33.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.32.1</div>
+    <div class="sb-ver">v6.33.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1662,13 +1662,18 @@ async function renderProfilesPane(){
   // Offered once per distinct text, remembered across restarts, and never for text already saved.
   try{
     const t=await window.api.clipboardReadText();
-    if(/^\s*ABRP-PROFILE v1/m.test(t||'')&&!_spPaste.open&&!_spClipSeen(t)){ _spClipMark(t); _spPaste={open:true,text:t,preview:null,fromClip:true}; spPasteInput(t); }
+    if(/^\s*ABRP-PROFILE v1/m.test(t||'')&&!_spPaste.open&&!_spClipSeen(t)){
+      // v6.33.0: a small "Claude's block on your clipboard" prompt instead of opening the edit box by itself
+      let pv=null; try{ pv=await window.api.profilesExpPreview({text:t}); }catch(_){}
+      _spClip={text:t, preview:pv}; _spRender();
+    }
   }catch(_){}
 }
 function profilesRange(a,b){
   const f=s=>{ const d=new Date(String(s).slice(0,10)+'T12:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
   return (a&&b&&String(a).slice(0,10)!==String(b).slice(0,10))?(f(a)+' – '+f(b)):f(a||b);
 }
+let _spClip=null, _spStart=null, _spEndAsk=null, _spMoreOpen=null;
 function _spSection(t,sub){ return '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:18px 0 8px">'+t+(sub?' <span style="text-transform:none;letter-spacing:0">'+sub+'</span>':'')+'</div>'; }
 function _spRender(){
   const body=document.getElementById('prof-body'); if(!body||!_SP)return;
@@ -1678,22 +1683,23 @@ function _spRender(){
     +'<span style="flex:1">'+(_spMsg.ok?'✓ ':'⚠ ')+esc(_spMsg.text)+'</span>'
     +(_spMsg.undo&&_SP.lastApply?'<button class="btn bg bxs" onclick="spUndo()">↶ Undo</button>':'')
     +'<button class="btn bg bxs" onclick="_spMsg=null;_spRender()">✕</button></div>';
+  // v6.33.0: where you are with testing comes first, then anything that needs an answer
+  h+=_spTestBanner()+_spEndAskCard()+_spStartCard()+_spClipCard();
   // 1 · what the sim is set to right now
   const curMatch=cur?mine.filter(p=>_spMatches(p.values,cur)).map(p=>p.name):[];
   h+='<div class="api-pan" style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">'
     +'<div style="flex:1;min-width:260px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:5px">Your sim right now</div>';
   if(!_SP.found) h+='<div style="font-size:13px;color:var(--red)">Couldn&rsquo;t find your MSFS settings file (UserCfg.opt).</div>';
   else h+='<div id="sp-current-name" style="font-size:15px;font-weight:600;color:var(--ink0);margin-bottom:6px">'+esc(_SP.currentName||'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+_spChips(cur)+'</div>'
-    +'<div id="sp-current-match" style="font-size:12px;color:var(--ink3);margin-top:7px">'+(curMatch.length?('✓ Matches your profile <b style="color:var(--ink1)">'+esc(curMatch[0])+'</b>'):'Not saved as a profile yet.')+'</div>';
+    +'<div id="sp-current-match" style="font-size:12px;color:var(--ink3);margin-top:7px">'+((_SP.test&&_SP.test.matches)?('▶ Running test: <b style="color:var(--ink1)">'+esc(_SP.test.name)+'</b> (flight '+_SP.test.n+' of '+_SP.test.budget+')'):(curMatch.length?('✓ Matches your profile <b style="color:var(--ink1)">'+esc(curMatch[0])+'</b>'):'Not saved as a profile yet.'))+'</div>';
   h+='</div>'+(_SP.found?'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spSave(\'captured\')">＋ Save as profile</button>':'')+'</div>';
   if(_SP.simRunning) h+='<div id="sp-simrunning" style="background:var(--acc3);border:1px solid var(--acc2);border-radius:var(--r2);padding:9px 14px;margin:-4px 0 14px;font-size:12.5px;color:var(--acc)">⏸ MSFS is running. You can browse and save, but profiles apply only when the sim is closed (it reads its settings at launch and overwrites them when it exits).</div>';
-  if(_SP.lastApply&&!(_spMsg&&_spMsg.undo)) h+='<div style="font-size:12px;color:var(--ink3);margin:-4px 0 12px">Last applied: <b style="color:var(--ink1)">'+esc(_SP.lastApply.name)+'</b> · <span style="color:var(--blu);cursor:pointer" onclick="spUndo()">↶ Undo</span></div>';
-  // reminders: a finished experiment waiting for a decision, or one you've stopped flying
-  for(const n of (_SP.nudges||[])) h+='<div class="sp-nudge" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--acc3);border:1px solid var(--acc);border-radius:var(--r2);padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--ink1)"><span style="flex:1">🧪 '+esc(n.text)+'</span><button class="btn bg bxs" onclick="spOpenCard(\''+n.id+'\')">Open</button></div>';
-  // 2 · ABRP Suggested
-  h+=_spSuggestedCard();
-  // 3 · experiments
-  h+=_spExperimentsSection();
+  if(_SP.lastApply&&!(_spMsg&&_spMsg.undo)&&!_SP.test) h+='<div style="font-size:12px;color:var(--ink3);margin:-4px 0 12px">Last applied: <b style="color:var(--ink1)">'+esc(_SP.lastApply.name)+'</b> · <span style="color:var(--blu);cursor:pointer" onclick="spUndo()">↶ Undo</span></div>';
+  // v6.33.0: ONE status banner says where you are with testing (none / running / off the test / finished),
+  // then any question that needs an answer (end the running test?), the start confirmation and the
+  // clipboard prompt. While a test runs, the experiments section comes before the profiles.
+  if(_SP.test){ h+=_spExperimentsSection(); h+=_spSuggestedCard(); }
+  else { h+=_spSuggestedCard(); h+=_spExperimentsSection(); }
   // 4 · my profiles
   h+=_spSection('My profiles');
   if(!mine.length) h+='<div style="font-size:13px;color:var(--ink3);margin-bottom:12px">No profiles yet. Save your current settings above, or rebuild a past setup from your flight history below.</div>';
@@ -1715,6 +1721,102 @@ function _spRender(){
   body.innerHTML=h;
   if(_spRenaming){ const el=document.getElementById('sp-rename-'+_spRenaming); if(el){ el.focus(); el.select(); } }
 }
+const _SP_BAN=(bg,bd,fg)=>'display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:'+bg+';border:1px solid '+bd+';border-radius:var(--r2);padding:12px 16px;margin-bottom:12px;color:'+fg;
+function _spDots(n,b){ let h=''; for(let i=0;i<b;i++) h+='<span style="width:11px;height:11px;border-radius:50%;border:1.5px solid var(--blu);display:inline-block;'+(i<n?'background:var(--blu)':'')+'" title="'+(i<n?'flown':'to fly')+'"></span>'; return '<span style="display:inline-flex;gap:5px" aria-label="'+n+' of '+b+' flights">'+h+'</span>'; }
+function _spTestBanner(){
+  const t=_SP.test, pr=(_SP.proposals||{}), idea=(pr.ok&&pr.proposals&&pr.proposals[0])||null;
+  if(!t){
+    const clipOn=!!(_spClip&&_spClip.preview&&_spClip.preview.ok&&!_spDupOf(_spClip.preview)&&!_spStart);   // the clipboard prompt below carries the Start button
+    return '<div id="sp-banner" data-state="none" style="'+_SP_BAN('var(--bg3)','var(--sep)','var(--ink1)')+'">'
+      +'<span style="font-size:18px">🧪</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">No test running</div>'
+      +'<div style="font-size:12.5px;color:var(--ink3)">'+(idea?('Next idea: <b style="color:var(--ink1)">'+esc(idea.name)+'</b> — '+esc(idea.why||'')):'Paste a change from Claude to test one setting.')+'</div></div>'
+      +(idea&&!clipOn?'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spAskStart(\'proposal\',\''+idea.id+'\')">Start this test</button>':'')
+      +(clipOn?'':'<button class="btn bg bsm" onclick="spNewExp()">Paste from Claude</button>')+'</div>';
+  }
+  if(t.done){
+    return '<div id="sp-banner" data-state="finished" style="'+_SP_BAN('var(--grn2, var(--bg3))','var(--grn)','var(--ink1)')+'">'
+      +'<span style="font-size:18px">🏁</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">'+esc(t.name)+': done, '+t.n+' of '+t.budget+'</div>'
+      +'<div style="font-size:12.5px;color:var(--ink2)">'+esc(t.sentence)+'</div></div>'
+      +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spExpFinish(\''+t.id+'\',\'keep\')">Keep it</button>'
+      +'<button class="btn bg bsm" onclick="spExpFinish(\''+t.id+'\',\'revert\')">Revert</button>'
+      +'<button class="btn bg bsm" onclick="spOpenCard(\''+t.id+'\')">Details</button></div>';
+  }
+  if(!t.matches){
+    const what=t.off.slice(0,3).map(o=>o.label+' is '+o.now+' (test: '+o.test+')').join('; ');
+    return '<div id="sp-banner" data-state="off" style="'+_SP_BAN('var(--acc3)','var(--acc)','var(--ink1)')+'">'
+      +'<span style="font-size:18px">⚠</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">Your sim no longer matches the test “'+esc(t.name)+'”</div>'
+      +'<div style="font-size:12.5px;color:var(--ink2)">'+esc(what)+'. Flights like this don’t count toward the test.</div></div>'
+      +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled title="Close MSFS first"':'')+' onclick="spApply(\''+t.id+'\')">Re-apply test settings</button>'
+      +'<button class="btn bg bsm" onclick="spExpFinish(\''+t.id+'\',\'end\')">End test</button></div>';
+  }
+  return '<div id="sp-banner" data-state="running" style="'+_SP_BAN('var(--blu2)','var(--blu)','var(--ink1)')+'">'
+    +'<span style="font-size:18px">▶</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">Testing '+esc(t.name)+' · flight '+t.n+' of '+t.budget+'</div>'
+    +'<div style="font-size:12.5px;color:var(--ink2)">Nothing to do. Fly normally with capture on; ABRP counts each flight.</div></div>'
+    +_spDots(t.n,t.budget)+'</div>';
+}
+// "This ends your running test" — asked before anything would knock the sim off the test
+function _spEndAskCard(){
+  const q=_spEndAsk; if(!q)return '';
+  return '<div id="sp-endask" class="api-pan" style="border:2px solid var(--acc);padding:14px 16px;margin-bottom:12px">'
+    +'<div style="font-weight:600;font-size:14px;color:var(--ink0);margin-bottom:6px">⚠ This ends your running test</div>'
+    +'<div style="font-size:13px;color:var(--ink2);margin-bottom:12px">'+esc(q.what)+' changes the tested setting, so flights after this won’t count toward “'+esc(q.test.name)+'” ('+q.test.n+' of '+q.test.budget+' flown).</div>'
+    +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="_spEndAsk=null;_spRender()">Keep testing</button> '
+    +'<button class="btn bg bsm" onclick="spEndAskGo()">End test and '+esc(q.verb)+'</button></div>';
+}
+// One confirmation, then it is live: "Start test" creates AND applies.
+function _spStartCard(){
+  const q=_spStart; if(!q)return '';
+  const pv=q.preview||{}, chg=(pv.changes||[]).filter(c=>!c.same);
+  return '<div id="sp-start" class="api-pan" style="border:2px solid var(--blu);padding:14px 16px;margin-bottom:12px">'
+    +'<div style="font-weight:600;font-size:14px;color:var(--ink0);margin-bottom:4px">Start test: '+esc(pv.name||'')+'</div>'
+    +'<div style="font-size:12.5px;color:var(--ink3);margin-bottom:8px">'+chg.length+' setting'+(chg.length===1?'':'s')+' change'+(chg.length===1?'s':'')+' on top of '+(pv.base&&pv.base.id!=='current'?'“'+esc(pv.base.name)+'”':'your current sim settings')+':</div>'
+    +chg.map(c=>{ const k=_spK(c.id); return '<div style="font-size:13px;color:var(--ink1);margin-bottom:4px">'+esc(k?k.label:c.id)+': <span style="font-family:\'JetBrains Mono\',monospace">'+esc(_spDisp(k,c.from))+' → <b>'+esc(_spDisp(k,c.to))+'</b></span> '+_spDirTag(c.dir)+'</div>'; }).join('')
+    +'<div style="font-size:12px;color:var(--ink3);margin:8px 0 12px">Then fly '+(pv.budget||3)+' flights with capture on. ABRP backs up your settings first; one click undoes it.</div>'
+    +(_SP.simRunning?'<div style="font-size:12px;color:var(--acc);margin-bottom:8px">⏸ Close MSFS to start (it reads its settings at launch).</div>':'')
+    +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled':'')+' onclick="spStartGo(false)">Start test</button> '
+    +'<button class="btn bg bsm" onclick="spStartGo(true)">Save for later</button> '
+    +'<button class="btn bg bsm" onclick="_spStart=null;_spRender()">Cancel</button></div>';
+}
+function _spClipCard(){
+  const c=_spClip; if(!c||_spStart)return '';
+  const pv=c.preview||{}, dup=_spDupOf(pv);
+  if(dup) return '<div id="sp-clip" class="api-pan" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px"><span style="flex:1;font-size:13px;color:var(--ink1)">ℹ Your clipboard has “'+esc(pv.name||'')+'”, which is already '+(dup.status==='active'?'running':'saved')+'. Nothing new to do.</span>'
+    +'<button class="btn bg bxs" onclick="spOpenCard(\''+dup.id+'\')">Show it</button><button class="btn bg bxs" onclick="spClipDismiss()">Dismiss</button></div>';
+  if(!pv.ok) return '';
+  return '<div id="sp-clip" class="api-pan" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px"><span style="flex:1;font-size:13px;color:var(--ink1)">📋 Claude’s block on your clipboard: <b>'+esc(pv.name||'')+'</b></span>'
+    +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spAskStart(\'text\',null,_spClip.text)">Start test</button>'
+    +'<button class="btn bg bxs" onclick="spClipEdit()">Edit first</button><button class="btn bg bxs" onclick="spClipDismiss()">Dismiss</button></div>';
+}
+// an existing running/saved test with exactly the same change(s) as a parsed block
+function _spDupOf(pv){
+  if(!pv||!pv.changes)return null;
+  const sig=cs=>cs.filter(c=>!c.same).map(c=>c.id+'='+JSON.stringify(c.to)).sort().join('|'), want=sig(pv.changes);
+  if(!want)return null;
+  return (_SP.experiments||[]).find(e=>(e.status==='active'||e.status==='draft')&&sig(e.changes||[])===want)||null;
+}
+function spClipDismiss(){ if(_spClip)_spClipMark(_spClip.text); _spClip=null; _spRender(); }
+function spClipEdit(){ const t=_spClip.text; _spClipMark(t); _spClip=null; _spPaste={open:true,text:t,preview:null,fromClip:true}; _spRender(); spPasteInput(t); }
+async function spAskStart(kind,pid,text){
+  let pv=null;
+  if(kind==='proposal'){ const p=((_SP.proposals||{}).proposals||[]).find(x=>x.id===pid); if(!p)return; text=p.text; }
+  try{ pv=await window.api.profilesExpPreview({text}); }catch(e){ pv={ok:false,errors:[e.message]}; }
+  if(!pv||!pv.ok){ _spMsg={ok:false,text:((pv&&pv.errors)||['That block could not be read.']).join(' ')}; return _spRender(); }
+  const dup=_spDupOf(pv);
+  if(dup){ _spMsg={ok:true,text:'“'+dup.name+'” is already '+(dup.status==='active'?'running':'saved')+'. Nothing new was created.'}; if(_spClip&&_spClip.text===text)spClipDismiss(); return spOpenCard(dup.id); }
+  _spStart={kind,pid,text,preview:pv}; _spRender(); _spTop();
+}
+async function spStartGo(later,endTest){
+  const q=_spStart; if(!q)return;
+  const r=await window.api.profilesExpCreate({text:q.text,start:!later,endTest:!!endTest});
+  if(r&&r.needsEndTest){ _spEndAsk={what:'Starting “'+(q.preview&&q.preview.name)+'”',verb:'start this one',test:r.test,go:()=>spStartGo(false,true)}; return _spRender(); }
+  _spStart=null;
+  if(_spClip&&_spClip.text===q.text){ _spClipMark(q.text); _spClip=null; }
+  if(r&&r.duplicate){ _spMsg={ok:true,text:r.msg}; await renderProfilesPane(); return spOpenCard(r.id); }
+  if(r&&r.ok){ _spClipMark(q.text); _spMsg={ok:r.started!==false||later,text:later?('Saved “'+r.experiment.name+'” for later. Start it when your current test is done.'):(r.msg||'Started.'),undo:!!(r.started&&r.changed&&r.changed.length)}; }
+  else _spMsg={ok:false,text:(r&&r.msg)||'Could not start it.'};
+  await renderProfilesPane(); _spTop();
+}
+function spEndAskGo(){ const q=_spEndAsk; _spEndAsk=null; if(q&&q.go)q.go(); }
 function _spSuggestedCard(){
   const sg=_SP.suggestion;
   let h=_spSection('⭐ ABRP Suggested');
@@ -1749,9 +1851,11 @@ function _spCard(o){
     h+='<div class="sp-body" style="border-top:1px solid var(--sep);padding:12px 16px">';
     if(o.extra) h+=o.extra;
     if(o.note) h+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">'+esc(o.note)+'</div>';
+    if(!(o.kind==='experiment'&&o.active&&isCur)){   // v6.33.0: a running test that matches your sim has nothing to compare
     h+='<label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);margin-bottom:6px;cursor:pointer">'
       +'<input type="checkbox" '+(_spDiffOnly?'checked':'')+' onchange="_spDiffOnly=this.checked;_spRender()"> Only show what differs from your sim now</label>';
     h+=_spSettingsTable(o.values,cur);
+    }
     if(_spConfirm===o.key){
       const lodDiff=_spDiff(o.values,cur,true).filter(x=>x.k.lod);
       h+='<div class="sp-confirm" style="background:var(--acc3);border:1px solid var(--acc);border-radius:var(--r2);padding:12px 14px;margin-top:12px">'
@@ -1763,6 +1867,7 @@ function _spCard(o){
         +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(d.length||lodDiff.length?'':'disabled')+' onclick="spApply(\''+o.id+'\')">Apply</button> '
         +'<button class="btn bg bsm" onclick="_spConfirm=null;_spRender()">Cancel</button></div>';
     } else {
+      if(o.kind==='experiment'){ h+=_spExpActions(o,isCur)+'</div>'; return h+'</div>'; }   // v6.33.0: test cards have their own, simpler set
       h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
         +'<button class="btn bsm sp-apply" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled title="Close MSFS first"':'')+' onclick="_spConfirm=\''+o.key+'\';_spRender()">Apply…</button>';
       if(o.kind==='profile'||o.kind==='safety'||o.kind==='experiment') h+='<button class="btn bg bsm" onclick="_spRenaming=\''+o.key+'\';_spRender()">Rename</button>';
@@ -1785,7 +1890,7 @@ function _spCard(o){
 // An experiment = a base profile + one (or a few) changed settings, flown for a small flight budget and
 // judged against the base's own flights (per-aircraft, ±1σ noise). Created by pasting ABRP text, dropping
 // a .txt file, or one click on an ABRP proposal. Verdict words reuse Settings A/B's (_LABV).
-const _SP_EXP_STATUS={draft:'READY TO APPLY',active:'TESTING',kept:'KEPT',reverted:'REVERTED',ended:'ENDED'};
+const _SP_EXP_STATUS={draft:'SAVED FOR LATER',active:'TESTING',kept:'KEPT',reverted:'REVERTED',ended:'ENDED'};
 function _spExperimentsSection(){
   const exps=(_SP.experiments||[]).slice().reverse();
   const live=exps.filter(e=>e.status==='draft'||e.status==='active'), done=exps.filter(e=>!(e.status==='draft'||e.status==='active'));
@@ -1799,13 +1904,13 @@ function _spExperimentsSection(){
   const pr=_SP.proposals||{};
   if(pr.ok&&pr.proposals&&pr.proposals.length){
     h+='<div class="api-pan" style="padding:12px 16px">'
-      +'<div style="font-size:12.5px;color:var(--ink1);margin-bottom:8px"><b>Suggested experiments</b> <span style="color:var(--ink3)">— your GPU is busy about '+Number(pr.gpu).toFixed(1)+' ms of each '+Number(pr.budgetMs).toFixed(1)+' ms frame'+(pr.cpuBound!=null?(' and '+Math.round(pr.cpuBound)+'% of frames wait on the CPU'):'')+', so there is room for GPU-only detail that doesn&rsquo;t use video memory.</span></div>';
+      +'<div style="font-size:12.5px;color:var(--ink1);margin-bottom:8px"><b>'+(_SP.test?'Next ideas':'Suggested experiments')+'</b> <span style="color:var(--ink3)">— your GPU is busy about '+Number(pr.gpu).toFixed(1)+' ms of each '+Number(pr.budgetMs).toFixed(1)+' ms frame'+(pr.cpuBound!=null?(' and '+Math.round(pr.cpuBound)+'% of frames wait on the CPU'):'')+', so there is room for GPU-only detail that doesn&rsquo;t use video memory.</span></div>';
     for(const p of pr.proposals){
       const c=p.changes[0], k=_spK(c.id);
       h+='<div class="sp-prop" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--sep);font-size:12.5px">'
         +'<span style="flex:1;color:var(--ink1)"><b>'+esc(p.name)+'</b> <span style="color:var(--ink3);font-family:\'JetBrains Mono\',monospace;font-size:11.5px">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to))+'</span>'
-        +'<button class="btn bg bxs" onclick="spExpPropose(\''+p.id+'\')">Start experiment</button>'
-        +'<button class="btn bg bxs" title="Copy as ABRP text" onclick="spCopyProposal(\''+p.id+'\')">Copy text</button></div>';
+        +(_SP.test?'<span style="font-size:11.5px;color:var(--ink3)">Available after this test</span>'
+          :'<button class="btn bg bxs" onclick="spAskStart(\'proposal\',\''+p.id+'\')">Start test</button><button class="btn bg bxs" title="Copy as ABRP text" onclick="spCopyProposal(\''+p.id+'\')">Copy text</button>')+'</div>';
     }
     h+='</div>';
   } else if(!live.length&&!_spPaste.open){
@@ -1818,15 +1923,16 @@ function _spExperimentsSection(){
   return h;
 }
 function _spExpCard(e){
+  if(_spOpen[e.id]===undefined&&e.status==='active')_spOpen[e.id]=true;   // v6.33.0: the running test is shown open
   const r=e.result||{}, live=e.status==='draft'||e.status==='active';
   const vk=live?r.verdict:(e.verdict||r.verdict);
   let v=(typeof _LABV!=='undefined'&&_LABV[vk])||{c:'var(--ink3)',t:''};
   if(!live&&vk==='collecting') v={c:'var(--ink3)',t:'NOT ENOUGH FLIGHTS'};   // finished before it had data
   const chg=(e.changes||[]).map(c=>{ const k=_spK(c.id); return esc(k?k.label:c.id)+' <span style="font-family:\'JetBrains Mono\',monospace">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to)); }).join(' · ');
-  const status=live?(e.status==='active'?('TESTING '+Math.min(r.n||0,r.budget||3)+' OF '+(r.budget||3)):_SP_EXP_STATUS.draft):_SP_EXP_STATUS[e.status];
+  const status=live?(e.status==='active'?(r.done?'DONE · DECIDE':('TESTING '+Math.min(r.n||0,r.budget||3)+' OF '+(r.budget||3))):_SP_EXP_STATUS.draft):_SP_EXP_STATUS[e.status];
   const sub='<span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:var(--acc);border:1px solid var(--acc);border-radius:5px;padding:1px 7px">'+esc(status)+'</span>'
     +(r.verdict&&r.verdict!=='collecting'||!live?' <span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:1px 7px">'+esc(v.t)+'</span>':'')
-    +' &nbsp;on <b style="color:var(--ink1)">'+esc(e.baseName||'?')+'</b><div style="margin-top:4px">'+chg+'</div>';
+    +' &nbsp;on <b style="color:var(--ink1)">'+esc(e.baseId==='current'?'your sim settings at the time':(e.baseName||'?'))+'</b><div style="margin-top:4px">'+chg+'</div>';
   let extra='<div class="sp-exp-verdict" style="font-size:12.5px;color:var(--ink1);line-height:1.6;margin-bottom:8px">'+esc(r.sentence||'')+'</div>';
   if(e.status==='draft') extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Apply it (sim closed), then fly normally with capture on. ABRP matches each flight to this experiment by its settings, so there is nothing to tag.</div>';
   if(r.rows&&r.rows.length){
@@ -1844,7 +1950,39 @@ function _spExpCard(e){
   for(const n of (r.notes||[])) extra+='<div style="font-size:12px;color:var(--acc);margin-bottom:6px">⚠ '+esc(n)+'</div>';
   for(const w of (e.warnings||[])) extra+='<div style="font-size:11.5px;color:var(--ink3);margin-bottom:6px">Note from setup: '+esc(w)+'</div>';
   if(e.why) extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Why: '+esc(e.why)+'</div>';
-  return _spCard({key:e.id,id:e.id,kind:'experiment',live,active:e.status==='active',name:e.name,values:e.values,track:null,sub,extra,accent:false,dim:!live,noTrack:true});
+  return _spCard({key:e.id,id:e.id,kind:'experiment',live,active:e.status==='active',draft:e.status==='draft',done:!!r.done,name:e.name,values:e.values,track:null,sub,extra,accent:false,dim:!live,noTrack:true});
+}
+// v6.33.0: actions on a test card. Running → "✓ Applied" (or Re-apply if the sim drifted), End test early,
+// and everything else under More. Finished → Keep it / Revert. Saved for later → Start test. Done ones →
+// copy + delete only.
+function _spExpActions(o,isCur){
+  const pri='class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600"';
+  const dis=_SP.simRunning?' disabled title="Close MSFS first"':'';
+  const more=_spMoreOpen===o.id;
+  const moreBtn='<button class="btn bg bsm sp-more" onclick="_spMoreOpen=(_spMoreOpen===\''+o.id+'\'?null:\''+o.id+'\');_spRender()">'+(more?'▾':'▸')+' More</button>';
+  const copyRes='<button class="btn bg bsm" title="Copies a short results summary to paste into a chat with Claude" onclick="spCopyResults(\''+o.id+'\')">📋 Copy results for Claude</button>';
+  const copyTxt='<button class="btn bg bsm" onclick="spCopyText(\''+o.id+'\')">Copy as text</button>';
+  const ren='<button class="btn bg bsm" onclick="_spRenaming=\''+o.key+'\';_spRender()">Rename</button>';
+  const del='<button class="btn bg bsm" style="color:var(--red)" onclick="spDelete(\''+o.id+'\')">Delete</button>';
+  let h='<div class="sp-exp-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px">';
+  if(o.active&&o.done){
+    h+='<button '+pri+' onclick="spExpFinish(\''+o.id+'\',\'keep\')">Keep it</button><button class="btn bg bsm"'+dis+' onclick="spExpFinish(\''+o.id+'\',\'revert\')">Revert</button>'+moreBtn+'</div>';
+    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+copyRes+copyTxt+ren+'<button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'end\')">End without deciding</button>'+del+'</div>';
+    return h;
+  }
+  if(o.active){
+    h+=(isCur?'<span class="sp-applied" style="font-size:12.5px;color:var(--ink2)">✓ Applied to your sim</span>':'<button '+pri+dis+' onclick="spApply(\''+o.id+'\')">Re-apply test settings</button>')
+      +'<button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'end\')">End test early</button>'+moreBtn+'</div>';
+    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'keep\')" title="Decide now, before the 3 flights are in">✓ Keep now</button>'
+      +'<button class="btn bg bsm"'+dis+' onclick="spExpFinish(\''+o.id+'\',\'revert\')">↶ Revert now</button>'+copyRes+copyTxt+ren+del+'</div>';
+    return h;
+  }
+  if(o.draft){
+    h+='<button '+pri+dis+' onclick="spApply(\''+o.id+'\')">Start test</button>'+moreBtn+'</div>';
+    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+copyTxt+ren+del+'</div>';
+    return h;
+  }
+  return h+copyRes+copyTxt+del+'</div>';
 }
 function _spPastePanel(){
   const pv=_spPaste.preview;
@@ -1865,6 +2003,10 @@ function _spPastePanel(){
       if(pv.why) h+='<div style="font-size:12px;color:var(--ink3);margin-top:4px">Why: '+esc(pv.why)+'</div>';
     }
   }
+  const dupP=pv&&pv.ok&&pv.kind!=='profile'?_spDupOf(pv):null;
+  if(dupP) return h+'<div style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px;color:var(--ink1)">ℹ “'+esc(dupP.name)+'” is already '+(dupP.status==='active'?'running':'saved')+'. Nothing new to do. <button class="btn bg bxs" onclick="_spPaste={open:false,text:\'\',preview:null};spOpenCard(\''+dupP.id+'\')">Show it</button></div></div>';
+  if(pv&&pv.ok&&pv.kind!=='profile') return h+'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn bsm sp-paste-save" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spPasteStart()">'+(_SP.test?'Save for later':'Start test…')+'</button>'
+    +'<span style="font-size:11.5px;color:var(--ink3);align-self:center">'+(_SP.test?'A test is running; this one can start when it finishes.':'Next you’ll see exactly what changes before anything is applied.')+'</span></div></div>';
   h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn bsm sp-paste-save" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(pv&&pv.ok?'':'disabled')+' onclick="spExpSave()">'+(pv&&pv.kind==='profile'?'Save profile':'Save experiment')+'</button>'
     +'<span style="font-size:11.5px;color:var(--ink3);align-self:center">Saving never changes your sim. You apply it afterwards, like any profile.</span></div></div>';
   return h;
@@ -1891,6 +2033,11 @@ async function spPasteFromClipboard(){
   let t=''; try{ t=await window.api.clipboardReadText(); }catch(_){}
   if(!t){ _spMsg={ok:false,text:'Your clipboard is empty.'}; return _spRender(); }
   _spPaste.open=true; _spPaste.fromClip=true; _spPaste.text=t; _spRender(); spPasteInput(t);
+}
+async function spPasteStart(){
+  const t=_spPaste.text;
+  if(_SP.test){ _spStart={kind:'text',text:t,preview:_spPaste.preview}; _spPaste={open:false,text:'',preview:null}; return spStartGo(true); }
+  _spPaste={open:false,text:'',preview:null}; return spAskStart('text',null,t);
 }
 async function spExpSave(){
   const r=await window.api.profilesExpCreate({text:_spPaste.text});
@@ -1984,15 +2131,21 @@ async function spDelete(id){
   if(!confirm('Delete the profile "'+p.name+'"?\n\nThis only removes the saved profile from ABRP. Your sim settings are not changed.'))return;
   await window.api.profilesDelete({id}); delete _spOpen[id]; await renderProfilesPane();
 }
-async function spApply(id){
-  const lodEl=document.getElementById('sp-lod');
-  const r=await window.api.profilesApply({id,includeLod:!!(lodEl&&lodEl.checked)});
+async function spApply(id,endTest){
+  const lodEl=document.getElementById('sp-lod'), lod=!!(lodEl&&lodEl.checked);
+  const r=await window.api.profilesApply({id,includeLod:lod,endTest:!!endTest});
+  if(r&&r.needsEndTest){
+    const p=(_SP.profiles||[]).concat(_SP.experiments||[]).find(x=>x.id===id), nm=id==='suggested'?'ABRP Suggested':(p?p.name:'this profile');
+    _spEndAsk={what:'Applying “'+nm+'”',verb:'apply',test:r.test,go:async()=>{ const r2=await window.api.profilesApply({id,includeLod:lod,endTest:true}); _spConfirm=null; _spMsg={ok:!!(r2&&r2.ok),text:(r2&&r2.msg)||'Apply failed.',undo:!!(r2&&r2.ok&&r2.changed&&r2.changed.length)}; await renderProfilesPane(); _spTop(); }};
+    _spConfirm=null; return _spRender();
+  }
   _spConfirm=null;
   _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Apply failed.',undo:!!(r&&r.ok&&r.changed&&r.changed.length)};
   await renderProfilesPane(); _spTop();
 }
-async function spUndo(){
-  const r=await window.api.profilesApply({undo:true});
+async function spUndo(endTest){
+  const r=await window.api.profilesApply({undo:true,endTest:!!endTest});
+  if(r&&r.needsEndTest){ _spEndAsk={what:'Undo',verb:'undo',test:r.test,go:()=>spUndo(true)}; return _spRender(); }
   _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Undo failed.'};
   await renderProfilesPane(); _spTop();
 }
@@ -9314,5 +9467,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.32.1</div>
+  pointer-events:none;">v6.33.0</div>
 </body></html>

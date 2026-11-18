@@ -113,6 +113,43 @@ function createStore(o) {
     return out;
   }
 
+  // v6.33.0 — the ONE running test (newest applied active experiment), with what the page needs to say
+  // where you are: flight n of budget, finished, and whether the sim still matches it (a sim exit, an Undo
+  // or another profile can knock it off). null when no test is running.
+  function activeTest(st) {
+    const a = st.profiles.filter(p => p.source === 'experiment' && p.status === 'active');
+    a.sort((x, y) => String(y.applied || y.created).localeCompare(String(x.applied || x.created)));
+    return a[0] || null;
+  }
+  function testSummary(exps, cur) {
+    const a = exps.filter(e => e.status === 'active').sort((x, y) => String(y.applied || y.created).localeCompare(String(x.applied || x.created)));
+    const e = a[0]; if (!e) return null;
+    const r = e.result || {};
+    const off = cur ? Object.keys(e.values).filter(k => { const key = SCHEMA.BY_ID[k]; return key && !key.lod && (k in cur) && !P.matches({ [k]: e.values[k] }, { [k]: cur[k] }); })
+      .map(k => { const key = SCHEMA.BY_ID[k]; return { id: k, label: key.label, now: SCHEMA.display(key, cur[k]), test: SCHEMA.display(key, e.values[k]) }; }) : [];
+    return { id: e.id, name: e.name, baseName: e.baseName, n: Math.min(r.n || 0, r.budget || e.budget || 3), budget: r.budget || e.budget || 3,
+      done: !!r.done, verdict: r.verdict || null, sentence: r.sentence || '', matches: !!cur && off.length === 0, off, others: a.length - 1 };
+  }
+  // Would applying `values` leave the running test's settings in place? (Applying an identical-in-the-
+  // tested-keys profile is harmless; anything else ends the test.)
+  function keepsTest(test, values, includeLod) {
+    if (!test) return true;
+    try { const text = fs.readFileSync(ucfg(), 'utf8'); const after = P.readProfileable(P.applyToText(text, values, { includeLod: !!includeLod }).text); return P.matches(test.values, after); }
+    catch (_) { return false; }
+  }
+  function endTestFor(reason) {
+    const st = load(), t = activeTest(st); if (!t) return null;
+    const v = P.experimentVerdict(t, flights());
+    Object.assign(t, { status: 'ended', verdict: v.verdict, finished: new Date().toISOString(), finalN: v.n, endedBy: reason });
+    save(st); log('[PROFILES] experiment ended "' + t.name + '" (' + reason + ', ' + v.n + ' flights)');
+    return t;
+  }
+  function needsEnd(t) {
+    const v = P.experimentVerdict(t, flights());
+    return { ok: false, needsEndTest: true, test: { id: t.id, name: t.name, n: Math.min(v.n || 0, v.budget || t.budget || 3), budget: v.budget || t.budget || 3 },
+      msg: 'This would end your running test "' + t.name + '".' };
+  }
+
   function list() {
     const st = load(), fl = flights(), cur = current();
     const runs = P.historyRuns(fl).map(r => Object.assign({}, r, { flights: undefined }));
@@ -122,7 +159,8 @@ function createStore(o) {
     const exps = experimentsWithVerdicts(st, fl);
     const base = resolveBaseFn(fl, cur, suggestion)(null);
     const proposals = P.proposeExperiments(fl, cur, { experiments: exps.map(e => Object.assign({ verdict: e.verdict || e.result.verdict }, e)), baseName: base ? (base.id === 'current' ? 'current' : base.name) : '' });
-    return { ok: true, found: !!cur, current: cur, currentName: cur ? P.profileName(cur) : null,
+    const test = testSummary(exps, cur);
+    return { ok: true, found: !!cur, current: cur, currentName: cur ? P.profileName(cur) : null, test,
       profiles: st.profiles.filter(p => p.source !== 'experiment').map(p => Object.assign({}, p, { track: P.trackRecord(p.values, fl), text: P.toChangeText(p) })),
       experiments: exps, proposals, nudges: nudgesFor(exps, fl), defaultBase: base ? { id: base.id, name: base.name } : null,
       runs, suggestion, simRunning: simUp(), schema: SCHEMA.schemaMeta(),
@@ -154,11 +192,24 @@ function createStore(o) {
       return { ok: true, profile: p, kind: 'profile' };
     }
     const changes = r.changes.filter(c => !c.same).map(c => ({ id: c.id, from: c.from, to: c.to }));
+    // v6.33.0: the same change as a test that's already running or saved → point at it, don't copy it
+    const sig = cs => cs.map(c => c.id + '=' + JSON.stringify(c.to)).sort().join('|');
+    const dup = st.profiles.find(p => p.source === 'experiment' && (p.status === 'active' || p.status === 'draft') && sig(p.changes || []) === sig(changes));
+    if (dup) return { ok: false, duplicate: true, id: dup.id, status: dup.status, msg: '"' + dup.name + '" is already ' + (dup.status === 'active' ? 'running' : 'saved') + '. Nothing new was created.' };
+    if (!changes.length) return { ok: false, msg: 'Your sim already has every setting in that block, so there is nothing to test.' };
+    // starting it now while another test runs: ask first (nothing is created until you choose)
+    const running = activeTest(st);
+    if (a.start && running && !a.endTest) return needsEnd(running);
     const values = Object.assign({}, r.base.values); for (const c of changes) values[c.id] = c.to;
     const e = { id: newId(), name: r.name.slice(0, 80), source: 'experiment', status: 'draft', created: new Date().toISOString(),
       baseId: r.base.id, baseName: r.base.name, baseValues: r.base.values, values, changes, budget: r.budget, why: r.why, warnings: r.warnings };
     st.profiles.push(e); save(st);
     log('[PROFILES] experiment created "' + e.name + '" on base "' + e.baseName + '": ' + changes.map(c => c.id + ' ' + c.from + '->' + c.to).join(', '));
+    if (a.start) {                                   // "Start test" = create + apply in one step
+      const ar = apply({ id: e.id, endTest: !!a.endTest });
+      if (!ar.ok) return { ok: true, experiment: e, kind: 'experiment', started: false, msg: 'Saved "' + e.name + '" for later. ' + ar.msg };
+      return Object.assign(ar, { experiment: e, kind: 'experiment', started: true });
+    }
     return { ok: true, experiment: e, kind: 'experiment' };
   }
   // Keep → fold the change into the base profile (or save a new profile if the base was ABRP
@@ -255,6 +306,14 @@ function createStore(o) {
     else if (/^run-/.test(a.id || '')) { const r = P.historyRuns(flights()).find(x => x.id === a.id); if (r) { values = r.values; name = r.name; } }
     else { const p = st.profiles.find(x => x.id === a.id); if (p) { values = p.values; name = p.name; } }
     if (!values) return { ok: false, msg: 'Profile not found.' };
+    // v6.33.0: applying anything else (incl. Undo) while a test runs ends that test — ask first, unless
+    // the result keeps the test's settings anyway. Re-applying the test itself is always fine.
+    const running = activeTest(st);
+    if (running && a.id !== running.id && !keepsTest(running, values, a.includeLod || a.undo)) {
+      if (!a.endTest) return needsEnd(running);
+      if (simUp()) return { ok: false, msg: 'MSFS is running. Close the sim first: it only reads its settings at launch and overwrites them when it exits.' };
+      endTestFor(a.undo ? 'undo' : 'applied "' + name + '"');
+    }
     const r = applyValues(values, name, a.id, a);
     // applying an experiment starts it (draft → active); re-applying an active one is fine
     if (r.ok && !a.undo) {

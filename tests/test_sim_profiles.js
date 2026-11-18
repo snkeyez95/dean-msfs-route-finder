@@ -138,10 +138,11 @@ try {
 
 // ── 5. SURFACE: the real renderer from index.html, fed by the store ──
 {
-  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel'];
+  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel', '_spDots', '_spTestBanner', '_spEndAskCard', '_spStartCard', '_spClipCard', '_spDupOf', '_spExpActions'];
   const els = {};
   const src = 'let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;\n'
     + 'let _spPaste={open:false,text:"",preview:null}, _spShowFinished=false;\n'
+    + 'let _spClip=null, _spStart=null, _spEndAsk=null, _spMoreOpen=null;\n' + X.html.match(/const _SP_BAN=[^\n]*/)[0] + '\n'   // v6.33.0 test-flow pieces
     + 'const document={getElementById:id=>(els[id]=els[id]||{innerHTML:"",focus(){},select(){}}),querySelector:()=>null};\n'
     + X.html.match(/const _LABV=\{[\s\S]*?\n\};/)[0] + '\n' + X.html.match(/const _SP_EXP_STATUS=[^\n]*/)[0] + '\n'
     + X.grab('esc') + '\n' + names.map(n => X.grab(n)).join('\n')

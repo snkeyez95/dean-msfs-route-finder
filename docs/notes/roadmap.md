@@ -1,3 +1,12 @@
+# v6.33.0 — SIM PROFILES TESTS SIMPLIFIED (Dean 2026-11-18)
+> ✅ BUILT (awaiting release.bat; includes v6.32.1 SimBrief ATIS-runway wait). After 3 slips in one session (stray draft from
+> "Start experiment", applying ABRP Suggested mid-test silently undid it, duplicate from re-paste). Store: list().test summary
+> (n/budget/done/matches/off), apply()/undo refuse with needsEndTest unless endTest (or the result keeps the tested keys),
+> experimentCreate dedupes active/draft with same changes, {start:true} = create+apply. UI: top banner (none/running/off/finished),
+> "This ends your running test" card (Keep testing = primary), one-confirm Start card, clipboard prompt instead of auto-open,
+> running card = Applied / End test early / More; drafts "Saved for later" + Start test; ideas "Available after this test".
+> tests/test_sim_test_flow.js 27/27 on copies of real data; all 8 states visually checked in the browser pane.
+
 # v6.32.0 — GSX DROP ZONE VERSION CHECK (Dean 2026-11-15)
 > ✅ BUILT (awaiting release.bat). gsx-install-dropped: GSXP.compareDrop → identical = "already up to date" (no rewrite, no
 > record), newer = replace in place (incl. subfolder copy), OLDER .ini = ask (olderChoice keep|install; scripts follow by stem).

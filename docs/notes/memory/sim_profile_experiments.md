@@ -8,7 +8,7 @@ metadata:
   modified: 2026-11-10T18:30:03.935Z
 ---
 
-Since v6.28.0, when I suggest an MSFS graphics change, I give Dean a **paste block** instead of in-sim instructions. He pastes it in Sim Profiles → ＋ New experiment (ABRP also auto-detects it on the clipboard), saves, then applies it with the sim closed. ABRP judges it from his next flights (per-aircraft, ±1σ noise) and shows Keep / Revert.
+Since v6.28.0, when I suggest an MSFS graphics change, I give Dean a **paste block** instead of in-sim instructions. Since v6.33.0 the flow is: he copies it → opens Sim Profiles → **Start test** on the "Claude's block on your clipboard" prompt → confirm (sim closed). One test at a time is ENFORCED (a second can only be "Saved for later"; applying another profile/Undo mid-test asks first). Only suggest a new test when none is running. A top banner tells him the state; tell him "nothing to do, just fly" while one runs. He pastes it in Sim Profiles → ＋ New experiment (ABRP also auto-detects it on the clipboard), saves, then applies it with the sim closed. ABRP judges it from his next flights (per-aircraft, ±1σ noise) and shows Keep / Revert.
 
 Format (put it in a ```text block so he can copy it in one go):
 ```

@@ -172,10 +172,11 @@ try {
 // ── 6. SURFACE: the page Dean sees ──
 {
   const listed = store.list();
-  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel'];
+  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel', '_spDots', '_spTestBanner', '_spEndAskCard', '_spStartCard', '_spClipCard', '_spDupOf', '_spExpActions'];
   const els = {};
   const src = 'let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;\n'
     + 'let _spPaste={open:false,text:"",preview:null}, _spShowFinished=false;\n'
+    + 'let _spClip=null, _spStart=null, _spEndAsk=null, _spMoreOpen=null;\n' + X.html.match(/const _SP_BAN=[^\n]*/)[0] + '\n'   // v6.33.0 test-flow pieces
     + 'const document={getElementById:id=>(els[id]=els[id]||{innerHTML:"",focus(){},select(){}}),querySelector:()=>null};\n'
     + X.html.match(/const _LABV=\{[\s\S]*?\n\};/)[0] + '\n' + X.html.match(/const _SP_EXP_STATUS=[^\n]*/)[0] + '\n'
     + X.grab('esc') + '\n' + names.map(n => X.grab(n)).join('\n')
@@ -186,8 +187,8 @@ try {
   // by the end of the lifecycle run every proposal has been used up; show the list with Dean's real headroom
   const realPr = P.proposeExperiments(loadFlights(path.join(X.APP_DATA, 'Sessions')), start, { baseName: 'ABRP Suggested' });
   const hp = (R.set({ _SP: Object.assign({}, listed, { proposals: realPr }) }), R.render()); R.set({ _SP: listed });
-  T('   with Dean\'s real GPU headroom, "Suggested experiments" lists Light shafts Ultra + Start experiment', /Suggested experiments/.test(hp) && /Light shafts Ultra/.test(hp) && hp.includes('Start experiment'));
-  T('   the new draft shows READY TO APPLY on its base', /READY TO APPLY/.test(h0));
+  T('   with Dean\'s real GPU headroom, "Suggested experiments" lists Light shafts Ultra + Start test', /Suggested experiments|Next ideas/.test(hp) && /Light shafts Ultra/.test(hp) && (hp.includes('>Start test<') || hp.includes('Available after this test')));
+  T('   the new draft shows SAVED FOR LATER on its base (v6.33.0 wording)', /SAVED FOR LATER/.test(h0));
   const h1 = (R.set({ _spShowFinished: true }), R.render());
   T('   finished experiments listed with KEPT / REVERTED / ENDED + verdict word', /KEPT/.test(h1) && /REVERTED/.test(h1) && /ENDED/.test(h1) && /FREE UPGRADE/.test(h1));
   const kept = listed.experiments.find(e => e.status === 'kept');
