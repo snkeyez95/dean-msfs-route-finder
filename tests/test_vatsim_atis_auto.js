@@ -50,7 +50,7 @@ T('does NOT fight a manual revert', decide({autoAtis:true, weatherButton:true, a
 T('does NOT apply when no controller is staffing the ATIS', decide({autoAtis:true, weatherButton:true, alreadyVatsim:false, reverted:false, available:false}) === false);
 
 // ── the shipped condition string is actually present in fetchDatis ──
-const fd = grab('fetchDatis');
+const fd = grab('_fetchDatisInner');   // v6.32.1: fetchDatis is now a wrapper that tracks in-flight loads
 T('fetchDatis gates auto-apply on autoAtis + weatherButton', /vCfg\(\)\.autoAtis && vCfg\(\)\.weatherButton/.test(fd));
 T('fetchDatis skips when already vatsim or user-reverted', /!\(cur&&cur\.vatsim\) && !\(S\._vatsimReverted&&S\._vatsimReverted\[icao\]\)/.test(fd));
 T('fetchDatis only auto-applies when vatsimAtisAvail is true', /if\(vatsimAtisAvail\(icao\)\)\{ const d=vatsimAtisData\(icao\)/.test(fd));

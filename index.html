@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.32.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.32.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.32.0</div>
+    <div class="sb-ver">v6.32.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -6140,12 +6140,30 @@ function openSimBrief(dep,arr,type,url){
   // Plan a Flight until next launch (it still appears in the dashboard recent list immediately).
   (S.sessionSimBrief||(S.sessionSimBrief=new Set())).add([dep,arr].sort().join('>'));
   window.api.saveConfig(S.cfg);
-  // pre-fill SimBrief runways from live D-ATIS when we have them
+  sbOpenWithRunways(dep,arr,url);
+  renderDashRecent();
+}
+// v6.32.1: pre-fill SimBrief runways from the live ATIS. If an airport's ATIS is still loading, wait for
+// it (up to SB_RWY_WAIT_MS) rather than opening SimBrief with no runway — SimBrief would then pick its
+// own (KBOS: 33L instead of the ATIS's 22L). Opens anyway after the wait, and says so.
+const SB_RWY_WAIT_MS=10000;
+async function sbOpenWithRunways(dep,arr,url){
+  const pending=[];
+  for(const [ic,side] of [[dep,'dep'],[arr,'arr']]){
+    if(datisActiveRwy(ic,side))continue;
+    const set=(S._atisInflight||{})[(ic||'').toUpperCase()];
+    if(set&&set.size) pending.push(...set);
+  }
+  if(pending.length){
+    gsxToast('Getting active runways from the ATIS before opening SimBrief…');
+    await Promise.race([Promise.allSettled(pending), new Promise(r=>setTimeout(r,SB_RWY_WAIT_MS))]);
+  }
   const orw=datisActiveRwy(dep,'dep'), drw=datisActiveRwy(arr,'arr');
   if(orw)url+=(url.includes('?')?'&':'?')+'origrwy='+encodeURIComponent(orw);
   if(drw)url+=(url.includes('?')?'&':'?')+'destrwy='+encodeURIComponent(drw);
+  RLOG('[SB] SimBrief: dep '+dep+' RWY '+(orw||'none sent')+' · arr '+arr+' RWY '+(drw||'none sent')+(pending.length?' (waited for ATIS)':''));
+  if(pending.length&&(!orw||!drw)) gsxToast('No active runway yet for '+[!orw?dep:null,!drw?arr:null].filter(Boolean).join(' & ')+' — SimBrief will pick one');
   window.api.openExternal(url);
-  renderDashRecent();
 }
 
 // One click from the dashboard back to a planned flight's full panel (weather, D-ATIS, runways,
@@ -7431,7 +7449,17 @@ function datisActiveRwy(icao,side){
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // fetch + render D-ATIS into the expanded panel. prefix:''|'fr'|'tp', side:'dep'|'arr'
-async function fetchDatis(icao,idx,side,prefix){
+// v6.32.1: track each airport's ATIS load while it runs, so Open in SimBrief can wait for the active
+// runway instead of sending none (KBOS 2026-11-18: SimBrief opened 11 s before KBOS's SI ATIS arrived,
+// got no origrwy and picked 33L itself while the ATIS said 22L).
+function fetchDatis(icao,idx,side,prefix){
+  const k=(icao||'').toUpperCase();
+  const p=_fetchDatisInner(icao,idx,side,prefix);
+  if(k){ const set=(S._atisInflight||(S._atisInflight={}))[k]||(S._atisInflight[k]=new Set()); set.add(p);
+    p.finally(()=>{ set.delete(p); }); }
+  return p;
+}
+async function _fetchDatisInner(icao,idx,side,prefix){
   prefix=prefix||'';
   const rwyEl=document.getElementById(prefix+'rwy-'+side+'-'+idx);
   const box=document.getElementById(prefix+'datis-'+side+'-'+idx);
@@ -7443,7 +7471,9 @@ async function fetchDatis(icao,idx,side,prefix){
   let _vb=document.getElementById(prefix+'vbtn-'+side+'-'+idx);
   if(!_vb&&box.parentNode){ _vb=document.createElement('div'); _vb.id=prefix+'vbtn-'+side+'-'+idx; _vb.style.marginTop='4px'; box.parentNode.insertBefore(_vb, box.nextSibling); }
   // ensure the airport's runway list is loaded so runway tokens validate correctly
-  try{await fetchRwyData(icao);}catch(e){}
+  // v6.32.1: look up the runway table IN PARALLEL with the SI/VATSIM ATIS (it was awaited first and took
+  // ~11 s for KBOS, delaying the ATIS behind it). Awaited below, before anything reads the runway table.
+  const _rwyP=fetchRwyData(icao).catch(()=>{});
   // AUTO-DEFAULT to VATSIM ATIS (Dean 2026-07-17): if enabled AND a controller is staffing this
   // field's ATIS AND it's not already applied AND the user hasn't manually reverted it this session,
   // make VATSIM the source BEFORE the render below — so it just shows, no click needed. Set the cache
@@ -7479,6 +7509,7 @@ async function fetchDatis(icao,idx,side,prefix){
     try{data=await window.api.fetchDatis({icao});}catch(e){data=null;}
     if(data)S.datisCache[icao]={data,ts:Date.now()};
   }
+  await _rwyP;
   // make sure the panel is still open on this route
   if(!document.getElementById(prefix+'datis-'+side+'-'+idx))return;
   const block=datisBlockFor(data,side);
@@ -8397,6 +8428,13 @@ async function siWxFetch(icao){
   const c=S.siWxCache[icao];
   if(c&&c.data&&(Date.now()-c.ts)<600000) return c.data;
   const key=(S.cfg.siApiKey||'').trim(); if(!key)return null;
+  // v6.32.1: the departure and arrival panels (and the button) asked for the same airport at once —
+  // three identical requests for KBOS. Share one in-flight request per airport.
+  const inf=S._siWxInflight||(S._siWxInflight={});
+  if(inf[icao]) return inf[icao];
+  return (inf[icao]=_siWxFetchNet(icao,key).finally(()=>{ delete inf[icao]; }));
+}
+async function _siWxFetchNet(icao,key){
   try{
     const r=await window.api.siFetchWx({icao,apiKey:key});
     if(r&&r.ok&&r.data&&Array.isArray(r.data.airports)){
@@ -9276,5 +9314,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.32.0</div>
+  pointer-events:none;">v6.32.1</div>
 </body></html>

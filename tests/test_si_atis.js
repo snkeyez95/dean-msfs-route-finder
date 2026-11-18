@@ -89,7 +89,7 @@ mod.applySiAtis('kjfk', 0, 'arr', '');   // lower-case
 T('apply upper-cases the ICAO key', !!(S.datisCache.KJFK && S.datisCache.KJFK.si));
 
 // ── (d) the shipped wiring/labels inside fetchDatis + neighbours ──
-const fd = grab('fetchDatis');
+const fd = grab('_fetchDatisInner');   // v6.32.1: fetchDatis is now a wrapper that tracks in-flight loads
 T('fetchDatis resolves the source', /_atisSrc\s*=\s*atisSourceResolved\(\)/.test(fd));
 T('fetchDatis has an SI auto-apply branch gated on a key', /_atisSrc==='si' && \(S\.cfg\.siApiKey\|\|''\)\.trim\(\)/.test(fd));
 T('fetchDatis auto-applies SI only when siAtisAvail', /if\(siAtisAvail\(icao\)\)\{ const d=siAtisData\(icao\)/.test(fd));
