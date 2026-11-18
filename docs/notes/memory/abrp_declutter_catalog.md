@@ -39,3 +39,11 @@ I **catalog only**. Nothing gets changed until he asks for a full debrief, which
 Side observation (not a catalog item unless he says so): "✱ Fresh routes" hides any city pair among the last
 30 SimBriefed flights, but the dashboard "Recent routes" lists only FLOWN flights (since v6.10.6). A planned
 but never-flown pair still hides from Fresh until removed from Recent Routes. Related: [[fresh-routes-removal-timing]].
+
+4. **Sim Profiles → Experiments page is confusing (2026-11-18).** Dean couldn't tell what to do after starting
+   "Contact shadows Ultra": it was already applied and active, but a second proposal ("Raymarched reflections
+   Ultra", created 8 s later — likely an accidental Start click) sat above it as a draft with its Apply
+   confirmation open. Its base was "your settings when created" (already incl. contact shadows), so applying it
+   would have stacked two changes. Ideas for debrief: while a test is active, hide/disable Start on proposals
+   and say "one test at a time"; show the active test first with a plain "Nothing to do — just fly" line;
+   collapse drafts; don't let a draft's base silently include an in-progress test.
