@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.33.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.34.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.33.0</div>
+    <div class="sb-ver">v6.34.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1580,6 +1580,7 @@ function sw(t){
   if(t==='routes'){
     (async()=>{
       S.routeRegistry=await window.api.siGetRegistry();
+      if(!LATC.db&&!LATC.dbLoading) latcEnsureDb().then(()=>{ if(document.getElementById('pane-routes').classList.contains('on'))renderRoutes(); });   // v6.34.0: coordinates for true distances
       if((S.cfg.freshLevel||0)>=2)await loadFlownLog();   // pick up a flight filed since the last look
       renderRoutes();updateStats();
       fetchMetarBatch();
@@ -3675,7 +3676,7 @@ function getRoutes(){
       return(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0);
     }
     if(srt==='airline')return(a.airline||'').localeCompare(b.airline||'');
-    if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
+    if(srt==='dist')return(routeNm(a)||0)-(routeNm(b)||0);
     if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
     if(srt==='wx-worst'||srt==='wx-best'){
       // Stale observations (>3h — e.g. airports that don't report overnight) can't be trusted to
@@ -3733,7 +3734,7 @@ function renderRoutes(){
     const simAcft=SI_ACFT_MAP[r.aircraft_type]||'a320';
     const simLbl=FLEET_LBL[r.aircraft_type]||SIM_LBL[simAcft]||r.aircraft_type;
     const dur=fmtFlightLen(r.flight_length);
-    const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
+    const dist=routeNm(r)!=null?routeNm(r)+' nm':'—';
     const _wxPill=getWxPill(r,i);
     const _vsPill=VSCORE.on?getVatsimPill(r):'';    // 📡 stacked under the WX pill only while the toggle is on
     const main=`<tr class="dr${isO?' open':''}" onclick="togR(${i})">
@@ -3924,7 +3925,7 @@ function exportCSV(){
     const simAcft=SI_ACFT_MAP[r.aircraft_type]||'';
     return[r.callsign,r.airline,r.departure_airport,r.arrival_airport,
       r.aircraft_type,SIM_LBL[simAcft]||'',fmtFlightLen(r.flight_length),
-      r.distance_nm?Math.round(r.distance_nm)+'nm':'',
+      routeNm(r)!=null?routeNm(r)+'nm':'',
       (()=>{const al=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';const fn=(r.callsign||'').replace(/^[A-Z]+/,'');let u=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${SIM_SB[simAcft]||'A320'}`;if(al)u+=`&airline=${al}`;if(fn)u+=`&fltnum=${fn}`;return u;})()
     ].join(',');
   });
@@ -4047,7 +4048,7 @@ function getFreeRouteResults(){
   }
   rs.sort((a,b)=>{
     if(srt==='airline')return(a.airline||'').localeCompare(b.airline||'');
-    if(srt==='dist')return(a.distance_nm||0)-(b.distance_nm||0);
+    if(srt==='dist')return(routeNm(a)||0)-(routeNm(b)||0);
     if(srt==='reliable')return(b.times_seen||0)-(a.times_seen||0);
     if(srt==='wx-worst'||srt==='wx-best'){
       // Stale observations (>3h — e.g. airports that don't report overnight) can't be trusted to
@@ -4158,7 +4159,7 @@ function renderFreeRouteResults(){
     const simAcft=SI_ACFT_MAP[r.aircraft_type]||'a320';
     const simLbl=FLEET_LBL[r.aircraft_type]||SIM_LBL[simAcft]||r.aircraft_type;
     const dur=fmtFlightLen(r.flight_length);
-    const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
+    const dist=routeNm(r)!=null?routeNm(r)+' nm':'—';
     const dep=r.departure_airport,arr=r.arrival_airport;
     const depM=S.metarCache[dep.toUpperCase()];
     const arrM=S.metarCache[arr.toUpperCase()];
@@ -4536,7 +4537,7 @@ function renderTripCard(){
     const libTag=`<span style="display:inline-flex;align-items:center;font-size:9px;font-weight:700;color:var(--acc);background:var(--acc2);border:1px solid rgba(245,166,35,.25);border-radius:20px;padding:0 5px;margin-left:3px;font-family:'JetBrains Mono',monospace">&#10003;</span>`;
     const route=leg.routeId?S.routeRegistry[leg.routeId]||null:null;
     const simLbl=route?(FLEET_LBL[route.aircraft_type]||SIM_LBL[SI_ACFT_MAP[route.aircraft_type]]||route.aircraft_type):'—';
-    const dist=route&&route.distance_nm?Math.round(route.distance_nm)+' nm':'—';
+    const dist=route&&routeNm(route)!=null?routeNm(route)+' nm':'—';
     const airline=route?route.airline:plan.carrier;
     const depM=S.metarCache[leg.dep];
     const arrM=S.metarCache[leg.arr];
@@ -7841,6 +7842,30 @@ function gcDist(lat1,lon1,lat2,lon2){
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLon/2)**2;
   return R*2*Math.asin(Math.sqrt(a));
 }
+// v6.34.0 — TRUE route distance. SayIntentions' "distance_nm" is really statute miles (it is 1.152× the
+// great-circle distance on 3,986 routes with almost no spread: the statute/nautical ratio is 1.1508), so
+// every distance read ~15% long (KCLE→KATL 556 shown vs 483 nm). Distance is computed from the two
+// airports' coordinates — the standard airport-to-airport distance every distance service uses — from the
+// OurAirports database (99.4% of routes) or the built-in airport list, else SI's figure ÷ 1.1508.
+const SI_STATUTE_TO_NM=1.1508;
+let _rnmCache=new Map(), _rnmDb=null;
+function _latcDb(){ try{ return LATC.db||null; }catch(_){ return null; } }   // LATC is declared later in the file
+function _aptLL(ic){
+  const db=_latcDb(), a=db&&db.get(ic); if(a&&a.lat!=null&&a.lon!=null)return [+a.lat,+a.lon];
+  const b=AI[ic]; if(b&&b[4]!=null&&b[5]!=null)return [+b[4],+b[5]];
+  return null;
+}
+function routeNm(r){
+  if(!r)return null;
+  if(_rnmDb!==_latcDb()){ _rnmCache=new Map(); _rnmDb=_latcDb(); }   // the full DB arrived → recompute
+  const k=r.departure_airport+'>'+r.arrival_airport;
+  if(_rnmCache.has(k))return _rnmCache.get(k);
+  const a=_aptLL(r.departure_airport), b=_aptLL(r.arrival_airport);
+  let nm=null;
+  if(a&&b) nm=Math.round(gcDist(a[0],a[1],b[0],b[1]));
+  else if(+r.distance_nm>0) nm=Math.round(+r.distance_nm/SI_STATUTE_TO_NM);
+  _rnmCache.set(k,nm); return nm;
+}
 function flightMins(nm){return Math.round((nm/450)*60*1.10)+BLOCK_PAD_MIN;}   // block estimate, same taxi pad as route durations
 
 // ── LIVE ATC (VATSIM frequency helper) ───────────────────────────────────────
@@ -9104,7 +9129,7 @@ function chRoutesHTML(ch){
     if(r.arrival_airport!==ch.icao||!activeFleet.has(r.aircraft_type))return false;
     if(scenic){ const bl=blockLen(r.flight_length); return bl==null||bl<=capMins; }
     return S.selICAOs.has(r.departure_airport);
-  }).sort((a,b)=>(a.distance_nm||0)-(b.distance_nm||0));
+  }).sort((a,b)=>(routeNm(a)||0)-(routeNm(b)||0));
   let routes=pick(S.routeRegistry);
   if(scenic&&!routes.length)routes=pick(S.routeRegistrySnapshot||{});   // snapshot fallback
   // de-dup by dep→arr pair, keep a handful
@@ -9129,7 +9154,7 @@ function chRoutesHTML(ch){
     const sbAirline=(r.airline||'').match(/\(([^)]+)\)/)?.[1]||'';
     const sbFltnum=(r.callsign||'').replace(/^[A-Z]+/,'');
     const sbU=`https://dispatch.simbrief.com/options/custom?orig=${r.departure_airport}&dest=${r.arrival_airport}&type=${r.aircraft_type}`+(sbAirline?'&airline='+sbAirline:'')+(sbFltnum?'&fltnum='+sbFltnum:'');
-    const dist=r.distance_nm?Math.round(r.distance_nm)+' nm':'—';
+    const dist=routeNm(r)!=null?routeNm(r)+' nm':'—';
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep);font-size:12px">
       <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--acc);white-space:nowrap;flex-shrink:0">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</span>
       <span style="color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.airline||r.callsign)||'&mdash;'}</span>
@@ -9467,5 +9492,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.33.0</div>
+  pointer-events:none;">v6.34.0</div>
 </body></html>
