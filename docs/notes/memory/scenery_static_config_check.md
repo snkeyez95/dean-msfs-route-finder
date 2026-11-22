@@ -60,5 +60,6 @@ lever. See [[dean_colorblind]] is unrelated; relevant perf context in the roadma
 - KPSP 1.1.1: statics, gse
 - EGLL 1.1.1: GSE; T1 + T4 swapped to LowDetail (HD textures KEPT by Dean's choice — SD is the next lever if Heathrow VRAM stays tight)
 - LEIB 1.0.3: gse · LOWI 1.0.3: gse
+- KLAX 1.0.4 (added 2026-11-21): statics, GSE-general (Sceneryirport-klax-losangeles\klax-scene\klax-scene-statics.bgl / klax-scene-GSE-general.bgl → .disabled). KLVB Venice Beach is now INSIDE the KLAX package (its separate folder is gone); Hooper heliport too.
 - KBFM 1.1.0 (Drzewiecki): nothing; unlisted KBFM_Static.BGL untouched (unknown contents)
 Medium items without a GSX substitute (clutter, people) stay ON. Source note: Dean uses sceneryaddons.org only as a readme reference (keeps the iniBuilds installer uninstalled).
