@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.34.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.35.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.34.0</div>
+    <div class="sb-ver">v6.35.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -527,6 +527,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
       </div>
       <div class="crow" id="fresh-row">
         <div class="chip sq" id="vatsim-toggle-btn" style="margin-left:auto" onclick="toggleVatsimRoutes()" title="Score routes by live VATSIM ATC coverage (arrival-weighted: staffed arrival > departure > enroute Centers)">&#128225; VATSIM</div>
+        <div class="chip sq" id="group-toggle-btn" onclick="toggleGroupRepeats()" title="Show one row per route + airline + aircraft (×N = scheduled flights; open the row to pick one). Off = every flight on its own row.">&#10697; Group repeats</div>
         <span style="font-size:11px;color:var(--ink3);margin-left:10px" title="Hide routes you've done recently. Each level hides more; set how far back each looks in Settings → Fresh Routes.">&#10038; Fresh:</span>
         <div class="chip sq" data-fresh="0" onclick="setFreshLevel(0)" title="Show every route">Off</div>
         <div class="chip sq" data-fresh="1" onclick="setFreshLevel(1)" title="Hide city pairs you've SimBriefed recently (either direction)">Same route</div>
@@ -1411,7 +1412,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // v6.31.0: Fresh routes has 4 levels (cfg.freshLevel 0-3). Older configs only had the on/off freshOnly.
   if(typeof S.cfg.freshLevel!=='number')S.cfg.freshLevel=S.cfg.freshOnly?1:0;
   S.freshOnly=S.cfg.freshLevel>0;
-  paintFreshChips();
+  paintFreshChips(); paintGroupChip();
   loadFlownLog();
   // ⏱ duration chips + route sort restore (v6.26.0)
   S.durBands=(Array.isArray(S.cfg.durBands)?S.cfg.durBands:[]).filter(b=>DUR_BANDS[b]);
@@ -3704,6 +3705,43 @@ function populateAirlineDropdown(){
   if(prev&&!airlines.includes(prev))S.acFilter='';
 }
 
+// ── ⧉ GROUP REPEATS (v6.35.0, Dean 2026-11-23) ─────────────────────────────────────────────────
+// SayIntentions lists every scheduled flight separately (KDEN→KHDN has 11 United A319 flights), so the
+// list was mostly near-duplicates. With "Group repeats" on (default) one row stands for every flight with
+// the same route + airline + aircraft: a ×N tag, the usual (median) duration with the range on hover, and
+// the individual flights listed in the open row — pick one and SimBrief gets that flight number (default:
+// the most-seen one). Filters and sorting run on the flights first; a group sits where its first flight
+// sorts. Switch it off for the full list. CSV export always lists every flight.
+function routeGroupKey(r){ return r.departure_airport+'>'+r.arrival_airport+'|'+(r.airline||'')+'|'+(r.aircraft_type||''); }
+function groupRepeatsOn(){ return !(S.cfg&&S.cfg.groupRepeats===false); }
+function getDisplayRoutes(){
+  const rs=getRoutes();
+  if(!groupRepeatsOn()) return rs;
+  const m=new Map();
+  for(const r of rs){ const k=routeGroupKey(r); let g=m.get(k); if(!g){ g={key:k,members:[]}; m.set(k,g); } g.members.push(r); }
+  const picks=S.groupPick||{};
+  return [...m.values()].map(g=>{
+    if(g.members.length===1) return g.members[0];
+    const rep=g.members.find(x=>x.id===picks[g.key])||g.members.slice().sort((a,b)=>(b.times_seen||0)-(a.times_seen||0)||String(a.id).localeCompare(String(b.id)))[0];
+    const mins=g.members.map(x=>parseInt(x.flight_length)).filter(x=>x>0).sort((a,b)=>a-b);
+    return Object.assign({},rep,{_grp:{key:g.key,members:g.members,n:g.members.length,
+      med:mins.length?mins[Math.floor((mins.length-1)/2)]:null,min:mins[0]||null,max:mins[mins.length-1]||null}});
+  });
+}
+function toggleGroupRepeats(){ S.cfg.groupRepeats=!groupRepeatsOn(); window.api.saveConfig(S.cfg); paintGroupChip(); S.openRoute=null; renderRoutes(); }
+function paintGroupChip(){ const b=document.getElementById('group-toggle-btn'); if(b)b.classList.toggle('on',groupRepeatsOn()); }
+function pickGroupFlight(key,id){ (S.groupPick||(S.groupPick={}))[key]=id; renderRoutes(); }
+function _grpFlightsHtml(r){
+  const g=r._grp; if(!g) return '';
+  const rows=g.members.slice().sort((a,b)=>(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0)).map(x=>{
+    const on=x.id===r.id, gt=(x.gate_origin||x.gate_destination)?((x.gate_origin||'?')+' → '+(x.gate_destination||'?')):'—';
+    return '<div class="dpr grp-fl" style="cursor:pointer'+(on?';background:var(--acc3)':'')+'" onclick="event.stopPropagation();pickGroupFlight('+esc(JSON.stringify(g.key))+','+esc(JSON.stringify(x.id))+')" title="Use this flight for SimBrief">'
+      +'<span class="dl" style="font-family:\'JetBrains Mono\',monospace;color:'+(on?'var(--acc)':'var(--ink1)')+'">'+(on?'✓ ':'')+esc(x.callsign||'—')+'</span>'
+      +'<span class="dv2" style="font-size:11px">'+esc(gt)+' · '+fmtFlightLen(x.flight_length)+(x.times_seen>1?' · seen '+x.times_seen+'×':'')+'</span></div>';
+  }).join('');
+  return '<div class="dp-sec" style="grid-column:1/-1"><div class="dp-st">'+g.n+' flights on this route &mdash; pick one for SimBrief</div>'+rows+'</div>';
+}
+
 function renderRoutes(){
   if(S.freeRouteMode){renderFreeRouteResults();updateStats();return;}
   // 📡 keep VATSIM scores current: refresh the feed (60s renderer cache makes this free most renders)
@@ -3714,11 +3752,11 @@ function renderRoutes(){
   if(VSCORE.on&&VSCORE.ready){ vatsimFeedGet().then(f=>{ if(f&&f.ts&&f.ts!==VSCORE.ts&&VSCORE.on&&!S.freeRouteMode){ VSCORE.cache.clear(); VSCORE.ts=f.ts; renderRoutes(); } }); }
   console.log('[WX] buildRouteList: metarCache has',Object.keys(S.metarCache||{}).length,'entries');
   populateAirlineDropdown();
-  const rs=getRoutes();
+  const rs=getDisplayRoutes();
   {const fn=document.getElementById('fresh-note'); if(fn){ const h=freshNoteHtml(); fn.innerHTML=h; fn.style.display=h?'block':'none'; }}
-  const cnt=rs.length;
+  const cnt=rs.length, flights=rs.reduce((n,r)=>n+(r._grp?r._grp.n:1),0);
   const regSize=Object.keys(S.routeRegistry).length;
-  document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(regSize?'':' — paste cookie and click Refresh Routes');
+  document.getElementById('rcnt').textContent=cnt+' route'+(cnt!==1?'s':'')+' found'+(flights>cnt?' · '+flights+' flights':'')+(regSize?'':' — paste cookie and click Refresh Routes');
   if(!cnt){
     const msg=!regSize
       ?'Fastest start: download the free Community Routes database (10,000+ real routes, no account needed). Or paste your SayIntentions cookie in Settings and click Refresh Routes.'
@@ -3733,7 +3771,8 @@ function renderRoutes(){
     const aa=AI[r.arrival_airport]||[r.arrival_airport,'','',''];
     const simAcft=SI_ACFT_MAP[r.aircraft_type]||'a320';
     const simLbl=FLEET_LBL[r.aircraft_type]||SIM_LBL[simAcft]||r.aircraft_type;
-    const dur=fmtFlightLen(r.flight_length);
+    const dur=r._grp&&r._grp.med?'~'+fmtFlightLen(r._grp.med):fmtFlightLen(r.flight_length);
+    const durTip=r._grp&&r._grp.min?' title="Usual time across '+r._grp.n+' flights; range '+fmtFlightLen(r._grp.min)+'–'+fmtFlightLen(r._grp.max)+'"':'';
     const dist=routeNm(r)!=null?routeNm(r)+' nm':'—';
     const _wxPill=getWxPill(r,i);
     const _vsPill=VSCORE.on?getVatsimPill(r):'';    // 📡 stacked under the WX pill only while the toggle is on
@@ -3741,10 +3780,10 @@ function renderRoutes(){
       <td style="color:var(--ink3);font-size:11px;padding-left:16px;text-align:center;vertical-align:middle">${isO?'&#9660;':'&#9658;'}</td>
       <td><div class="rp">${r.departure_airport}&thinsp;&rarr;&thinsp;${r.arrival_airport}</div>
           <div class="rc">${da[1]||r.departure_airport} &rarr; ${aa[1]||r.arrival_airport}</div></td>
-      <td><div class="ra">${esc(r.airline||r.callsign)||'—'}</div></td>
+      <td><div class="ra">${esc(r.airline||r.callsign)||'—'}${r._grp?` <span class="rgrp" title="${r._grp.n} scheduled flights on this route — open the row to pick one" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);border:1px solid var(--sep);border-radius:5px;padding:0 5px;margin-left:6px">×${r._grp.n}</span>`:''}</div></td>
       <td style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono',monospace">${simLbl}</td>
       <td style="text-align:center;vertical-align:middle;padding:0 6px">${_wxPill}${_vsPill?'<div style="margin-top:2px">'+_vsPill+'</div>':''}</td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:13px">${dur}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:13px"${durTip}>${dur}</td>
       <td style="font-size:12px;color:var(--ink2)">${dist}</td>
     </tr>`;
     if(!isO)return[main];
@@ -3767,6 +3806,7 @@ function renderRoutes(){
       </div>
       ${VSCORE.on?vscoreDetailRow(r):''}
       <div class="dp-grid">
+        ${_grpFlightsHtml(r)}
         <div class="dp-sec">
           <div class="dp-st">Flight Info</div>
           <div class="dpr"><span class="dl">Airline</span><span class="dv2">${esc(r.airline)||'—'}</span></div>
@@ -3817,7 +3857,7 @@ function renderRoutes(){
 // the panel is rebuilt by something other than the toggle handler.
 function hydrateOpenRoute(){
   if(S.openRoute===null)return;
-  const r=getRoutes()[S.openRoute];
+  const r=getDisplayRoutes()[S.openRoute];
   if(!r)return;
   fetchMetar(r.departure_airport,S.openRoute,'dep');
   fetchMetar(r.arrival_airport,S.openRoute,'arr');
@@ -6301,6 +6341,7 @@ function openSimBrief(dep,arr,type,url){
 // it (up to SB_RWY_WAIT_MS) rather than opening SimBrief with no runway — SimBrief would then pick its
 // own (KBOS: 33L instead of the ATIS's 22L). Opens anyway after the wait, and says so.
 const SB_RWY_WAIT_MS=10000;
+function sbRwy(r){ if(!r) return r; return String(r).toUpperCase().trim().replace(/^(\d)(?=[LRC]?$)/,'0$1'); }
 async function sbOpenWithRunways(dep,arr,url){
   const pending=[];
   for(const [ic,side] of [[dep,'dep'],[arr,'arr']]){
@@ -6312,7 +6353,8 @@ async function sbOpenWithRunways(dep,arr,url){
     gsxToast('Getting active runways from the ATIS before opening SimBrief…');
     await Promise.race([Promise.allSettled(pending), new Promise(r=>setTimeout(r,SB_RWY_WAIT_MS))]);
   }
-  const orw=datisActiveRwy(dep,'dep'), drw=datisActiveRwy(arr,'arr');
+  // v6.35.0: SimBrief only takes two-digit runways — SI sends "5L"; SimBrief ignored it and picked 23L (KRDU 2026-11-23).
+  const orw=sbRwy(datisActiveRwy(dep,'dep')), drw=sbRwy(datisActiveRwy(arr,'arr'));
   if(orw)url+=(url.includes('?')?'&':'?')+'origrwy='+encodeURIComponent(orw);
   if(drw)url+=(url.includes('?')?'&':'?')+'destrwy='+encodeURIComponent(drw);
   RLOG('[SB] SimBrief: dep '+dep+' RWY '+(orw||'none sent')+' · arr '+arr+' RWY '+(drw||'none sent')+(pending.length?' (waited for ATIS)':''));
@@ -9492,5 +9534,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.34.0</div>
+  pointer-events:none;">v6.35.0</div>
 </body></html>

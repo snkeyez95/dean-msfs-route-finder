@@ -28,10 +28,10 @@ function makeEnv(opts) {
   const code = grab('siWxFetch') + '\n' + grab('_siWxFetchNet') + '\n' + grab('siAtisData') + '\n' + grab('datisBlockFor') + '\n' + grab('datisActiveRwy') + '\n'
     + 'function extractRunways(){return [];}\n'
     + html.slice(html.indexOf('const SB_RWY_WAIT_MS='), html.indexOf(';', html.indexOf('const SB_RWY_WAIT_MS=')) + 1).replace(/=\d+;/, '=' + sbWait + ';') + '\n'
-    + grab('sbOpenWithRunways') + '\n' + grab('fetchDatis') + '\n'
+    + grab('sbRwy') + '\n' + grab('sbOpenWithRunways') + '\n' + grab('fetchDatis') + '\n'
     // stand-in for the real loader: fetch SI and cache it the way _fetchDatisInner does
     + 'async function _fetchDatisInner(icao){ await siWxFetch(icao); const d=siAtisData(icao); if(d) S.datisCache[icao.toUpperCase()]={data:d,ts:Date.now(),si:true}; }\n'
-    + 'return {fetchDatis, sbOpenWithRunways, siWxFetch, siAtisData};';
+    + 'return {fetchDatis, sbOpenWithRunways, siWxFetch, siAtisData, sbRwy};';
   const F = new Function(...Object.keys(env), code)(...Object.values(env));
   return { F, S, opened, toasts, logs, netCalls };
 }
@@ -80,6 +80,16 @@ function makeEnv(opts) {
     const inner = grab('_fetchDatisInner');
     const iP = inner.indexOf('const _rwyP=fetchRwyData(icao)'), iSI = inner.indexOf('await siWxFetch(icao)'), iW = inner.indexOf('await _rwyP;'), iB = inner.indexOf('const block=datisBlockFor(data,side)');
     ok(iP > 0 && iP < iSI && iW > iSI && iW < iB && !/await fetchRwyData\(icao\)/.test(inner), 'runway table starts first, runs alongside the ATIS, and is awaited before the runway is read');
+  }
+  console.log('4. SimBrief needs two-digit runways (KRDU 2026-11-23: SI said 5L, SimBrief ignored it and picked 23L)');
+  {
+    const E = makeEnv({});
+    const P = E.F.sbRwy;
+    ok(P('5L') === '05L' && P('5') === '05' && P('4r') === '04R' && P('22L') === '22L' && P('01') === '01' && P('') === '' && P(null) === null, '5L→05L, 5→05, 4r→04R; 22L / 01 unchanged; empty stays empty');
+    E.S.datisCache.KRDU = { data: { hasData: true, dep: { siRwy: '5L', runways: ['5L'] }, arr: { siRwy: '5L', runways: ['5L'] }, combined: { text: 'x' } }, ts: Date.now(), si: true };
+    E.S.datisCache.KEWR = { data: { hasData: true, dep: { siRwy: '4R', runways: ['4R'] }, arr: { siRwy: '4R', runways: ['4R'] }, combined: { text: 'x' } }, ts: Date.now(), si: true };
+    await E.F.sbOpenWithRunways('KRDU', 'KEWR', 'https://www.simbrief.com/system/dispatch.php?orig=KRDU');
+    ok(/origrwy=05L/.test(E.opened[0] || '') && /destrwy=04R/.test(E.opened[0] || ''), 'the SimBrief link carries origrwy=05L and destrwy=04R', E.opened[0]);
   }
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

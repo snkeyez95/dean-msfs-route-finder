@@ -1,3 +1,10 @@
+# v6.35.0 — GROUP REPEATS + SIMBRIEF 2-DIGIT RUNWAY (Dean 2026-11-23)
+> ✅ BUILT (awaiting release.bat). Plan a Flight ⧉ Group repeats chip (cfg.groupRepeats, default on): one row per
+> route+airline+aircraft, ×N tag, median duration w/ range tooltip, open row lists flights (pick → SimBrief flight no.).
+> Off = full list (Dean's revert). Real registry 15,000 → 10,695 rows. tests/test_group_repeats.js 16/16.
+> SimBrief fix: SI active_runway '5L' was sent as origrwy=5L; SimBrief ignored it and picked 23L (KRDU). sbRwy pads to 05L.
+> test_simbrief_runway_wait.js 11/11. Seen but not fixed: KRDU card later reverted from SI ATIS to real D-ATIS (atis.info refetch 2 min after).
+
 # v6.33.0 — SIM PROFILES TESTS SIMPLIFIED (Dean 2026-11-18)
 > ✅ BUILT (awaiting release.bat; includes v6.32.1 SimBrief ATIS-runway wait). After 3 slips in one session (stray draft from
 > "Start experiment", applying ABRP Suggested mid-test silently undid it, duplicate from re-paste). Store: list().test summary
