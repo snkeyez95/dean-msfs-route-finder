@@ -22,10 +22,16 @@ function _atomic(file, data) {
 // One record per logged flight that carries a graphics snapshot (2026-07-16 onward).
 function loadFlights(sessionsDir) {
   let idx; try { idx = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'index.json'), 'utf8')); } catch (_) { return []; }
-  const out = [];
+  const out = [], taxiPool = [];
   for (const s of (idx.sessions || [])) {
     let sj = null; try { sj = JSON.parse(fs.readFileSync(path.join(sessionsDir, s.folder, 'summary.json'), 'utf8')); } catch (_) {}
-    const st = sj && sj.settings; if (!st || !st.graphics) continue;
+    const st = sj && sj.settings; if (!st) continue;
+    // v6.36.0: every flight's taxi stutter per airport END goes into the pool that experiment
+    // verdicts judge against — including flights from before graphics snapshots existed.
+    const ends = _taxiEnds(s, sj, sessionsDir);
+    const excl = !!(s.excluded || /mid-flight session/i.test(st.notes || '') || st.experiment || st.manual_capture);
+    if (!excl) for (const e of ends) taxiPool.push({ sid: s.session_id, aircraft: s.aircraft, icao: e.icao, end: e.end, stut: e.stut });
+    if (!st.graphics) continue;
     let felt = s.perceptible_count != null ? s.perceptible_count : null;
     const tm = sj.smoothness && sj.smoothness.trim_method;
     if (tm !== 'brake' && tm !== 'movement') {        // the teardown-corrected count lives in the sidecar
@@ -43,9 +49,20 @@ function loadFlights(sessionsDir) {
       dur: s.duration_seconds || sm.duration_seconds || null,
       vram: s.peak_vram_mb, vramTotal: sj.vram && sj.vram.total_vram_mb, sim: s.sim_version,
       gpu: sm.avg_gpu_busy_ms != null ? sm.avg_gpu_busy_ms : null, cpuBound: sm.cpu_bound_pct != null ? sm.cpu_bound_pct : null,
-      taxiStut: ts.length ? Math.max(...ts) : null,
+      taxiStut: ts.length ? Math.max(...ts) : null, taxiEnds: ends,
       afps: st.autofps_active ? (ac ? ac.min + '–' + ac.max : 'on') : 'off', traffic: st.online_traffic || 'offline',
       excluded: !!(s.excluded || midflight || st.experiment || st.manual_capture), settings: st });
+  }
+  out.taxiPool = taxiPool;      // rides on the array so every existing caller passes it through untouched
+  return out;
+}
+function _taxiEnds(s, sj, sessionsDir) {
+  let ph = (sj.smoothness && sj.smoothness.phases) || {};
+  if (!ph.arr_taxi && !ph.dep_taxi) { try { ph = JSON.parse(fs.readFileSync(path.join(sessionsDir, s.folder, 'phases_ext.json'), 'utf8')).phases || {}; } catch (_) {} }
+  const st = sj.settings || {}, out = [];
+  for (const [end, k, ic] of [['dep', 'dep_taxi', s.dep_icao || st.dep_icao], ['arr', 'arr_taxi', s.arr_icao || st.arr_icao]]) {
+    const v = ph[k] && ph[k].stutter_pct;
+    if (ic && v != null) out.push({ end, icao: ic, stut: v });
   }
   return out;
 }

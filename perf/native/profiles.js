@@ -464,15 +464,36 @@ function _flightMetrics(f, nm) {
     p99: f.p99 != null && nm && nm.p99 != null ? f.p99 - nm.p99 : null,                   // ms vs usual
     gpu: f.gpu != null ? f.gpu : null,                                                     // avg GPU busy ms
     vram: f.vram && f.vramTotal ? f.vram / f.vramTotal : null,                             // peak fraction
-    taxi: f.taxiStut != null ? f.taxiStut : null
+    taxi: f._taxiVsAirport != null ? f._taxiVsAirport : null
   };
+}
+// v6.36.0 airport-aware taxi stutter. A flight's taxi stutter is compared with how THAT airport end
+// (departure or arrival) usually runs in THAT aircraft, across all your other flights. Payware hubs
+// taxi rougher no matter what the graphics are, so a raw comparison blamed the setting for where you
+// landed (Contact shadows test: KSFO + KEWR arrivals read as "costs"). An end with fewer than
+// TAXI_MIN_PEERS earlier visits can't be judged and is skipped; a flight with no judgeable end
+// drops out of the taxi row only (felt stutters / P99 still count it).
+const TAXI_MIN_PEERS = 2;
+function _taxiVsAirport(f, pool) {
+  const d = [];
+  for (const e of (f.taxiEnds || [])) {
+    const peers = pool.filter(p => p.sid !== f.session_id && p.aircraft === f.aircraft && p.icao === e.icao && p.end === e.end).map(p => p.stut);
+    if (peers.length >= TAXI_MIN_PEERS) d.push(e.stut - _mean(peers));
+  }
+  return d.length ? _mean(d) : null;
+}
+function _taxiPoolFrom(flights) {
+  if (flights && flights.taxiPool) return flights.taxiPool;
+  const pool = [];
+  for (const f of (flights || [])) if (!f.excluded) for (const e of (f.taxiEnds || [])) pool.push({ sid: f.session_id, aircraft: f.aircraft, icao: e.icao, end: e.end, stut: e.stut });
+  return pool;
 }
 const _mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const _sd = a => { if (a.length < 2) return 0; const m = _mean(a); return Math.sqrt(a.reduce((s, v) => s + (v - m) * (v - m), 0) / a.length); };
 const EXP_METRICS = [
   { k: 'felt', label: 'Felt stutters (vs your usual)', judge: true, unit: '×', dec: 2 },
   { k: 'p99', label: 'P99 frametime (vs your usual)', judge: true, unit: 'ms', dec: 2 },
-  { k: 'taxi', label: 'Taxi stutter', judge: true, unit: '%', dec: 3 },
+  { k: 'taxi', label: "Taxi stutter (vs that airport's usual)", judge: true, unit: 'pts', dec: 3, minEach: 2 },
   { k: 'gpu', label: 'GPU busy per frame', judge: false, unit: 'ms', dec: 1 },
   { k: 'vram', label: 'Peak video memory', judge: false, unit: '%', dec: 0, pct: true }
 ];
@@ -480,7 +501,8 @@ const EXP_METRICS = [
 // Verdict for an experiment vs its base, on flights matched by their logged settings.
 // Same vocabulary as Settings A/B: collecting · free · saves · noeffect · costs · mixed.
 function experimentVerdict(exp, flights) {
-  const all = (flights || []).filter(f => !f.excluded);
+  const pool = _taxiPoolFrom(flights);
+  const all = (flights || []).filter(f => !f.excluded).map(f => Object.assign({}, f, { _taxiVsAirport: _taxiVsAirport(f, pool) }));
   const norms = _aircraftNorms(all);
   const on = vals => all.filter(f => { const v = fromSnapshot(f.settings); return v && _sameSetup(vals, v) && _sameSetup(v, vals); });
   const ef = on(exp.values), bf = on(exp.baseValues || {});
@@ -492,12 +514,15 @@ function experimentVerdict(exp, flights) {
     const a = em.map(x => x[m.k]).filter(v => v != null), b = bm.map(x => x[m.k]).filter(v => v != null);
     if (!a.length || !b.length) continue;
     const am = _mean(a), bmn = _mean(b), delta = am - bmn, sigma = b.length >= 2 ? _sd(b) : null;
+    const judge = m.judge && !(m.minEach && (a.length < m.minEach || b.length < m.minEach));
     const beyond = sigma != null && sigma > 0 ? Math.abs(delta) > sigma : false;
-    if (!collecting && beyond && m.judge) { if (delta > 0) worse = true; else better = true; }
+    if (!collecting && beyond && judge) { if (delta > 0) worse = true; else better = true; }
     if (!collecting && m.k === 'gpu' && delta > 0) gpuUp = true;
     if (m.k === 'vram' && am > VRAM_CAP) vramOver = true;
-    rows.push({ k: m.k, label: m.label, base: bmn, exp: am, delta, sigma, within: m.judge ? (sigma > 0 ? !beyond : null) : null, unit: m.unit, dec: m.dec, pct: !!m.pct });
+    rows.push({ k: m.k, label: m.label, base: bmn, exp: am, delta, sigma, within: judge ? (sigma > 0 ? !beyond : null) : null, unit: m.unit, dec: m.dec, pct: !!m.pct,
+      nExp: a.length, nBase: b.length });
   }
+  const tSkip = ef.length - ef.filter(f => f._taxiVsAirport != null).length + bf.length - bf.filter(f => f._taxiVsAirport != null).length;
   let verdict, sentence;
   if (collecting) { verdict = 'collecting'; sentence = 'Collecting: ' + ef.length + ' of ' + budget + ' experiment flights' + (bf.length < 2 ? (' (the base needs 2 flights too; it has ' + bf.length + ')') : '') + '.'; }
   else if (worse && better) { verdict = 'mixed'; sentence = 'Trade-off: some measures improved and others got worse, beyond your normal flight-to-flight variation.'; }
@@ -507,6 +532,7 @@ function experimentVerdict(exp, flights) {
   else { verdict = 'noeffect'; sentence = 'No measurable effect: everything stayed within your normal flight-to-flight variation.'; }
   // honesty notes: things that changed between the two sides besides the setting
   const notes = [];
+  if (tSkip > 0) notes.push("Taxi stutter is compared with each airport's usual; " + tSkip + ' flight' + (tSkip > 1 ? 's' : '') + " at airports with too little history (first visits) weren't judged on it.");
   const set = (fl, f) => [...new Set(fl.map(f))].filter(Boolean);
   const ea = set(ef, f => f.afps), ba = set(bf, f => f.afps);
   if (ea.length && ba.length && ea.join() !== ba.join()) notes.push('AutoFPS range differs: base ' + ba.join('/') + ', experiment ' + ea.join('/') + '.');

@@ -1,3 +1,6 @@
+# v6.36.0 — SIM PROFILES: AIRPORT-AWARE TAXI STUTTER (Dean 2026-11-24)
+> ✅ BUILT (awaiting release.bat). experimentVerdict taxi row = each flight's per-end taxi stutter minus that (aircraft, airport, end)'s mean across ALL other logged flights (loadFlights now builds a taxiPool from every session incl. pre-graphics; rides on the array). <2 peers → end skipped; taxi row judged only with ≥2 judgeable flights per side; note counts skipped flights. Finished cards show the live verdict + 'When you decided, this read X'. Real data: Contact shadows COSTS→FREE, Light shafts SAVES→NO EFFECT. tests/test_airport_aware_taxi.js 12/12 (incl. real card render).
+
 # v6.35.2 — AUTOFPS LOG+ SESSION LOGS (Dean 2026-11-24)
 > ✅ BUILT (awaiting release.bat). AutoFPS 0.5.7.0-test2 with Log+ writes MSFS_AutoFPS_YYYYMMDD_HHMMSS.log per session; findLogs/tailLatest only knew the daily name → EGKK-LFBD chart had no TLOD line. logsForDate() returns daily + session files; trace dedupes by timestamp; tailLatest reads the newest-written file. tests/test_autofps_logplus.js 6/6 (real log: 570 samples). EGKK-LFBD backfilled + report regenerated, raw files hash-unchanged. Contact shadows Ultra test: 3/3 flown, recommended Keep.
 
