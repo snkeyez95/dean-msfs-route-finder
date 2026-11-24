@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.35.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.35.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.35.0</div>
+    <div class="sb-ver">v6.35.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -3732,14 +3732,20 @@ function toggleGroupRepeats(){ S.cfg.groupRepeats=!groupRepeatsOn(); window.api.
 function paintGroupChip(){ const b=document.getElementById('group-toggle-btn'); if(b)b.classList.toggle('on',groupRepeatsOn()); }
 function pickGroupFlight(key,id){ (S.groupPick||(S.groupPick={}))[key]=id; renderRoutes(); }
 function _grpFlightsHtml(r){
+  // v6.35.1: a compact left-aligned table (Flight · Gates · Time · ×seen) instead of text spread to the far right.
   const g=r._grp; if(!g) return '';
+  const cols='display:grid;grid-template-columns:16px 92px 120px 64px 40px;align-items:center;column-gap:10px;padding:4px 8px;border-radius:6px;font-family:\'JetBrains Mono\',monospace;font-size:12px';
+  const head='<div style="'+cols+';font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding-top:0"><span></span><span>Flight</span><span>Gates</span><span>Time</span><span title="Times SayIntentions has listed this flight">Seen</span></div>';
   const rows=g.members.slice().sort((a,b)=>(parseInt(a.flight_length)||0)-(parseInt(b.flight_length)||0)).map(x=>{
     const on=x.id===r.id, gt=(x.gate_origin||x.gate_destination)?((x.gate_origin||'?')+' → '+(x.gate_destination||'?')):'—';
-    return '<div class="dpr grp-fl" style="cursor:pointer'+(on?';background:var(--acc3)':'')+'" onclick="event.stopPropagation();pickGroupFlight('+esc(JSON.stringify(g.key))+','+esc(JSON.stringify(x.id))+')" title="Use this flight for SimBrief">'
-      +'<span class="dl" style="font-family:\'JetBrains Mono\',monospace;color:'+(on?'var(--acc)':'var(--ink1)')+'">'+(on?'✓ ':'')+esc(x.callsign||'—')+'</span>'
-      +'<span class="dv2" style="font-size:11px">'+esc(gt)+' · '+fmtFlightLen(x.flight_length)+(x.times_seen>1?' · seen '+x.times_seen+'×':'')+'</span></div>';
+    return '<div class="grp-fl" style="'+cols+';cursor:pointer'+(on?';background:var(--acc3)':'')+'" onclick="event.stopPropagation();pickGroupFlight('+esc(JSON.stringify(g.key))+','+esc(JSON.stringify(x.id))+')" title="Use this flight for SimBrief">'
+      +'<span style="color:var(--acc)">'+(on?'✓':'')+'</span>'
+      +'<span style="color:'+(on?'var(--acc)':'var(--ink1)')+'">'+esc(x.callsign||'—')+'</span>'
+      +'<span style="color:var(--ink2)">'+esc(gt)+'</span>'
+      +'<span style="color:var(--ink2)">'+fmtFlightLen(x.flight_length)+'</span>'
+      +'<span style="color:var(--ink3)">'+(x.times_seen>1?x.times_seen+'×':'')+'</span></div>';
   }).join('');
-  return '<div class="dp-sec" style="grid-column:1/-1"><div class="dp-st">'+g.n+' flights on this route &mdash; pick one for SimBrief</div>'+rows+'</div>';
+  return '<div class="dp-sec" style="grid-column:1/-1"><div class="dp-st">'+g.n+' flights on this route &mdash; pick one for SimBrief</div>'+head+rows+'</div>';
 }
 
 function renderRoutes(){
@@ -9534,5 +9540,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.35.0</div>
+  pointer-events:none;">v6.35.1</div>
 </body></html>

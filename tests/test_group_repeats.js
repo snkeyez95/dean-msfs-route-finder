@@ -55,7 +55,7 @@ console.log('1. grouping rules (synthetic)');
   T('count line says routes and flights', cnt === '3 routes found · 5 flights', cnt);
   S.openRoute = 0; A.renderRoutes();
   const open = A.els['rt-body'].innerHTML;
-  T('open row lists the 3 flights with the picked one marked', /3 flights on this route/.test(open) && /✓ UAL2201/.test(open) && /UAL2045/.test(open) && /UAL2173/.test(open));
+  T('open row lists the 3 flights with the picked one marked', /3 flights on this route/.test(open) && /✓<\/span><span[^>]*>UAL2201/.test(open) && !/seen /.test(open) && /UAL2045/.test(open) && /UAL2173/.test(open));
   T('SimBrief link uses the picked flight number', /fltnum=2201/.test(open));
 }
 console.log('2. wiring');
