@@ -1,3 +1,6 @@
+# v6.35.2 — AUTOFPS LOG+ SESSION LOGS (Dean 2026-11-24)
+> ✅ BUILT (awaiting release.bat). AutoFPS 0.5.7.0-test2 with Log+ writes MSFS_AutoFPS_YYYYMMDD_HHMMSS.log per session; findLogs/tailLatest only knew the daily name → EGKK-LFBD chart had no TLOD line. logsForDate() returns daily + session files; trace dedupes by timestamp; tailLatest reads the newest-written file. tests/test_autofps_logplus.js 6/6 (real log: 570 samples). EGKK-LFBD backfilled + report regenerated, raw files hash-unchanged. Contact shadows Ultra test: 3/3 flown, recommended Keep.
+
 # v6.35.0 — GROUP REPEATS + SIMBRIEF 2-DIGIT RUNWAY (Dean 2026-11-23)
 > ✅ BUILT (awaiting release.bat). Plan a Flight ⧉ Group repeats chip (cfg.groupRepeats, default on): one row per
 > route+airline+aircraft, ×N tag, median duration w/ range tooltip, open row lists flights (pick → SimBrief flight no.).

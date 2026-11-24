@@ -22,15 +22,30 @@ function defaultLogDir() {
 }
 
 // Daily log files covering [t0, t1] epoch-seconds (LOCAL dates; a flight crossing midnight spans two).
+// v6.35.2: AutoFPS writes a DAILY log (MSFS_AutoFPS20261124.log) — but with "Log+" turned on it switches
+// mid-session to ONE FILE PER SESSION (MSFS_AutoFPS_20261124_094146.log). Dean's EGKK-LFBD flight had no
+// TLOD line because only the daily name was looked for. Return both kinds for a date, oldest first.
+function _ymd(d) { return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
+function logsForDate(logDir, d) {
+  const ymd = _ymd(d), out = [];
+  let names = [];
+  try { names = fs.readdirSync(logDir); } catch (_) { return out; }
+  for (const n of names) {
+    if (n === 'MSFS_AutoFPS' + ymd + '.log' || new RegExp('^MSFS_AutoFPS_' + ymd + '_\\d{6}\\.log$').test(n)) {
+      const p = path.join(logDir, n);
+      try { out.push({ p, m: fs.statSync(p).mtimeMs }); } catch (_) {}
+    }
+  }
+  return out.sort((a, b) => a.m - b.m).map(x => x.p);
+}
+
 function findLogs(logDir, t0, t1) {
   if (!logDir) return [];
   const out = [], seen = new Set();
   for (let t = t0; t <= t1 + 86400; t += 86400) {
     const d = new Date(Math.min(t, t1) * 1000);
-    const name = 'MSFS_AutoFPS' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.log';
-    if (seen.has(name)) continue; seen.add(name);
-    const p = path.join(logDir, name);
-    try { if (fs.existsSync(p)) out.push(p); } catch (_) {}
+    const key = _ymd(d);
+    if (!seen.has(key)) { seen.add(key); for (const p of logsForDate(logDir, d)) out.push(p); }
     if (t >= t1) break;
   }
   return out;
@@ -74,6 +89,7 @@ function buildTrace(logDir, t0, t1) {
       try { samples = samples.concat(parseTrace(fs.readFileSync(f, 'utf8'), t0, t1)); } catch (_) {}
     }
     samples.sort((a, b) => a.t - b.t);
+    samples = samples.filter((x, i) => i === 0 || x.t !== samples[i - 1].t);   // daily + session file never double-count
     if (!samples.length) return null;
     return { samples, stats: traceStats(samples) };
   } catch (_) { return null; }
@@ -120,10 +136,9 @@ function tailLatest(logDir, maxAgeS) {
     const dir = logDir || defaultLogDir();
     if (!dir) return null;
     const now = Date.now() / 1000;
-    for (const t of [now, now - 86400]) {                       // today, then yesterday (midnight edge)
-      const d = new Date(t * 1000);
-      const name = 'MSFS_AutoFPS' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.log';
-      const p = path.join(dir, name);
+    const cand = [];                                            // today, then yesterday (midnight edge); newest-written file first
+    for (const t of [now, now - 86400]) cand.push(...logsForDate(dir, new Date(t * 1000)).reverse());
+    for (const p of cand) {
       let st; try { st = fs.statSync(p); } catch (_) { continue; }
       let text;
       try {
@@ -150,4 +165,4 @@ function tailLatest(logDir, maxAgeS) {
   } catch (_) { return null; }
 }
 
-module.exports = { defaultLogDir, findLogs, parseTrace, traceStats, buildTrace, writeSidecar, readSidecar, tailLatest, LINE_RE };
+module.exports = { defaultLogDir, findLogs, logsForDate, parseTrace, traceStats, buildTrace, writeSidecar, readSidecar, tailLatest, LINE_RE };
