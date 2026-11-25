@@ -6,7 +6,7 @@
 
 - [UDP port exhaustion](udp_port_exhaustion.md) — Tcpip 4266 lines up with freeze storms (10-27 LIMC, 10-28 LSZH-EDDB ~1 min after); BURST by an in-flight process (ports back to 56 after sim closed, Plex normal) — needs in-flight per-process UDP sampling to name it
 
-- [AutoFPS TLOD band 250/400](autofps_tlod_band_250_400.md) — Dean's validated min 250 / max 400: detail at low alt where you see it, not at cruise; ~6pts VRAM cushion back off the redline, smoothness identical; min is a soft floor (VRAM protection overrides it)
+- [AutoFPS TLOD band (history)](autofps_tlod_band_250_400.md) — Sep 2026 band 250/400 + reasoning; SUPERSEDED: since Nov 3 his IFR band is 50/200 (cfg + every trace agree) — read the latest trace before quoting it
 
 - [VATSIM/overlay audit 2026-07-16](vatsim_audit_2026-07-16.md) — 4 bugs fixed in v6.12.8 (NY_CTR segment loss, graze chime storm, tier/next-up, stray grey dot); 3 low suspects logged; harnesses in scratchpad
 

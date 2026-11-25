@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-11-25T00:46:39.813Z
+  modified: 2026-11-25T05:03:40.159Z
 ---
 
 **Model since v6.37.0 (Dean's design, 2026-11-24): three profiles + a "flies next" dot.**
@@ -34,6 +34,6 @@ He can paste back `ABRP-EXPERIMENT-RESULTS v1` blocks (Copy results for Claude).
 
 ABRP proposes tests itself (GPU-cost, VRAM-light, one step up from ABRP Suggested) when GPU busy < 60% of the frame. 2026-11-24: ~10.6 of 33.3 ms → next idea Raymarched reflections Ultra.
 
-Known gap: the AutoFPS cfg reader reads minTLod/maxTLod 50/200 (IFR), but the band Dean sees is 250–400, so don't trust `autofps_cfg` as a label.
+AutoFPS band: read the latest autofps_trace.json. Nov 2026: IFR 50–200, and the `autofps_cfg` reader is correct. (I wrongly doubted it on 2026-11-24 because of an outdated memory.)
 
 Code: perf/native/profiles.js (parseChangeText / experimentVerdict / baselineCheck / proposeExperiments), profiles_store.js (migrate / flyNext / addTest / dropTest / importInbox / preflight). Tests: tests/test_three_profiles.js. Related: [[usercfg-scale-gotchas]].

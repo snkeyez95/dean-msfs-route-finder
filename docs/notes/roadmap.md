@@ -26,7 +26,8 @@
 > Live migration on a copy of Dean's data gives Baseline (Aug 27 – Oct 7) and Suggested = Baseline + Light shafts Ultra + Contact shadows Ultra, with the dot on Suggested.
 >
 > NOT BUILT:
-> - AutoFPS band on the cards. AutoFPS config min/max reads 50/200 (IFR) while the TLOD band Dean sees is 250–400, so the config reader isn't trustworthy as a label. Logged.
+> - AutoFPS band on the cards. CORRECTED 2026-11-24: the config reader is RIGHT (IFR 50/200 matches every Nov flight's trace); the 250/400 belief came from a stale Sep memory. The band just isn't shown yet: small follow-up.
+> - Follow-ups Dean was offered: hide the second "Start test" while the confirm box is open; hide the Launch + Capture TLOD step once the benchmark is complete.
 
 ## Context
 Dean has asked more than once "am I where I should be?" on Sim Profiles. The page is confusing for an

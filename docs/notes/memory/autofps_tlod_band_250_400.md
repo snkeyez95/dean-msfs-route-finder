@@ -1,12 +1,18 @@
 ---
 name: autofps-tlod-band-250-400
-description: "Dean's validated AutoFPS TLOD band (min 250 / max 400) and the reasoning behind it — detail where you see it, not at cruise"
+description: "HISTORY: Dean's Sep 2026 AutoFPS band 250/400 + reasoning. SUPERSEDED — since at least Nov 3 his IFR band is 50/200 (config + every flight trace agree). Check the trace, don't assume."
 metadata: 
   node_type: memory
   type: project
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-09-18T19:52:17.829Z
+  modified: 2026-11-25T05:01:27.283Z
 ---
+
+**⚠ CURRENT STATE (verified 2026-11-24): the band below is no longer in use.** MSFS2024_AutoFPS.config
+IFR profile = minTLod 50 / maxTLod 200, and every flight's autofps_trace.json from Nov 3 to Nov 24 shows
+TLOD 50–200 (median ~200, 50–80% at cap), peak VRAM 83–94%. ABRP's autofps_cfg reader is CORRECT. On
+2026-11-24 I wrongly told Dean that reader was untrustworthy because I trusted this memory; I
+corrected it the same day. Always read the latest trace before quoting his band.
 
 Dean's AutoFPS TLOD philosophy, validated 2026-09-18: **high TLOD at cruise is wasted** — at FL430 you
 can't resolve terrain detail 8 miles down; TLOD's visible payoff is **low altitude** (taxi / climb /
