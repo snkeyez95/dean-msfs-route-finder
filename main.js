@@ -2583,6 +2583,15 @@ ipcMain.handle('profiles-exp-preview', (_, a) => _profCall('experimentPreview', 
 ipcMain.handle('profiles-exp-create',  (_, a) => _profCall('experimentCreate', a));
 ipcMain.handle('profiles-exp-finish',  (_, a) => _profCall('experimentFinish', a));
 ipcMain.handle('profiles-export-text', (_, a) => _profCall('exportText', a));
+// v6.37.0: Baseline · ABRP Suggested · Experimental + the "flies next" dot, Claude's inbox, pre-flight
+ipcMain.handle('profiles-flynext',     (_, a) => _profCall('flyNext', a));
+ipcMain.handle('profiles-add-test',    (_, a) => _profCall('addTest', a));
+ipcMain.handle('profiles-drop-test',   (_, a) => _profCall('dropTest', a));
+ipcMain.handle('profiles-remove-add',  (_, a) => _profCall('removeAdd', a));
+ipcMain.handle('profiles-make-test',   ()     => _profCall('makeTestFromSim'));
+ipcMain.handle('profiles-start-test',  (_, a) => _profCall('startTest', a));
+ipcMain.handle('profiles-dismiss',     ()     => _profCall('dismissNotice'));
+ipcMain.handle('profiles-preflight',   (_, a) => _profCall('preflight', a));
 // Clipboard via the main process (reliable in Electron; the renderer's navigator.clipboard can be
 // permission-gated). Read is only used to offer "Paste from clipboard" when it holds an ABRP block.
 ipcMain.handle('clipboard-read-text',  () => { try { return require('electron').clipboard.readText() || ''; } catch(_) { return ''; } });

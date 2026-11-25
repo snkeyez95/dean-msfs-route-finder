@@ -1,3 +1,234 @@
+# v6.37.0 — SIM PROFILES REDESIGN: BASELINE · ABRP SUGGESTED · EXPERIMENTAL + "FLY NEXT" DOT (Dean 2026-11-24, PLAN)
+> ✅ BUILT 2026-11-24 (awaiting release.bat). All three stages shipped together. The store (profiles_store.js) adds:
+> - **One-time set-up:** freezes the Baseline from the history pick, carries kept tests into Suggested, backs up first to sim_profiles.pre-v6.37.json.
+> - **The dot:** flyNext; applies at once with the sim closed, waits while it's running.
+> - **Test results:** addTest / dropTest / removeAdd.
+> - **makeTestFromSim** (in-sim changes become a test).
+> - **startTest:** one test at a time; a second one queues as "up next".
+> - **Inbox:** \<userData\>\inbox\*.txt files are picked up; used files move to done\, unreadable ones to rejected\.
+> - **preflight** (also does a dry run).
+> - The "this ends your running test" question and the drift nudge are gone.
+>
+> profiles.js adds:
+> - baselineCheck: Baseline flights on the newest sim vs older sims, per aircraft, within ±1σ;
+> - verdict passed / vramOnly flags;
+> - the AutoFPS band on the track record.
+>
+> Page: status line, three cards with a radio dot, details panel, Next test, More. Launch + Capture runs a dry pre-flight first, then a 3-button dialog (abrpChoice) with "Fly Baseline instead", and applies the profile before auto-TLOD.
+>
+> Tests:
+> - new test_three_profiles 61/61;
+> - test_sim_test_flow 19/19 (rewritten), test_sim_experiments 61/61, test_sim_profiles 65/65;
+> - full board green.
+>
+> Surface was checked in the browser pane (real index.html + real store, on a copy): ok, running, pending, the launch dialog, light theme.
+>
+> Live migration on a copy of Dean's data gives Baseline (Aug 27 – Oct 7) and Suggested = Baseline + Light shafts Ultra + Contact shadows Ultra, with the dot on Suggested.
+>
+> NOT BUILT:
+> - AutoFPS band on the cards. AutoFPS config min/max reads 50/200 (IFR) while the TLOD band Dean sees is 250–400, so the config reader isn't trustworthy as a label. Logged.
+
+## Context
+Dean has asked more than once "am I where I should be?" on Sim Profiles. The page is confusing for an
+end user, and the causes are in the design, not the wording:
+- **Two things look like "the baseline".** ABRP Suggested is recomputed from history and only adopts
+  a tested change after 5 flights. His own "Suggested + Light shafts Ultra" profile already holds both
+  kept upgrades. So the starred card says "2 settings differ" while the card marked CURRENT is right.
+- **Too many concepts on one page:** test banner, sim-right-now, last applied/undo, Suggested,
+  experiments (ideas, drafts, finished), My profiles, flight-history rebuilds, backups.
+- **No single answer at the top** to "what am I on, and is that right?"
+- **Claude's advice only reaches ABRP by copy/paste**, and applying is manual and blocked mid-test.
+
+Dean's model (his words, locked, revised 2026-11-24): **three profiles, plus a "fly next" dot.**
+1. **Baseline:** the known-good. It NEVER changes. It is the sanity check after a sim or aircraft
+   update: fly it, and if it's rougher than before, the update caused it, not a setting.
+2. **ABRP Suggested:** Baseline plus only the changes proven by test data. This is the profile that
+   grows over time.
+3. **Experimental:** the one place changes are developed, by Dean and Claude together.
+
+Automation: Claude's suggestions flow into Experimental without pasting. A selector dot decides which
+profile Launch + Capture loads.
+
+## The goal everything is judged against (Dean's, from day one)
+**Frametime smoothness first, then VRAM headroom.** AutoFPS guards the VRAM ceiling by trimming TLOD.
+Every part of this redesign answers to those two:
+- **Card headline metrics:** every card shows the same three numbers, in this order. Nothing else
+  leads.
+  1. Felt stutters/hr (what you feel)
+  2. P99 frametime
+  3. Peak VRAM vs the 96% line where AutoFPS starts holding detail back
+
+  GPU busy and the other detail stay inside the expanded card.
+- **"Passed" means both:**
+  - no smoothness cost beyond noise — felt/hr, P99 and airport-aware taxi stutter, using the existing
+    ±1σ `experimentVerdict`;
+  - AND peak VRAM stays under the AutoFPS hold line.
+
+  A change that's smooth but pushes VRAM over the line is shown as **"Costs VRAM headroom"** and is
+  not offered for ABRP Suggested, even if frametimes look fine. AutoFPS would hide the cost by
+  silently dropping detail.
+- **Test ideas** keep today's gate: only GPU-cost, VRAM-light settings, proposed only when there's
+  real GPU headroom and VRAM cushion. A test whose base is already near the line gets the warning
+  before it starts.
+- **AutoFPS stays in charge of TLOD/OLOD.** Profiles never set them, unchanged from v6.27.0. Each
+  card's track record notes the AutoFPS band it was flown with (e.g. 250–400). When the band differs
+  between two profiles' flights, the comparison says so (the existing confound note).
+- **Baseline sanity line** uses the same three numbers. After an update it reads like "Since sim
+  1.9.24: felt stutters ×1.8, P99 +1.1 ms, VRAM peak 91% (was 89%)".
+
+## The model
+| Profile | What it is | Changes when |
+|---|---|---|
+| 🔒 Baseline | Known-good, frozen | Never. There's no edit, no promote, no apply-over. Its whole value is that it stays put. |
+| ⭐ ABRP Suggested | Baseline + changes that passed a test | A test finishes and passes (Free / Saves / No effect at its full flight budget). The card then offers **[Add to ABRP Suggested] [Drop]**: one click, never silent. A failed test shows why and offers nothing. A change can be removed again from the changelog. |
+| 🧪 Experimental | ABRP Suggested + ONE change under test | A test starts: from Claude's inbox, an ABRP idea, or a paste. It's empty (and can't be selected) when no test is open. |
+
+- Stacking is shown on each card: "Baseline + Light shafts Ultra + Contact shadows Ultra" and
+  "ABRP Suggested + Raymarched reflections Ultra".
+- The old 5-flight adoption rule goes away. The test's own budget (3 flights) plus Dean's one click
+  replace it.
+- **Today's history-computed Suggested** is used once, to seed Baseline on a fresh install. After
+  that it's only reachable as "Rebuild from flight history" under More.
+
+## The "fly next" dot (Dean's idea; it removes most of the confusion)
+- **Placement:** one radio dot on each of the three cards. The selected card reads **"◉ Flies
+  next"**. A plain sentence sits above the cards: "Next flight flies: ABRP Suggested."
+- **Meaning:** this is what Launch + Capture loads. When the sim is closed, picking a dot also
+  applies it right away (backup → write → verify), so launching MSFS any other way gets it too.
+  While the sim is running, the pick waits and the card says "applies at your next Launch + Capture".
+- **Two separate facts, both shown:** "◉ Flies next" is your choice; "✓ In your sim" is what's
+  actually set right now. Normally they're the same card. When they differ, the status line says so
+  in one sentence, e.g. "You picked Baseline; your sim is still on ABRP Suggested until the next
+  launch."
+- **Automatic moves (only two, both announced on the status line):**
+  - Starting a test selects Experimental.
+  - When the test reaches its flight budget, the dot returns to ABRP Suggested, and the result card
+    asks Add / Drop.
+  - Otherwise the dot only moves when Dean clicks.
+- **Flying Baseline mid-test is fine.** Only flights flown on Experimental count toward the test; a
+  Baseline sanity flight just pauses it. This removes today's "this ends your running test" friction.
+- **Baseline as the sanity check:** because Baseline never changes, every flight flown on it is
+  directly comparable across sim and aircraft versions. After an update, the Baseline card shows
+  "Since sim 1.9.24: P99 +1.1 ms, felt stutters ×1.8 vs before", using the existing ±1σ verdict math.
+  That is the cleanest drift signal the app can give.
+- **Colour-blind:** the dot is a filled vs empty circle plus words, never colour alone.
+
+## The page (top to bottom)
+1. **One status line answering "where am I?"** It shows icon + words, never colour alone. The
+   normal case:
+   - ✓ "Next flight flies **ABRP Suggested**. It's already in your sim."
+
+   Other cases, shown one at a time, with buttons only where a decision is needed:
+   - ▶ **Test running:** Raymarched reflections Ultra, flight 2 of 3 (Experimental selected).
+   - ⚑ **Test passed:** Raymarched reflections Ultra, no measurable cost.
+     [Add to ABRP Suggested] [Drop]
+   - ⚠ **Your sim doesn't match the selected profile.** 2 settings changed in-sim.
+     [Put it back] [Make these a test] [Show]
+   - 📥 **New test from Claude:** "<name>". [Start it] [Later]
+2. **Three cards in a row: 🔒 Baseline → ⭐ ABRP Suggested → 🧪 Experimental.**
+   - Each card has: its dot; the key setting chips; "adds over the one before"; its track record; the
+     ✓ In your sim tag when true.
+   - Baseline adds its "since the last update" sanity line.
+   - Expanding a card shows the full settings table plus its changelog. Example: "Light shafts Ultra,
+     tested Nov 17 (3 flights, no effect), added Nov 17 · [remove]".
+3. **Next test idea:** one line, with "more ideas" behind it.
+4. **Collapsed under "More":** Test history (finished tests + verdicts), Other saved setups (his
+   existing profiles, kept untouched), Rebuild from flight history, Automatic backups, Paste from
+   Claude (fallback).
+- **Words used on the page:** Baseline, ABRP Suggested, Experimental, test, "flies next", "in your
+  sim". Stop using "profile", "experiment", "kept" and "Suggested +" as labels.
+
+## Getting Claude's suggestions into ABRP (no copy/paste)
+- **Inbox folder:** `%APPDATA%\A Better Route Planner\inbox\`. Claude drops one `.abrp.txt` file there
+  in the existing ABRP-PROFILE format, so it goes through the same parser and checks as a paste
+  (`parseChangeText` / `experimentPreview`).
+  - ABRP reads the inbox at launch, when the page opens, and at Launch + Capture.
+  - A valid file becomes the Experimental test, or "Up next" if a test is already running.
+  - Imported files move to `inbox\done\`; invalid ones go to `inbox\rejected\`, with the reason shown
+    on the status card.
+- **Why not git:** a push/pull round trip, his settings in a public repo, and it's slower. A local
+  folder works because Claude runs on the same PC. Keep git in reserve only for a cloud or
+  other-machine setup.
+- **The one permission:** writing to this inbox is outside the project folder. Dean grants it once;
+  Claude writes there only when he says "queue it".
+- **Results back to Claude:** unchanged. Claude already reads the Sessions logs; "Copy results for
+  Claude" stays.
+
+## Launch + Capture pre-flight (applies the right profile at the one safe moment)
+Inside `launchAndCapture` (index.html), before MSFS starts. The sim is closed then, which is the only
+time UserCfg can be written.
+1. Import anything in the inbox.
+2. **Target = whichever card has the dot.** There's no guessing logic. The two automatic dot moves
+   above keep it right during a test.
+3. If the sim's settings ≠ target: apply it, using the existing backup → write → verify chain in
+   `profiles_store.apply`.
+4. If the sim was changed in-sim since the last apply, ask once: make these a test, or overwrite.
+5. Say it in the **existing single confirm dialog**, e.g. "This flight: 🧪 Experimental — Raymarched
+   reflections Ultra (test flight 2 of 3). 1 setting applied." Add **Fly Baseline instead** for a
+   quick sanity flight. No extra dialogs.
+
+## Migration of Dean's install (nothing deleted)
+- **Baseline** = today's history-computed ABRP Suggested values (the Aug 27–Oct 7 known-good +
+  Rocks). Frozen from here on.
+- **ABRP Suggested** = Baseline + Light shafts Ultra + Contact shadows Ultra. You already approved
+  both by clicking Keep, so they carry over as added, with their test results in the changelog.
+  This equals your sim today.
+- **Dot on ABRP Suggested.** First screen: "✓ Next flight flies ABRP Suggested. It's already in your
+  sim."
+- **Experimental:** empty. The next idea is Raymarched reflections Ultra.
+- **Other saved setups:** existing profiles, backups and the finished-test history move there
+  unchanged.
+- `sim_profiles.json` gains `baseline` (frozen values + date), `suggested:{adds[]}`, `experimental`
+  and `flyNext`. A backup is taken first.
+
+## Files
+- `perf/native/profiles_store.js`:
+  - new store shape + migration;
+  - add/remove a proven change;
+  - fly-next select (apply now if the sim is closed);
+  - inbox import;
+  - pre-flight.
+- `perf/native/profiles.js`:
+  - ABRP Suggested = Baseline + approved adds;
+  - Baseline drift = Baseline flights before vs after a version change.
+  - Reuse `experimentVerdict`, `diff`, `matches`, `trackRecord`, `parseChangeText`.
+- `main.js` + `preload.js`: thin IPCs (`profiles-flynext`, `profiles-add`, `profiles-inbox`,
+  `profiles-preflight`), same pattern as `_profCall`.
+- `index.html`:
+  - rewrite `_spRender` around status + three cards + More;
+  - reuse `_spCard`, `_spChips`, `_spSettingsTable`, `_spExpCard`, `_spDots`;
+  - pre-flight step in `launchAndCapture`.
+- Tests:
+  - new `tests/test_three_profiles.js`: migration on a copy of real data, promote/restore, inbox
+    import/reject, pre-flight target picking, real-renderer surface for every status state;
+  - update `test_sim_test_flow`, `test_sim_experiments`, `test_sim_profiles`.
+- README guide section; v6.37.0 ×4; memory `sim_profile_experiments.md` (the new inbox replaces the
+  paste-block habit).
+
+## Delivery
+- **Stage 1:** three-profile model + page + migration.
+- **Stage 2:** Launch + Capture pre-flight.
+- **Stage 3:** inbox.
+
+Each stage is testable on its own. Ship them together as v6.37.0 unless Dean wants Stage 1 sooner.
+
+## Verification
+- Desk tests (copies of the real store + UserCfg, live-file hash guard):
+  - migration produces a frozen Baseline / Suggested (+2) / empty Experimental, with the dot on
+    Suggested;
+  - Baseline can't be changed by any code path;
+  - each dot pick applies when the sim is closed and is deferred when it's running;
+  - a Baseline flight mid-test doesn't count toward the test;
+  - passing test → Add puts it in Suggested; Remove takes it out byte-for-byte;
+  - inbox: valid / invalid / queued behind a running test;
+  - pre-flight writes exactly the changed lines.
+- Surface: render the real page from Dean's real store in the browser pane and check every status
+  line, the dot, and the "✓ In your sim" tag. First screen = "Next flight flies ABRP Suggested. It's
+  already in your sim."
+- Live (Dean): release.bat → open Sim Profiles. Pick Baseline → Launch + Capture → the dialog says
+  Baseline, and the MSFS graphics page shows Light shafts back at High. Then Claude queues a test →
+  it appears, the dot moves to Experimental, and the next Launch + Capture applies it.
+
 # v6.36.0 — SIM PROFILES: AIRPORT-AWARE TAXI STUTTER (Dean 2026-11-24)
 > ✅ BUILT (awaiting release.bat). experimentVerdict taxi row = each flight's per-end taxi stutter minus that (aircraft, airport, end)'s mean across ALL other logged flights (loadFlights now builds a taxiPool from every session incl. pre-graphics; rides on the array). <2 peers → end skipped; taxi row judged only with ≥2 judgeable flights per side; note counts skipped flights. Finished cards show the live verdict + 'When you decided, this read X'. Real data: Contact shadows COSTS→FREE, Light shafts SAVES→NO EFFECT. tests/test_airport_aware_taxi.js 12/12 (incl. real card render).
 

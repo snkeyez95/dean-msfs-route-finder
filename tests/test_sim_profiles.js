@@ -136,36 +136,30 @@ try {
   listed = store.list();
 } catch (e) { T('store threw: ' + e.stack, false); }
 
-// ── 5. SURFACE: the real renderer from index.html, fed by the store ──
+// ── 5. SURFACE: the real renderer from index.html (v6.37.0 layout), fed by the store ──
 {
-  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel', '_spDots', '_spTestBanner', '_spEndAskCard', '_spStartCard', '_spClipCard', '_spDupOf', '_spExpActions'];
-  const els = {};
-  const src = 'let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;\n'
-    + 'let _spPaste={open:false,text:"",preview:null}, _spShowFinished=false;\n'
-    + 'let _spClip=null, _spStart=null, _spEndAsk=null, _spMoreOpen=null;\n' + X.html.match(/const _SP_BAN=[^\n]*/)[0] + '\n'   // v6.33.0 test-flow pieces
-    + 'const document={getElementById:id=>(els[id]=els[id]||{innerHTML:"",focus(){},select(){}}),querySelector:()=>null};\n'
-    + X.html.match(/const _LABV=\{[\s\S]*?\n\};/)[0] + '\n' + X.html.match(/const _SP_EXP_STATUS=[^\n]*/)[0] + '\n'
-    + X.grab('esc') + '\n' + names.map(n => X.grab(n)).join('\n')
-    + '\nreturn { set:(o)=>{ for(const k in o){ eval(k+"=o[k]"); } }, render:()=>{ _SP._keys={}; for(const k of _SP.schema.keys)_SP._keys[k.id]=k; _spRender(); return els["prof-body"].innerHTML; } };';
-  const R = new Function('els', src)(els);
+  const R = require('./lib/sp_render.js').makeRenderer();
+  const txt = h => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
   const html0 = (R.set({ _SP: listed }), R.render());
-  T('5. SURFACE: "Your sim right now" shows the live setup name', html0.includes('Your sim right now') && html0.includes(X.html ? listed.currentName.replace(/&/g, '&amp;') : ''));
-  T('   ⭐ ABRP Suggested card with a HIGH CONFIDENCE tag', html0.includes('⭐ ABRP Suggested') && html0.includes('HIGH CONFIDENCE'));
-  T('   the baseline profile shows its track record "Flown 36×"', html0.includes('TAA baseline (pre-DLSS)') && /Flown 36× · P99 17\.8 ms · 7\.5 felt stutters\/hr/.test(html0), (html0.match(/Flown [^<]*/g)||[]).join(' | '));
-  T('   the history section is collapsed by default (keeps the page clean)', html0.includes('▸ From your flight history') && !html0.includes('Aug 27 – Oct 7 · 36 flights'));
+  T('5. SURFACE: one status line, then 🔒 Baseline · ⭐ ABRP Suggested · 🧪 Experimental', /id="sp-status"/.test(html0) && /data-who="baseline"[\s\S]*data-who="suggested"[\s\S]*data-who="experimental"/.test(html0));
+  T('   the Baseline card says where it came from (Aug 27 – Oct 7) in its details', /Aug 27/.test(txt((R.set({ _spTriOpen: 'baseline' }), R.render()))));
+  R.set({ _spTriOpen: null });
+  T('   saved profiles live under More → Other saved setups, collapsed by default', !html0.includes('TAA baseline (pre-DLSS)') && /▸ More/.test(html0));
+  const htmlM = (R.set({ _spShowMore: true }), R.render());
+  T('   …opened, "TAA baseline (pre-DLSS)" shows its track record "Flown 36×"', htmlM.includes('TAA baseline (pre-DLSS)') && /Flown 36× · P99 17\.8 ms · 7\.5 felt stutters\/hr/.test(htmlM), (htmlM.match(/Flown [^<]*/g)||[]).join(' | '));
+  T('   the flight-history rebuild is collapsed inside More', htmlM.includes('▸ Rebuild from flight history') && !htmlM.includes('Aug 27 – Oct 7 · 36 flights'));
   const html1 = (R.set({ _spShowRuns: true }), R.render());
   T('   expanded, it lists "Aug 27 – Oct 7 · 36 flights (+4 excluded)"', html1.includes('Aug 27 – Oct 7 · 36 flights (+4 excluded)'));
   const html2 = (R.set({ _spOpen: { [base.id]: true } }), R.render());
-  T('   expanding the baseline shows Textures now "1 · High" → "2 · Medium" ▼ less', /Texture resolution[\s\S]{0,400}now 1 · High →[\s\S]{0,300}2 · Medium[\s\S]{0,200}▼ less/.test(html2));
+  T('   expanding the baseline profile shows Textures now "1 · High" → "2 · Medium" ▼ less', /Texture resolution[\s\S]{0,400}now 1 · High →[\s\S]{0,300}2 · Medium[\s\S]{0,200}▼ less/.test(html2));
   T('   …and SSAO now "1 · Medium" → "3 · Ultra" ▲ more', /Ambient occlusion quality[\s\S]{0,400}now 1 · Medium →[\s\S]{0,300}3 · Ultra[\s\S]{0,200}▲ more/.test(html2));
-  T('   only differing rows shown by default (no unchanged Clouds row)', !/Volumetric clouds quality/.test(html2.slice(html2.indexOf('data-key="' + base.id + '"'), html2.indexOf('data-key="' + base.id + '"') + 20000)));
   const html3 = (R.set({ _spConfirm: base.id }), R.render());
-  T('   Apply… opens a confirm listing the changes, with the backup + undo promise', /will change:/.test(html3) && /One click undoes it/.test(html3));
-  const html4 = (R.set({ _spConfirm: null, _spOpen: { suggested: true, __why: true } }), R.render());
-  T('   "Why this profile?" explains the base in plain words', html4.includes('36 flights') && html4.includes('Not adopted:'));
-  const html5 = (R.set({ _SP: Object.assign({}, listed, { simRunning: true }), _spOpen: { suggested: true } }), R.render());
-  T('   with MSFS running: banner shown + Apply disabled', html5.includes('MSFS is running') && /sp-apply[^>]*disabled/.test(html5));
-  T('   colour-blind safe: changes carry ▲/▼ words, not colour alone', /▼ less/.test(html2) && /▲ more/.test(html2));
+  T('   Apply… on a saved setup opens a confirm listing the changes, with the backup + undo promise', /will change:/.test(html3) && /One click undoes it/.test(html3));
+  const html4 = (R.set({ _spConfirm: null, _spShowMore: false, _spShowRuns: false, _spOpen: {}, _spTriOpen: 'baseline' }), R.render());
+  T('   Baseline details show the full settings table vs your sim', /sp-tri-detail/.test(html4) && /Only show what differs from your sim now/.test(html4));
+  const html5 = (R.set({ _SP: Object.assign({}, listed, { simRunning: true }), _spTriOpen: null }), R.render());
+  T('   with MSFS running: a one-line note that picks wait for the next Launch + Capture', html5.includes('MSFS is running') && /next Launch \+ Capture/.test(html5));
+  T('   colour-blind safe: changes carry ▲/▼ words, the dot says FLIES NEXT', /▼ less/.test(html2) && /▲ more/.test(html2) && /FLIES NEXT/.test(html0));
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

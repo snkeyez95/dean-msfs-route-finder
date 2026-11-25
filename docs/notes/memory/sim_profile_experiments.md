@@ -1,28 +1,39 @@
 ---
 name: sim-profile-experiments
-description: "How to hand Dean a settings change — the ABRP-PROFILE paste format for Sim Profiles → 🧪 Experiments (v6.28.0), and how to read his pasted results"
+description: "How to hand Dean a settings test (v6.37.0: drop an ABRP-PROFILE file in ABRP's inbox; paste is the fallback), the Baseline/Suggested/Experimental model, and how to read his results"
 metadata:
   node_type: memory
   type: reference
   originSessionId: 169a96fe-eac5-4a96-b021-e23e74773bc5
-  modified: 2026-11-10T18:30:03.935Z
+  modified: 2026-11-25T00:46:39.813Z
 ---
 
-Since v6.28.0, when I suggest an MSFS graphics change, I give Dean a **paste block** instead of in-sim instructions. Since v6.33.0 the flow is: he copies it → opens Sim Profiles → **Start test** on the "Claude's block on your clipboard" prompt → confirm (sim closed). One test at a time is ENFORCED (a second can only be "Saved for later"; applying another profile/Undo mid-test asks first). Only suggest a new test when none is running. A top banner tells him the state; tell him "nothing to do, just fly" while one runs. He pastes it in Sim Profiles → ＋ New experiment (ABRP also auto-detects it on the clipboard), saves, then applies it with the sim closed. ABRP judges it from his next flights (per-aircraft, ±1σ noise) and shows Keep / Revert.
+**Model since v6.37.0 (Dean's design, 2026-11-24): three profiles + a "flies next" dot.**
+- 🔒 **Baseline:** the frozen known-good (his Aug 27 – Oct 7 setup). It NEVER changes; he uses it as the sanity check after sim/aircraft updates.
+- ⭐ **ABRP Suggested:** Baseline + only proven changes. At migration that was Light shafts Ultra + Contact shadows Ultra. He adds each passed test with one click.
+- 🧪 **Experimental:** Suggested + the ONE change under test.
+- The dot decides what Launch + Capture loads. Judging order: smoothness first, then VRAM headroom (96% AutoFPS hold line). A test passes on free / saves / noeffect; smooth but over the VRAM line = "Costs video-memory headroom", not offered.
 
-Format (put it in a ```text block so he can copy it in one go):
+**How I hand him a test:** with his OK ("queue it"), write ONE `.txt` file into `%APPDATA%\A Better Route Planner\inbox\`. ABRP imports it on the next page open, app start, or Launch + Capture. It becomes the Experimental test (dot moves) or "up next" if one is running, and the file moves to `inbox\done\` (or `inbox\rejected\` with a reason shown). This is outside the project folder: only write there when he says so. Fallback: a ```text paste block (Sim Profiles → Paste one instead).
+
+Format:
 ```
 ABRP-PROFILE v1
 name: Light shafts Ultra
-base: ABRP Suggested          (or a saved profile's exact name, or "current"; omit = profile his sim matches)
-set: Light shafts = Ultra     (in-sim row name or ABRP label or raw id "Graphics/SSR/Quality"; in-sim words or raw values)
+base: ABRP Suggested          (default; "Baseline" also works)
+set: Light shafts = Ultra     (in-sim row name or ABRP label or raw id; in-sim words or raw values)
 flights: 3                    (test budget, 1-20; default 3)
-why: one line — it shows on the experiment card
+why: one line — it shows on the test card
 ```
-Rules the parser enforces: no TLOD/OLOD (AutoFPS owns them), no display/VR keys, values must exist for that setting, caps from the in-sim Ultra preset (Windshield/Glass/Water/Particles top out at High). "Depth of field = Medium" sets on-flag + quality. One change per experiment unless there's a reason (it warns on 2+).
+Parser rules:
+- No TLOD/OLOD (AutoFPS owns them) and no display/VR keys.
+- Values must exist for that setting, capped at the sim's Ultra preset (Windshield/Glass/Water/Particles top out at High).
+- One change per test.
 
-He can paste back **"Copy results for Claude"** blocks starting `ABRP-EXPERIMENT-RESULTS v1` — base vs experiment per metric, "within/BEYOND noise", verdict, notes (AutoFPS range / sim version / traffic differences). Read those instead of asking for screenshots.
+He can paste back `ABRP-EXPERIMENT-RESULTS v1` blocks (Copy results for Claude). Read those instead of asking for screenshots. Only suggest a new test when none is running.
 
-ABRP also proposes experiments itself (GPU-cost, VRAM-light, confirmed settings, one step up) when GPU busy < 60% of the frame. As of 2026-11-10: ~11.4 ms of 33.3 ms, so it offers Light shafts / Contact shadows / Raymarched reflections Ultra.
+ABRP proposes tests itself (GPU-cost, VRAM-light, one step up from ABRP Suggested) when GPU busy < 60% of the frame. 2026-11-24: ~10.6 of 33.3 ms → next idea Raymarched reflections Ultra.
 
-Code: perf/native/profiles.js (parseChangeText / toChangeText / experimentVerdict / proposeExperiments), profiles_store.js (create/finish), usercfg_schema.js (findKey/parseValue). Related: [[usercfg-scale-gotchas]].
+Known gap: the AutoFPS cfg reader reads minTLod/maxTLod 50/200 (IFR), but the band Dean sees is 250–400, so don't trust `autofps_cfg` as a label.
+
+Code: perf/native/profiles.js (parseChangeText / experimentVerdict / baselineCheck / proposeExperiments), profiles_store.js (migrate / flyNext / addTest / dropTest / importInbox / preflight). Tests: tests/test_three_profiles.js. Related: [[usercfg-scale-gotchas]].

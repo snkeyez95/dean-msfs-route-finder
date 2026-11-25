@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.36.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.37.0</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.36.0</div>
+    <div class="sb-ver">v6.37.0</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -967,7 +967,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <!-- ── SIM PROFILES (v6.27.0) ── -->
 <div class="pane" id="pane-profiles"><div class="scroll">
   <div style="font-size:20px;font-weight:700;letter-spacing:-0.04em;color:var(--ink0);margin-bottom:4px">Sim Profiles</div>
-  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px">Save your MSFS graphics settings as named profiles and switch between them. ABRP changes only the sim&rsquo;s graphics and upscaling settings, never your display, window or VR setup, and only while the sim is closed.</div>
+  <div style="font-size:13px;color:var(--ink3);margin-bottom:18px;line-height:1.6">Three graphics setups, and a dot that says which one your next flight uses. <b style="color:var(--ink1)">🔒 Baseline</b> is your known-good and never changes. <b style="color:var(--ink1)">⭐ ABRP Suggested</b> is Baseline plus only the changes your flights proved. <b style="color:var(--ink1)">🧪 Experimental</b> is the one change being tested. Everything is judged on smoothness first, then video-memory headroom. ABRP changes only graphics and upscaling settings, and only while the sim is closed.</div>
   <div id="prof-body"><div style="font-size:13px;color:var(--ink3)">Loading&hellip;</div></div>
 </div></div>
 <div class="pane" id="pane-liveatc"><div class="scroll">
@@ -1675,7 +1675,7 @@ function profilesRange(a,b){
   const f=s=>{ const d=new Date(String(s).slice(0,10)+'T12:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
   return (a&&b&&String(a).slice(0,10)!==String(b).slice(0,10))?(f(a)+' – '+f(b)):f(a||b);
 }
-let _spClip=null, _spStart=null, _spEndAsk=null, _spMoreOpen=null;
+let _spClip=null, _spStart=null, _spMoreOpen=null, _spShowMore=false, _spTriOpen=null, _spAllIdeas=false;
 function _spSection(t,sub){ return '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:18px 0 8px">'+t+(sub?' <span style="text-transform:none;letter-spacing:0">'+sub+'</span>':'')+'</div>'; }
 function _spRender(){
   const body=document.getElementById('prof-body'); if(!body||!_SP)return;
@@ -1685,30 +1685,31 @@ function _spRender(){
     +'<span style="flex:1">'+(_spMsg.ok?'✓ ':'⚠ ')+esc(_spMsg.text)+'</span>'
     +(_spMsg.undo&&_SP.lastApply?'<button class="btn bg bxs" onclick="spUndo()">↶ Undo</button>':'')
     +'<button class="btn bg bxs" onclick="_spMsg=null;_spRender()">✕</button></div>';
-  // v6.33.0: where you are with testing comes first, then anything that needs an answer
-  h+=_spTestBanner()+_spEndAskCard()+_spStartCard()+_spClipCard();
-  // 1 · what the sim is set to right now
-  const curMatch=cur?mine.filter(p=>_spMatches(p.values,cur)).map(p=>p.name):[];
-  h+='<div class="api-pan" style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">'
-    +'<div style="flex:1;min-width:260px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:5px">Your sim right now</div>';
-  if(!_SP.found) h+='<div style="font-size:13px;color:var(--red)">Couldn&rsquo;t find your MSFS settings file (UserCfg.opt).</div>';
-  else h+='<div id="sp-current-name" style="font-size:15px;font-weight:600;color:var(--ink0);margin-bottom:6px">'+esc(_SP.currentName||'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+_spChips(cur)+'</div>'
-    +'<div id="sp-current-match" style="font-size:12px;color:var(--ink3);margin-top:7px">'+((_SP.test&&_SP.test.matches)?('▶ Running test: <b style="color:var(--ink1)">'+esc(_SP.test.name)+'</b> (flight '+_SP.test.n+' of '+_SP.test.budget+')'):(curMatch.length?('✓ Matches your profile <b style="color:var(--ink1)">'+esc(curMatch[0])+'</b>'):'Not saved as a profile yet.'))+'</div>';
-  h+='</div>'+(_SP.found?'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spSave(\'captured\')">＋ Save as profile</button>':'')+'</div>';
-  if(_SP.simRunning) h+='<div id="sp-simrunning" style="background:var(--acc3);border:1px solid var(--acc2);border-radius:var(--r2);padding:9px 14px;margin:-4px 0 14px;font-size:12.5px;color:var(--acc)">⏸ MSFS is running. You can browse and save, but profiles apply only when the sim is closed (it reads its settings at launch and overwrites them when it exits).</div>';
-  if(_SP.lastApply&&!(_spMsg&&_spMsg.undo)&&!_SP.test) h+='<div style="font-size:12px;color:var(--ink3);margin:-4px 0 12px">Last applied: <b style="color:var(--ink1)">'+esc(_SP.lastApply.name)+'</b> · <span style="color:var(--blu);cursor:pointer" onclick="spUndo()">↶ Undo</span></div>';
-  // v6.33.0: ONE status banner says where you are with testing (none / running / off the test / finished),
-  // then any question that needs an answer (end the running test?), the start confirmation and the
-  // clipboard prompt. While a test runs, the experiments section comes before the profiles.
-  if(_SP.test){ h+=_spExperimentsSection(); h+=_spSuggestedCard(); }
-  else { h+=_spSuggestedCard(); h+=_spExperimentsSection(); }
-  // 4 · my profiles
-  h+=_spSection('My profiles');
-  if(!mine.length) h+='<div style="font-size:13px;color:var(--ink3);margin-bottom:12px">No profiles yet. Save your current settings above, or rebuild a past setup from your flight history below.</div>';
+  // v6.37.0: 1 · where you are (one line)  2 · the three, each with its "flies next" dot  3 · next test
+  // 4 · everything else, folded under More
+  if(!_SP.three){
+    h+=_spStatus()+'<div class="api-pan" style="font-size:13px;color:var(--ink3)">Your Baseline is set up from your flight history, or from your current settings, the first time ABRP can read your MSFS settings file.</div>';
+    body.innerHTML=h; return;
+  }
+  h+=_spStatus()+_spNotices()+_spStartCard()+_spClipCard();
+  if(_SP.simRunning) h+='<div id="sp-simrunning" style="font-size:12px;color:var(--ink3);margin:-4px 0 12px">⏸ MSFS is running. Picking a dot now takes effect at your next Launch + Capture.</div>';
+  h+='<div id="sp-three" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:6px">'+_spTri('baseline')+_spTri('suggested')+_spTri('experimental')+'</div>';
+  h+=_spTriDetail();
+  h+=_spIdeas();
+  // 4 · everything else
+  h+='<div id="sp-more-toggle" style="margin:22px 0 8px;cursor:pointer" onclick="_spShowMore=!_spShowMore;_spRender()"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">'+(_spShowMore?'▾':'▸')+' More</span> <span style="font-size:11px;color:var(--ink3)">— test history, other saved setups, rebuild from flight history, backups</span></div>';
+  if(!_spShowMore){ body.innerHTML=h; return; }
+  const done=(_SP.experiments||[]).filter(e=>!(e.status==='draft'||e.status==='active')).slice().reverse();
+  h+=_spSection('Test history',done.length?'— every finished test and its result':'');
+  if(!done.length) h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:10px">No finished tests yet.</div>';
+  for(const e of done) h+=_spExpCard(e);
+  h+='<div style="display:flex;align-items:center;gap:10px;margin:18px 0 8px"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">Other saved setups</span><span style="font-size:11px;color:var(--ink3)">— your own snapshots; applying one leaves the three above untouched</span>'
+    +(_SP.found?'<button class="btn bg bxs" style="margin-left:auto" onclick="spSave(\'captured\')">＋ Save my sim as a setup</button>':'')+'</div>';
+  if(!mine.length) h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:10px">None saved.</div>';
   for(const p of mine) h+=_spCard({key:p.id,id:p.id,kind:'profile',name:p.name,note:p.note,values:p.values,track:p.track});
-  // 4 · rebuilt from flight history
+  // rebuilt from flight history
   const runs=(_SP.runs||[]).slice().reverse();
-  h+='<div style="margin:18px 0 8px;cursor:pointer" onclick="_spShowRuns=!_spShowRuns;_spRender()"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">'+(_spShowRuns?'▾':'▸')+' From your flight history</span>'
+  h+='<div style="margin:18px 0 8px;cursor:pointer" onclick="_spShowRuns=!_spShowRuns;_spRender()"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">'+(_spShowRuns?'▾':'▸')+' Rebuild from flight history</span>'
     +' <span style="font-size:11px;color:var(--ink3)">— '+runs.length+' past setups, rebuilt from what each flight logged</span></div>';
   if(_spShowRuns){
     h+='<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:10px">Each row is a stretch of flights flown on the same settings, newest first. Sharpening, exposure, Reflex and the DLSS/FSR mode weren&rsquo;t logged before v6.27.0, so applying an older setup leaves those as they are now.</div>';
@@ -1725,45 +1726,131 @@ function _spRender(){
 }
 const _SP_BAN=(bg,bd,fg)=>'display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:'+bg+';border:1px solid '+bd+';border-radius:var(--r2);padding:12px 16px;margin-bottom:12px;color:'+fg;
 function _spDots(n,b){ let h=''; for(let i=0;i<b;i++) h+='<span style="width:11px;height:11px;border-radius:50%;border:1.5px solid var(--blu);display:inline-block;'+(i<n?'background:var(--blu)':'')+'" title="'+(i<n?'flown':'to fly')+'"></span>'; return '<span style="display:inline-flex;gap:5px" aria-label="'+n+' of '+b+' flights">'+h+'</span>'; }
-function _spTestBanner(){
-  const t=_SP.test, pr=(_SP.proposals||{}), idea=(pr.ok&&pr.proposals&&pr.proposals[0])||null;
-  if(!t){
-    const clipOn=!!(_spClip&&_spClip.preview&&_spClip.preview.ok&&!_spDupOf(_spClip.preview)&&!_spStart);   // the clipboard prompt below carries the Start button
-    return '<div id="sp-banner" data-state="none" style="'+_SP_BAN('var(--bg3)','var(--sep)','var(--ink1)')+'">'
-      +'<span style="font-size:18px">🧪</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">No test running</div>'
-      +'<div style="font-size:12.5px;color:var(--ink3)">'+(idea?('Next idea: <b style="color:var(--ink1)">'+esc(idea.name)+'</b> — '+esc(idea.why||'')):'Paste a change from Claude to test one setting.')+'</div></div>'
-      +(idea&&!clipOn?'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spAskStart(\'proposal\',\''+idea.id+'\')">Start this test</button>':'')
-      +(clipOn?'':'<button class="btn bg bsm" onclick="spNewExp()">Paste from Claude</button>')+'</div>';
+// ── v6.37.0 · Baseline · ABRP Suggested · Experimental ──────────────────────────────────────────
+// One status line says where you are; three cards each carry a "flies next" dot (what Launch + Capture
+// loads). Colour-blind safe: the dot is filled vs empty AND says "Flies next" in words.
+const _SPT={baseline:{icon:'🔒',name:'Baseline'},suggested:{icon:'⭐',name:'ABRP Suggested'},experimental:{icon:'🧪',name:'Experimental'}};
+const _spWord=t=>{ const s=String(t||''); return s.includes(' · ')?s.split(' · ').pop():s; };
+const _spShort=l=>String(l||'').replace(/ quality$/i,'');
+const _spPri='class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600"';
+function _spStatus(){
+  const s=_SP.status||{}, nm=w=>'<b>'+_SPT[w].icon+' '+_SPT[w].name+'</b>';
+  const box=(state,icon,title,sub,btns,bg,bd)=>'<div id="sp-status" data-state="'+state+'" style="'+_SP_BAN(bg||'var(--bg3)',bd||'var(--sep)','var(--ink1)')+'"><span style="font-size:20px" aria-hidden="true">'+icon+'</span>'
+    +'<div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14.5px;color:var(--ink0)">'+title+'</div><div style="font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.5">'+sub+'</div></div>'+(btns||'')+'</div>';
+  const dis=_SP.simRunning?' disabled title="Close MSFS first"':'';
+  if(s.kind==='nosim') return box('nosim','⚠','Couldn’t find your MSFS settings file (UserCfg.opt).','ABRP needs it to read and set your graphics.','','var(--red2)','var(--red)');
+  if(s.kind==='setup') return box('setup','⏳','Setting up your three profiles…','','');
+  if(s.kind==='decide'){
+    const t=s.test, e=(_SP.experiments||[]).find(x=>x.id===t.id)||{}, r=e.result||{};
+    if(r.passed) return box('decide-pass','⚑','Test passed: '+esc(t.name),esc(r.sentence||'')+' Add it and it becomes part of ABRP Suggested from your next flight.',
+      '<button '+_spPri+' onclick="spAddTest(\''+t.id+'\')">Add to ABRP Suggested</button><button class="btn bg bsm" onclick="spDropTest(\''+t.id+'\')">Drop</button><button class="btn bg bsm" onclick="spOpenTri(\'experimental\')">Details</button>','var(--blu2)','var(--blu)');
+    if(r.vramOnly) return box('decide-vram','⚠','Costs video-memory headroom: '+esc(t.name),'Frametimes held, but video memory went past the '+Math.round((_SP.vramCap||0.96)*100)+'% line where AutoFPS starts quietly lowering detail. Not offered for ABRP Suggested.',
+      '<button '+_spPri+' onclick="spDropTest(\''+t.id+'\')">Drop test</button><button class="btn bg bsm" onclick="spOpenTri(\'experimental\')">Details</button>','var(--acc3)','var(--acc)');
+    return box('decide-fail','✕','Test didn’t pass: '+esc(t.name),esc(r.sentence||'')+' It stays out of ABRP Suggested.',
+      '<button '+_spPri+' onclick="spDropTest(\''+t.id+'\')">Drop test</button><button class="btn bg bsm" onclick="spOpenTri(\'experimental\')">Details</button>','var(--acc3)','var(--acc)');
   }
-  if(t.done){
-    return '<div id="sp-banner" data-state="finished" style="'+_SP_BAN('var(--grn2, var(--bg3))','var(--grn)','var(--ink1)')+'">'
-      +'<span style="font-size:18px">🏁</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">'+esc(t.name)+': done, '+t.n+' of '+t.budget+'</div>'
-      +'<div style="font-size:12.5px;color:var(--ink2)">'+esc(t.sentence)+'</div></div>'
-      +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spExpFinish(\''+t.id+'\',\'keep\')">Keep it</button>'
-      +'<button class="btn bg bsm" onclick="spExpFinish(\''+t.id+'\',\'revert\')">Revert</button>'
-      +'<button class="btn bg bsm" onclick="spOpenCard(\''+t.id+'\')">Details</button></div>';
+  if(s.kind==='ok') return box('ok','✓','Next flight flies '+nm(s.target)+'. It’s already in your sim.','Nothing to do. Launch + Capture keeps it that way.','');
+  if(s.kind==='running'){ const t=s.test||{n:0,budget:3}; return box('running','▶','Testing '+esc(t.name)+' · flight '+Math.min(t.n+1,t.budget)+' of '+t.budget+' next',
+    'Next flight flies '+nm('experimental')+'. Fly normally with capture on; ABRP counts each flight. Flights on Baseline or ABRP Suggested don’t count, so a sanity flight is fine.',_spDots(t.n,t.budget),'var(--blu2)','var(--blu)'); }
+  if(s.kind==='pending') return box('pending','⏳','Next flight flies '+nm(s.target)+'. Your sim is still on '+nm(s.inSim)+'.',
+    'It switches at your next Launch + Capture'+(_SP.simRunning?'.':', or now:'),_SP.simRunning?'':'<button '+_spPri+' onclick="spFlyNext(\''+s.target+'\')">Switch now</button>');
+  if(s.kind==='off'){
+    const d=s.diff||[], what=s.other?('It’s on your saved setup “'+esc(s.other)+'”.'):(d.length+' setting'+(d.length===1?'':'s')+' differ (changed in the sim?): '+d.slice(0,3).map(x=>esc(x.label)+' is '+esc(_spWord(x.now))+' (wants '+esc(_spWord(x.want))+')').join('; ')+(d.length>3?'…':'.'));
+    const canTest=!s.other&&s.target!=='experimental'&&!_SP.test;
+    return box('off','⚠','Your sim doesn’t match '+nm(s.target)+', which flies next',what+' Launch + Capture will put '+_SPT[s.target].name+' back.',
+      '<button '+_spPri+dis+' onclick="spFlyNext(\''+s.target+'\')">Put it back now</button>'+(canTest?'<button class="btn bg bsm" onclick="spMakeTest()" title="Test your in-sim changes against ABRP Suggested">Make these a test</button>':''),'var(--acc3)','var(--acc)');
   }
-  if(!t.matches){
-    const what=t.off.slice(0,3).map(o=>o.label+' is '+o.now+' (test: '+o.test+')').join('; ');
-    return '<div id="sp-banner" data-state="off" style="'+_SP_BAN('var(--acc3)','var(--acc)','var(--ink1)')+'">'
-      +'<span style="font-size:18px">⚠</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">Your sim no longer matches the test “'+esc(t.name)+'”</div>'
-      +'<div style="font-size:12.5px;color:var(--ink2)">'+esc(what)+'. Flights like this don’t count toward the test.</div></div>'
-      +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled title="Close MSFS first"':'')+' onclick="spApply(\''+t.id+'\')">Re-apply test settings</button>'
-      +'<button class="btn bg bsm" onclick="spExpFinish(\''+t.id+'\',\'end\')">End test</button></div>';
-  }
-  return '<div id="sp-banner" data-state="running" style="'+_SP_BAN('var(--blu2)','var(--blu)','var(--ink1)')+'">'
-    +'<span style="font-size:18px">▶</span><div style="flex:1;min-width:240px"><div style="font-weight:600;font-size:14px;color:var(--ink0)">Testing '+esc(t.name)+' · flight '+t.n+' of '+t.budget+'</div>'
-    +'<div style="font-size:12.5px;color:var(--ink2)">Nothing to do. Fly normally with capture on; ABRP counts each flight.</div></div>'
-    +_spDots(t.n,t.budget)+'</div>';
+  return '';
 }
-// "This ends your running test" — asked before anything would knock the sim off the test
-function _spEndAskCard(){
-  const q=_spEndAsk; if(!q)return '';
-  return '<div id="sp-endask" class="api-pan" style="border:2px solid var(--acc);padding:14px 16px;margin-bottom:12px">'
-    +'<div style="font-weight:600;font-size:14px;color:var(--ink0);margin-bottom:6px">⚠ This ends your running test</div>'
-    +'<div style="font-size:13px;color:var(--ink2);margin-bottom:12px">'+esc(q.what)+' changes the tested setting, so flights after this won’t count toward “'+esc(q.test.name)+'” ('+q.test.n+' of '+q.test.budget+' flown).</div>'
-    +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="_spEndAsk=null;_spRender()">Keep testing</button> '
-    +'<button class="btn bg bsm" onclick="spEndAskGo()">End test and '+esc(q.verb)+'</button></div>';
+// one-line notes: the dot moved by itself, or Claude's inbox delivered something
+function _spNotices(){
+  let h='';
+  const line=(txt)=>'<div class="sp-notice" style="display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink1);background:var(--bg3);border:1px solid var(--sep);border-radius:var(--r2);padding:8px 12px;margin:-4px 0 12px"><span style="flex:1">'+txt+'</span><button class="btn bg bxs" onclick="spDismissNotice()">✕</button></div>';
+  if(_SP.notice) h+=line('ℹ '+esc(_SP.notice.text));
+  const ib=_SP.inboxNotice;
+  if(ib&&ib.items&&ib.items.length) for(const it of ib.items){
+    h+=line(it.ok?(it.duplicate?('📥 From Claude: '+esc(it.msg||'already have that test.')):('📥 New test from Claude: <b>'+esc(it.name)+'</b>. '+(it.queued?'Saved as up next; it starts when the current test is done.':'It flies on your next Launch + Capture.')))
+      :('📥 A file from Claude couldn’t be used ('+esc(it.file)+'): '+esc(it.msg||'')));
+  }
+  return h;
+}
+function _spMetrics(t){
+  if(!t||!t.n) return '<div class="sp-metrics" style="font-size:12px;color:var(--ink3);padding:4px 0">Not flown on these exact settings yet.</div>';
+  const cap=Math.round((_SP.vramCap||0.96)*100), vp=(t.vram&&t.vramTotal)?Math.round(t.vram/t.vramTotal*100):null;
+  const row=(k,v,s)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;padding:2px 0"><span style="color:var(--ink2)">'+k+'</span><span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink0);font-weight:600">'+v+(s?' <span style="font-weight:400;color:var(--ink3);font-size:11px">'+s+'</span>':'')+'</span></div>';
+  return '<div class="sp-metrics">'+row('Felt stutters',t.feltHr!=null?t.feltHr+'/hr':'—')+row('P99 frametime',t.p99!=null?Number(t.p99).toFixed(1)+' ms':'—')
+    +row('Peak video memory',vp!=null?vp+'%':'—',vp!=null?(vp>=cap?'⚠ past '+cap+'%':'of '+cap+'% line'):'')
+    +'<div style="font-size:11px;color:var(--ink3);margin-top:3px">Typical of '+t.n+' flight'+(t.n===1?'':'s')+' on exactly these settings</div></div>';
+}
+function _spTri(who){
+  const T=_SP.three[who], sel=_SP.flyNext===who, here=_SP.inSim===who, can=!!(T&&T.values), M=_SPT[who];
+  let sub='';
+  if(who==='baseline') sub='Your known-good. Never changes. Fly it after a sim or aircraft update to check the update itself.';
+  if(who==='suggested') sub=T.adds.length?('Baseline + '+T.adds.map(a=>'<b style="color:var(--ink1)">'+esc(_spShort(a.label))+' '+esc(_spWord(a.toText))+'</b>').join(' + ')):'Same as Baseline: no tested change added yet.';
+  if(who==='experimental') sub=T?('ABRP Suggested + '+T.changes.map(c=>'<b style="color:var(--ink1)">'+esc(_spShort(c.label))+' '+esc(_spWord(c.toText))+'</b>').join(' + ')+(_SP.test?' · '+Math.min(_SP.test.n,_SP.test.budget)+' of '+_SP.test.budget+' test flights flown':''))
+    :'Empty. Start a test from the idea below.';
+  const open=_spTriOpen===who;
+  let h='<div class="sp-tri" data-who="'+who+'" style="background:var(--bg2);border:'+(sel?'2px solid var(--acc)':'1px solid var(--sep)')+';border-radius:var(--r);padding:'+(sel?'11px 13px':'12px 14px')+';display:flex;flex-direction:column;gap:8px'+(can?'':';opacity:.65')+'">'
+    +'<button class="sp-dot" role="radio" aria-checked="'+sel+'" '+(can&&!sel?'':'disabled ')+'onclick="spFlyNext(\''+who+'\')" title="'+(sel?'Your next flight uses this':can?'Use this on your next flight':'Nothing to fly yet')+'" style="display:flex;align-items:center;gap:8px;background:none;border:none;padding:0;cursor:'+(can&&!sel?'pointer':'default')+';color:'+(sel?'var(--acc)':'var(--ink3)')+';font-size:12px;font-weight:'+(sel?'700':'500')+';text-align:left">'
+    +'<span style="width:16px;height:16px;border-radius:50%;border:2px solid '+(sel?'var(--acc)':'var(--ink3)')+';display:inline-flex;align-items:center;justify-content:center">'+(sel?'<span style="width:8px;height:8px;border-radius:50%;background:var(--acc)"></span>':'')+'</span>'
+    +(sel?'FLIES NEXT':can?'Fly this next':'No test to fly')+'</button>'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:15px;font-weight:700;color:var(--ink0)">'+M.icon+' '+M.name+'</span>'
+    +(here?'<span class="sp-insim" style="font-size:10px;font-weight:700;color:var(--blu);border:1px solid var(--blu);border-radius:5px;padding:1px 6px">✓ IN YOUR SIM</span>':'')+'</div>'
+    +'<div style="font-size:12px;color:var(--ink3);line-height:1.5;min-height:34px">'+sub+'</div>'
+    +(can?_spMetrics(T.track):'');
+  if(who==='baseline'&&T.check&&T.check.line) h+='<div class="sp-check" style="font-size:11.5px;line-height:1.5;color:'+(T.check.verdict==='worse'?'var(--acc)':'var(--ink2)')+';border-top:1px solid var(--sep);padding-top:6px">'+(T.check.verdict==='worse'?'⚠ ':'Update check: ')+esc(T.check.line)+'</div>';
+  if(can) h+='<div style="margin-top:auto"><span class="sp-details" style="font-size:12px;color:var(--blu);cursor:pointer" onclick="spOpenTri(\''+who+'\')">'+(open?'▾ Hide details':'▸ Details')+'</span></div>';
+  return h+'</div>';
+}
+function spOpenTri(who){ _spTriOpen=_spTriOpen===who?null:who; if(who==='experimental'&&_SP.three.experimental)_spOpen[_SP.three.experimental.id]=true; _spRender(); const el=document.getElementById('sp-tri-detail'); if(el)el.scrollIntoView({block:'nearest'}); }
+function _spTriDetail(){
+  const who=_spTriOpen; if(!who||!_SP.three[who]||!_SP.three[who].values) return '';
+  const T=_SP.three[who], cur=_SP.current;
+  let h='<div id="sp-tri-detail" class="api-pan" style="padding:14px 16px;margin-top:4px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b style="font-size:13.5px;color:var(--ink0)">'+_SPT[who].icon+' '+_SPT[who].name+'</b>'
+    +'<button class="btn bg bxs" style="margin-left:auto" onclick="spCopyText(\''+who+'\')">Copy as text</button><button class="btn bg bxs" onclick="spOpenTri(\''+who+'\')">Close</button></div>';
+  if(who==='experimental'){
+    const e=(_SP.experiments||[]).find(x=>x.id===T.id);
+    return h+(e?_spExpCard(e):'')+'</div>';
+  }
+  if(who==='baseline') h+='<div style="font-size:12.5px;color:var(--ink2);margin-bottom:10px;line-height:1.6">Frozen '+esc(profilesRange(T.created,T.created))+'. Built from '+esc(T.note||'your flights')+' Nothing changes it: it’s the fixed point you compare updates against.</div>';
+  if(who==='suggested'){
+    h+='<div style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:6px">What it adds to Baseline</div>';
+    if(!T.adds.length) h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:10px">Nothing yet. A test that passes can be added here with one click.</div>';
+    else h+='<div style="border:1px solid var(--sep);border-radius:var(--r3);overflow:hidden;margin-bottom:12px">'+T.adds.map((a,i)=>{
+      const v=(typeof _LABV!=='undefined'&&_LABV[a.verdict])||{t:a.verdict||''};
+      return '<div class="sp-add" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;font-size:12.5px;'+(i?'border-top:1px solid var(--sep)':'')+'">'
+        +'<span style="flex:1;min-width:220px;color:var(--ink1)"><b>'+esc(a.label)+'</b> <span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink2)">'+esc(a.fromText)+' → '+esc(a.toText)+'</span><br>'
+        +'<span style="font-size:11.5px;color:var(--ink3)">Test “'+esc(a.name)+'” · '+(a.n||0)+' flight'+(a.n===1?'':'s')+' · '+esc(v.t||'')+' · added '+esc(profilesRange(a.added,a.added))+'</span></span>'
+        +'<button class="btn bg bxs" onclick="spRemoveAdd(\''+a.id+'\')">Remove</button></div>'; }).join('')+'</div>';
+  }
+  h+='<label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);margin-bottom:6px;cursor:pointer">'
+    +'<input type="checkbox" '+(_spDiffOnly?'checked':'')+' onchange="_spDiffOnly=this.checked;_spRender()"> Only show what differs from your sim now</label>';
+  return h+_spSettingsTable(T.values,cur)+'</div>';
+}
+// what to test next: ABRP's idea (one, more behind a click), anything Claude queued, or paste one in
+function _spIdeas(){
+  const pr=_SP.proposals||{}, ideas=(pr.ok&&pr.proposals)||[], q=_SP.queue||[];
+  let h=_spSection('🧪 Next test');
+  if(_spPaste.open) h+=_spPastePanel();
+  for(const d of q) h+='<div class="sp-queue" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;padding:8px 12px;background:var(--bg2);border:1px solid var(--sep);border-radius:var(--r2);margin-bottom:8px"><span style="flex:1;color:var(--ink1)">Up next: <b>'+esc(d.name)+'</b></span>'
+    +(_SP.test?'<span style="font-size:11.5px;color:var(--ink3)">starts when the current test is added or dropped</span>':'<button '+_spPri+' onclick="spStartTest(\''+d.id+'\')">Start it</button>')
+    +'<button class="btn bg bxs" onclick="spDelete(\''+d.id+'\')">Remove</button></div>';
+  if(_SP.test){
+    h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:8px">One test at a time: '+esc(_SP.test.name)+' is running (see 🧪 Experimental above).</div>';
+  } else if(ideas.length){
+    const show=_spAllIdeas?ideas:ideas.slice(0,1);
+    h+='<div class="api-pan" style="padding:10px 14px">';
+    show.forEach((p,i)=>{ const c=p.changes[0], k=_spK(c.id);
+      h+='<div class="sp-prop" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;'+(i?'border-top:1px solid var(--sep);':'')+'font-size:12.5px">'
+        +'<span style="flex:1;min-width:240px;color:var(--ink1)"><b>'+esc(p.name)+'</b> <span style="color:var(--ink3);font-family:\'JetBrains Mono\',monospace;font-size:11.5px">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to))
+        +'<br><span style="font-size:11.5px;color:var(--ink3)">'+esc(p.why||'')+'</span></span>'
+        +'<button '+(i?'class="btn bg bsm"':_spPri)+' onclick="spAskStart(\'proposal\',\''+p.id+'\')">Start test</button></div>'; });
+    if(ideas.length>1) h+='<div style="font-size:12px;color:var(--blu);cursor:pointer;padding-top:4px" onclick="_spAllIdeas=!_spAllIdeas;_spRender()">'+(_spAllIdeas?'▾ Fewer ideas':'▸ '+(ideas.length-1)+' more idea'+(ideas.length>2?'s':''))+'</div>';
+    h+='</div>';
+  } else h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:8px">'+esc(pr.reason||'No ideas right now.')+'</div>';
+  if(!_spPaste.open) h+='<div style="font-size:12px;color:var(--ink3);margin-top:6px">Tests from Claude arrive by themselves through ABRP’s inbox. <span style="color:var(--blu);cursor:pointer" onclick="spNewExp()">Paste one instead</span></div>';
+  return h;
 }
 // One confirmation, then it is live: "Start test" creates AND applies.
 function _spStartCard(){
@@ -1771,12 +1858,13 @@ function _spStartCard(){
   const pv=q.preview||{}, chg=(pv.changes||[]).filter(c=>!c.same);
   return '<div id="sp-start" class="api-pan" style="border:2px solid var(--blu);padding:14px 16px;margin-bottom:12px">'
     +'<div style="font-weight:600;font-size:14px;color:var(--ink0);margin-bottom:4px">Start test: '+esc(pv.name||'')+'</div>'
-    +'<div style="font-size:12.5px;color:var(--ink3);margin-bottom:8px">'+chg.length+' setting'+(chg.length===1?'':'s')+' change'+(chg.length===1?'s':'')+' on top of '+(pv.base&&pv.base.id!=='current'?'“'+esc(pv.base.name)+'”':'your current sim settings')+':</div>'
+    +'<div style="font-size:12.5px;color:var(--ink3);margin-bottom:8px">This becomes 🧪 Experimental: '+(pv.base&&pv.base.id!=='current'?'“'+esc(pv.base.name)+'”':'your current sim settings')+' plus '+chg.length+' change'+(chg.length===1?'':'s')+':</div>'
     +chg.map(c=>{ const k=_spK(c.id); return '<div style="font-size:13px;color:var(--ink1);margin-bottom:4px">'+esc(k?k.label:c.id)+': <span style="font-family:\'JetBrains Mono\',monospace">'+esc(_spDisp(k,c.from))+' → <b>'+esc(_spDisp(k,c.to))+'</b></span> '+_spDirTag(c.dir)+'</div>'; }).join('')
-    +'<div style="font-size:12px;color:var(--ink3);margin:8px 0 12px">Then fly '+(pv.budget||3)+' flights with capture on. ABRP backs up your settings first; one click undoes it.</div>'
-    +(_SP.simRunning?'<div style="font-size:12px;color:var(--acc);margin-bottom:8px">⏸ Close MSFS to start (it reads its settings at launch).</div>':'')
-    +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" '+(_SP.simRunning?'disabled':'')+' onclick="spStartGo(false)">Start test</button> '
-    +'<button class="btn bg bsm" onclick="spStartGo(true)">Save for later</button> '
+    +(pv.warnings||[]).map(w=>'<div style="font-size:12px;color:var(--acc);margin-top:4px">⚠ '+esc(w)+'</div>').join('')
+    +'<div style="font-size:12px;color:var(--ink3);margin:8px 0 12px">The dot moves to Experimental, so your next '+(pv.budget||3)+' Launch + Capture flights fly it. '+(_SP.simRunning?'MSFS is running, so it goes in at your next Launch + Capture.':'ABRP backs up your settings and applies it now.')+'</div>'
+    +(_SP.test?'<div style="font-size:12px;color:var(--ink2);margin-bottom:8px">“'+esc(_SP.test.name)+'” is still running, so this one is saved as up next.</div>':'')
+    +'<button class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600" onclick="spStartGo(false)">'+(_SP.test?'Save as up next':'Start test')+'</button> '
+    +(_SP.test?'':'<button class="btn bg bsm" onclick="spStartGo(true)">Save for later</button> ')
     +'<button class="btn bg bsm" onclick="_spStart=null;_spRender()">Cancel</button></div>';
 }
 function _spClipCard(){
@@ -1807,35 +1895,37 @@ async function spAskStart(kind,pid,text){
   if(dup){ _spMsg={ok:true,text:'“'+dup.name+'” is already '+(dup.status==='active'?'running':'saved')+'. Nothing new was created.'}; if(_spClip&&_spClip.text===text)spClipDismiss(); return spOpenCard(dup.id); }
   _spStart={kind,pid,text,preview:pv}; _spRender(); _spTop();
 }
-async function spStartGo(later,endTest){
+async function spStartGo(later){
   const q=_spStart; if(!q)return;
-  const r=await window.api.profilesExpCreate({text:q.text,start:!later,endTest:!!endTest});
-  if(r&&r.needsEndTest){ _spEndAsk={what:'Starting “'+(q.preview&&q.preview.name)+'”',verb:'start this one',test:r.test,go:()=>spStartGo(false,true)}; return _spRender(); }
+  const r=await window.api.profilesExpCreate({text:q.text,start:!later});
   _spStart=null;
   if(_spClip&&_spClip.text===q.text){ _spClipMark(q.text); _spClip=null; }
   if(r&&r.duplicate){ _spMsg={ok:true,text:r.msg}; await renderProfilesPane(); return spOpenCard(r.id); }
-  if(r&&r.ok){ _spClipMark(q.text); _spMsg={ok:r.started!==false||later,text:later?('Saved “'+r.experiment.name+'” for later. Start it when your current test is done.'):(r.msg||'Started.'),undo:!!(r.started&&r.changed&&r.changed.length)}; }
+  if(r&&r.ok){ _spClipMark(q.text); _spMsg={ok:true,text:later?('Saved “'+r.experiment.name+'” as up next.'):(r.msg||'Started.')}; }
   else _spMsg={ok:false,text:(r&&r.msg)||'Could not start it.'};
   await renderProfilesPane(); _spTop();
 }
-function spEndAskGo(){ const q=_spEndAsk; _spEndAsk=null; if(q&&q.go)q.go(); }
-function _spSuggestedCard(){
-  const sg=_SP.suggestion;
-  let h=_spSection('⭐ ABRP Suggested');
-  if(!sg||!sg.ok) return h+'<div class="api-pan" style="font-size:13px;color:var(--ink3)">'+esc((sg&&sg.reason)||'Not enough flight data yet.')+'</div>';
-  const why=!!_spOpen.__why, confC=sg.confidence==='High'?'var(--blu)':'var(--acc)';
-  let extra='<div style="margin:2px 0 10px"><span id="sp-why-toggle" style="cursor:pointer;font-size:12.5px;color:var(--blu)" onclick="event.stopPropagation();_spOpen.__why=!_spOpen.__why;_spRender()">'+(why?'▾':'▸')+' Why this profile?</span></div>';
-  if(why){
-    extra+='<div id="sp-why" style="background:var(--bg3);border:1px solid var(--sep);border-radius:var(--r2);padding:10px 14px;margin-bottom:10px">'
-      +sg.reasons.map(t=>'<div style="font-size:12.5px;color:var(--ink1);line-height:1.6;padding:2px 0">• '+esc(t)+'</div>').join('')
-      +(sg.unrecorded&&sg.unrecorded.length?('<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">Not logged on those flights, so applying leaves them as they are now: '+esc(sg.unrecorded.join(', '))+'.</div>'):'')
-      +'<div style="font-size:11px;color:var(--ink3);margin-top:6px">Recomputed from your flights every time you open this page. It never applies itself.</div></div>';
-  }
-  return h+_spCard({key:'suggested',id:'suggested',kind:'suggested',name:sg.name,values:sg.values,
-    track:{n:sg.base.n,p99:sg.base.p99,feltHr:sg.base.feltHr},
-    sub:'<span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:'+confC+';border:1px solid '+confC+';border-radius:5px;padding:1px 7px">'+esc(String(sg.confidence).toUpperCase())+' CONFIDENCE</span> &nbsp;based on your '+esc(profilesRange(sg.base.first,sg.base.last))+' setup',
-    extra, accent:true});
+// ── v6.37.0 actions on the three ──
+async function _spDo(fn,a){
+  let r; try{ r=await window.api[fn](a||{}); }catch(e){ r={ok:false,msg:e.message}; }
+  _spMsg={ok:!!(r&&r.ok),text:(r&&(r.msg||r.applyMsg))||'Something went wrong.'};
+  await renderProfilesPane(); _spTop(); return r;
 }
+function spFlyNext(who){ return _spDo('profilesFlyNext',{to:who}); }
+function spAddTest(id){ return _spDo('profilesAddTest',{id}); }
+function spDropTest(id){
+  const e=(_SP.experiments||[]).find(x=>x.id===id); if(!e)return;
+  if(!confirm('Drop the test “'+e.name+'”?\n\nABRP Suggested flies next. The test stays in Test history under More.'))return;
+  return _spDo('profilesDropTest',{id});
+}
+function spRemoveAdd(id){
+  const a=((_SP.three&&_SP.three.suggested.adds)||[]).find(x=>x.id===id); if(!a)return;
+  if(!confirm('Take '+a.label+' '+_spWord(a.toText)+' out of ABRP Suggested?\n\nIt goes back to the Baseline value ('+_spWord(a.fromText)+'). You can test it again any time.'))return;
+  return _spDo('profilesRemoveAdd',{id});
+}
+function spMakeTest(){ return _spDo('profilesMakeTest'); }
+function spStartTest(id){ return _spDo('profilesStartTest',{id}); }
+async function spDismissNotice(){ try{ await window.api.profilesDismissNotice(); }catch(_){} await renderProfilesPane(); }
 function _spCard(o){
   const cur=_SP.current, open=!!_spOpen[o.key], isCur=cur&&_spMatches(o.values,cur);
   const d=_spDiff(o.values,cur,false);
@@ -1844,7 +1934,7 @@ function _spCard(o){
     +'<span style="color:var(--ink3);font-size:12px;width:10px;padding-top:2px">'+(open?'▾':'▸')+'</span><div style="flex:1;min-width:220px">';
   if(_spRenaming===o.key) h+='<input id="sp-rename-'+o.key+'" value="'+esc(o.name)+'" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\')this.blur();if(event.key===\'Escape\'){_spRenaming=null;_spRender()}" onblur="spRenameSave(\''+o.key+'\',this.value)" style="font-size:14px;font-weight:600;background:var(--bg3);color:var(--ink0);border:1px solid var(--acc);border-radius:6px;padding:4px 8px;width:100%">';
   else h+='<div class="sp-name" style="font-size:14px;font-weight:600;color:var(--ink0)">'+(o.accent?'⭐ ':'')+esc(o.name)
-    +(isCur?' <span class="sp-cur" style="font-size:10px;font-weight:700;color:var(--blu);border:1px solid var(--blu);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:2px">✓ CURRENT</span>':'')+'</div>';
+    +(isCur?' <span class="sp-cur" style="font-size:10px;font-weight:700;color:var(--blu);border:1px solid var(--blu);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:2px">✓ IN YOUR SIM</span>':'')+'</div>';
   if(o.sub) h+='<div style="font-size:11.5px;color:var(--ink3);margin-top:4px">'+o.sub+'</div>';
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">'+_spChips(o.values)+'</div>'
     +(o.noTrack?'':'<div class="sp-track" style="font-size:11.5px;color:var(--ink2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">'+_spTrack(o.track)+'</div>')+'</div>'
@@ -1892,38 +1982,7 @@ function _spCard(o){
 // An experiment = a base profile + one (or a few) changed settings, flown for a small flight budget and
 // judged against the base's own flights (per-aircraft, ±1σ noise). Created by pasting ABRP text, dropping
 // a .txt file, or one click on an ABRP proposal. Verdict words reuse Settings A/B's (_LABV).
-const _SP_EXP_STATUS={draft:'SAVED FOR LATER',active:'TESTING',kept:'KEPT',reverted:'REVERTED',ended:'ENDED'};
-function _spExperimentsSection(){
-  const exps=(_SP.experiments||[]).slice().reverse();
-  const live=exps.filter(e=>e.status==='draft'||e.status==='active'), done=exps.filter(e=>!(e.status==='draft'||e.status==='active'));
-  let h='<div style="display:flex;align-items:center;gap:10px;margin:18px 0 8px">'
-    +'<span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)">🧪 Experiments</span>'
-    +'<span style="font-size:11px;color:var(--ink3)">— test one change against a base profile; ABRP judges it from your flights</span>'
-    +'<button class="btn bg bxs" style="margin-left:auto" onclick="spNewExp()">＋ New experiment</button></div>';
-  if(_spPaste.open) h+=_spPastePanel();
-  for(const e of live) h+=_spExpCard(e);
-  // ABRP's own ideas (only when the GPU clearly has headroom)
-  const pr=_SP.proposals||{};
-  if(pr.ok&&pr.proposals&&pr.proposals.length){
-    h+='<div class="api-pan" style="padding:12px 16px">'
-      +'<div style="font-size:12.5px;color:var(--ink1);margin-bottom:8px"><b>'+(_SP.test?'Next ideas':'Suggested experiments')+'</b> <span style="color:var(--ink3)">— your GPU is busy about '+Number(pr.gpu).toFixed(1)+' ms of each '+Number(pr.budgetMs).toFixed(1)+' ms frame'+(pr.cpuBound!=null?(' and '+Math.round(pr.cpuBound)+'% of frames wait on the CPU'):'')+', so there is room for GPU-only detail that doesn&rsquo;t use video memory.</span></div>';
-    for(const p of pr.proposals){
-      const c=p.changes[0], k=_spK(c.id);
-      h+='<div class="sp-prop" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--sep);font-size:12.5px">'
-        +'<span style="flex:1;color:var(--ink1)"><b>'+esc(p.name)+'</b> <span style="color:var(--ink3);font-family:\'JetBrains Mono\',monospace;font-size:11.5px">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to))+'</span>'
-        +(_SP.test?'<span style="font-size:11.5px;color:var(--ink3)">Available after this test</span>'
-          :'<button class="btn bg bxs" onclick="spAskStart(\'proposal\',\''+p.id+'\')">Start test</button><button class="btn bg bxs" title="Copy as ABRP text" onclick="spCopyProposal(\''+p.id+'\')">Copy text</button>')+'</div>';
-    }
-    h+='</div>';
-  } else if(!live.length&&!_spPaste.open){
-    h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:10px">No experiments running. '+esc(pr.reason||'')+' Paste a change from Claude with <b>＋ New experiment</b>, or drop a .txt file on this page.</div>';
-  }
-  if(done.length){
-    h+='<div style="margin:8px 0;cursor:pointer" onclick="_spShowFinished=!_spShowFinished;_spRender()"><span style="font-size:11px;color:var(--ink3)">'+(_spShowFinished?'▾':'▸')+' Finished experiments ('+done.length+')</span></div>';
-    if(_spShowFinished) for(const e of done) h+=_spExpCard(e);
-  }
-  return h;
-}
+const _SP_EXP_STATUS={draft:'UP NEXT',active:'TESTING',kept:'ADDED TO ABRP SUGGESTED',dropped:'DROPPED',reverted:'REVERTED',ended:'ENDED'};
 function _spExpCard(e){
   if(_spOpen[e.id]===undefined&&e.status==='active')_spOpen[e.id]=true;   // v6.33.0: the running test is shown open
   const r=e.result||{}, live=e.status==='draft'||e.status==='active';
@@ -1938,7 +1997,7 @@ function _spExpCard(e){
     +(r.verdict&&r.verdict!=='collecting'||!live?' <span style="font-size:10px;font-weight:800;letter-spacing:.08em;font-family:\'JetBrains Mono\',monospace;color:'+v.c+';border:1px solid '+v.c+';border-radius:5px;padding:1px 7px">'+esc(v.t)+'</span>':'')
     +' &nbsp;on <b style="color:var(--ink1)">'+esc(e.baseId==='current'?'your sim settings at the time':(e.baseName||'?'))+'</b><div style="margin-top:4px">'+chg+'</div>';
   let extra='<div class="sp-exp-verdict" style="font-size:12.5px;color:var(--ink1);line-height:1.6;margin-bottom:8px">'+esc(r.sentence||'')+'</div>';
-  if(e.status==='draft') extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Apply it (sim closed), then fly normally with capture on. ABRP matches each flight to this experiment by its settings, so there is nothing to tag.</div>';
+  if(e.status==='draft') extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Start it and the dot moves to 🧪 Experimental. ABRP matches each flight to the test by its settings, so there is nothing to tag.</div>';
   if(r.rows&&r.rows.length){
     extra+='<div style="border:1px solid var(--sep);border-radius:var(--r3);overflow:hidden;margin-bottom:8px">';
     r.rows.forEach((x,i)=>{
@@ -1957,12 +2016,10 @@ function _spExpCard(e){
   if(e.why) extra+='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Why: '+esc(e.why)+'</div>';
   return _spCard({key:e.id,id:e.id,kind:'experiment',live,active:e.status==='active',draft:e.status==='draft',done:!!r.done,name:e.name,values:e.values,track:null,sub,extra,accent:false,dim:!live,noTrack:true});
 }
-// v6.33.0: actions on a test card. Running → "✓ Applied" (or Re-apply if the sim drifted), End test early,
-// and everything else under More. Finished → Keep it / Revert. Saved for later → Start test. Done ones →
-// copy + delete only.
+// v6.37.0: actions on a test card. Running → flies next / pick it, End test (drop). Finished → Add to ABRP
+// Suggested (only when it passed) / Drop. Up next → Start it. Finished ones → copy + delete only.
 function _spExpActions(o,isCur){
   const pri='class="btn bsm" style="background:var(--acc);color:#000;border-color:var(--acc);font-weight:600"';
-  const dis=_SP.simRunning?' disabled title="Close MSFS first"':'';
   const more=_spMoreOpen===o.id;
   const moreBtn='<button class="btn bg bsm sp-more" onclick="_spMoreOpen=(_spMoreOpen===\''+o.id+'\'?null:\''+o.id+'\');_spRender()">'+(more?'▾':'▸')+' More</button>';
   const copyRes='<button class="btn bg bsm" title="Copies a short results summary to paste into a chat with Claude" onclick="spCopyResults(\''+o.id+'\')">📋 Copy results for Claude</button>';
@@ -1971,19 +2028,20 @@ function _spExpActions(o,isCur){
   const del='<button class="btn bg bsm" style="color:var(--red)" onclick="spDelete(\''+o.id+'\')">Delete</button>';
   let h='<div class="sp-exp-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px">';
   if(o.active&&o.done){
-    h+='<button '+pri+' onclick="spExpFinish(\''+o.id+'\',\'keep\')">Keep it</button><button class="btn bg bsm"'+dis+' onclick="spExpFinish(\''+o.id+'\',\'revert\')">Revert</button>'+moreBtn+'</div>';
-    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+copyRes+copyTxt+ren+'<button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'end\')">End without deciding</button>'+del+'</div>';
+    const e=(_SP.experiments||[]).find(x=>x.id===o.id)||{}, passed=!!(e.result&&e.result.passed);
+    h+=(passed?'<button '+pri+' onclick="spAddTest(\''+o.id+'\')">Add to ABRP Suggested</button><button class="btn bg bsm" onclick="spDropTest(\''+o.id+'\')">Drop</button>'
+      :'<button '+pri+' onclick="spDropTest(\''+o.id+'\')">Drop test</button>')+moreBtn+'</div>';
+    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+copyRes+copyTxt+ren+'</div>';
     return h;
   }
   if(o.active){
-    h+=(isCur?'<span class="sp-applied" style="font-size:12.5px;color:var(--ink2)">✓ Applied to your sim</span>':'<button '+pri+dis+' onclick="spApply(\''+o.id+'\')">Re-apply test settings</button>')
-      +'<button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'end\')">End test early</button>'+moreBtn+'</div>';
-    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn bg bsm" onclick="spExpFinish(\''+o.id+'\',\'keep\')" title="Decide now, before the 3 flights are in">✓ Keep now</button>'
-      +'<button class="btn bg bsm"'+dis+' onclick="spExpFinish(\''+o.id+'\',\'revert\')">↶ Revert now</button>'+copyRes+copyTxt+ren+del+'</div>';
+    h+=(_SP.flyNext==='experimental'?'<span class="sp-applied" style="font-size:12.5px;color:var(--ink2)">◉ Flies next'+(isCur?' · ✓ in your sim':'')+'</span>':'<button '+pri+' onclick="spFlyNext(\'experimental\')">Fly it next</button>')
+      +'<button class="btn bg bsm" onclick="spDropTest(\''+o.id+'\')">End test (drop it)</button>'+moreBtn+'</div>';
+    if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+copyRes+copyTxt+ren+'</div>';
     return h;
   }
   if(o.draft){
-    h+='<button '+pri+dis+' onclick="spApply(\''+o.id+'\')">Start test</button>'+moreBtn+'</div>';
+    h+=(_SP.test?'<span style="font-size:12px;color:var(--ink3)">Starts after the current test</span>':'<button '+pri+' onclick="spStartTest(\''+o.id+'\')">Start it</button>')+moreBtn+'</div>';
     if(more) h+='<div class="sp-more-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+copyTxt+ren+del+'</div>';
     return h;
   }
@@ -2060,16 +2118,8 @@ async function spExpPropose(pid){
   if(r&&r.ok)_spOpen[r.experiment.id]=true;
   await renderProfilesPane(); _spTop();
 }
-async function spExpFinish(id,action){
-  const e=(_SP.experiments||[]).find(x=>x.id===id); if(!e)return;
-  const q={keep:'Keep “'+e.name+'”?\n\nThe change is folded into "'+e.baseName+'" (or saved as a new profile if the base was ABRP Suggested). Your sim is not changed.',
-    revert:'Revert “'+e.name+'”?\n\nABRP applies the base profile "'+e.baseName+'" again (backup + undo as usual).',
-    end:'End “'+e.name+'” without changing anything?'}[action];
-  if(!confirm(q))return;
-  const r=await window.api.profilesExpFinish({id,action});
-  _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Failed.',undo:action==='revert'&&r&&r.ok};
-  await renderProfilesPane(); _spTop();
-}
+// v6.37.0: a finished test is added to ABRP Suggested or dropped (older "keep"/"revert"/"end" map to these)
+function spExpFinish(id,action){ return (action==='keep'||action==='add')?spAddTest(id):spDropTest(id); }
 async function spCopyRaw(t){ const ok=await window.api.clipboardWriteText(t); _spMsg={ok:!!ok,text:ok?'Copied to the clipboard.':'Could not copy.'}; _spRender(); _spTop(); }
 async function spCopyText(id){ const r=await window.api.profilesExportText({id}); if(r&&r.ok) return spCopyRaw(r.text); _spMsg={ok:false,text:'Could not export that profile.'}; _spRender(); }
 async function spCopyProposal(pid){ const p=((_SP.proposals||{}).proposals||[]).find(x=>x.id===pid); if(p) return spCopyRaw(p.text); }
@@ -2136,21 +2186,15 @@ async function spDelete(id){
   if(!confirm('Delete the profile "'+p.name+'"?\n\nThis only removes the saved profile from ABRP. Your sim settings are not changed.'))return;
   await window.api.profilesDelete({id}); delete _spOpen[id]; await renderProfilesPane();
 }
-async function spApply(id,endTest){
+async function spApply(id){
   const lodEl=document.getElementById('sp-lod'), lod=!!(lodEl&&lodEl.checked);
-  const r=await window.api.profilesApply({id,includeLod:lod,endTest:!!endTest});
-  if(r&&r.needsEndTest){
-    const p=(_SP.profiles||[]).concat(_SP.experiments||[]).find(x=>x.id===id), nm=id==='suggested'?'ABRP Suggested':(p?p.name:'this profile');
-    _spEndAsk={what:'Applying “'+nm+'”',verb:'apply',test:r.test,go:async()=>{ const r2=await window.api.profilesApply({id,includeLod:lod,endTest:true}); _spConfirm=null; _spMsg={ok:!!(r2&&r2.ok),text:(r2&&r2.msg)||'Apply failed.',undo:!!(r2&&r2.ok&&r2.changed&&r2.changed.length)}; await renderProfilesPane(); _spTop(); }};
-    _spConfirm=null; return _spRender();
-  }
+  const r=await window.api.profilesApply({id,includeLod:lod});
   _spConfirm=null;
   _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Apply failed.',undo:!!(r&&r.ok&&r.changed&&r.changed.length)};
   await renderProfilesPane(); _spTop();
 }
-async function spUndo(endTest){
-  const r=await window.api.profilesApply({undo:true,endTest:!!endTest});
-  if(r&&r.needsEndTest){ _spEndAsk={what:'Undo',verb:'undo',test:r.test,go:()=>spUndo(true)}; return _spRender(); }
+async function spUndo(){
+  const r=await window.api.profilesApply({undo:true});
   _spMsg={ok:!!(r&&r.ok),text:(r&&r.msg)||'Undo failed.'};
   await renderProfilesPane(); _spTop();
 }
@@ -6022,14 +6066,29 @@ async function launchAndCapture(dep,arr,acType){
   }
   const closeApps=(S.cfg.flightCloseApps||[]).filter(a=>a.enabled!==false);
   const comps=(S.cfg.quickLaunchApps||[]).filter(a=>a&&a.path&&a.autoStart!==false);
-  const msg=warn+'Launch a clean benchmark flight?\n\nThis will, in order:\n'
-    +'1. Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete — your current settings are left alone)\n'
-    +(closeApps.length?('2. Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)\n'):'')
-    +(comps.length?('3. Launch your '+comps.length+' companion app'+(comps.length>1?'s':'')+'\n'):'')
-    +'4. Launch MSFS and start the performance capture\n\n'
-    +'Make sure you’ve already generated your SimBrief plan and MSFS isn’t already running.\n'
-    +'A summary note appears after OK — no more clicks needed.';
-  if(!confirm(msg))return;
+  // v6.37.0: which Sim Profile this flight flies (the "flies next" dot) — said once, here
+  let gfx=null; try{ gfx=await window.api.profilesPreflight({dry:true}); }catch(_){}
+  const gfxOn=!!(gfx&&gfx.ok&&!gfx.skipped);
+  const steps=[];
+  if(gfxOn) steps.push('Put that profile in your sim (backed up and verified first)');
+  steps.push('Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete)');
+  if(closeApps.length) steps.push('Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)');
+  if(comps.length) steps.push('Launch your '+comps.length+' companion app'+(comps.length>1?'s':''));
+  steps.push('Launch MSFS and start the performance capture');
+  const msg=warn+'Launch a clean flight?\n\n'
+    +(gfxOn?('Graphics: '+gfx.line+'\n\n'):'')
+    +'This will, in order:\n'+steps.map((s,i)=>(i+1)+'. '+s).join('\n')+'\n\n'
+    +'Make sure you’ve already generated your SimBrief plan and MSFS isn’t already running.';
+  const btns=[{label:'Launch',value:'go',primary:true}];
+  if(gfxOn&&gfx.target!=='baseline') btns.push({label:'Fly 🔒 Baseline instead',value:'baseline'});
+  btns.push({label:'Cancel',value:null});
+  const choice=await abrpChoice(msg,btns);
+  if(!choice)return;
+  let gfxRes=null;
+  if(gfxOn){
+    try{ gfxRes=await window.api.profilesPreflight(choice==='baseline'?{to:'baseline'}:{}); }catch(e){ gfxRes={ok:false,line:'Graphics: '+((e&&e.message)||'error')}; }
+    if(!(gfxRes&&gfxRes.ok)&&!confirm(((gfxRes&&gfxRes.line)||'Graphics could not be applied.')+'\n\nLaunch anyway with your sim settings as they are?'))return;
+  }
   if(protectRoutePair(dep,arr)&&S.freshOnly)renderRoutes();   // you're flying it → keep it visible in Plan a Flight this session
   // 1) Auto-TLOD — must finish BEFORE MSFS launches (it writes UserCfg.opt; engine backs it up).
   let prep; try{ prep=await window.api.perfPrepNext(); }catch(e){ prep={ok:false,error:(e&&e.message)||'error'}; }
@@ -6060,11 +6119,34 @@ async function launchAndCapture(dep,arr,acType){
     : (prep&&prep.reason==='coverage-complete') ? ('&#10003; Benchmark complete — flying your own settings (Settings A/B is watching)')
     : ('&bull; TLOD left unchanged');
   // Non-blocking summary (was a third alert to dismiss) — MSFS launch no longer waits on a click.
-  flightToast('<b>Clean flight launching 🚀</b><br>'+setLine
+  flightToast('<b>Clean flight launching 🚀</b>'
+    +(gfxRes?('<br>'+(gfxRes.ok?'&#10003; ':'&bull; ')+esc(gfxRes.line||'')+(choice==='baseline'?'<br>&bull; Next flights fly Baseline until you pick another dot on Sim Profiles':'')):'')
+    +'<br>'+setLine
     +(closeApps.length?('<br>&bull; '+closeApps.length+' app'+(closeApps.length>1?'s':'')+' closed — reopen after the sim'):'')
     +(comps.length?('<br>&bull; '+comps.length+' companion app'+(comps.length>1?'s':'')+' launched'):'')
     +'<br>&bull; MSFS starting; capture '+((cap&&cap.ok)?'<span style="color:var(--grn)">armed</span> — records on your takeoff roll, files when you close the sim':'<span style="color:#e23">could NOT arm — check the log</span>'),
     14000);
+}
+// v6.37.0: a small dialog with more than OK/Cancel (Launch · Fly Baseline instead · Cancel). Resolves to
+// the clicked button's value, or null on Cancel / Escape. Plain text only (textContent).
+function abrpChoice(text,buttons){
+  return new Promise(res=>{
+    const ov=document.createElement('div'); ov.id='abrp-choice';
+    ov.style.cssText='position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center';
+    const box=document.createElement('div');
+    box.style.cssText='background:var(--bg1);border:1px solid var(--sep);border-radius:12px;padding:18px 20px;max-width:580px;width:calc(100% - 32px);max-height:85vh;overflow:auto;color:var(--ink1);font-size:13px;line-height:1.6;box-shadow:0 16px 50px rgba(0,0,0,.5)';
+    const p=document.createElement('div'); p.style.whiteSpace='pre-wrap'; p.textContent=text; box.appendChild(p);
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap';
+    const done=v=>{ ov.remove(); document.removeEventListener('keydown',kd); res(v); };
+    const kd=e=>{ if(e.key==='Escape')done(null); };
+    for(const b of buttons){
+      const el=document.createElement('button'); el.className='btn bsm'+(b.primary?'':' bg'); el.textContent=b.label;
+      if(b.primary) el.style.cssText='background:var(--acc);color:#000;border-color:var(--acc);font-weight:600';
+      el.onclick=()=>done(b.value); row.appendChild(el);
+    }
+    box.appendChild(row); ov.appendChild(box); document.body.appendChild(ov); document.addEventListener('keydown',kd);
+    const first=row.querySelector('button'); if(first)first.focus();
+  });
 }
 // Bottom-center multi-line toast for flight-launch summaries (info that used to be blocking alerts).
 let _ftTimer=null;
@@ -9543,5 +9625,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.36.0</div>
+  pointer-events:none;">v6.37.0</div>
 </body></html>

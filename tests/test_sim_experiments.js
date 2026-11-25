@@ -127,12 +127,14 @@ try {
   const id = c.experiment.id;
   T('   experiment = base + ONLY the change', P.diff(start, c.experiment.values).length === 1 && P.diff(start, c.experiment.values)[0].id === 'Graphics/VolumetricLights/Quality');
   T('   experiments stay out of "My profiles" and out of ABRP Suggested\'s sources', !store.list().profiles.some(p => p.id === id) && store.list().experiments.some(e => e.id === id));
-  simUp = true; T('   apply refused while MSFS runs', !store.apply({ id }).ok); simUp = false;
+  // v6.37.0: starting with MSFS running is allowed — it waits for the next Launch + Capture
+  simUp = true; const pend = store.apply({ id });
+  T('   start while MSFS runs: the test starts but waits, sim file untouched', pend.ok && pend.pending && fs.readFileSync(ucfg, 'utf8') === before && store.list().flyNext === 'experimental', pend.msg); simUp = false;
   const ap = store.apply({ id });
   const afterApply = fs.readFileSync(ucfg, 'utf8');
   const lineDiff = before.split('\n').filter((l, i) => l !== afterApply.split('\n')[i]);
   T('   apply: exactly ONE line of the sim file changes (Light shafts → 3)', ap.ok && lineDiff.length === 1 && /\tQuality 2/.test(lineDiff[0]) && P.readProfileable(afterApply)['Graphics/VolumetricLights/Quality'] === 3, lineDiff.join('|'));
-  T('   …and the experiment is now ACTIVE, with a "fly 3 flights" message', store.load().profiles.find(p => p.id === id).status === 'active' && /fly 3 flights/.test(ap.msg));
+  T('   …and the experiment is ACTIVE, with a "Fly 3 flights" message', store.load().profiles.find(p => p.id === id).status === 'active' && /Fly 3 flights/.test(ap.msg), ap.msg);
   const expVals = P.readProfileable(afterApply);
   logFlight(expVals, { felt: 7, gpu: 12 });
   let l = store.list(), e = l.experiments.find(x => x.id === id);
@@ -140,57 +142,53 @@ try {
   logFlight(expVals, { felt: 8, gpu: 12.4 }); logFlight(expVals, { felt: 8, gpu: 12.1 });
   l = store.list(); e = l.experiments.find(x => x.id === id);
   T('   after 3 flights: verdict FREE UPGRADE (GPU took the work)', e.result.verdict === 'free' && e.result.done, e.result.verdict);
-  T('   …and a "Keep it or revert?" reminder appears', l.nudges.length === 1 && l.nudges[0].kind === 'finished' && /Keep it or revert/.test(l.nudges[0].text));
+  T('   …and a finished-test reminder appears (menu badge)', l.nudges.length === 1 && l.nudges[0].kind === 'finished' && /has its 3 flights/.test(l.nudges[0].text), l.nudges);
   T('   proposals no longer offer Light shafts (it\'s under test)', !(l.proposals.proposals || []).some(p => /VolumetricLights/.test(p.changes[0].id)));
+  T('   the page\'s status line asks to decide', l.status.kind === 'decide');
+  // v6.37.0: Keep = add the change to ABRP Suggested (the Baseline never changes)
+  const baseBefore = JSON.stringify(store.load().baseline);
   const keep = store.experimentFinish({ id, action: 'keep' });
-  const baseNow = store.load().profiles.find(p => p.id === saved.profile.id);
-  T('   KEEP folds the change into "My base" and notes it', keep.ok && baseNow.values['Graphics/VolumetricLights/Quality'] === 3 && /kept experiment "Shafts test"/.test(baseNow.note));
-  T('   …experiment marked kept with its verdict; reminder gone', store.load().profiles.find(p => p.id === id).status === 'kept' && store.list().nudges.length === 0);
-  // second experiment → revert
-  const c2 = store.experimentCreate({ text: 'ABRP-PROFILE v1\nname: Reflections test\nbase: My base\nset: Raymarched reflections = Ultra' });
+  l = store.list();
+  T('   KEEP adds the change to ABRP Suggested, and it flies next', keep.ok && l.three.suggested.values['Graphics/VolumetricLights/Quality'] === 3 && l.three.suggested.adds.some(a => a.id === 'Graphics/VolumetricLights/Quality') && l.flyNext === 'suggested', keep.msg);
+  T('   …the Baseline is untouched', JSON.stringify(store.load().baseline) === baseBefore);
+  T('   …experiment marked kept with its verdict; reminder gone', store.load().profiles.find(p => p.id === id).status === 'kept' && l.nudges.length === 0);
+  // second experiment → drop
+  const c2 = store.experimentCreate({ text: 'ABRP-PROFILE v1\nname: Reflections test\nset: Raymarched reflections = Ultra' });
   store.apply({ id: c2.experiment.id });
   const rv = store.experimentFinish({ id: c2.experiment.id, action: 'revert' });
-  T('   REVERT applies the base again (reflections back to High) and offers Undo', rv.ok && P.readProfileable(fs.readFileSync(ucfg, 'utf8'))['Graphics/SSR/Quality'] === 2 && store.load().profiles.find(p => p.id === c2.experiment.id).status === 'reverted');
-  // drift reminder
-  const c3 = store.experimentCreate({ text: 'ABRP-PROFILE v1\nbase: My base\nset: Contact shadows = Ultra' });
+  T('   REVERT/DROP puts ABRP Suggested back (reflections back to High)', rv.ok && P.readProfileable(fs.readFileSync(ucfg, 'utf8'))['Graphics/SSR/Quality'] === 2 && store.load().profiles.find(p => p.id === c2.experiment.id).status === 'dropped');
+  // flying something else mid-test is normal now: no "Still testing?" nag
+  const c3 = store.experimentCreate({ text: 'ABRP-PROFILE v1\nset: Contact shadows = Ultra' });
   store.apply({ id: c3.experiment.id });
-  const baseVals = store.load().profiles.find(p => p.id === saved.profile.id).values;
+  const baseVals = store.list().three.suggested.values;
   logFlight(baseVals, {}); logFlight(baseVals, {});
-  T('   flew 2 flights OFF an active experiment → "Still testing?" reminder', store.list().nudges.some(n => n.kind === 'drift' && /Still testing/.test(n.text)));
-  T('   END closes it without touching the sim file', (() => { const b = fs.readFileSync(ucfg, 'utf8'); const r = store.experimentFinish({ id: c3.experiment.id, action: 'end' }); return r.ok && fs.readFileSync(ucfg, 'utf8') === b; })());
+  T('   flew 2 flights on ABRP Suggested mid-test → no nag (they just don\'t count)', !store.list().nudges.length && store.list().experiments.find(e => e.id === c3.experiment.id).result.n === 0);
+  T('   END drops it and ABRP Suggested flies next', (() => { const r = store.experimentFinish({ id: c3.experiment.id, action: 'end' }); return r.ok && store.list().flyNext === 'suggested' && store.load().profiles.find(p => p.id === c3.experiment.id).status === 'dropped'; })());
   // import a full profile from text
   const exportT = store.exportText({ id: saved.profile.id });
+  const mine = store.load().profiles.find(p => p.id === saved.profile.id).values;
   const imp = store.experimentCreate({ text: exportT.text.replace('name: My base', 'name: Imported copy') });
-  T('   "Copy as text" → paste back recreates the profile exactly', imp.ok && imp.kind === 'profile' && P.diff(baseVals, imp.profile.values).length === 0);
+  T('   "Copy as text" → paste back recreates the profile exactly', imp.ok && imp.kind === 'profile' && P.diff(mine, imp.profile.values).length === 0);
   // proposals → one click
   const l2 = store.list();
   const pid = (l2.proposals.proposals || [])[0];
   const fromProp = pid && store.experimentCreate({ proposalId: pid.id });
-  T('   "Start experiment" on a proposal creates it in one click', !!fromProp && fromProp.ok && fromProp.experiment.changes.length === 1);
+  T('   "Start test" on a proposal creates it in one click', !!fromProp && fromProp.ok && fromProp.experiment.changes.length === 1);
 } catch (e) { T('store lifecycle threw: ' + e.stack, false); }
 
-// ── 6. SURFACE: the page Dean sees ──
+// ── 6. SURFACE: the page Dean sees (v6.37.0 layout, real renderer) ──
 {
   const listed = store.list();
-  const names = ['_spK', '_spEq', '_spDisp', '_spDir', '_spDirTag', '_spMatches', '_spDiff', '_spChips', '_spTrack', 'profilesRange', '_spSection', '_spRender', '_spSuggestedCard', '_spCard', '_spSettingsTable', '_spExperimentsSection', '_spExpCard', '_spPastePanel', '_spDots', '_spTestBanner', '_spEndAskCard', '_spStartCard', '_spClipCard', '_spDupOf', '_spExpActions'];
-  const els = {};
-  const src = 'let _SP=null, _spOpen={}, _spDiffOnly=true, _spConfirm=null, _spMsg=null, _spRenaming=null, _spShowSafety=false, _spShowRuns=false;\n'
-    + 'let _spPaste={open:false,text:"",preview:null}, _spShowFinished=false;\n'
-    + 'let _spClip=null, _spStart=null, _spEndAsk=null, _spMoreOpen=null;\n' + X.html.match(/const _SP_BAN=[^\n]*/)[0] + '\n'   // v6.33.0 test-flow pieces
-    + 'const document={getElementById:id=>(els[id]=els[id]||{innerHTML:"",focus(){},select(){}}),querySelector:()=>null};\n'
-    + X.html.match(/const _LABV=\{[\s\S]*?\n\};/)[0] + '\n' + X.html.match(/const _SP_EXP_STATUS=[^\n]*/)[0] + '\n'
-    + X.grab('esc') + '\n' + names.map(n => X.grab(n)).join('\n')
-    + '\nreturn { set:(o)=>{ for(const k in o){ eval(k+"=o[k]"); } }, render:()=>{ _SP._keys={}; for(const k of _SP.schema.keys)_SP._keys[k.id]=k; _spRender(); return els["prof-body"].innerHTML; } };';
-  const R = new Function('els', src)(els);
+  const R = require('./lib/sp_render.js').makeRenderer();
   const h0 = (R.set({ _SP: listed }), R.render());
-  T('6. SURFACE: a 🧪 Experiments section with "＋ New experiment"', h0.includes('🧪 Experiments') && h0.includes('＋ New experiment'));
+  T('6. SURFACE: a 🧪 Next test section with a way to paste one in', h0.includes('🧪 Next test') && h0.includes('Paste one instead'));
   // by the end of the lifecycle run every proposal has been used up; show the list with Dean's real headroom
   const realPr = P.proposeExperiments(loadFlights(path.join(X.APP_DATA, 'Sessions')), start, { baseName: 'ABRP Suggested' });
-  const hp = (R.set({ _SP: Object.assign({}, listed, { proposals: realPr }) }), R.render()); R.set({ _SP: listed });
-  T('   with Dean\'s real GPU headroom, "Suggested experiments" lists Light shafts Ultra + Start test', /Suggested experiments|Next ideas/.test(hp) && /Light shafts Ultra/.test(hp) && (hp.includes('>Start test<') || hp.includes('Available after this test')));
-  T('   the new draft shows SAVED FOR LATER on its base (v6.33.0 wording)', /SAVED FOR LATER/.test(h0));
-  const h1 = (R.set({ _spShowFinished: true }), R.render());
-  T('   finished experiments listed with KEPT / REVERTED / ENDED + verdict word', /KEPT/.test(h1) && /REVERTED/.test(h1) && /ENDED/.test(h1) && /FREE UPGRADE/.test(h1));
+  const hp = (R.set({ _SP: Object.assign({}, listed, { proposals: realPr, test: null }) }), R.render()); R.set({ _SP: listed });
+  T('   with Dean\'s real GPU headroom, the next idea is Light shafts Ultra + Start test', /Light shafts Ultra/.test(hp) && hp.includes('>Start test<'));
+  T('   the proposal-created draft waits as UP NEXT (it\'s in the queue)', listed.queue.length >= 1 && /Up next:/.test(h0));
+  const h1 = (R.set({ _spShowMore: true }), R.render());
+  T('   finished tests listed under More with ADDED / DROPPED + verdict word', /ADDED TO ABRP SUGGESTED/.test(h1) && /DROPPED/.test(h1) && /FREE UPGRADE/.test(h1));
   const kept = listed.experiments.find(e => e.status === 'kept');
   const h2 = (R.set({ _spOpen: { [kept.id]: true } }), R.render());
   T('   an opened experiment shows its measured rows and the plain verdict', /Felt stutters \(vs your usual\)/.test(h2) && /GPU busy per frame/.test(h2) && /Free upgrade/.test(h2));

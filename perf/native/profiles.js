@@ -250,7 +250,45 @@ function trackRecord(values, flights) {
   if (!fl.length) return null;
   const hrs = fl.reduce((a, f) => a + (f.dur || 0), 0) / 3600;
   return { n: fl.length, p99: _med(fl.map(f => f.p99)), feltHr: hrs > 0 ? Math.round(fl.reduce((a, f) => a + (f.felt || 0), 0) / hrs * 10) / 10 : null,
-    vram: _med(fl.map(f => f.vram)), vramTotal: _med(fl.map(f => f.vramTotal)) || null, last: fl[fl.length - 1].timestamp };
+    vram: _med(fl.map(f => f.vram)), vramTotal: _med(fl.map(f => f.vramTotal)) || null, last: fl[fl.length - 1].timestamp,
+    afps: _topOf(fl.map(f => f.afps)) };
+}
+// most common value (the AutoFPS band most of a profile's flights were flown with)
+function _topOf(a) { const c = _counts(a.filter(x => x != null && x !== '')); const e = Object.entries(c).sort((x, y) => y[1] - x[1])[0]; return e ? e[0] : null; }
+
+// v6.37.0 — the Baseline never changes, so its flights compare directly across sim versions: Baseline
+// flights on the newest sim vs Baseline flights on older ones, per-aircraft normalised like test
+// verdicts, judged against ±1σ of the older flights.
+function baselineCheck(values, flights) {
+  const all = (flights || []).filter(f => !f.excluded);
+  const latest = (all[all.length - 1] || {}).sim || null;
+  const on = all.filter(f => { const v = fromSnapshot(f.settings); return v && _sameSetup(values, v) && _sameSetup(v, values); });
+  const norms = _aircraftNorms(all);
+  const m = f => _flightMetrics(f, norms[f.aircraft || '?']);
+  const after = on.filter(f => latest && f.sim === latest), before = on.filter(f => !latest || f.sim !== latest);
+  const out = { sim: latest, nAfter: after.length, nBefore: before.length, verdict: 'collecting', line: '' };
+  const short = s => String(s || '').split('.').slice(0, 3).join('.');
+  if (!after.length) { out.line = before.length ? 'Not flown on sim ' + short(latest) + ' yet. Fly it once after an update to check the update itself.' : 'Not flown on these exact settings yet.'; return out; }
+  if (before.length < 2) { out.line = 'Flown ' + after.length + '× on sim ' + short(latest) + '. Needs 2 flights on an older sim version to compare against.'; return out; }
+  const rows = {};
+  for (const k of ['felt', 'p99', 'vram']) {
+    const a = after.map(m).map(x => x[k]).filter(v => v != null), b = before.map(m).map(x => x[k]).filter(v => v != null);
+    if (!a.length || !b.length) continue;
+    const am = _mean(a), bm = _mean(b), sd = _sd(b);
+    rows[k] = { after: am, before: bm, delta: am - bm, beyond: sd > 0 && Math.abs(am - bm) > sd };
+  }
+  const worse = !!((rows.felt && rows.felt.beyond && rows.felt.delta > 0) || (rows.p99 && rows.p99.beyond && rows.p99.delta > 0));
+  const better = !worse && !!((rows.felt && rows.felt.beyond && rows.felt.delta < 0) || (rows.p99 && rows.p99.beyond && rows.p99.delta < 0));
+  out.verdict = worse ? 'worse' : better ? 'better' : 'same';
+  out.rows = rows;
+  const bits = [];
+  if (rows.felt && rows.felt.before > 0) bits.push('felt stutters ×' + (rows.felt.after / rows.felt.before).toFixed(1));
+  if (rows.p99) bits.push('P99 ' + (rows.p99.delta >= 0 ? '+' : '') + rows.p99.delta.toFixed(1) + ' ms');
+  if (rows.vram) bits.push('video memory ' + Math.round(rows.vram.after * 100) + '% (was ' + Math.round(rows.vram.before * 100) + '%)');
+  out.line = 'Since sim ' + short(latest) + ' (' + after.length + ' flight' + (after.length === 1 ? '' : 's') + '): ' + bits.join(', ') + '. '
+    + (worse ? 'Rougher than before, beyond normal variation: the update is the likely cause, not your settings.'
+      : better ? 'Smoother than before.' : 'Within your normal flight-to-flight variation.');
+  return out;
 }
 
 // ── ⭐ ABRP Suggested ─────────────────────────────────────────────────────────────────────────
@@ -541,6 +579,8 @@ function experimentVerdict(exp, flights) {
   const et = set(ef, f => f.traffic), bt = set(bf, f => f.traffic);
   if (et.length && bt.length && et.join() !== bt.join()) notes.push('Online traffic differs: base ' + bt.join('/') + ', experiment ' + et.join('/') + '.');
   return { verdict, sentence, rows, n: ef.length, baseN: bf.length, budget, done: ef.length >= budget, notes,
+    vramOnly: verdict === 'costs' && !worse && vramOver,                 // smooth, but past AutoFPS's hold line
+    passed: verdict === 'free' || verdict === 'saves' || verdict === 'noeffect',
     lastExpFlight: ef.length ? ef[ef.length - 1].timestamp : null };
 }
 
@@ -604,6 +644,6 @@ function fmtRange(a, b) {
   return a && b && String(a).slice(0, 10) !== String(b).slice(0, 10) ? f(a) + ' – ' + f(b) : f(a || b);
 }
 
-module.exports = { readProfileable, applyToText, verify, diff, matches, profileName, fromSnapshot, historyRuns, trackRecord, suggest, fmtRange,
+module.exports = { readProfileable, applyToText, verify, diff, matches, profileName, fromSnapshot, historyRuns, trackRecord, suggest, fmtRange, baselineCheck,
   parseChangeText, toChangeText, experimentVerdict, experimentResultsText, proposeExperiments, HEADER, EXP_METRICS,
   _equal, MIN_BASE, MIN_CANDIDATE, VRAM_CAP };
