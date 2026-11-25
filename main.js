@@ -2421,6 +2421,18 @@ ipcMain.handle('perf-stop-capture', () => {
 // that renders the Performance tracker, so the set value can't diverge from the tracker. The engine
 // backs up UserCfg.opt itself. Waits for exit, parses stdout, returns {set, aircraft, tlod} so ABRP can
 // surface "Set TLOD X for <aircraft>". 30s timeout guard so a stuck prep can never block the launch.
+// v6.37.1: is the benchmark grid full? Same coverage model as auto-TLOD below, so the Launch + Capture
+// dialog can leave out the "set the next benchmark TLOD" step once there's nothing left to set.
+ipcMain.handle('perf-bench-complete', () => {
+  try {
+    const { computeCoverage } = require(path.join(perfDir(), 'native', 'coverage.js'));
+    let sessions = [];
+    try { sessions = (JSON.parse(fs.readFileSync(path.join(USER_DATA, 'Sessions', 'index.json'), 'utf8')).sessions) || []; } catch(_){}
+    const cov = computeCoverage(sessions, benchCfg());
+    const open = [...new Set(cov.gaps.map(g => g.aircraft))];    // aircraft whose grid still has cells
+    return { ok:true, complete: cov.total_remaining === 0, remaining: cov.total_remaining, open };
+  } catch (e) { return { ok:false, complete:false }; }
+});
 ipcMain.handle('perf-prep-next', () => new Promise((resolve) => {
   try {
     if (nativePerfEnabled()) {

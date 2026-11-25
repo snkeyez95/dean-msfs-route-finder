@@ -22,6 +22,16 @@ function fresh(simUp) {
   fs.copyFileSync(UCFG, path.join(dir, 'UserCfg.opt'));
   const flag = { up: !!simUp };
   const st = createStore({ userData: dir, usercfgPath: path.join(dir, 'UserCfg.opt'), sessionsDir: path.join(UD, 'Sessions'), isSimRunning: () => flag.up, log: () => {} });
+  // every scenario starts with NO test running and the dot on ABRP Suggested (Dean's live file may be
+  // mid-test), with the sim on ABRP Suggested — the "first open" state these checks describe
+  const j = JSON.parse(fs.readFileSync(path.join(dir, 'sim_profiles.json'), 'utf8'));
+  j.profiles.forEach(p => { if (p.source === 'experiment' && (p.status === 'active' || p.status === 'draft')) p.status = 'ended'; });
+  if (j.baseline) {
+    j.flyNext = 'suggested'; j.notice = null; j.inboxNotice = null;
+    const sv = Object.assign({}, j.baseline.values); for (const a of (j.suggested && j.suggested.adds) || []) sv[a.id] = a.to;
+    fs.writeFileSync(path.join(dir, 'UserCfg.opt'), P.applyToText(fs.readFileSync(path.join(dir, 'UserCfg.opt'), 'utf8'), sv).text);
+  }
+  fs.writeFileSync(path.join(dir, 'sim_profiles.json'), JSON.stringify(j));
   return { dir, st, flag, ucfg: path.join(dir, 'UserCfg.opt'), file: path.join(dir, 'sim_profiles.json') };
 }
 const sim = c => P.readProfileable(fs.readFileSync(c.ucfg, 'utf8'));
@@ -46,7 +56,7 @@ try {
     T('ABRP Suggested = your sim today, so the dot starts there', L.flyNext === 'suggested' && L.inSim === 'suggested', L.flyNext + '/' + L.inSim);
     T('first status line: "Next flight flies ABRP Suggested. It’s already in your sim."', L.status.kind === 'ok' && L.status.target === 'suggested');
   } else console.log('  (your live file is already set up — set-up checks skipped)');
-  T('nothing was written to the sim file just by opening the page', sha(c.ucfg) === sha(UCFG));
+  { const before = sha(c.ucfg); c.st.list(); T('nothing is written to the sim file just by opening the page', sha(c.ucfg) === before); }
   const baseFrozen = JSON.stringify(st0.baseline);
 
   console.log('2. the dot');
@@ -160,6 +170,13 @@ try {
   const hd = text(page(L, { _spTriOpen: 'suggested' }));
   T('Details on ABRP Suggested lists each added change with its test result and a Remove button', /What it adds to Baseline/.test(hd) && /Light shafts quality 2 · High → 3 · Ultra/.test(hd) && /FREE UPGRADE|NO EFFECT/.test(hd) && /Remove/.test(hd));
   T('colour-blind safe: the selected card says FLIES NEXT in words, not only an orange border', /FLIES NEXT/.test(t));
+  // v6.37.1 fixes
+  T('v6.37.1: cards show the AutoFPS band the flights were flown with (e.g. "AutoFPS TLOD 50–200")', /AutoFPS TLOD \d+–\d+/.test(text(card('suggested'))), text(card('suggested')).match(/AutoFPS[^·]*/));
+  const pr = (L.proposals && L.proposals.proposals || [])[0];
+  if (pr) {
+    const hs = page(L, { _spStart: { kind: 'proposal', pid: pr.id, text: pr.text, preview: c.st.experimentPreview({ text: pr.text }) } });
+    T('v6.37.1: while the Start test confirmation is open, only ONE Start test button is on screen', (hs.match(/>Start test</g) || []).length === 1 && /↑ Confirm above/.test(hs), (hs.match(/>Start test</g) || []).length);
+  }
   // the other states, same renderer
   c.st.flyNext({ to: 'baseline' }); c.flag.up = true; c.st.flyNext({ to: 'suggested' });
   t = text(page(c.st.list()));
@@ -190,6 +207,16 @@ console.log('10. Launch + Capture wiring');
   T('the dialog offers Launch · Fly 🔒 Baseline instead · Cancel', /label:'Launch'/.test(lc) && /Fly 🔒 Baseline instead/.test(lc) && /abrpChoice\(msg,btns\)/.test(lc));
   T('the profile goes in BEFORE auto-TLOD and before MSFS starts', lc.indexOf('profilesPreflight(choice') < lc.indexOf('perfPrepNext') && lc.indexOf('perfPrepNext') < lc.indexOf('launchMsfs'));
   T('the summary toast says what was applied', /gfxRes\.line/.test(lc));
+  T('v6.37.1: the benchmark TLOD step only shows for aircraft whose benchmark has cells left', /perfBenchComplete\(\)/.test(lc) && /else if\(benchOpen\.length\) steps\.push\('Set a benchmark TLOD only if your SimBrief aircraft is the '\+benchOpen\.join/.test(lc));
+  T('v6.37.1: step 1 says "already set, nothing to change" when the profile is already in the sim', /gfx\.changes\?'Put that profile in your sim[^']*':'Keep that profile in your sim \(already set, nothing to change\)'/.test(lc));
+  const { computeCoverage } = require('../perf/native/coverage.js');
+  const mainSrc = fs.readFileSync(path.join(X.ROOT, 'main.js'), 'utf8');
+  T('v6.37.1: perf-bench-complete uses the same coverage model as auto-TLOD and names the open aircraft', /ipcMain\.handle\('perf-bench-complete'[\s\S]{0,500}computeCoverage\(sessions, benchCfg\(\)\)[\s\S]{0,300}open/.test(mainSrc));
+  let sess = []; try { sess = JSON.parse(fs.readFileSync(path.join(UD, 'Sessions', 'index.json'), 'utf8')).sessions; } catch (_) {}
+  let bench = null; try { bench = JSON.parse(fs.readFileSync(path.join(UD, 'config.json'), 'utf8')).benchmark; } catch (_) {}
+  const cov = computeCoverage(sess, bench && bench.aircraft ? bench : undefined);
+  const open = [...new Set(cov.gaps.map(g => g.aircraft))];
+  T('v6.37.1: on your real flights Fenix + PMDG 737 are complete, so the step only names what is open (' + (open.join(', ') || 'nothing') + ')', !open.includes('Fenix') && !open.includes('PMDG'), open);
 }
 
 for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });

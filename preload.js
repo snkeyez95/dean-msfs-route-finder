@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('api', {
   perfStartCapture:   (o)   => ipcRenderer.invoke('perf-start-capture', o),
   perfStopCapture:    ()    => ipcRenderer.invoke('perf-stop-capture'),
   perfPrepNext:       ()    => ipcRenderer.invoke('perf-prep-next'),
+  perfBenchComplete:  ()    => ipcRenderer.invoke('perf-bench-complete'),
   perfCaptureStatus:  ()    => ipcRenderer.invoke('perf-capture-status'),
   perfCompareData:    ()    => ipcRenderer.invoke('perf-compare-data'),
   perfExportCapframex:(a)   => ipcRenderer.invoke('perf-export-capframex', a||{}),

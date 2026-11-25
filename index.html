@@ -346,7 +346,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 </style></head><body>
 <div id="gsx-toast"></div>
 <div class="tbar">
-  <div class="tname">A Better Route Planner &mdash; v6.37.0</div>
+  <div class="tname">A Better Route Planner &mdash; v6.37.1</div>
   <button class="launch-btn" onclick="launchMSFS()" title="Launch MSFS 2024 via Steam (no storefront)">&#9654; Launch MSFS</button>
   <div id="cap-badge" onclick="sw('perf')" title="A performance capture is active — it runs independently of ABRP and files automatically when you close the sim." style="display:none;align-items:center;gap:7px;margin-left:10px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb, var(--acc) 16%, transparent);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer">
     <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:cappulse 1.4s ease-in-out infinite"></span>
@@ -395,7 +395,7 @@ html[data-theme="light"] #perf-compare select{color-scheme:light}
 <div class="sidebar">
   <div class="sb-brand">
     <div class="sb-brand-name">A Better&nbsp;<span class="acc">Route Planner</span></div>
-    <div class="sb-ver">v6.37.0</div>
+    <div class="sb-ver">v6.37.1</div>
   </div>
   <div class="sb-nav">
     <div class="sb-item active" data-tab="dashboard" onclick="sw('dashboard')"><span class="sb-ic">&#9726;</span> Dashboard</div>
@@ -1780,7 +1780,8 @@ function _spMetrics(t){
   const row=(k,v,s)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;padding:2px 0"><span style="color:var(--ink2)">'+k+'</span><span style="font-family:\'JetBrains Mono\',monospace;color:var(--ink0);font-weight:600">'+v+(s?' <span style="font-weight:400;color:var(--ink3);font-size:11px">'+s+'</span>':'')+'</span></div>';
   return '<div class="sp-metrics">'+row('Felt stutters',t.feltHr!=null?t.feltHr+'/hr':'—')+row('P99 frametime',t.p99!=null?Number(t.p99).toFixed(1)+' ms':'—')
     +row('Peak video memory',vp!=null?vp+'%':'—',vp!=null?(vp>=cap?'⚠ past '+cap+'%':'of '+cap+'% line'):'')
-    +'<div style="font-size:11px;color:var(--ink3);margin-top:3px">Typical of '+t.n+' flight'+(t.n===1?'':'s')+' on exactly these settings</div></div>';
+    +'<div style="font-size:11px;color:var(--ink3);margin-top:3px">Typical of '+t.n+' flight'+(t.n===1?'':'s')+' on exactly these settings'
+    +(t.afps?(' · '+(t.afps==='off'?'AutoFPS off':t.afps==='on'?'AutoFPS on':'AutoFPS TLOD '+esc(t.afps))):'')+'</div></div>';   // v6.37.1
 }
 function _spTri(who){
   const T=_SP.three[who], sel=_SP.flyNext===who, here=_SP.inSim===who, can=!!(T&&T.values), M=_SPT[who];
@@ -1845,7 +1846,8 @@ function _spIdeas(){
       h+='<div class="sp-prop" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;'+(i?'border-top:1px solid var(--sep);':'')+'font-size:12.5px">'
         +'<span style="flex:1;min-width:240px;color:var(--ink1)"><b>'+esc(p.name)+'</b> <span style="color:var(--ink3);font-family:\'JetBrains Mono\',monospace;font-size:11.5px">'+esc(_spDisp(k,c.from))+' → '+esc(_spDisp(k,c.to))+'</span> '+_spDirTag(_spDir(k,c.from,c.to))
         +'<br><span style="font-size:11.5px;color:var(--ink3)">'+esc(p.why||'')+'</span></span>'
-        +'<button '+(i?'class="btn bg bsm"':_spPri)+' onclick="spAskStart(\'proposal\',\''+p.id+'\')">Start test</button></div>'; });
+        +(_spStart?'<span class="sp-confirm-above" style="font-size:11.5px;color:var(--ink3)">↑ Confirm above</span>'   // v6.37.1: one Start test on screen at a time
+          :'<button '+(i?'class="btn bg bsm"':_spPri)+' onclick="spAskStart(\'proposal\',\''+p.id+'\')">Start test</button>')+'</div>'; });
     if(ideas.length>1) h+='<div style="font-size:12px;color:var(--blu);cursor:pointer;padding-top:4px" onclick="_spAllIdeas=!_spAllIdeas;_spRender()">'+(_spAllIdeas?'▾ Fewer ideas':'▸ '+(ideas.length-1)+' more idea'+(ideas.length>2?'s':''))+'</div>';
     h+='</div>';
   } else h+='<div style="font-size:12.5px;color:var(--ink3);margin-bottom:8px">'+esc(pr.reason||'No ideas right now.')+'</div>';
@@ -6069,9 +6071,14 @@ async function launchAndCapture(dep,arr,acType){
   // v6.37.0: which Sim Profile this flight flies (the "flies next" dot) — said once, here
   let gfx=null; try{ gfx=await window.api.profilesPreflight({dry:true}); }catch(_){}
   const gfxOn=!!(gfx&&gfx.ok&&!gfx.skipped);
+  // v6.37.1: the auto-TLOD step only shows while the benchmark still has cells to fill, and names
+  // the aircraft it would act on (auto-TLOD only touches TLOD when your SimBrief plane is one of them)
+  let bench=null; try{ bench=await window.api.perfBenchComplete(); }catch(_){}
+  const benchOpen=(bench&&bench.ok&&Array.isArray(bench.open))?bench.open:null;
   const steps=[];
-  if(gfxOn) steps.push('Put that profile in your sim (backed up and verified first)');
-  steps.push('Set the next benchmark TLOD for your SimBrief aircraft (skipped once your 24-flight benchmark is complete)');
+  if(gfxOn) steps.push(gfx.changes?'Put that profile in your sim (backed up and verified first)':'Keep that profile in your sim (already set, nothing to change)');
+  if(!benchOpen) steps.push('Set the next benchmark TLOD for your SimBrief aircraft');
+  else if(benchOpen.length) steps.push('Set a benchmark TLOD only if your SimBrief aircraft is the '+benchOpen.join(' or ')+' (its benchmark isn’t finished)');
   if(closeApps.length) steps.push('Close your '+closeApps.length+' checked background app'+(closeApps.length>1?'s':'')+' (reopened after the sim)');
   if(comps.length) steps.push('Launch your '+comps.length+' companion app'+(comps.length>1?'s':''));
   steps.push('Launch MSFS and start the performance capture');
@@ -9625,5 +9632,5 @@ async function downloadCommunityRoutes(){
 
 </script><div style="position:fixed;bottom:8px;right:12px;font-size:10px;color:var(--ink3);
   font-family:'JetBrains Mono',monospace;letter-spacing:.05em;z-index:9999;
-  pointer-events:none;">v6.37.0</div>
+  pointer-events:none;">v6.37.1</div>
 </body></html>

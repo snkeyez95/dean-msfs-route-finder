@@ -26,8 +26,11 @@
 > Live migration on a copy of Dean's data gives Baseline (Aug 27 – Oct 7) and Suggested = Baseline + Light shafts Ultra + Contact shadows Ultra, with the dot on Suggested.
 >
 > NOT BUILT:
-> - AutoFPS band on the cards. CORRECTED 2026-11-24: the config reader is RIGHT (IFR 50/200 matches every Nov flight's trace); the 250/400 belief came from a stale Sep memory. The band just isn't shown yet: small follow-up.
-> - Follow-ups Dean was offered: hide the second "Start test" while the confirm box is open; hide the Launch + Capture TLOD step once the benchmark is complete.
+> - ✅ v6.37.1 (2026-11-24) built all three follow-ups:
+>   - The AutoFPS band shows on the cards. The cfg reader was right all along (IFR 50/200).
+>   - The idea row shows "↑ Confirm above" while the Start test confirm is open.
+>   - Launch + Capture names only the aircraft whose benchmark is still open (perf-bench-complete IPC).
+> - FINDING: the PMDG 777 benchmark grid (12 cells) has never been filled. AutoFPS flights are excluded from coverage, and every 777 flight so far is AutoFPS. If Dean wants the 777 baselined, it needs non-AutoFPS flights; otherwise drop it from config.benchmark.
 
 ## Context
 Dean has asked more than once "am I where I should be?" on Sim Profiles. The page is confusing for an
