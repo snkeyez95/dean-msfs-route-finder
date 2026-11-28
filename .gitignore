@@ -34,3 +34,6 @@ perf/native/_preview.js
 perf/native/_cfx_ref_out/
 perf/native/_cfx_nat_out/
 _phase8_preview_flight.html
+
+# marketing drafts stay local (contain personal flight data)
+docs/marketing/
